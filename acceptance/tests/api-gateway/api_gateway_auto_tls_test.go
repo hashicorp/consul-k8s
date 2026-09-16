@@ -488,6 +488,7 @@ func writeCAPEMToContainer(t *testing.T, opts *terratestk8s.KubectlOptions, depl
 // Returns the first PEM block in the openssl output.
 func fetchGatewayCert(t *testing.T, opts *terratestk8s.KubectlOptions, host, port string) string {
 	t.Helper()
+	target := net.JoinHostPort(host, port)
 	var pemOut string
 	retryCheckWithWait(t, 30, 3*time.Second, func(r *retry.R) {
 		// Close stdin immediately so s_client does not wait for interactive
@@ -497,11 +498,11 @@ func fetchGatewayCert(t *testing.T, opts *terratestk8s.KubectlOptions, host, por
 		// used because certificate verification is not configured here.
 		cmd := fmt.Sprintf(
 			"tmp=$(mktemp); "+
-				"openssl s_client -connect %s:%s -showcerts </dev/null >$tmp 2>$tmp.err; "+
+				"openssl s_client -connect %s -showcerts </dev/null >$tmp 2>$tmp.err; "+
 				"openssl x509 -in $tmp -outform PEM 2>$tmp.x509; status=$?; "+
 				"if [ $status -ne 0 ]; then cat $tmp.err $tmp.x509 >&2; fi; "+
 				"rm -f $tmp $tmp.err $tmp.x509; exit $status",
-			host, port,
+			target,
 		)
 		out, err := k8s.RunKubectlAndGetOutputE(r, opts,
 			"exec", "deploy/"+StaticClientName, "-c", StaticClientName, "--",
