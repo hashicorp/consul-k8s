@@ -1187,6 +1187,19 @@ func (r *TerminatingGatewayController) deployTerminatingGatewayDeployment(
 		return fmt.Errorf("construct deployment from CRD: %w", err)
 	}
 
+	// Roll the workload when the non-secret credential ConfigMaps change (but not
+	// when the rendered credential files rotate, which live on a memory emptyDir).
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled {
+		checksum, err := r.credentialConfigChecksum(ctx, termGW.Namespace, ci)
+		if err != nil {
+			return fmt.Errorf("compute credential config checksum: %w", err)
+		}
+		if deployment.Spec.Template.Annotations == nil {
+			deployment.Spec.Template.Annotations = map[string]string{}
+		}
+		deployment.Spec.Template.Annotations[campCredentialConfigChecksumAnnotation] = checksum
+	}
+
 	// Ensure the referenced ServiceAccount exists before the Deployment is created/updated.
 	if saName := deployment.Spec.Template.Spec.ServiceAccountName; saName != "" {
 		desiredSA := &corev1.ServiceAccount{

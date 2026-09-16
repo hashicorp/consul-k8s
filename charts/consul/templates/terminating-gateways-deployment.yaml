@@ -81,6 +81,11 @@ spec:
         "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/gateway-kind": "terminating-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
+        {{- if and $ci $ci.enabled }}
+        # Rolls the workload when the non-secret credential ConfigMaps change.
+        # Rendered credential files (memory emptyDir) rotate without a pod restart.
+        "consul.hashicorp.com/credential-config-checksum": {{ cat (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.processorConfigMap))) (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.vaultAgentConfigMap))) (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.vaultCAConfigMap))) | sha256sum | quote }}
+        {{- end }}
         {{- if $root.Values.global.enableConsulNamespaces }}
         "consul.hashicorp.com/gateway-namespace": {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
         {{- end }}
