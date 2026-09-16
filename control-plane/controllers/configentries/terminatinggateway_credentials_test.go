@@ -81,6 +81,14 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 	require.Contains(t, proc.Lifecycle.PreStop.Exec.Command, "drain-wait")
 	require.Contains(t, proc.Lifecycle.PreStop.Exec.Command, "-duration=45s")
 
+	// Liveness is tolerant (higher failure threshold) than readiness.
+	require.Equal(t, int32(6), proc.LivenessProbe.FailureThreshold)
+	require.Equal(t, int32(3), proc.ReadinessProbe.FailureThreshold)
+
+	// Grace period exceeds drain (45) by the shutdown allowance (15).
+	require.NotNil(t, podSpec.TerminationGracePeriodSeconds)
+	require.Equal(t, int64(60), *podSpec.TerminationGracePeriodSeconds)
+
 	// Shared supplemental group for the socket.
 	require.Contains(t, podSpec.SecurityContext.SupplementalGroups, campCredentialUID)
 
