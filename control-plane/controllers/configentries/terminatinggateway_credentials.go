@@ -4,11 +4,17 @@
 package configentries
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"sort"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -314,4 +320,68 @@ func validateCredentialInjectionWorkload(
 	}
 
 	return nil
+}
+
+// campCredentialConfigChecksumAnnotation carries a hash of the non-secret
+// credential-injection ConfigMaps so that changing their content rolls the
+// terminating-gateway workload. It intentionally covers only the ConfigMaps:
+// the Vault Agent-rendered credential files live on a memory emptyDir and their
+// runtime rotation must never change the pod template (no pod restart).
+const campCredentialConfigChecksumAnnotation = "consul.hashicorp.com/credential-config-checksum"
+
+// campCredentialConfigChecksum returns a deterministic hash over the given
+// ConfigMap data maps (order-independent within each map).
+func campCredentialConfigChecksum(dataMaps ...map[string]string) string {
+	h := sha256.New()
+	for _, data := range dataMaps {
+		keys := make([]string, 0, len(data))
+		for k := range data {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			h.Write([]byte(k))
+			h.Write([]byte{0})
+			h.Write([]byte(data[k]))
+			h.Write([]byte{0})
+		}
+		h.Write([]byte{'\n'})
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// credentialConfigChecksum reads the referenced non-secret ConfigMaps and
+// returns a checksum of their content. A missing ConfigMap contributes empty
+// content so the workload rolls once it is created.
+func (r *TerminatingGatewayController) credentialConfigChecksum(
+	ctx context.Context,
+	namespace string,
+	ci *consulv1alpha1.TerminatingGatewayCredentialInjection,
+) (string, error) {
+	names := []string{ci.ProcessorConfigMap, ci.VaultAgentConfigMap}
+	if ci.VaultCAConfigMap != "" {
+		names = append(names, ci.VaultCAConfigMap)
+	}
+
+	dataMaps := make([]map[string]string, 0, len(names))
+	for _, name := range names {
+		cm := &corev1.ConfigMap{}
+		err := r.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, cm)
+		switch {
+		case apierrors.IsNotFound(err):
+			dataMaps = append(dataMaps, nil)
+		case err != nil:
+			return "", fmt.Errorf("get configmap %s/%s: %w", namespace, name, err)
+		default:
+			combined := make(map[string]string, len(cm.Data)+len(cm.BinaryData))
+			for k, v := range cm.Data {
+				combined[k] = v
+			}
+			for k, v := range cm.BinaryData {
+				combined[k] = string(v)
+			}
+			dataMaps = append(dataMaps, combined)
+		}
+	}
+	return campCredentialConfigChecksum(dataMaps...), nil
 }

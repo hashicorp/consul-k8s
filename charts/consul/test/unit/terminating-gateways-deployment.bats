@@ -1700,3 +1700,25 @@ key2: value2' \
       . | tee /dev/stderr | yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds')
   [ "$g" = "10" ]
 }
+
+#--------------------------------------------------------------------
+# credentialInjection config checksum (T8 Task 9)
+
+@test "terminatingGateways/Deployment: credentialInjection adds a config-checksum annotation" {
+  cd `chart_dir`
+  local ann=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s -r '.[0].spec.template.metadata.annotations["consul.hashicorp.com/credential-config-checksum"]' | tee /dev/stderr)
+  [ -n "$ann" ] && [ "$ann" != "null" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection disabled has no config-checksum annotation" {
+  cd `chart_dir`
+  local ann=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      . | tee /dev/stderr | yq -s -r '.[0].spec.template.metadata.annotations["consul.hashicorp.com/credential-config-checksum"]' | tee /dev/stderr)
+  [ "$ann" = "null" ]
+}
