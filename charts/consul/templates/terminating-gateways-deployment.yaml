@@ -135,7 +135,13 @@ spec:
         supplementalGroups:
         - 10001
       {{- end }}
+      {{- if and $ci $ci.enabled }}
+      # Grace period must exceed the processor's preStop drain plus a shutdown
+      # allowance so in-flight requests drain before the pod is killed.
+      terminationGracePeriodSeconds: {{ add (int (default 30 $ci.drainSeconds)) 15 }}
+      {{- else }}
       terminationGracePeriodSeconds: 10
+      {{- end }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
       - name: tmp

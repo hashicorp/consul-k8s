@@ -1673,3 +1673,30 @@ key2: value2' \
   [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.initContainers | map(.name) | contains(["camp-auth-socket-init"])')" = "false" ]
   [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway") | .volumeMounts | map(.name) | contains(["camp-auth-socket"])')" = "false" ]
 }
+
+#--------------------------------------------------------------------
+# credentialInjection readiness/grace (T8 Task 8)
+
+@test "terminatingGateways/Deployment: credentialInjection raises grace period above drain, tolerant liveness" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.drainSeconds=45 \
+      . | tee /dev/stderr)
+  # 45 (drain) + 15 (shutdown allowance)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds')" = "60" ]
+  local proc=$(echo "$out" | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")')
+  [ "$(echo "$proc" | yq -r '.livenessProbe.failureThreshold')" = "6" ]
+  [ "$(echo "$proc" | yq -r '.readinessProbe.failureThreshold')" = "3" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection disabled keeps default grace period" {
+  cd `chart_dir`
+  local g=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      . | tee /dev/stderr | yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds')
+  [ "$g" = "10" ]
+}

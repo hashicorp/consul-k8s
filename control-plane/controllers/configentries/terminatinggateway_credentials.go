@@ -36,9 +36,10 @@ const (
 	campProcessorConfigFile = "/consul/processor-config/config.json"
 	campVaultCAPath         = "/consul/vault-ca"
 
-	campCredentialUID    = int64(10001)
-	campDefaultAudience  = "vault"
-	campDefaultDrainSecs = int64(30)
+	campCredentialUID        = int64(10001)
+	campDefaultAudience      = "vault"
+	campDefaultDrainSecs     = int64(30)
+	campShutdownAllowanceSecs = int64(15)
 )
 
 // applyTerminatingGatewayCredentialInjection mutates podSpec in place to add the
@@ -84,6 +85,14 @@ func applyTerminatingGatewayCredentialInjection(
 		podSpec.SecurityContext = &corev1.PodSecurityContext{}
 	}
 	podSpec.SecurityContext.SupplementalGroups = append(podSpec.SecurityContext.SupplementalGroups, campCredentialUID)
+
+	// Grace period must exceed the processor's preStop drain plus a shutdown
+	// allowance so in-flight requests drain before the pod is killed.
+	drainSeconds := campDefaultDrainSecs
+	if ci.DrainSeconds != nil {
+		drainSeconds = *ci.DrainSeconds
+	}
+	podSpec.TerminationGracePeriodSeconds = ptr.To(drainSeconds + campShutdownAllowanceSecs)
 }
 
 func campCredentialVolumes(ci *consulv1alpha1.TerminatingGatewayCredentialInjection) []corev1.Volume {
@@ -187,15 +196,15 @@ func campAuthProcessorContainer(
 		drainSeconds = *ci.DrainSeconds
 	}
 
-	probe := func(mode string) *corev1.Probe {
+	probe := func(mode string, initialDelay, failureThreshold int32) *corev1.Probe {
 		return &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{Exec: &corev1.ExecAction{Command: []string{
 				"camp-auth-processor", "health", fmt.Sprintf("-uds-path=%s", campAuthSocketFile), mode,
 			}}},
-			InitialDelaySeconds: 5,
+			InitialDelaySeconds: initialDelay,
 			PeriodSeconds:       10,
 			TimeoutSeconds:      5,
-			FailureThreshold:    3,
+			FailureThreshold:    failureThreshold,
 		}
 	}
 
@@ -215,8 +224,10 @@ func campAuthProcessorContainer(
 			{Name: campAuthSocketVolume, MountPath: campAuthSocketDir},
 			{Name: campAuthProcessorConfigVolume, MountPath: campProcessorConfigPath, ReadOnly: true},
 		},
-		ReadinessProbe: probe("-ready"),
-		LivenessProbe:  probe("-live"),
+		// Readiness surfaces credential availability; liveness only checks the
+		// process is alive and stays tolerant of recoverable Vault/file errors.
+		ReadinessProbe: probe("-ready", 5, 3),
+		LivenessProbe:  probe("-live", 15, 6),
 		Lifecycle: &corev1.Lifecycle{PreStop: &corev1.LifecycleHandler{Exec: &corev1.ExecAction{Command: []string{
 			"camp-auth-processor", "drain-wait", fmt.Sprintf("-duration=%ds", drainSeconds),
 		}}}},
