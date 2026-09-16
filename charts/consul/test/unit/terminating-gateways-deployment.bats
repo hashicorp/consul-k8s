@@ -1572,3 +1572,53 @@ key2: value2' \
   [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-agent-config").configMap.name')" = "camp-agent" ]
   [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-ca").configMap.name')" = "camp-ca" ]
 }
+
+#--------------------------------------------------------------------
+# credentialInjection auth processor (T8 Task 4)
+
+@test "terminatingGateways/Deployment: credentialInjection disabled has no auth processor" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers | map(.name) | contains(["camp-auth-processor"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection auth processor is hardened, read-only creds, writable socket, and cannot read the token sink" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.image')" = "camp-auth-processor:test" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "10001" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsGroup')" = "10001" ]
+  [ "$(echo "$c" | yq -r '.securityContext.readOnlyRootFilesystem')" = "true" ]
+  # rendered credentials are read-only
+  [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-vault-rendered").readOnly')" = "true" ]
+  # socket volume is writable (readOnly not true)
+  [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-auth-socket").readOnly')" = "null" ]
+  # config is mounted read-only
+  [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-auth-processor-config").readOnly')" = "true" ]
+  # MUST NOT mount the Vault token or the private agent token sink
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-token"])')" = "false" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-agent-private"])')" = "false" ]
+  # health + drain contract
+  [ "$(echo "$c" | yq -r '.readinessProbe.exec.command | contains(["-ready"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.livenessProbe.exec.command | contains(["-live"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.lifecycle.preStop.exec.command | contains(["drain-wait"])')" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection auth processor config volume references processorConfigMap" {
+  cd `chart_dir`
+  local vols=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.volumes' | tee /dev/stderr)
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-auth-processor-config").configMap.name')" = "camp-proc" ]
+}

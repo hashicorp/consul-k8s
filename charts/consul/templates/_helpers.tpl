@@ -818,3 +818,78 @@ It carries no secret material. Input dict: name, exitAfterAuth (bool), ci, root.
     readOnly: true
   {{- end }}
 {{- end -}}
+
+{{- /*
+consul.terminatingGatewayCredentialAuthProcessor renders the camp-auth-processor
+sidecar for terminating-gateway credential injection. It reads the Vault
+Agent-rendered credentials read-only, serves the ext_proc UDS on a writable
+socket volume, and loads its non-secret binding config read-only. It must NOT
+mount the Vault token or the private Agent token sink. Input dict: ci, logLevel,
+drainSeconds.
+*/ -}}
+{{- define "consul.terminatingGatewayCredentialAuthProcessor" -}}
+- name: camp-auth-processor
+  image: {{ .ci.processorImage | quote }}
+  command:
+  - "camp-auth-processor"
+  args:
+  - "-config-file=/consul/processor-config/config.json"
+  - "-uds-path=/consul/auth-socket/auth.sock"
+  - "-log-level={{ .logLevel }}"
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  volumeMounts:
+  - name: camp-vault-rendered
+    mountPath: /consul/vault-rendered
+    readOnly: true
+  - name: camp-auth-socket
+    mountPath: /consul/auth-socket
+  - name: camp-auth-processor-config
+    mountPath: /consul/processor-config
+    readOnly: true
+  readinessProbe:
+    exec:
+      command:
+      - "camp-auth-processor"
+      - "health"
+      - "-uds-path=/consul/auth-socket/auth.sock"
+      - "-ready"
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+  livenessProbe:
+    exec:
+      command:
+      - "camp-auth-processor"
+      - "health"
+      - "-uds-path=/consul/auth-socket/auth.sock"
+      - "-live"
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+  lifecycle:
+    preStop:
+      exec:
+        command:
+        - "camp-auth-processor"
+        - "drain-wait"
+        - "-duration={{ .drainSeconds }}s"
+  resources:
+    requests:
+      memory: "50Mi"
+      cpu: "50m"
+    limits:
+      memory: "50Mi"
+      cpu: "50m"
+{{- end -}}
