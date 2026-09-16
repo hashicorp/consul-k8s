@@ -874,9 +874,12 @@ drainSeconds.
       - "health"
       - "-uds-path=/consul/auth-socket/auth.sock"
       - "-live"
-    initialDelaySeconds: 5
+    # Liveness only checks that the process is alive; it stays tolerant of
+    # recoverable Vault/file errors (credential unavailability is surfaced via
+    # readiness, not liveness) so transient issues don't restart the container.
+    initialDelaySeconds: 15
     periodSeconds: 10
-    failureThreshold: 3
+    failureThreshold: 6
     timeoutSeconds: 5
   lifecycle:
     preStop:
