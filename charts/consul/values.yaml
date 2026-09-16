@@ -3624,6 +3624,75 @@ terminatingGateways:
     # Note: The Consul namespace MUST exist before the gateway is deployed.
     consulNamespace: "default"
 
+    # `credentialInjection` configures the optional, Vault-only credential
+    # injection sidecars (a Vault Agent that renders external-model credentials
+    # and a credential processor that injects them at the terminating gateway).
+    # It carries no secret material: credential values come only from Vault at
+    # runtime. This is disabled by default. When enabled, the referenced
+    # ConfigMaps and Vault Kubernetes auth role/mount must be provisioned by an
+    # operator beforehand. Any field set on an individual gateway in the
+    # `gateways` list overrides the default here.
+    credentialInjection:
+      # Enabled controls whether the credential processor and Vault Agent
+      # sidecars are added to the terminating gateway deployment.
+      enabled: false
+
+      # ProcessorImage is the container image for the credential processor sidecar.
+      # @type: string
+      processorImage: ""
+
+      # VaultAgentImage is the container image for the Vault Agent sidecar.
+      # @type: string
+      vaultAgentImage: ""
+
+      # ProcessorConfigMap names a ConfigMap (in the gateway's namespace) carrying
+      # the credential processor's non-secret binding configuration.
+      # @type: string
+      processorConfigMap: ""
+
+      # VaultAgentConfigMap names a ConfigMap (in the gateway's namespace) carrying
+      # the Vault Agent configuration and credential templates.
+      # @type: string
+      vaultAgentConfigMap: ""
+
+      # VaultAddress is the address of the Vault server the sidecar authenticates
+      # against. It must be an absolute https:// URL.
+      # @type: string
+      vaultAddress: ""
+
+      # VaultNamespace is the optional Vault Enterprise namespace.
+      # @type: string
+      vaultNamespace: ""
+
+      # VaultAuthRole is the Vault Kubernetes auth role assumed by the sidecar.
+      # @type: string
+      vaultAuthRole: ""
+
+      # VaultAuthMount is the mount path of the Vault Kubernetes auth method.
+      # @type: string
+      vaultAuthMount: ""
+
+      # VaultCAConfigMap optionally names a ConfigMap (in the gateway's namespace)
+      # carrying the CA certificate used to verify the Vault server.
+      # @type: string
+      vaultCAConfigMap: ""
+
+      # TokenAudience is the audience requested for the projected Kubernetes
+      # service account token the Vault Agent uses for Kubernetes auth.
+      # @type: string
+      tokenAudience: ""
+
+      # TokenExpirationSeconds is the requested expiration, in seconds, of the
+      # projected service account token. Null uses the platform default.
+      # @type: integer
+      tokenExpirationSeconds: null
+
+      # DrainSeconds bounds how long the sidecars wait to finish in-flight
+      # credential refresh work before terminating during a rolling update.
+      # Null uses the processor's own default.
+      # @type: integer
+      drainSeconds: null
+
   # Gateways is a list of gateway objects. The only required field for
   # each is `name`, though they can also contain any of the fields in
   # `defaults`. Values defined here override the defaults except in the
