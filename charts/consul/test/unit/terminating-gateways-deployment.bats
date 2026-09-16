@@ -1449,3 +1449,64 @@ key2: value2' \
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# credentialInjection volumes (T8 Task 2)
+
+@test "terminatingGateways/Deployment: credentialInjection disabled by default has no camp volumes" {
+  cd `chart_dir`
+  local vols=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.volumes[].name' | tee /dev/stderr)
+  [[ "$vols" != *"camp-vault-rendered"* ]]
+  [[ "$vols" != *"camp-auth-socket"* ]]
+  [[ "$vols" != *"camp-vault-token"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection enabled adds memory + projected token volumes" {
+  cd `chart_dir`
+  local vols=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s '.[0].spec.template.spec.volumes' | tee /dev/stderr)
+
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-rendered") | .emptyDir.medium')" = "Memory" ]
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-auth-socket") | .emptyDir.medium')" = "Memory" ]
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-token") | .projected.sources[0].serviceAccountToken.path')" = "token" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection token uses configured audience and expiration" {
+  cd `chart_dir`
+  local tok=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenExpirationSeconds=600' \
+      . | tee /dev/stderr |
+      yq -s '.[0].spec.template.spec.volumes[] | select(.name=="camp-vault-token").projected.sources[0].serviceAccountToken' | tee /dev/stderr)
+  [ "$(echo "$tok" | yq -r '.audience')" = "vault" ]
+  [ "$(echo "$tok" | yq -r '.expirationSeconds')" = "600" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection per-gateway override enables volumes" {
+  cd `chart_dir`
+  local vols=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=tgw' \
+      --set 'terminatingGateways.gateways[0].credentialInjection.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.volumes[].name' | tee /dev/stderr)
+  [[ "$vols" == *"camp-vault-rendered"* ]]
+  [[ "$vols" == *"camp-auth-socket"* ]]
+  [[ "$vols" == *"camp-vault-token"* ]]
+}
