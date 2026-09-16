@@ -157,6 +157,19 @@ spec:
               {{- if $ci.tokenExpirationSeconds }}
               expirationSeconds: {{ $ci.tokenExpirationSeconds }}
               {{- end }}
+      # Private token sink for the Vault Agent (never mounted into the processor
+      # or Envoy) and the operator-provided agent config / Vault CA.
+      - name: camp-vault-agent-private
+        emptyDir:
+          medium: "Memory"
+      - name: camp-vault-agent-config
+        configMap:
+          name: {{ $ci.vaultAgentConfigMap | quote }}
+      {{- if $ci.vaultCAConfigMap }}
+      - name: camp-vault-ca
+        configMap:
+          name: {{ $ci.vaultCAConfigMap | quote }}
+      {{- end }}
       {{- end }}
       {{- range (default $defaults.extraVolumes .extraVolumes) }}
       - name: userconfig-{{ .name }}
@@ -251,6 +264,9 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+        {{- if and $ci $ci.enabled }}
+        {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent-init" "exitAfterAuth" true "ci" $ci "root" $root) | nindent 8 }}
+        {{- end }}
       containers:
         - name: terminating-gateway
           image: {{ $root.Values.global.imageConsulDataplane | quote }}
@@ -380,6 +396,9 @@ spec:
           ports:
             - name: gateway
               containerPort: 8443
+        {{- if and $ci $ci.enabled }}
+        {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent" "exitAfterAuth" false "ci" $ci "root" $root) | nindent 8 }}
+        {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}
       priorityClassName: {{ (default $defaults.priorityClassName .priorityClassName) | quote }}
       {{- end }}
