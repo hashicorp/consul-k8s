@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -149,6 +151,90 @@ func TestAppMetrics(t *testing.T) {
 		// This assertion represents the metrics from the application.
 		require.Contains(r, metricsOutput, `service_started_total 1`)
 	})
+}
+
+// Test that a single container exposing metrics on more than one port has all
+// of those ports scraped and merged, via the service-metrics-endpoints
+// annotation.
+func TestAppMetricsMultiplePorts(t *testing.T) {
+	env := suite.Environment()
+	cfg := suite.Config()
+	ctx := env.DefaultContext(t)
+	ns := ctx.KubectlOptions(t).Namespace
+
+	helmValues := map[string]string{
+		"global.datacenter":                          "dc1",
+		"global.metrics.enabled":                     "true",
+		"connectInject.enabled":                      "true",
+		"connectInject.metrics.defaultEnableMerging": "true",
+	}
+
+	releaseName := helpers.RandomName()
+
+	// Install the consul cluster in the default kubernetes ctx.
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	consulCluster.Create(t)
+
+	// Deploy a service whose single container serves metrics on two ports.
+	logger.Log(t, "creating static-multiport-metrics-app")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-multiport-metrics-app")
+
+	// Create the static-client deployment so we can use it for in-cluster calls to metrics endpoints.
+	logger.Log(t, "creating static-client")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+
+	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-multiport-metrics-app"})
+	require.NoError(t, err)
+	require.Len(t, podList.Items, 1)
+	podIP := podList.Items[0].Status.PodIP
+
+	// The injected sidecar should have been given one
+	// -telemetry-prom-service-metrics-url flag per configured endpoint. The
+	// host is matched loosely because it is 127.0.0.1 or ::1 depending on the
+	// cluster's address family.
+	serviceMetricsURLs := consulDataplaneServiceMetricsURLs(t, podList.Items[0])
+	require.Len(t, serviceMetricsURLs, 2, "expected one flag per configured metrics endpoint, got %v", serviceMetricsURLs)
+	require.Contains(t, serviceMetricsURLs[0], ":8080/metrics")
+	require.Contains(t, serviceMetricsURLs[1], ":9090/alt-metrics")
+
+	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
+	// to start.
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 150}, t, func(r *retry.R) {
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s/metrics", net.JoinHostPort(podIP, "20200")))
+		require.NoError(r, err)
+		// This assertion represents the metrics from the envoy sidecar.
+		require.Contains(r, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="multiport-metrics",consul_source_service="multiport-metrics"`)
+		// These assertions represent the metrics from both of the
+		// application's ports, proving that more than one was scraped.
+		require.Contains(r, metricsOutput, `static_multiport_metrics_app_a_total 1`)
+		require.Contains(r, metricsOutput, `static_multiport_metrics_app_b_total 1`)
+	})
+}
+
+// consulDataplaneServiceMetricsURLs returns the values of every
+// -telemetry-prom-service-metrics-url flag passed to the consul-dataplane
+// sidecar injected into the given pod, in the order they appear.
+func consulDataplaneServiceMetricsURLs(t *testing.T, pod corev1.Pod) []string {
+	t.Helper()
+
+	const flagPrefix = "-telemetry-prom-service-metrics-url="
+
+	var container *corev1.Container
+	for i, c := range pod.Spec.Containers {
+		if c.Name == "consul-dataplane" {
+			container = &pod.Spec.Containers[i]
+			break
+		}
+	}
+	require.NotNil(t, container, "no consul-dataplane container found in pod %s", pod.Name)
+
+	var urls []string
+	for _, arg := range container.Args {
+		if strings.HasPrefix(arg, flagPrefix) {
+			urls = append(urls, strings.TrimPrefix(arg, flagPrefix))
+		}
+	}
+	return urls
 }
 
 func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, label, metricsAssertion string) {
