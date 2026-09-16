@@ -60,21 +60,34 @@ func (mc Config) MergedMetricsServerConfiguration(pod corev1.Pod) (metricsPorts,
 		return metricsPorts{}, err
 	}
 
+	// The service-metrics-endpoints annotation takes precedence, so when it is
+	// set the legacy annotations are not read. Nil when it is not set.
+	serviceEndpoints, err := mc.ServiceMetricsEndpoints(pod)
+	if err != nil {
+		return metricsPorts{}, err
+	}
+
+	if len(serviceEndpoints) > 0 {
+		return metricsPorts{
+			mergedPort: mergedMetricsPort,
+			// servicePort and servicePath describe the first endpoint, for
+			// callers that only understand a single one.
+			servicePort:      serviceEndpoints[0].Port,
+			servicePath:      serviceEndpoints[0].Path,
+			serviceEndpoints: serviceEndpoints,
+		}, nil
+	}
+
 	// Don't need to check the error since it's checked in the call to
 	// mc.ShouldRunMergedMetricsServer() above.
 	serviceMetricsPort, _ := mc.ServiceMetricsPort(pod)
 
 	serviceMetricsPath := mc.ServiceMetricsPath(pod)
 
-	// Additional scrape targets from the service-metrics-endpoints annotation,
-	// if it is set. Nil when it is not.
-	serviceEndpoints, _ := mc.ServiceMetricsEndpoints(pod)
-
 	metricsPorts := metricsPorts{
-		mergedPort:       mergedMetricsPort,
-		servicePort:      serviceMetricsPort,
-		servicePath:      serviceMetricsPath,
-		serviceEndpoints: serviceEndpoints,
+		mergedPort:  mergedMetricsPort,
+		servicePort: serviceMetricsPort,
+		servicePath: serviceMetricsPath,
 	}
 	return metricsPorts, nil
 }
@@ -178,6 +191,19 @@ func (mc Config) ShouldRunMergedMetricsServer(pod corev1.Pod) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// The service-metrics-endpoints annotation takes precedence over
+	// service-metrics-port and service-metrics-path, so it is resolved first.
+	// When it provides the endpoints the legacy annotations are not read at
+	// all, otherwise an unused and invalid service-metrics-port would reject a
+	// Pod that is fully configured by service-metrics-endpoints.
+	serviceEndpoints, err := mc.ServiceMetricsEndpoints(pod)
+	if err != nil {
+		return false, err
+	}
+	if len(serviceEndpoints) > 0 {
+		return enableMetrics && enableMetricsMerging, nil
+	}
+
 	serviceMetricsPort, err := mc.ServiceMetricsPort(pod)
 	if err != nil {
 		return false, err
@@ -187,15 +213,7 @@ func (mc Config) ShouldRunMergedMetricsServer(pod corev1.Pod) (bool, error) {
 	// validated by calling mc.ServiceMetricsPort above.
 	smp, _ := strconv.Atoi(serviceMetricsPort)
 
-	// The service-metrics-endpoints annotation can declare scrape targets
-	// independently of service-metrics-port, so it can enable merging on its
-	// own. When it is not set this is nil and the behaviour is unchanged.
-	serviceEndpoints, err := mc.ServiceMetricsEndpoints(pod)
-	if err != nil {
-		return false, err
-	}
-
-	if enableMetrics && enableMetricsMerging && (smp > 0 || len(serviceEndpoints) > 0) {
+	if enableMetrics && enableMetricsMerging && smp > 0 {
 		return true, nil
 	}
 	return false, nil

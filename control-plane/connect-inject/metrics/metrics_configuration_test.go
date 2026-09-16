@@ -630,6 +630,114 @@ func TestMetricsConfigShouldRunMergedMetricsServerWithEndpoints(t *testing.T) {
 	}
 }
 
+// Tests that the service-metrics-endpoints annotation fully replaces the legacy
+// service-metrics-port and service-metrics-path annotations, including their
+// validation. An unused and invalid legacy port must not reject a Pod that is
+// configured entirely by service-metrics-endpoints.
+func TestMetricsConfigServiceMetricsEndpointsTakesPrecedenceOverInvalidLegacyPort(t *testing.T) {
+	cases := []struct {
+		Name                string
+		LegacyPort          string
+		LegacyPath          string
+		Endpoints           string
+		ExpRun              bool
+		ExpErr              string
+		ExpServicePort      string
+		ExpServicePath      string
+		ExpServiceEndpoints []ServiceMetricsEndpoint
+	}{
+		{
+			Name:       "a non-numeric legacy port is ignored when endpoints are set",
+			LegacyPort: "not-a-port",
+			Endpoints:  "8080:/metrics,9090:/alt",
+			ExpRun:     true,
+			ExpServiceEndpoints: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+				{Port: "9090", Path: "/alt"},
+			},
+			ExpServicePort: "8080",
+			ExpServicePath: "/metrics",
+		},
+		{
+			Name:       "an out of range legacy port is ignored when endpoints are set",
+			LegacyPort: "70000",
+			Endpoints:  "8080",
+			ExpRun:     true,
+			ExpServiceEndpoints: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+			},
+			ExpServicePort: "8080",
+			ExpServicePath: "/metrics",
+		},
+		{
+			Name:       "a legacy port of 0 does not disable merging when endpoints are set",
+			LegacyPort: "0",
+			Endpoints:  "8080",
+			ExpRun:     true,
+			ExpServiceEndpoints: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+			},
+			ExpServicePort: "8080",
+			ExpServicePath: "/metrics",
+		},
+		{
+			Name:       "a legacy path is ignored when endpoints are set",
+			LegacyPort: "9000",
+			LegacyPath: "/legacy",
+			Endpoints:  "8080",
+			ExpRun:     true,
+			ExpServiceEndpoints: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+			},
+			ExpServicePort: "8080",
+			ExpServicePath: "/metrics",
+		},
+		{
+			Name:       "an invalid legacy port is still reported when endpoints are not set",
+			LegacyPort: "not-a-port",
+			ExpErr:     "is not a valid integer",
+		},
+		{
+			Name:      "an invalid endpoints annotation is still reported",
+			Endpoints: "8080:metrics",
+			ExpErr:    "must begin with '/'",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			pod := minimal()
+			if tt.LegacyPort != "" {
+				pod.Annotations[constants.AnnotationServiceMetricsPort] = tt.LegacyPort
+			}
+			if tt.LegacyPath != "" {
+				pod.Annotations[constants.AnnotationServiceMetricsPath] = tt.LegacyPath
+			}
+			if tt.Endpoints != "" {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = tt.Endpoints
+			}
+
+			mc := Config{DefaultEnableMetrics: true, DefaultEnableMetricsMerging: true}
+
+			run, err := mc.ShouldRunMergedMetricsServer(*pod)
+			if tt.ExpErr != "" {
+				require.ErrorContains(t, err, tt.ExpErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.ExpRun, run)
+
+			// The configuration handed to the sidecar must also come from the
+			// endpoints rather than the legacy annotations.
+			ports, err := mc.MergedMetricsServerConfiguration(*pod)
+			require.NoError(t, err)
+			require.Equal(t, tt.ExpServiceEndpoints, ports.serviceEndpoints)
+			require.Equal(t, tt.ExpServicePort, ports.servicePort)
+			require.Equal(t, tt.ExpServicePath, ports.servicePath)
+		})
+	}
+}
+
 func minimal() *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -205,9 +205,12 @@ func TestAppMetricsMultiplePorts(t *testing.T) {
 		// This assertion represents the metrics from the envoy sidecar.
 		require.Contains(r, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="multiport-metrics",consul_source_service="multiport-metrics"`)
 		// These assertions represent the metrics from both of the
-		// application's ports, proving that more than one was scraped.
-		require.Contains(r, metricsOutput, `static_multiport_metrics_app_a_total 1`)
-		require.Contains(r, metricsOutput, `static_multiport_metrics_app_b_total 1`)
+		// application's ports. The two ports serve disjoint metric families, so
+		// seeing both proves that more than one port was scraped and merged.
+		require.Contains(r, metricsOutput, `app_http_requests_total{port="8080",code="200"} 1027`)
+		require.Contains(r, metricsOutput, `app_build_info{port="8080",version="1.4.2"} 1`)
+		require.Contains(r, metricsOutput, `worker_jobs_processed_total{port="9090",queue="default"} 88`)
+		require.Contains(r, metricsOutput, `worker_last_success_timestamp_seconds{port="9090"} 1757000000`)
 	})
 }
 
