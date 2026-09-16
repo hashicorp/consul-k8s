@@ -366,6 +366,270 @@ func TestMetricsConfigMergedMetricsServerConfiguration(t *testing.T) {
 	}
 }
 
+func TestMetricsConfigServiceMetricsEndpoints(t *testing.T) {
+	cases := []struct {
+		Name                string
+		Pod                 func(*corev1.Pod) *corev1.Pod
+		Expected            []ServiceMetricsEndpoint
+		ExpErr              string
+		CheckLegacyBehavior bool
+		ExpectedLegacyPort  string
+		ExpectedLegacyPath  string
+	}{
+		{
+			Name: "Returns nil when the annotation is not set",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsPort] = "9000"
+				pod.Annotations[constants.AnnotationServiceMetricsPath] = "/custom"
+				return pod
+			},
+			Expected: nil,
+		},
+		{
+			Name: "Returns nil when the annotation is empty",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = ""
+				return pod
+			},
+			Expected: nil,
+		},
+		{
+			Name: "Parses a single port with a path",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:/metrics"
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{{Port: "8080", Path: "/metrics"}},
+		},
+		{
+			Name: "Parses multiple ports with paths",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:/metrics,9090:/admin/metrics,7070:/q/metrics"
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+				{Port: "9090", Path: "/admin/metrics"},
+				{Port: "7070", Path: "/q/metrics"},
+			},
+		},
+		{
+			Name: "Path is optional and defaults to /metrics",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080,9090:/admin"
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+				{Port: "9090", Path: "/admin"},
+			},
+		},
+		{
+			Name: "Whitespace and empty entries are tolerated",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = " 8080 : /metrics , , 9090 "
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+				{Port: "9090", Path: "/metrics"},
+			},
+		},
+		{
+			Name: "Named container ports are resolved",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
+					{Name: "http", ContainerPort: 8080},
+					{Name: "admin", ContainerPort: 9090},
+				}
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "http,admin:/admin/metrics"
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+				{Port: "9090", Path: "/admin/metrics"},
+			},
+		},
+		{
+			Name: "Privileged ports are allowed",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "80:/metrics"
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{{Port: "80", Path: "/metrics"}},
+		},
+		{
+			Name: "Same port with different paths is kept",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:/metrics,8080:/other"
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+				{Port: "8080", Path: "/other"},
+			},
+		},
+		{
+			Name: "Exact duplicates are de-duplicated",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:/metrics,8080:/metrics,9090"
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+				{Port: "9090", Path: "/metrics"},
+			},
+		},
+		{
+			Name: "Takes precedence over service-metrics-port and service-metrics-path",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationPort] = "1234"
+				pod.Annotations[constants.AnnotationServiceMetricsPort] = "9000"
+				pod.Annotations[constants.AnnotationServiceMetricsPath] = "/ignored"
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:/metrics,9090"
+				return pod
+			},
+			Expected: []ServiceMetricsEndpoint{
+				{Port: "8080", Path: "/metrics"},
+				{Port: "9090", Path: "/metrics"},
+			},
+		},
+		{
+			Name: "Does not disturb ServiceMetricsPort and ServiceMetricsPath",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsPort] = "9000"
+				pod.Annotations[constants.AnnotationServiceMetricsPath] = "/legacy"
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080"
+				return pod
+			},
+			Expected:            []ServiceMetricsEndpoint{{Port: "8080", Path: "/metrics"}},
+			ExpectedLegacyPort:  "9000",
+			ExpectedLegacyPath:  "/legacy",
+			CheckLegacyBehavior: true,
+		},
+		{
+			Name: "Errors on a non-numeric, non-named port",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:/metrics,nope:/metrics"
+				return pod
+			},
+			ExpErr: "does not have a valid port",
+		},
+		{
+			Name: "Errors on an out of range port",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "70000:/metrics"
+				return pod
+			},
+			ExpErr: "is not in the valid port range 1-65535",
+		},
+		{
+			Name: "Errors on a port of 0",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "0:/metrics"
+				return pod
+			},
+			ExpErr: "is not in the valid port range 1-65535",
+		},
+		{
+			Name: "Errors on a missing port",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = ":/metrics"
+				return pod
+			},
+			ExpErr: "is missing a port",
+		},
+		{
+			Name: "Errors on a path without a leading slash",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:metrics"
+				return pod
+			},
+			ExpErr: "must begin with '/'",
+		},
+		{
+			Name: "Errors when the value contains no endpoints",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = ",,"
+				return pod
+			},
+			ExpErr: "did not contain any endpoints",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			mc := Config{}
+			pod := *tt.Pod(minimal())
+
+			actual, err := mc.ServiceMetricsEndpoints(pod)
+
+			if tt.ExpErr != "" {
+				require.ErrorContains(t, err, tt.ExpErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.Expected, actual)
+
+			if tt.CheckLegacyBehavior {
+				legacyPort, err := mc.ServiceMetricsPort(pod)
+				require.NoError(t, err)
+				require.Equal(t, tt.ExpectedLegacyPort, legacyPort)
+				require.Equal(t, tt.ExpectedLegacyPath, mc.ServiceMetricsPath(pod))
+			}
+		})
+	}
+}
+
+func TestMetricsConfigShouldRunMergedMetricsServerWithEndpoints(t *testing.T) {
+	cases := []struct {
+		Name     string
+		Pod      func(*corev1.Pod) *corev1.Pod
+		Expected bool
+	}{
+		{
+			Name: "Runs when service-metrics-endpoints is set",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationEnableMetrics] = "true"
+				pod.Annotations[constants.AnnotationEnableMetricsMerging] = "true"
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:/metrics,9090"
+				return pod
+			},
+			Expected: true,
+		},
+		{
+			Name: "Does not run when merging is disabled even with endpoints set",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationEnableMetrics] = "true"
+				pod.Annotations[constants.AnnotationEnableMetricsMerging] = "false"
+				pod.Annotations[constants.AnnotationServiceMetricsEndpoints] = "8080:/metrics"
+				return pod
+			},
+			Expected: false,
+		},
+		{
+			Name: "Does not run when no endpoints are configured",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationEnableMetrics] = "true"
+				pod.Annotations[constants.AnnotationEnableMetricsMerging] = "true"
+				return pod
+			},
+			Expected: false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			mc := Config{}
+
+			actual, err := mc.ShouldRunMergedMetricsServer(*tt.Pod(minimal()))
+
+			require.NoError(t, err)
+			require.Equal(t, tt.Expected, actual)
+		})
+	}
+}
+
 func minimal() *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
