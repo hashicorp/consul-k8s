@@ -430,6 +430,21 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			common.ComponentLabel: "api-gateway-consul",
 		}),
 	)
+	// See the equivalent comment in
+	// control-plane/api-gateway/controllers/gateway_controller.go: the
+	// ComponentLabel is set on generated resources, not on the user-authored
+	// Gateway CR, so on its own it drops every Gateway event. Metadata alone is
+	// not a safe discriminator here either, since a newly created Gateway has
+	// no Consul annotation yet. Admit anything naming a GatewayClass and let
+	// Reconcile do the authoritative ControllerName ownership check.
+	gwPredicate = predicate.Or(
+		gwPredicate,
+		common.ConsulAnnotationPredicate(),
+		predicate.NewPredicateFuncs(func(o client.Object) bool {
+			gw, ok := o.(*gwv1beta1.Gateway)
+			return ok && gw.Spec.GatewayClassName != ""
+		}),
+	)
 
 	r := &GatewayController{
 		Client:     mgr.GetClient(),

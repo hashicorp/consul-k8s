@@ -440,6 +440,31 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			common.ComponentLabel: "api-gateway",
 		}),
 	)
+	// The ComponentLabel above is only ever applied to the resources consul-k8s
+	// GENERATES for a gateway (Deployment, Service, Pods) -- never to the
+	// user-authored Gateway CR. On its own it therefore drops every Gateway
+	// event, so metadata-only edits (for example adding or removing the
+	// consul.hashicorp.com/tls-enabled annotation) never reached Consul while
+	// the Gateway still reported Synced=True, and spec edits such as a listener
+	// port change were silently lost the same way.
+	//
+	// Metadata is not a safe discriminator for the root Gateway watch at all: a
+	// freshly created Gateway has neither the label nor any Consul annotation
+	// (consul.hashicorp.com/gateway-class-config is written by this controller
+	// during reconciliation), so filtering on metadata alone deadlocks it --
+	// the annotation can only appear after a reconcile that the filter itself
+	// prevents. Admit anything that names a GatewayClass; Reconcile already
+	// performs the authoritative ownership check by comparing
+	// gatewayClass.Spec.ControllerName against GatewayClassControllerName and
+	// returns early for gateways this controller does not own.
+	gwPredicate = predicate.Or(
+		gwPredicate,
+		common.ConsulAnnotationPredicate(),
+		predicate.NewPredicateFuncs(func(o client.Object) bool {
+			gw, ok := o.(*gwv1.Gateway)
+			return ok && gw.Spec.GatewayClassName != ""
+		}),
+	)
 
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
