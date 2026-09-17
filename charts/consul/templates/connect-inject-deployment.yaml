@@ -152,6 +152,12 @@ spec:
                 -consul-dataplane-image="{{ .Values.global.imageConsulDataplane }}" \
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
                 -consul-ai-mcp-interceptor-image="{{ default .Values.global.imageConsulAIMCPInterceptor .Values.connectInject.imageConsulAIMCPInterceptor }}" \
+                {{- if (or .Values.global.imageConsulOBOInbound .Values.connectInject.imageConsulOBOInbound) }}
+                -consul-obo-inbound-image="{{ default .Values.global.imageConsulOBOInbound .Values.connectInject.imageConsulOBOInbound }}" \
+                {{- end }}
+                {{- if (or .Values.global.imageConsulOBOOutbound .Values.connectInject.imageConsulOBOOutbound) }}
+                -consul-obo-outbound-image="{{ default .Values.global.imageConsulOBOOutbound .Values.connectInject.imageConsulOBOOutbound }}" \
+                {{- end }}
                 -release-name="{{ .Release.Name }}" \
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \

@@ -503,6 +503,10 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 	}
 
+	if common.IsOAuthClient(pod) {
+		args = append(args, "-credential-broker-bind-addr=unix:///consul/connect-inject/credential-broker.sock")
+	}
+
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
 	// for Consul DNS in the pod.
 	dnsEnabled, err := consulDNSEnabled(namespace, pod, w.EnableConsulDNS, w.EnableTransparentProxy)

@@ -26,6 +26,15 @@ func IsAIAgent(pod corev1.Pod) bool {
 	return pod.Annotations[constants.AnnotationAIRole] == constants.AIAgentRole
 }
 
+// IsOAuthClient returns true when the pod has opted into the OBO identity plane.
+// This is the case either when the explicit AnnotationOAuthClient annotation is
+// set to "true", or when the pod is an AI agent (which is always an OAuth client
+// by definition).  Both groups receive the consul-obo-inbound and
+// consul-obo-outbound sidecars.
+func IsOAuthClient(pod corev1.Pod) bool {
+	return IsAIAgent(pod) || pod.Annotations[constants.AnnotationOAuthClient] == "true"
+}
+
 // AIAgentMCPConfigName returns the ConfigMap name from the MCP config annotation,
 // or an empty string if the annotation is absent.
 func AIAgentMCPConfigName(pod corev1.Pod) string {
