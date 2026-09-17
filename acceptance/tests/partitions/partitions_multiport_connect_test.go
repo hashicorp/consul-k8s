@@ -153,6 +153,10 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
 				clientConsulCluster.Create(t)
 
+				// Ensure mesh gateways are available in both partition clusters before proceeding with config entries and workloads.
+				k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s-consul-mesh-gateway", releaseName))
+				k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s-consul-mesh-gateway", releaseName))
+
 				consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.aclsEnabled)
 
 				// Apply config entries (ProxyDefaults, ServiceDefaults, ServiceResolver) as CRDs

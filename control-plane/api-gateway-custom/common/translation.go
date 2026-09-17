@@ -71,8 +71,20 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *R
 			constants.MetaKeyKubeName: gateway.Name,
 		}),
 		Listeners: listeners,
+		TLS:       gatewayTLS(gateway.Annotations),
 		ExtAuthz:  gatewayExtAuthz(gateway.Annotations),
 	}
+}
+
+// gatewayTLS translates the gateway-wide tls-enabled annotation into the Consul
+// APIGateway gateway-level TLS configuration. When the annotation is set to
+// "true" it returns a config with Enabled=true; otherwise it returns the zero
+// value.
+func gatewayTLS(annotations map[string]string) api.GatewayTLSConfig {
+	if annotations[AnnotationTLSEnabled] == TLSEnabledValue {
+		return api.GatewayTLSConfig{Enabled: true}
+	}
+	return api.GatewayTLSConfig{}
 }
 
 // gatewayExtAuthz translates the gateway-wide ext_authz annotation into the

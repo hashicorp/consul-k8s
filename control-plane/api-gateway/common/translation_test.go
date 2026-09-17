@@ -355,9 +355,59 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 	}
 }
 
-func TestTranslator_ToAPIGateway_TLSWithSDS(t *testing.T) {
+func TestTranslator_ToAPIGateway_GatewayLevelTLS(t *testing.T) {
 	t.Parallel()
 
+	cases := map[string]struct {
+		annotations map[string]string
+		expectedTLS api.GatewayTLSConfig
+	}{
+		"tls-enabled=true sets gateway-level TLS.Enabled": {
+			annotations: map[string]string{AnnotationTLSEnabled: TLSEnabledValue},
+			expectedTLS: api.GatewayTLSConfig{Enabled: true},
+		},
+		"no annotation leaves gateway-level TLS at zero value": {
+			annotations: map[string]string{},
+			expectedTLS: api.GatewayTLSConfig{},
+		},
+		"unrecognized value leaves gateway-level TLS at zero value": {
+			annotations: map[string]string{AnnotationTLSEnabled: "yes"},
+			expectedTLS: api.GatewayTLSConfig{},
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			input := gwv1.Gateway{
+				TypeMeta:   metav1.TypeMeta{Kind: "Gateway"},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-gw", Namespace: "ns", Annotations: tc.annotations},
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
+						{
+							Name:     gwv1.SectionName("https"),
+							Port:     gwv1.PortNumber(8443),
+							Protocol: gwv1.ProtocolType("HTTPS"),
+							TLS:      &gwv1.ListenerTLSConfig{},
+						},
+					},
+				},
+			}
+
+			translator := ResourceTranslator{}
+			resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+
+			actual := translator.ToAPIGateway(input, resources, &v1alpha1.GatewayClassConfig{})
+
+			require.Equal(t, tc.expectedTLS, actual.TLS)
+		})
+	}
+}
+
+func TestTranslator_ToAPIGateway_TLSWithSDS(t *testing.T) {
+	t.Parallel()
 	translator := ResourceTranslator{
 		EnableConsulNamespaces: true,
 		EnableK8sMirroring:     true,

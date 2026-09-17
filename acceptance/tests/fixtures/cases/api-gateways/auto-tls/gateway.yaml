@@ -1,0 +1,26 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Zero-touch downstream TLS termination: the gateway opts into Consul-managed
+# TLS via the tls-enabled annotation and attaches NO custom certificate to the
+# listener. The gateway must terminate downstream HTTPS using its auto-issued
+# Connect leaf certificate, whose SANs include "*.api-gateway.<domain>".
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: auto-tls-gateway
+  labels:
+    component: api-gateway
+  annotations:
+    consul.hashicorp.com/tls-enabled: "true"
+spec:
+  gatewayClassName: auto-tls-gateway-class
+  listeners:
+  - protocol: HTTPS
+    port: 8443
+    name: https
+    tls:
+      mode: Terminate
+    allowedRoutes:
+      namespaces:
+        from: "All"
