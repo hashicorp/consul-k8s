@@ -312,6 +312,44 @@ func TestTerminatingGatewayCredentialInjection_Validate(t *testing.T) {
 				`spec.deployment.credentialInjection.vaultAgentConfigMap`,
 			},
 		},
+		"kubernetesSecret source without secretName is rejected": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) {
+				ci.Source = CredentialSourceKubernetesSecret
+				ci.SecretName = ""
+				ci.VaultAgentImage = ""
+				ci.VaultAgentConfigMap = ""
+				ci.VaultAddress = ""
+				ci.TokenAudience = ""
+			}, ptr.To(true)),
+			expectedErrMsgs: []string{
+				`spec.deployment.credentialInjection.secretName`,
+			},
+		},
+		"kubernetesSecret source does not require vault fields": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) {
+				ci.Source = CredentialSourceKubernetesSecret
+				ci.SecretName = "camp-egress-credentials"
+				ci.VaultAgentImage = ""
+				ci.VaultAgentConfigMap = ""
+				ci.VaultAddress = ""
+				ci.TokenAudience = ""
+			}, ptr.To(true)),
+			expectedErrMsgs: nil,
+		},
+		"kubernetesSecret source rejects wildcard secretName": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) {
+				ci.Source = CredentialSourceKubernetesSecret
+				ci.SecretName = "camp-*"
+				ci.VaultAgentImage = ""
+				ci.VaultAgentConfigMap = ""
+				ci.VaultAddress = ""
+				ci.TokenAudience = ""
+			}, ptr.To(true)),
+			expectedErrMsgs: []string{
+				`spec.deployment.credentialInjection.secretName`,
+				`wildcard`,
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -371,6 +409,8 @@ func TestTerminatingGatewayCredentialInjectionCRDSchema(t *testing.T) {
 
 	expectedFieldTypes := map[string]string{
 		"enabled":                "boolean",
+		"source":                 "string",
+		"secretName":             "string",
 		"processorImage":         "string",
 		"vaultAgentImage":        "string",
 		"processorConfigMap":     "string",
