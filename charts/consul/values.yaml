@@ -559,6 +559,31 @@ global:
     # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
     enableLicenseAutoload: true
 
+  # Configures the global registry integration. When enabled, the Consul server will
+  # communicate with an external registry service. The token used by the registry
+  # is read from a Kubernetes secret.
+  globalRegistry:
+    # If true, enables the global_registry stanza in the Consul server configuration.
+    # @type: boolean
+    enabled: false
+
+    # The address of the global registry service.
+    # @type: string
+    address: null
+
+    # The cluster ID to use when communicating with the global registry.
+    # @type: string
+    clusterId: null
+
+    # The name of the Kubernetes secret that holds the global registry token.
+    # A Kubernetes secret must be in the same namespace that Consul is installed into.
+    # @type: string
+    tokenSecretName: null
+
+    # The key within the Kubernetes secret that holds the global registry token.
+    # @type: string
+    tokenSecretKey: null
+
   # Configure federation.
   federation:
     # If enabled, this datacenter will be federation-capable. Only federation
