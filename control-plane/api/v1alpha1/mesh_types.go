@@ -110,6 +110,7 @@ type PeeringMeshConfig struct {
 	PeerThroughMeshGateways bool `json:"peerThroughMeshGateways,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || !(self.tlsMinVersion in ['TLSv1_0', 'TLSv1_1'])",message="ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"
 type MeshDirectionalTLSConfig struct {
 	// TLSMinVersion sets the default minimum TLS version supported.
 	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
@@ -126,6 +127,11 @@ type MeshDirectionalTLSConfig struct {
 	// Future releases of Envoy may remove currently-supported but insecure cipher suites,
 	// and future releases of Consul may add new supported cipher suites if any are added to Envoy.
 	CipherSuites []string `json:"cipherSuites,omitempty"`
+	// ECDHCurves specifies the list of ECDH/KEM curves to offer during the TLS
+	// handshake. Values must match Envoy TlsParameters.ecdh_curves identifiers.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:items:Enum=X25519MLKEM768;X25519;P-256;P-384;P-521
+	ECDHCurves []string `json:"ecdhCurves,omitempty"`
 }
 
 // RequestNormalizationMeshConfig contains options pertaining to the
@@ -373,6 +379,22 @@ func (in *MeshDirectionalTLSConfig) validate(path *field.Path) field.ErrorList {
 	if !sliceContains(versions, in.TLSMinVersion) {
 		errs = append(errs, field.Invalid(path.Child("tlsMinVersion"), in.TLSMinVersion, notInSliceMessage(versions)))
 	}
+
+	// validCurves defines the supported ECDH/KEM curves for TLS 1.3.
+	// NOTE: If this list is updated, ensure the corresponding validEnvoyECDHCurves
+	// map in github.com/hashicorp/consul/agent/structs/config_entry_mesh.go is also updated.
+	validCurves := []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"}
+	if len(in.ECDHCurves) > 0 {
+		if isTLSVersionLessThanTLS12(in.TLSMinVersion) {
+			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves, "ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"))
+		}
+		for i, curve := range in.ECDHCurves {
+			if !sliceContains(validCurves, curve) {
+				errs = append(errs, field.Invalid(path.Child("ecdhCurves").Index(i), curve, notInSliceMessage(validCurves)))
+			}
+		}
+	}
+
 	return errs
 }
 
@@ -384,6 +406,7 @@ func (in *MeshDirectionalTLSConfig) toConsul() *capi.MeshDirectionalTLSConfig {
 		TLSMinVersion: in.TLSMinVersion,
 		TLSMaxVersion: in.TLSMaxVersion,
 		CipherSuites:  in.CipherSuites,
+		ECDHCurves:    in.ECDHCurves,
 	}
 }
 
@@ -441,4 +464,19 @@ func (in *RequestNormalizationMeshConfig) validate(path *field.Path) field.Error
 
 // DefaultNamespaceFields has no behaviour here as meshes have no namespace specific fields.
 func (in *Mesh) DefaultNamespaceFields(_ common.ConsulMeta) {
+}
+
+var tlsVersionComparison = map[string]uint{
+	"TLSv1_0": 1,
+	"TLSv1_1": 2,
+	"TLSv1_2": 3,
+	"TLSv1_3": 4,
+}
+
+func isTLSVersionLessThanTLS12(v string) bool {
+	rank, ok := tlsVersionComparison[v]
+	if !ok {
+		return false
+	}
+	return rank < tlsVersionComparison["TLSv1_2"]
 }
