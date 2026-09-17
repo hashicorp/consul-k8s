@@ -1622,7 +1622,7 @@ load _helpers
       --set 'global.globalRegistry.enabled=true' \
       --set 'global.globalRegistry.address=http://host.docker.internal:8080' \
       . | tee /dev/stderr |
-      yq '.data["global-registry-config.json"]' | yq -r '.global_registry.address' | tee /dev/stderr)
+      yq -r '.data["global-registry-config.json"]' | yq -r '.global_registry.address' | tee /dev/stderr)
   [ "${actual}" = "http://host.docker.internal:8080" ]
 }
 
@@ -1633,7 +1633,7 @@ load _helpers
       --set 'global.globalRegistry.enabled=true' \
       --set 'global.globalRegistry.clusterId=4f2a1aa8-ccc2-cc11-9f4c-94c78075f5db' \
       . | tee /dev/stderr |
-      yq '.data["global-registry-config.json"]' | yq -r '.global_registry.cluster_id' | tee /dev/stderr)
+      yq -r '.data["global-registry-config.json"]' | yq -r '.global_registry.cluster_id' | tee /dev/stderr)
   [ "${actual}" = "4f2a1aa8-ccc2-cc11-9f4c-94c78075f5db" ]
 }
 
@@ -1645,7 +1645,7 @@ load _helpers
       --set 'global.globalRegistry.tokenSecretName=my-registry-secret' \
       --set 'global.globalRegistry.tokenSecretKey=token.txt' \
       . | tee /dev/stderr |
-      yq '.data["global-registry-config.json"]' | yq -r '.global_registry.token_file' | tee /dev/stderr)
+      yq -r '.data["global-registry-config.json"]' | yq -r '.global_registry.token_file' | tee /dev/stderr)
   [ "${actual}" = "/consul/global-registry-token/token.txt" ]
 }
 
@@ -1655,6 +1655,6 @@ load _helpers
       -s templates/server-config-configmap.yaml  \
       --set 'global.globalRegistry.enabled=true' \
       . | tee /dev/stderr |
-      yq '.data["global-registry-config.json"]' | yq '.global_registry | has("token_file")' | tee /dev/stderr)
+      yq -r '.data["global-registry-config.json"]' | yq '.global_registry | has("token_file")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
