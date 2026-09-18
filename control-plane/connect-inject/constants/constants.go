@@ -92,6 +92,22 @@ const (
 	// AIAgentRole is the expected value of AnnotationAIRole for an AI agent workload.
 	AIAgentRole = "ai-agent"
 
+	// AIMCPServerRole is the expected value of AnnotationAIRole for an MCP
+	// server workload. Catalog registration carries ai.role=mcp-server so
+	// Consul DCR can mint an IAM audience client_id. OBO sidecars are not
+	// injected for this role.
+	AIMCPServerRole = "mcp-server"
+
+	// DefaultAIMCPServerTransport is the catalog default for ai.mcp_server.transport.
+	DefaultAIMCPServerTransport = "streamable-http"
+
+	// DefaultAIMCPServerPath is the catalog default for ai.mcp_server.path.
+	DefaultAIMCPServerPath = "/mcp"
+
+	// DefaultAIMCPServerProtocolVersion is the catalog default for
+	// ai.mcp_server.protocol_version (must be non-empty for Consul Validate).
+	DefaultAIMCPServerProtocolVersion = "2025-03-26"
+
 	// AIContainerName is the injected container name for the consul-mcp-gateway sidecar.
 	// This container handles MCP body parsing: stamps x-mcp-method/tool/hitl headers.
 	AIContainerName = "consul-mcp-gateway"
