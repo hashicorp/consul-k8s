@@ -394,47 +394,24 @@ func TestOBOOutboundSidecarImageRequired(t *testing.T) {
 	require.Contains(t, err.Error(), "ImageConsulOBOOutbound must be set")
 }
 
-// oboPod returns a plain (non-AI) Pod annotated as an oauth-client for use in
-// tests that exercise the OBO-only injection path.
-func oboOnlyPod(serviceName string) corev1.Pod {
-	return corev1.Pod{
+// TestLegacyOAuthClientAnnotationDoesNotOptIn verifies that
+// consul.hashicorp.com/oauth-client is ignored. OBO inject is ai-agent only.
+func TestLegacyOAuthClientAnnotationDoesNotOptIn(t *testing.T) {
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				constants.AnnotationService:     serviceName,
-				constants.AnnotationInject:      "true",
-				constants.AnnotationOAuthClient: "true",
+				constants.AnnotationService:         "my-svc",
+				constants.AnnotationInject:          "true",
+				"consul.hashicorp.com/oauth-client": "true",
 			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "app", Image: "myapp:latest"}},
 		},
 	}
-}
 
-// TestOBOSidecarsInjectedForNonAIPod verifies that a non-AI pod annotated with
-// consul.hashicorp.com/oauth-client: "true" receives the consul-obo-inbound and
-// consul-obo-outbound sidecars but NOT the consul-mcp-gateway sidecar.
-func TestOBOSidecarsInjectedForNonAIPod(t *testing.T) {
-	w := baseAIWebhook(t)
-	w.ImageConsulOBOInbound = "hashicorp/consul-obo-inbound:test"
-	w.ImageConsulOBOOutbound = "hashicorp/consul-obo-outbound:test"
-
-	pod := oboOnlyPod("my-svc")
-
-	inbound, err := w.oboInboundSidecar(pod)
-	require.NoError(t, err)
-	outbound, err := w.oboOutboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
-	require.NoError(t, err)
-
-	// Should have OBO containers.
-	require.Equal(t, constants.ConsulOBOInboundContainerName, inbound.Name)
-	require.Equal(t, constants.ConsulOBOOutboundContainerName, outbound.Name)
-
-	// Verify IsOAuthClient recognises the pod.
-	require.True(t, common.IsOAuthClient(pod))
-	// Verify IsAIAgent does NOT recognise the pod (no mcp-gateway injection).
 	require.False(t, common.IsAIAgent(pod))
 }
 
@@ -460,7 +437,5 @@ func TestAIAgentPodGetsAllThreeSidecars(t *testing.T) {
 	require.Equal(t, constants.ConsulOBOInboundContainerName, oboIn.Name)
 	require.Equal(t, constants.ConsulOBOOutboundContainerName, oboOut.Name)
 
-	// IsOAuthClient must be true for AI agent pods.
-	require.True(t, common.IsOAuthClient(pod))
 	require.True(t, common.IsAIAgent(pod))
 }

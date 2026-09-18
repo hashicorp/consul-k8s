@@ -128,9 +128,8 @@ const (
 
 	// ConsulOBOOutboundContainerName is the injected container name for the
 	// consul-obo-outbound sidecar.
-	// This container handles OUTBOUND OBO for all outbound calls from any service
-	// with oauth_client=true: performs RFC 8693 token exchange and injects the
-	// audience-bound JWT before the request leaves the mesh.
+	// This container handles OUTBOUND OBO for ai-agent pods: RFC 8693 token
+	// exchange and injects the audience-bound JWT before the request leaves the mesh.
 	ConsulOBOOutboundContainerName = "consul-obo-outbound"
 
 	// DefaultGatewayBinary is the path to the consul-mcp-gateway binary inside the

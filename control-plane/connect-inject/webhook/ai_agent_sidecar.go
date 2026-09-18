@@ -97,26 +97,22 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 }
 
 // oboInboundSidecar builds and returns the consul-obo-inbound sidecar container
-// that handles INBOUND OBO for AI agent pods (and any pod with oauth_client=true).
+// that handles INBOUND OBO for ai-agent pods.
 //
 // It listens on loopback :21102 (DefaultOBOInboundPort) and is wired by the
 // Consul xDS generator as an ext_proc filter on the inbound Envoy listener.
 // Its responsibilities are:
 //
 //  1. Strip any forged x-user-* / x-claim-* headers from the caller (INV-8).
-//  2. Perform RFC 8693 OBO token exchange: swap the inbound bearer token for
-//     an audience-bound JWT signed with the service's EC P-256 key.
+//  2. Verify the already-exchanged bearer (JWKS, introspection fallback).
+//     Inbound does not perform RFC 8693 token exchange.
 //  3. Project x-user-role (pipe-separated UPPER CASE groups), x-user-aud,
 //     x-claim-sub, x-claim-email so that the downstream jwt_authn / RBAC
 //     filters can evaluate role-based intentions.
 //
-// The OAuth private key is delivered as an encrypted envelope on Envoy's
-// pod-local UDS plus a DEK from the dataplane credential broker — never via
-// file, env var, Kubernetes Secret, or gRPC stream metadata.
-//
-// This sidecar is injected for all pods that have opted into the OBO identity
-// plane: AI agent pods (AnnotationAIRole=ai-agent) and any pod annotated with
-// consul.hashicorp.com/oauth-client: "true".
+// Envelope ciphertext is on Envoy's pod-local UDS; the DEK comes from the
+// dataplane credential broker. Never file, env, Kubernetes Secret, or gRPC
+// stream metadata.
 func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) {
 	image := w.ImageConsulOBOInbound
 	if image == "" {
@@ -185,13 +181,11 @@ func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) 
 }
 
 // oboOutboundSidecar builds and returns the consul-obo-outbound sidecar
-// container that handles OUTBOUND OBO for ALL outbound calls from any service
-// with oauth_client=true.  It is not specific to MCP — it covers A2A, A2REST,
-// A2MCP, and A2LLM outbound paths.
+// container that handles OUTBOUND OBO for ai-agent pods. It is not specific
+// to MCP — it covers A2A, A2REST, A2MCP, and A2LLM outbound paths.
 //
 // It listens on loopback :21103 (DefaultOBOOutboundPort) and is wired by the
-// Consul xDS generator as an ext_proc filter on the outbound Envoy listener
-// for every oauth_client=true service.  Its responsibilities are:
+// Consul xDS generator as an ext_proc filter. Its responsibilities are:
 //
 //  1. Detect that the outbound request carries a user-context bearer token.
 //  2. Perform RFC 8693 OBO exchange for the target service audience.

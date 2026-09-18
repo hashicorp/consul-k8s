@@ -272,9 +272,9 @@ func TestAIConfigFromPod_ConfigMapNotFound_ReturnsError(t *testing.T) {
 	require.Contains(t, err.Error(), "failed to get AI agent MCP ConfigMap")
 }
 
-// TestIsOAuthClient verifies that IsOAuthClient returns true for AI agents,
-// for pods with the explicit annotation, and false for all others.
-func TestIsOAuthClient(t *testing.T) {
+// TestIsAIAgent is the CAMP OBO inject gate. oauth_client / oauth-client is not
+// an opt-in path.
+func TestIsAIAgent(t *testing.T) {
 	cases := map[string]struct {
 		annotations map[string]string
 		expected    bool
@@ -285,22 +285,21 @@ func TestIsOAuthClient(t *testing.T) {
 			},
 			expected: true,
 		},
-		"explicit oauth-client annotation true": {
+		"mcp-server is audience-only": {
 			annotations: map[string]string{
-				constants.AnnotationOAuthClient: "true",
+				constants.AnnotationAIRole: "mcp-server",
 			},
-			expected: true,
+			expected: false,
 		},
-		"both ai-agent and oauth-client": {
+		"inference-model": {
 			annotations: map[string]string{
-				constants.AnnotationAIRole:      constants.AIAgentRole,
-				constants.AnnotationOAuthClient: "true",
+				constants.AnnotationAIRole: "inference-model",
 			},
-			expected: true,
+			expected: false,
 		},
-		"oauth-client annotation false": {
+		"legacy oauth-client annotation is ignored": {
 			annotations: map[string]string{
-				constants.AnnotationOAuthClient: "false",
+				"consul.hashicorp.com/oauth-client": "true",
 			},
 			expected: false,
 		},
@@ -308,18 +307,12 @@ func TestIsOAuthClient(t *testing.T) {
 			annotations: map[string]string{},
 			expected:    false,
 		},
-		"unrelated ai-role value": {
-			annotations: map[string]string{
-				constants.AnnotationAIRole: "inference-model",
-			},
-			expected: false,
-		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: tc.annotations}}
-			require.Equal(t, tc.expected, IsOAuthClient(pod))
+			require.Equal(t, tc.expected, IsAIAgent(pod))
 		})
 	}
 }

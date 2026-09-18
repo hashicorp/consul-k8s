@@ -1,3 +1,0 @@
-```release-note:feature
-connect-inject: For oauth_client workloads, inject consul-dataplane `-credential-broker-bind-addr` and pass consul-obo-outbound `--envelope-uds` / `--broker-uds` instead of SDS xDS flags.
-```

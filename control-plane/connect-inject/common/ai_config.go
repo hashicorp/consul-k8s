@@ -20,19 +20,13 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
-// IsAIAgent returns true when the pod carries the AI agent role annotation with
-// the expected "ai-agent" value.
+// IsAIAgent returns true when the pod carries consul.hashicorp.com/ai-role=ai-agent.
+// That is the CAMP gate for envelope credentials, the dataplane Local Credential
+// Broker, and both OBO sidecars (matches enterprise ServiceNeedsOAuthCredential).
+// mcp-server and inference-model pods do not get OBO inject; MCP servers are
+// DCR audiences only.
 func IsAIAgent(pod corev1.Pod) bool {
 	return pod.Annotations[constants.AnnotationAIRole] == constants.AIAgentRole
-}
-
-// IsOAuthClient returns true when the pod has opted into the OBO identity plane.
-// This is the case either when the explicit AnnotationOAuthClient annotation is
-// set to "true", or when the pod is an AI agent (which is always an OAuth client
-// by definition).  Both groups receive the consul-obo-inbound and
-// consul-obo-outbound sidecars.
-func IsOAuthClient(pod corev1.Pod) bool {
-	return IsAIAgent(pod) || pod.Annotations[constants.AnnotationOAuthClient] == "true"
 }
 
 // AIAgentMCPConfigName returns the ConfigMap name from the MCP config annotation,

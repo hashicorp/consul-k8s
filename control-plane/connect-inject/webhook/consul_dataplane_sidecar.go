@@ -503,7 +503,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 	}
 
-	if common.IsOAuthClient(pod) {
+	if common.IsAIAgent(pod) {
 		args = append(args, "-credential-broker-bind-addr=unix:///consul/connect-inject/credential-broker.sock")
 	}
 

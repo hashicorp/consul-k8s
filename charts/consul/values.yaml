@@ -802,19 +802,17 @@ global:
   # @default: hashicorp/consul-ai-mcp-interceptor:<latest supported version>
   imageConsulAIMCPInterceptor: docker.mirror.hashicorp.services/hashicorppreview/consul-ai-mcp-interceptor:2.1.0-dev
 
-  # The Docker image for the consul-obo-inbound sidecar injected into all
-  # oauth_client=true pods. Runs the inbound OBO JWT validation ext_proc on
-  # loopback :21102 (DefaultOBOInboundPort).
+  # The Docker image for the consul-obo-inbound sidecar injected into
+  # consul.hashicorp.com/ai-role=ai-agent pods. Runs inbound OBO JWT validation
+  # ext_proc on loopback :21102 (DefaultOBOInboundPort).
   # Binary source: consul-ai-apps/gateways/obo-inbound
-  # Falls back to global.imageK8S when empty.
   # @type: string
   imageConsulOBOInbound: ""
 
-  # The Docker image for the consul-obo-outbound sidecar injected into all
-  # oauth_client=true pods. Runs the RFC 8693 egress OBO token exchange ext_proc
-  # on loopback :21103 (DefaultOBOOutboundPort).
+  # The Docker image for the consul-obo-outbound sidecar injected into
+  # consul.hashicorp.com/ai-role=ai-agent pods. RFC 8693 egress OBO token
+  # exchange ext_proc on loopback :21103 (DefaultOBOOutboundPort).
   # Binary source: consul-ai-apps/gateways/obo-outbound
-  # Falls back to global.imageK8S when empty.
   # @type: string
   imageConsulOBOOutbound: ""
 
