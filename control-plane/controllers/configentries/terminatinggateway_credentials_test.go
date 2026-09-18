@@ -116,6 +116,57 @@ func TestTerminatingGatewayCredentialPodDisabled(t *testing.T) {
 	require.Empty(t, podSpec.Containers[0].VolumeMounts)
 }
 
+// TestTerminatingGatewayCredentialPodKubernetesSecret asserts the controller's
+// projection when the credential source is a Kubernetes Secret: the processor and
+// socket wiring stay identical, camp-vault-rendered becomes a read-only Secret
+// volume, and no Vault Agent containers/volumes/token exist.
+func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
+	ci := &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:            true,
+		Source:             consulv1alpha1.CredentialSourceKubernetesSecret,
+		SecretName:         "camp-egress-credentials",
+		ProcessorImage:     "camp-auth-processor:test",
+		ProcessorConfigMap: "camp-proc",
+	}
+	podSpec := corev1.PodSpec{
+		InitContainers: []corev1.Container{{Name: "terminating-gateway-init"}},
+		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
+	}
+
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, "consul-k8s-control-plane:test", corev1.PullIfNotPresent, "info")
+
+	// No Vault Agent containers in either init or main containers.
+	for _, n := range []string{"camp-vault-agent", "camp-vault-agent-init"} {
+		require.Falsef(t, hasContainer(podSpec.InitContainers, n), "unexpected init container %q", n)
+		require.Falsef(t, hasContainer(podSpec.Containers, n), "unexpected container %q", n)
+	}
+
+	// camp-vault-rendered is a read-only Secret volume for the named Secret.
+	rendered := volumeByName(t, podSpec.Volumes, campVaultRenderedVolume)
+	require.NotNil(t, rendered.Secret, "camp-vault-rendered must be a Secret volume")
+	require.Equal(t, "camp-egress-credentials", rendered.Secret.SecretName)
+	require.Nil(t, rendered.EmptyDir)
+
+	// No Vault token / agent-config / private / CA volumes exist.
+	for _, n := range []string{campVaultTokenVolume, campVaultAgentPrivateVolume, campVaultAgentConfigVolume, campVaultCAVolume} {
+		require.Falsef(t, hasVolume(podSpec.Volumes, n), "unexpected volume %q", n)
+	}
+
+	// Processor still present, reads rendered read-only; socket init present.
+	proc := containerByName(t, podSpec.Containers, "camp-auth-processor")
+	require.True(t, mountReadOnly(proc, campVaultRenderedVolume))
+	require.True(t, hasContainer(podSpec.InitContainers, "camp-auth-socket-init"))
+
+	// Envoy mounts only the socket, never credentials.
+	envoy := containerByName(t, podSpec.Containers, "terminating-gateway")
+	require.True(t, hasMount(envoy, campAuthSocketVolume))
+	require.False(t, hasMount(envoy, campVaultRenderedVolume))
+
+	// Shared supplemental group and grace period still applied.
+	require.Contains(t, podSpec.SecurityContext.SupplementalGroups, campCredentialUID)
+	require.NotNil(t, podSpec.TerminationGracePeriodSeconds)
+}
+
 func containerByName(t *testing.T, containers []corev1.Container, name string) corev1.Container {
 	t.Helper()
 	for _, c := range containers {
@@ -149,6 +200,15 @@ func mountReadOnly(c corev1.Container, name string) bool {
 func hasVolume(volumes []corev1.Volume, name string) bool {
 	for _, v := range volumes {
 		if v.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasContainer(containers []corev1.Container, name string) bool {
+	for _, c := range containers {
+		if c.Name == name {
 			return true
 		}
 	}

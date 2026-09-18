@@ -3624,18 +3624,33 @@ terminatingGateways:
     # Note: The Consul namespace MUST exist before the gateway is deployed.
     consulNamespace: "default"
 
-    # `credentialInjection` configures the optional, Vault-only credential
-    # injection sidecars (a Vault Agent that renders external-model credentials
-    # and a credential processor that injects them at the terminating gateway).
-    # It carries no secret material: credential values come only from Vault at
-    # runtime. This is disabled by default. When enabled, the referenced
-    # ConfigMaps and Vault Kubernetes auth role/mount must be provisioned by an
-    # operator beforehand. Any field set on an individual gateway in the
-    # `gateways` list overrides the default here.
+    # `credentialInjection` configures the optional credential-injection sidecars
+    # for a terminating gateway. It supports two delivery sources (see `source`):
+    # a Vault Agent that renders external-model credentials, or a Kubernetes Secret
+    # mounted read-only. Either way, credentials are injected by a credential
+    # processor at the terminating gateway. This is disabled by default. When
+    # enabled, the referenced ConfigMaps/Secret and (for the Vault source) the
+    # Vault Kubernetes auth role/mount must be provisioned by an operator
+    # beforehand. Any field set on an individual gateway in the `gateways` list
+    # overrides the default here.
     credentialInjection:
       # Enabled controls whether the credential processor and Vault Agent
       # sidecars are added to the terminating gateway deployment.
       enabled: false
+
+      # Source selects the credential delivery mechanism: "vault" (default) runs
+      # the Vault Agent sidecars, or "kubernetesSecret" mounts a Kubernetes Secret
+      # read-only into the credential processor. Kubernetes Secrets are a weaker
+      # posture than Vault (base64 at rest, readable via the API with RBAC); enable
+      # etcd encryption-at-rest and scope RBAC before using this source.
+      # @type: string
+      source: "vault"
+
+      # SecretName names the Kubernetes Secret (in the gateway's namespace) whose
+      # data keys are per-binding credential envelope files. Required when
+      # source is "kubernetesSecret"; ignored otherwise.
+      # @type: string
+      secretName: ""
 
       # ProcessorImage is the container image for the credential processor sidecar.
       # @type: string
