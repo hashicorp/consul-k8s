@@ -107,10 +107,38 @@ func routeExtAuthzFromAnnotations(annotations map[string]string) *api.HTTPRouteE
 	}
 }
 
+// listenerProtocolMap maps Kubernetes Gateway API listener protocol values to
+// the corresponding Consul api-gateway listener protocol strings.
 var listenerProtocolMap = map[string]string{
 	"https": "http",
 	"http":  "http",
 	"tcp":   "tcp",
+	// http2 and grpc are not standard Gateway API protocol types; they are
+	// selected via the ListenerProtocol annotation (see resolveListenerProtocol).
+}
+
+// validConsulListenerProtocols is the set of values accepted by Consul's
+// APIGatewayListenerProtocol. Used to validate annotation-supplied overrides.
+var validConsulListenerProtocols = map[string]bool{
+	"http":  true,
+	"http2": true,
+	"grpc":  true,
+	"tcp":   true,
+}
+
+// resolveListenerProtocol returns the Consul listener protocol for the given
+// listener section. If the Gateway carries the per-section annotation
+// "api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol" with a
+// valid value, that value takes precedence over the protocol derived from the
+// Kubernetes listener.Protocol field.
+func resolveListenerProtocol(gateway gwv1.Gateway, listener gwv1.Listener) string {
+	annotationKey := ListenerProtocolAnnotationPrefix + string(listener.Name) + ListenerProtocolAnnotationSuffix
+	if override, ok := gateway.Annotations[annotationKey]; ok {
+		if validConsulListenerProtocols[strings.ToLower(override)] {
+			return strings.ToLower(override)
+		}
+	}
+	return listenerProtocolMap[strings.ToLower(string(listener.Protocol))]
 }
 
 func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1.Gateway, listener gwv1.Listener, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) (api.APIGatewayListener, bool) {
@@ -162,7 +190,7 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1.Gateway, listener 
 		Name:     string(listener.Name),
 		Hostname: DerefStringOr(listener.Hostname, ""),
 		Port:     ToContainerPort(listener.Port, portMapping),
-		Protocol: listenerProtocolMap[strings.ToLower(string(listener.Protocol))],
+		Protocol: resolveListenerProtocol(gateway, listener),
 		TLS: api.APIGatewayTLSConfiguration{
 			Certificates: certificates,
 			SDS:          sdsConfig,
