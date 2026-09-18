@@ -27,8 +27,6 @@ func validCredentialInjection() *TerminatingGatewayCredentialInjection {
 		VaultAgentConfigMap:    "camp-egress-vault-agent",
 		VaultAddress:           "https://vault.example:8200",
 		VaultNamespace:         "",
-		VaultAuthRole:          "camp-egress",
-		VaultAuthMount:         "kubernetes",
 		VaultCAConfigMap:       "vault-ca",
 		TokenAudience:          "vault",
 		TokenExpirationSeconds: ptr.To(int64(3600)),
@@ -292,10 +290,10 @@ func TestTerminatingGatewayCredentialInjection_Validate(t *testing.T) {
 				`spec.deployment.credentialInjection.drainSeconds`,
 			},
 		},
-		"forbidden wildcard in vaultAuthMount": {
-			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) { ci.VaultAuthMount = "kub*" }, ptr.To(true)),
+		"forbidden wildcard in processorConfigMap": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) { ci.ProcessorConfigMap = "camp-*" }, ptr.To(true)),
 			expectedErrMsgs: []string{
-				`spec.deployment.credentialInjection.vaultAuthMount`,
+				`spec.deployment.credentialInjection.processorConfigMap`,
 				`wildcard`,
 			},
 		},
@@ -347,6 +345,21 @@ func TestTerminatingGatewayCredentialInjection_Validate(t *testing.T) {
 			}, ptr.To(true)),
 			expectedErrMsgs: []string{
 				`spec.deployment.credentialInjection.secretName`,
+				`wildcard`,
+			},
+		},
+		"kubernetesSecret source rejects wildcard processorConfigMap": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) {
+				ci.Source = CredentialSourceKubernetesSecret
+				ci.SecretName = "camp-egress-credentials"
+				ci.ProcessorConfigMap = "camp-*"
+				ci.VaultAgentImage = ""
+				ci.VaultAgentConfigMap = ""
+				ci.VaultAddress = ""
+				ci.TokenAudience = ""
+			}, ptr.To(true)),
+			expectedErrMsgs: []string{
+				`spec.deployment.credentialInjection.processorConfigMap`,
 				`wildcard`,
 			},
 		},
@@ -417,8 +430,6 @@ func TestTerminatingGatewayCredentialInjectionCRDSchema(t *testing.T) {
 		"vaultAgentConfigMap":    "string",
 		"vaultAddress":           "string",
 		"vaultNamespace":         "string",
-		"vaultAuthRole":          "string",
-		"vaultAuthMount":         "string",
 		"vaultCAConfigMap":       "string",
 		"tokenAudience":          "string",
 		"tokenExpirationSeconds": "integer",

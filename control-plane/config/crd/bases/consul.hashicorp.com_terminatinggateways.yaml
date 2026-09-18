@@ -1027,19 +1027,13 @@ spec:
                       vaultAgentConfigMap:
                         description: |-
                           VaultAgentConfigMap names the ConfigMap, in the gateway's namespace, carrying
-                          non-secret Vault Agent configuration.
+                          non-secret Vault Agent configuration. This ConfigMap exclusively owns the
+                          Vault auth configuration (auto-auth method, role, and mount); there are no
+                          separate auth role/mount fields on this API.
                         type: string
                       vaultAgentImage:
                         description: VaultAgentImage is the container image reference
                           for the Vault Agent sidecar.
-                        type: string
-                      vaultAuthMount:
-                        description: VaultAuthMount is the mount path of the Vault
-                          Kubernetes auth method.
-                        type: string
-                      vaultAuthRole:
-                        description: VaultAuthRole is the Vault Kubernetes auth role
-                          assumed by the sidecar.
                         type: string
                       vaultCAConfigMap:
                         description: |-
