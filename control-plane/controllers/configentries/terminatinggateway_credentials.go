@@ -67,12 +67,16 @@ func applyTerminatingGatewayCredentialInjection(
 
 	podSpec.Volumes = append(podSpec.Volumes, campCredentialVolumes(ci)...)
 
-	podSpec.InitContainers = append(podSpec.InitContainers,
-		campSocketInitContainer(imageK8S, imagePullPolicy),
-		campVaultAgentContainer("camp-vault-agent-init", true, ci, imagePullPolicy),
-	)
+	podSpec.InitContainers = append(podSpec.InitContainers, campSocketInitContainer(imageK8S, imagePullPolicy))
+	if ci.EffectiveSource() == consulv1alpha1.CredentialSourceVault {
+		podSpec.InitContainers = append(podSpec.InitContainers,
+			campVaultAgentContainer("camp-vault-agent-init", true, ci, imagePullPolicy),
+		)
+		podSpec.Containers = append(podSpec.Containers,
+			campVaultAgentContainer("camp-vault-agent", false, ci, imagePullPolicy),
+		)
+	}
 	podSpec.Containers = append(podSpec.Containers,
-		campVaultAgentContainer("camp-vault-agent", false, ci, imagePullPolicy),
 		campAuthProcessorContainer(ci, imagePullPolicy, logLevel),
 	)
 
@@ -104,6 +108,29 @@ func applyTerminatingGatewayCredentialInjection(
 func campCredentialVolumes(ci *consulv1alpha1.TerminatingGatewayCredentialInjection) []corev1.Volume {
 	memory := &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory}
 
+	// The shared ext_proc socket and the non-secret processor config exist in
+	// every source.
+	volumes := []corev1.Volume{
+		{Name: campAuthSocketVolume, VolumeSource: corev1.VolumeSource{EmptyDir: memory}},
+		{Name: campAuthProcessorConfigVolume, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{Name: ci.ProcessorConfigMap},
+		}}},
+	}
+
+	if ci.EffectiveSource() == consulv1alpha1.CredentialSourceKubernetesSecret {
+		// Credentials arrive via a read-only Secret mounted at the rendered path.
+		// The volume keeps its name/mount so the processor container is unchanged.
+		volumes = append(volumes, corev1.Volume{
+			Name: campVaultRenderedVolume,
+			VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{
+				SecretName: ci.SecretName,
+			}},
+		})
+		return volumes
+	}
+
+	// Vault source: memory rendered dir written by the Vault Agent, plus its
+	// projected token and agent config/private (and optional CA) volumes.
 	token := corev1.ServiceAccountTokenProjection{
 		Path:     "token",
 		Audience: defaultIfEmpty(ci.TokenAudience, campDefaultAudience),
@@ -111,21 +138,16 @@ func campCredentialVolumes(ci *consulv1alpha1.TerminatingGatewayCredentialInject
 	if ci.TokenExpirationSeconds != nil {
 		token.ExpirationSeconds = ci.TokenExpirationSeconds
 	}
-
-	volumes := []corev1.Volume{
-		{Name: campVaultRenderedVolume, VolumeSource: corev1.VolumeSource{EmptyDir: memory}},
-		{Name: campAuthSocketVolume, VolumeSource: corev1.VolumeSource{EmptyDir: memory}},
-		{Name: campVaultTokenVolume, VolumeSource: corev1.VolumeSource{Projected: &corev1.ProjectedVolumeSource{
+	volumes = append(volumes,
+		corev1.Volume{Name: campVaultRenderedVolume, VolumeSource: corev1.VolumeSource{EmptyDir: memory}},
+		corev1.Volume{Name: campVaultTokenVolume, VolumeSource: corev1.VolumeSource{Projected: &corev1.ProjectedVolumeSource{
 			Sources: []corev1.VolumeProjection{{ServiceAccountToken: &token}},
 		}}},
-		{Name: campVaultAgentPrivateVolume, VolumeSource: corev1.VolumeSource{EmptyDir: memory}},
-		{Name: campVaultAgentConfigVolume, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+		corev1.Volume{Name: campVaultAgentPrivateVolume, VolumeSource: corev1.VolumeSource{EmptyDir: memory}},
+		corev1.Volume{Name: campVaultAgentConfigVolume, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: ci.VaultAgentConfigMap},
 		}}},
-		{Name: campAuthProcessorConfigVolume, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-			LocalObjectReference: corev1.LocalObjectReference{Name: ci.ProcessorConfigMap},
-		}}},
-	}
+	)
 	if ci.VaultCAConfigMap != "" {
 		volumes = append(volumes, corev1.Volume{
 			Name: campVaultCAVolume,
@@ -302,13 +324,29 @@ func validateCredentialInjectionWorkload(
 		value string
 	}{
 		{"processorImage", ci.ProcessorImage},
-		{"vaultAgentImage", ci.VaultAgentImage},
 		{"processorConfigMap", ci.ProcessorConfigMap},
-		{"vaultAgentConfigMap", ci.VaultAgentConfigMap},
-		{"vaultAddress", ci.VaultAddress},
 	} {
 		if f.value == "" {
 			missing = append(missing, f.name)
+		}
+	}
+
+	if ci.EffectiveSource() == consulv1alpha1.CredentialSourceKubernetesSecret {
+		if ci.SecretName == "" {
+			missing = append(missing, "secretName")
+		}
+	} else {
+		for _, f := range []struct {
+			name  string
+			value string
+		}{
+			{"vaultAgentImage", ci.VaultAgentImage},
+			{"vaultAgentConfigMap", ci.VaultAgentConfigMap},
+			{"vaultAddress", ci.VaultAddress},
+		} {
+			if f.value == "" {
+				missing = append(missing, f.name)
+			}
 		}
 	}
 	if len(missing) > 0 {
@@ -358,7 +396,10 @@ func (r *TerminatingGatewayController) credentialConfigChecksum(
 	namespace string,
 	ci *consulv1alpha1.TerminatingGatewayCredentialInjection,
 ) (string, error) {
-	names := []string{ci.ProcessorConfigMap, ci.VaultAgentConfigMap}
+	names := []string{ci.ProcessorConfigMap}
+	if ci.VaultAgentConfigMap != "" {
+		names = append(names, ci.VaultAgentConfigMap)
+	}
 	if ci.VaultCAConfigMap != "" {
 		names = append(names, ci.VaultCAConfigMap)
 	}
