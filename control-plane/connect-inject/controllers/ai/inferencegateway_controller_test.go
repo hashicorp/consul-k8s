@@ -33,6 +33,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 // ── mock Consul httptest helpers ──────────────────────────────────────────────
@@ -383,26 +384,88 @@ func TestInferenceGatewayReconcile_ChildResources(t *testing.T) {
 			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
 		require.Equal(t, "gw", dep.Name)
 		require.Equal(t, "default", dep.Namespace)
-		require.Equal(t, "test-gateway-image:latest", dep.Spec.Template.Spec.Containers[0].Image)
-		// Only the metrics port is exposed as a named container port now;
-		// the ext_proc gRPC listener uses a Unix socket (-uds-path).
-		require.Equal(t, inferenceGatewayMetricsPort, dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
 
-		// Deployment must carry pool env vars.
+		// Pod annotations: webhook opted out, gateway-kind set for endpoints controller.
+		require.Equal(t, "false", dep.Spec.Template.Annotations[constants.AnnotationInject])
+		require.Equal(t, "inference-gateway", dep.Spec.Template.Annotations[constants.AnnotationGatewayKind])
+		require.Equal(t, "gw", dep.Spec.Template.Annotations[constants.AnnotationGatewayConsulServiceName])
+		// No spec.service set → falls back to inferenceGatewayServicePort (8443).
+		require.Equal(t, "8443", dep.Spec.Template.Annotations[constants.AnnotationInferenceGatewayPort])
+
+		// Pod labels: ManagedByValue label present so registerGateway() fires.
+		require.Equal(t, constants.ManagedByValue, dep.Spec.Template.Labels[constants.KeyManagedBy])
+
+		// Init container is connect-init using the consul-k8s image.
+		require.Len(t, dep.Spec.Template.Spec.InitContainers, 1)
+		require.Equal(t, "connect-init", dep.Spec.Template.Spec.InitContainers[0].Name)
+		require.Equal(t, "consul-k8s:latest", dep.Spec.Template.Spec.InitContainers[0].Image)
+		// CONSUL_ADDRESSES must be set from ConsulAddress so connect-init can resolve the server.
+		initEnvMap := make(map[string]string)
+		for _, e := range dep.Spec.Template.Spec.InitContainers[0].Env {
+			initEnvMap[e.Name] = e.Value
+		}
+		require.Equal(t, "consul-server.default.svc", initEnvMap["CONSUL_ADDRESSES"])
+
+		// First container is consul-dataplane (Envoy).
+		require.Equal(t, "consul-dataplane", dep.Spec.Template.Spec.Containers[0].Name)
+		require.Equal(t, "consul-dataplane:latest", dep.Spec.Template.Spec.Containers[0].Image)
+
+		// Second container is inference-gateway (ext_proc sidecar).
+		require.Equal(t, "inference-gateway", dep.Spec.Template.Spec.Containers[1].Name)
+		require.Equal(t, "test-gateway-image:latest", dep.Spec.Template.Spec.Containers[1].Image)
+		// Only the metrics port is exposed on the ext_proc sidecar.
+		require.Equal(t, inferenceGatewayMetricsPort, dep.Spec.Template.Spec.Containers[1].Ports[0].ContainerPort)
+
+		// ext_proc sidecar must carry pool env vars.
 		envMap := make(map[string]string)
-		for _, e := range dep.Spec.Template.Spec.Containers[0].Env {
+		for _, e := range dep.Spec.Template.Spec.Containers[1].Env {
 			envMap[e.Name] = e.Value
 		}
 		require.Equal(t, "pool", envMap["POOL_NAME"])
 		require.Equal(t, "default", envMap["POOL_NAMESPACE"])
+
+		// Two shared volumes: consul-service (proxy-id) and run-consul (UDS socket).
+		require.Len(t, dep.Spec.Template.Spec.Volumes, 2)
+		volNames := []string{dep.Spec.Template.Spec.Volumes[0].Name, dep.Spec.Template.Spec.Volumes[1].Name}
+		require.Contains(t, volNames, "consul-service")
+		require.Contains(t, volNames, "run-consul")
 
 		// Service must exist with the controller's DefaultService values.
 		svc := &corev1.Service{}
 		require.NoError(t, fakeClient.Get(context.Background(),
 			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
 		require.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
-		// DefaultService is zero — falls back to inferenceGatewayPort constant.
-		require.Equal(t, inferenceGatewayPort, svc.Spec.Ports[0].Port)
+		// DefaultService is zero — falls back to inferenceGatewayServicePort constant (8443).
+		require.Equal(t, inferenceGatewayServicePort, svc.Spec.Ports[0].Port)
+	})
+
+	t.Run("spec.service.ports[0] is stamped as AnnotationInferenceGatewayPort", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.Spec.Service = &v1alpha1.InferenceGatewayService{
+			Ports: []v1alpha1.InferenceGatewayServicePort{{Port: 9443}},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		// spec.service.ports[0]=9443 must win over the 8443 default.
+		require.Equal(t, "9443", dep.Spec.Template.Annotations[constants.AnnotationInferenceGatewayPort])
 	})
 
 	t.Run("Deployment has owner reference pointing to InferenceGateway", func(t *testing.T) {
@@ -562,7 +625,7 @@ func TestInferenceGatewayReconcile_ReadyReplicas(t *testing.T) {
 		// Pre-create a Deployment with ReadyReplicas=1 in the fake store.
 		// The controller reads Deployment.Status.ReadyReplicas after reconcileDeployment,
 		// so seeding it here simulates a running pod.
-		existingDep := deploymentFor(igw, pool, "test-gateway-image:latest", corev1.ResourceRequirements{})
+		existingDep := deploymentFor(igw, pool, "consul-dataplane:latest", "consul-k8s:latest", "test-gateway-image:latest", inferenceGatewayServicePort, corev1.ResourceRequirements{}, deploymentConsulConfig{address: "consul-server.default.svc"})
 		existingDep.Status.ReadyReplicas = 1
 
 		fakeClient := fake.NewClientBuilder().
@@ -730,8 +793,11 @@ func igwController(
 		Log:                 logrtest.New(t),
 		Recorder:            record.NewFakeRecorder(10),
 		GatewayImage:        "test-gateway-image:latest",
+		DataplaneImage:      "consul-dataplane:latest",
+		ConsulK8SImage:      "consul-k8s:latest",
 		ConsulClientConfig:  consulCfg,
 		ConsulServerConnMgr: watcher,
+		ConsulAddress:       "consul-server.default.svc",
 		Datacenter:          "dc1",
 		// EnableConsulNamespaces defaults to false (OSS mode) — safe default.
 	}
@@ -1127,7 +1193,8 @@ func TestInferenceGatewayReconcile_Resources(t *testing.T) {
 		require.NoError(t, fakeClient.Get(context.Background(),
 			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
 
-		res := dep.Spec.Template.Spec.Containers[0].Resources
+		// Resources are applied to the inference-gateway ext_proc sidecar (index 1).
+		res := dep.Spec.Template.Spec.Containers[1].Resources
 		require.Equal(t, parseQty("250m"), res.Requests[corev1.ResourceCPU])
 		require.Equal(t, parseQty("128Mi"), res.Requests[corev1.ResourceMemory])
 		require.Equal(t, parseQty("500m"), res.Limits[corev1.ResourceCPU])
@@ -1167,7 +1234,8 @@ func TestInferenceGatewayReconcile_Resources(t *testing.T) {
 		require.NoError(t, fakeClient.Get(context.Background(),
 			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
 
-		res := dep.Spec.Template.Spec.Containers[0].Resources
+		// Resources are applied to the inference-gateway ext_proc sidecar (index 1).
+		res := dep.Spec.Template.Spec.Containers[1].Resources
 		require.Equal(t, parseQty("512Mi"), res.Requests[corev1.ResourceMemory],
 			"spec.resources must win over DefaultResources")
 	})
@@ -1196,7 +1264,8 @@ func TestInferenceGatewayReconcile_Resources(t *testing.T) {
 		require.NoError(t, fakeClient.Get(context.Background(),
 			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
 
-		res := dep.Spec.Template.Spec.Containers[0].Resources
+		// Resources are applied to the inference-gateway ext_proc sidecar (index 1).
+		res := dep.Spec.Template.Spec.Containers[1].Resources
 		require.Empty(t, res.Requests, "no requests when both DefaultResources and spec.resources are zero")
 		require.Empty(t, res.Limits, "no limits when both DefaultResources and spec.resources are zero")
 	})
@@ -1275,7 +1344,7 @@ func TestInferenceGatewayReconcile_Service(t *testing.T) {
 			"spec.service.ports must win over DefaultService")
 	})
 
-	t.Run("zero DefaultService falls back to inferenceGatewayPort constant", func(t *testing.T) {
+	t.Run("zero DefaultService falls back to inferenceGatewayServicePort constant", func(t *testing.T) {
 		consulCfg, watcher := consulMockServer(t)
 		s := igwScheme(t)
 
@@ -1299,7 +1368,7 @@ func TestInferenceGatewayReconcile_Service(t *testing.T) {
 		require.NoError(t, fakeClient.Get(context.Background(),
 			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
 		require.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
-		require.Equal(t, inferenceGatewayPort, svc.Spec.Ports[0].Port)
+		require.Equal(t, inferenceGatewayServicePort, svc.Spec.Ports[0].Port)
 	})
 
 	t.Run("multiple ports in spec.service are all rendered on the Service", func(t *testing.T) {

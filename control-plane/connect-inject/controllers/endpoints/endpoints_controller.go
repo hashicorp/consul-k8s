@@ -53,6 +53,7 @@ const (
 	ingressGateway     = "ingress-gateway"
 	apiGateway         = "api-gateway"
 	apiGatewayConsul   = "api-gateway-consul"
+	inferenceGateway   = "inference-gateway"
 
 	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
 	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"
@@ -281,7 +282,15 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						}
 					}
 
-					if hasBeenInjected(pod) {
+					// Gateway pods (mesh/ingress/terminating/inference) are registered below via
+					// registerGateway and must not also go through the normal connect-proxy
+					// registration path. Most gateway kinds never reach hasBeenInjected(pod)==true,
+					// but inference-gateway pods do get consul-dataplane injected like a regular
+					// workload, so without this guard they'd be double-registered (once as
+					// ServiceKindConnectProxy here, once as ServiceKindInferenceGateway below),
+					// which then causes connect-init's gateway registration lookup to see multiple
+					// matching services for the same pod and fail.
+					if hasBeenInjected(pod) && !isGateway(pod) {
 						if isConsulDataplaneSupported(pod) {
 							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
 							if err = r.registerServicesAndHealthCheck(ctx, apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
@@ -621,6 +630,7 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 		Locality:  locality,
 		AI:        serviceAI,
 	}
+
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
 		Address: pod.Status.HostIP,
@@ -869,6 +879,15 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 		metaKeySyntheticNode:     "true",
 		constants.MetaKeyPodUID:  string(pod.UID),
 	}
+	for k, v := range pod.Annotations {
+		if strings.HasPrefix(k, constants.AnnotationMeta) && strings.TrimPrefix(k, constants.AnnotationMeta) != "" {
+			if v == "$POD_NAME" {
+				meta[strings.TrimPrefix(k, constants.AnnotationMeta)] = pod.Name
+			} else {
+				meta[strings.TrimPrefix(k, constants.AnnotationMeta)] = v
+			}
+		}
+	}
 
 	// Set the default values from the annotation, if possible.
 	baseConfig, err := annotationProxyConfigMap(pod)
@@ -968,8 +987,18 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 	case apiGatewayConsul:
 		// Do nothing. This is only here so that API gateway pods have annotations
 		// consistent with other gateway types but don't return an error below.
+	case inferenceGateway:
+		service.Kind = api.ServiceKindInferenceGateway
+		// Use the port stamped on the pod by the controller (from spec.service.ports[0]).
+		// Fall back to 8443 if the annotation is absent or unparseable.
+		service.Port = 8443
+		if raw, ok := pod.Annotations[constants.AnnotationInferenceGatewayPort]; ok {
+			if p, err := strconv.Atoi(raw); err == nil && p > 0 {
+				service.Port = p
+			}
+		}
 	default:
-		return nil, fmt.Errorf("%s must be one of %s, %s, %s, %s, or %s ", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway, apiGatewayConsul)
+		return nil, fmt.Errorf("%s must be one of %s, %s, %s, %s, %s, or %s ", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway, apiGatewayConsul, inferenceGateway)
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {

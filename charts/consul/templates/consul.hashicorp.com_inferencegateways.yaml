@@ -21,6 +21,10 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: Number of gateway Deployment replicas that are ready.
+      jsonPath: .status.readyReplicas
+      name: Ready
+      type: integer
     - description: Whether the controller has successfully reconciled this resource.
       jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Synced
@@ -92,6 +96,72 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              resources:
+                description: |-
+                  resources sets the compute resource requests and limits for the gateway
+                  container. When not set the controller uses the cluster-level defaults
+                  configured via Helm (ai.inferenceGateway.resources).
+                properties:
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                        - type: integer
+                        - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: Limits describes the maximum amount of compute resources allowed.
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                        - type: integer
+                        - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: Requests describes the minimum amount of compute resources required.
+                    type: object
+                type: object
+              logLevel:
+                description: |-
+                  logLevel sets the log verbosity of the inference-gateway process.
+                  Valid values: trace, debug, info, warn, error. Defaults to info when not set.
+                enum:
+                  - trace
+                  - debug
+                  - info
+                  - warn
+                  - error
+                type: string
+              service:
+                description: |-
+                  service configures the ClusterIP Service fronting the gateway Deployment.
+                  When not set the controller uses the cluster-level defaults configured via
+                  Helm (ai.inferenceGateway.defaults.service).
+                properties:
+                  type:
+                    description: type is the Kubernetes Service type. Defaults to ClusterIP.
+                    enum:
+                      - ClusterIP
+                      - NodePort
+                      - LoadBalancer
+                    type: string
+                  ports:
+                    description: |-
+                      ports is the list of ports exposed by the Service. The first entry is
+                      used as the primary inference traffic port.
+                    items:
+                      properties:
+                        port:
+                          description: port number exposed on the Service.
+                          format: int32
+                          maximum: 65535
+                          minimum: 1
+                          type: integer
+                      required:
+                        - port
+                      type: object
+                    type: array
+                type: object
             required:
               - poolRef
             type: object
@@ -165,6 +235,15 @@ spec:
                   reconciled this resource.
                 format: date-time
                 type: string
+              readyReplicas:
+                description: |-
+                  readyReplicas is the number of gateway Deployment replicas that are
+                  currently Ready, as reported by the Deployment status. Mirrors
+                  apps/v1.DeploymentStatus.ReadyReplicas so consumers can read gateway
+                  readiness directly from the InferenceGateway object without querying
+                  the Deployment separately.
+                format: int32
+                type: integer
             type: object
         required:
           - spec
@@ -172,4 +251,7 @@ spec:
     served: true
     storage: true
     subresources:
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.readyReplicas
       status: {}

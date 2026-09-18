@@ -6,6 +6,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +47,11 @@ const (
 	// (consul-inference-gateway default: -addr=:9000).
 	inferenceGatewayPort = int32(9000)
 
+	// inferenceGatewayServicePort is the default Kubernetes Service port exposed
+	// to callers in the mesh. Matches the convention used by other inference
+	// gateway deployments in this cluster (8443).
+	inferenceGatewayServicePort = int32(8443)
+
 	// inferenceGatewayMetricsPort is the Prometheus /metrics port
 	// (consul-inference-gateway default: -metrics-addr=:9090).
 	inferenceGatewayMetricsPort = int32(9090)
@@ -77,9 +83,19 @@ type InferenceGatewayController struct {
 	Log      logr.Logger
 	Recorder record.EventRecorder
 
-	// GatewayImage is the container image for the inference-gateway binary.
-	// Injected at startup via v1controllers.go.
+	// GatewayImage is the container image for the inference-gateway binary
+	// (ext_proc sidecar). Injected at startup via v1controllers.go.
 	GatewayImage string
+
+	// DataplaneImage is the container image for consul-dataplane (Envoy).
+	// Used as the main container in the inference-gateway pod, mirroring
+	// the mesh-gateway deployment model. Sourced from c.flagConsulDataplaneImage.
+	DataplaneImage string
+
+	// ConsulK8SImage is the image for consul-k8s-control-plane, used for the
+	// connect-init init container that writes the proxy-id file.
+	// Sourced from c.flagConsulK8sImage.
+	ConsulK8SImage string
 
 	// DefaultResources is the fallback resource requests/limits for the
 	// gateway container, sourced from ai.inferenceGateway.defaults.resources
@@ -92,10 +108,31 @@ type InferenceGatewayController struct {
 	DefaultService v1alpha1.InferenceGatewayService
 
 	// ConsulClientConfig is the Consul API client configuration.
+	// GRPCPort, HTTPPort, and APITimeout are read from here for the init container
+	// and consul-dataplane env vars.
 	ConsulClientConfig *consul.Config
 
 	// ConsulServerConnMgr is the watcher for the live Consul server address.
 	ConsulServerConnMgr consul.ServerConnectionManager
+
+	// ConsulAddress is the stable DNS name of the Consul server, e.g.
+	// "release-consul-server.default.svc". Injected into the connect-init
+	// init container as CONSUL_ADDRESSES and into consul-dataplane as -addresses.
+	// Sourced from c.consul.Addresses in v1controllers.go.
+	ConsulAddress string
+
+	// ConsulTLSEnabled indicates whether the Consul server requires TLS.
+	// When true the init container and consul-dataplane receive the CA cert and
+	// server name; when false -tls-disabled is passed to consul-dataplane.
+	ConsulTLSEnabled bool
+
+	// ConsulCACert is the PEM-encoded CA certificate used to verify the Consul
+	// server's TLS certificate. Only used when ConsulTLSEnabled is true.
+	ConsulCACert string
+
+	// ConsulTLSServerName is the SNI/TLS server name for Consul. Only used when
+	// ConsulTLSEnabled is true.
+	ConsulTLSServerName string
 
 	// ConsulPartition is the Consul admin partition (Enterprise only; empty for OSS).
 	ConsulPartition string
@@ -635,11 +672,11 @@ func (r *InferenceGatewayController) reconcileDeployment(
 ) error {
 	log := r.Log.WithValues("inferenceGateway", igw.Name, "namespace", igw.Namespace)
 
-	// Resolve the effective image: spec field takes precedence over the
-	// controller-level default so users can pin a per-gateway image.
-	image := r.GatewayImage
+	// Resolve the effective ext_proc image: spec field takes precedence over
+	// the controller-level default so users can pin a per-gateway image.
+	gatewayImage := r.GatewayImage
 	if igw.Spec.Image != "" {
-		image = igw.Spec.Image
+		gatewayImage = igw.Spec.Image
 	}
 
 	// Resolve effective resources: spec-level overrides controller default.
@@ -648,7 +685,24 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		resources = *igw.Spec.Resources
 	}
 
-	desired := deploymentFor(igw, pool, image, resources)
+	// Resolve the Consul catalog service port — same precedence as reconcileService:
+	// spec.service.ports[0] → DefaultService.ports[0] → 8443.
+	servicePort := inferenceGatewayServicePort
+	if igw.Spec.Service != nil && len(igw.Spec.Service.Ports) > 0 {
+		servicePort = igw.Spec.Service.Ports[0].Port
+	} else if len(r.DefaultService.Ports) > 0 {
+		servicePort = r.DefaultService.Ports[0].Port
+	}
+
+	desired := deploymentFor(igw, pool, r.DataplaneImage, r.ConsulK8SImage, gatewayImage, servicePort, resources, deploymentConsulConfig{
+		address:       r.ConsulAddress,
+		grpcPort:      r.ConsulClientConfig.GRPCPort,
+		httpPort:      r.ConsulClientConfig.HTTPPort,
+		apiTimeout:    r.ConsulClientConfig.APITimeout,
+		tlsEnabled:    r.ConsulTLSEnabled,
+		caCert:        r.ConsulCACert,
+		tlsServerName: r.ConsulTLSServerName,
+	})
 	if err := controllerutil.SetControllerReference(igw, desired, r.Client.Scheme()); err != nil {
 		return fmt.Errorf("setting owner reference on Deployment: %w", err)
 	}
@@ -695,7 +749,7 @@ func (r *InferenceGatewayController) reconcileService(
 	}
 	// If neither spec nor default provided a port, fall back to the hardcoded constant.
 	if len(svc.Ports) == 0 {
-		svc.Ports = []v1alpha1.InferenceGatewayServicePort{{Port: inferenceGatewayPort}}
+		svc.Ports = []v1alpha1.InferenceGatewayServicePort{{Port: inferenceGatewayServicePort}}
 	}
 	if svc.Type == "" {
 		svc.Type = corev1.ServiceTypeClusterIP
@@ -732,17 +786,152 @@ func (r *InferenceGatewayController) reconcileService(
 
 // ── Resource builder functions ────────────────────────────────────────────────
 
+// deploymentConsulConfig carries Consul connectivity settings that must be
+// baked into the pod template (init container env vars + consul-dataplane args).
+// These mirror the fields the mesh webhook injects for regular workloads.
+type deploymentConsulConfig struct {
+	address       string        // stable DNS name, e.g. "release-consul-server.default.svc"
+	grpcPort      int           // Consul gRPC port (default 8502)
+	httpPort      int           // Consul HTTP(S) port (default 8500/8501)
+	apiTimeout    time.Duration // connect-init API timeout
+	tlsEnabled    bool
+	caCert        string // PEM CA cert (when TLS enabled)
+	tlsServerName string // SNI name (when TLS enabled)
+}
+
+// initContainerFor builds the connect-init init container for an InferenceGateway
+// pod. It mirrors what the mesh webhook does for regular workloads in container_init.go:
+// all Consul connectivity env vars are set explicitly since the webhook is bypassed.
+func initContainerFor(igw *v1alpha1.InferenceGateway, image string, cc deploymentConsulConfig) corev1.Container {
+	env := []corev1.EnvVar{
+		{
+			Name: "POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+			},
+		},
+		{
+			Name: "NODE_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+			},
+		},
+		{Name: "CONSUL_NODE_NAME", Value: "$(NODE_NAME)-virtual"},
+		{Name: "CONSUL_ADDRESSES", Value: cc.address},
+		{Name: "CONSUL_GRPC_PORT", Value: strconv.Itoa(cc.grpcPort)},
+		{Name: "CONSUL_HTTP_PORT", Value: strconv.Itoa(cc.httpPort)},
+		{Name: "CONSUL_API_TIMEOUT", Value: cc.apiTimeout.String()},
+		// DP_ENVOY_READY_BIND_ADDRESS is read by connect-init to configure the
+		// Envoy readiness endpoint address — matches the mesh-gateway init container.
+		{
+			Name: "DP_ENVOY_READY_BIND_ADDRESS",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+			},
+		},
+	}
+	if cc.tlsEnabled {
+		env = append(env,
+			corev1.EnvVar{Name: constants.UseTLSEnvVar, Value: "true"},
+			corev1.EnvVar{Name: constants.CACertPEMEnvVar, Value: cc.caCert},
+			corev1.EnvVar{Name: constants.TLSServerNameEnvVar, Value: cc.tlsServerName},
+		)
+	}
+	return corev1.Container{
+		Name:  "connect-init",
+		Image: image,
+		Env:   env,
+		Command: []string{
+			"/bin/sh", "-ec",
+			"exec consul-k8s-control-plane connect-init" +
+				" -pod-name=${POD_NAME}" +
+				" -pod-namespace=${POD_NAMESPACE}" +
+				" -gateway-kind=inference-gateway" +
+				" -proxy-id-file=/consul/service/proxy-id" +
+				" -service-name=" + igw.Name,
+		},
+		VolumeMounts: []corev1.VolumeMount{{
+			Name:      "consul-service",
+			MountPath: "/consul/service",
+		}},
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: boolPtr(false),
+			ReadOnlyRootFilesystem:   boolPtr(true),
+			RunAsNonRoot:             boolPtr(true),
+			Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+		},
+	}
+}
+
+// dataplaneArgsFor builds the consul-dataplane CLI args for an InferenceGateway pod.
+// Mirrors the args the mesh webhook's getContainerSidecarArgs produces for regular workloads.
+func dataplaneArgsFor(cc deploymentConsulConfig) []string {
+	args := []string{
+		"-addresses", cc.address,
+		"-grpc-port=" + strconv.Itoa(cc.grpcPort),
+		"-proxy-service-id-path=/consul/service/proxy-id",
+		"-log-level=info",
+		"-log-json=false",
+		"-envoy-admin-bind-address=127.0.0.1",
+		"-xds-bind-addr=127.0.0.1",
+		"-graceful-addr=127.0.0.1",
+		"-graceful-port=20600",
+	}
+	if cc.tlsEnabled {
+		if cc.tlsServerName != "" {
+			args = append(args, "-tls-server-name="+cc.tlsServerName)
+		}
+		if cc.caCert != "" {
+			args = append(args, "-ca-certs="+constants.LegacyConsulCAFile)
+		}
+	} else {
+		args = append(args, "-tls-disabled")
+	}
+	return args
+}
+
 // deploymentFor returns the desired Deployment for an InferenceGateway.
-// The connect-inject webhook annotation is set to "true" so that the mesh webhook
-// automatically injects the consul-dataplane sidecar and connect-init container,
-// exactly as it does for any other mesh-enabled workload.
+//
+// The pod is modelled after the mesh-gateway deployment:
+//   - connect-inject: "false" — the webhook is skipped; the controller builds
+//     the pod template directly with all containers.
+//   - gateway-kind: "inference-gateway" — isGateway() returns true so the
+//     endpoints controller routes registration through registerGateway() →
+//     createGatewayRegistrations(), which stamps ServiceKind=inference-gateway.
+//   - Init container (consul-k8s-control-plane connect-init -gateway-kind=…)
+//     writes the proxy-id to /consul/service/proxy-id.
+//   - Main container: consul-dataplane reads proxy-id, connects to Consul gRPC,
+//     and bootstraps Envoy as an inference-gateway proxy via xDS.
+//   - Sidecar container: inference-gateway binary listens for ext_proc calls on
+//     the UDS /run/consul/ext_proc.sock, shared via the run-consul emptyDir.
 func deploymentFor(
 	igw *v1alpha1.InferenceGateway,
 	pool *v1alpha1.InferencePoolConfig,
-	image string,
+	dataplaneImage string,
+	consulK8SImage string,
+	gatewayImage string,
+	servicePort int32,
 	resources corev1.ResourceRequirements,
+	cc deploymentConsulConfig,
 ) *appsv1.Deployment {
+	logLevel := igw.Spec.LogLevel
+	if logLevel == "" {
+		logLevel = "info"
+	}
 	labels := gatewayLabels(igw)
+	// The endpoints controller's registerGateway() only processes pods that
+	// carry the ManagedByValue label, mirroring mesh-gateway-deployment.yaml.
+	podLabels := make(map[string]string, len(labels)+1)
+	for k, v := range labels {
+		podLabels[k] = v
+	}
+	podLabels[constants.KeyManagedBy] = constants.ManagedByValue
 
 	replicas := int32(1)
 	if igw.Spec.Replicas != nil {
@@ -760,55 +949,141 @@ func deploymentFor(
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels: podLabels,
 					Annotations: map[string]string{
-						// Opt in to the connect-inject webhook via the AI role
-						// annotation. shouldInject() treats "inference-gateway" as
-						// an implicit true so that consul-dataplane and the
-						// consul-connect-inject-init init container are injected
-						// automatically — no separate connect-inject: "true" needed.
-						constants.AnnotationAIRole: "inference-gateway",
+						// Opt out of webhook injection — we manage all containers here.
+						constants.AnnotationInject: "false",
+						// Mark as a gateway so the endpoints controller uses registerGateway().
+						constants.AnnotationGatewayKind:              "inference-gateway",
+						constants.AnnotationGatewayConsulServiceName: igw.Name,
+						// Consul catalog service port read by createGatewayRegistrations.
+						constants.AnnotationInferenceGatewayPort: fmt.Sprintf("%d", servicePort),
 					},
 				},
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:  "inference-gateway",
-						Image: image,
-						Args: []string{
-							// Listen on the UDS shared with Envoy.
-							// Must match Processor.UDSPath in the config entry above.
-							"-uds-path=/run/consul/ext_proc.sock",
-							// Read Failover, RateLimit, PII config from the Consul
-							// config entry at startup and hot-reload via blocking query.
-							"-config-entry=" + igw.Name,
+					// connect-init writes the proxy-id to /consul/service/proxy-id
+					// so that consul-dataplane can bootstrap Envoy from Consul xDS.
+					InitContainers: []corev1.Container{initContainerFor(igw, consulK8SImage, cc)},
+					Containers: []corev1.Container{
+						{
+							// consul-dataplane boots Envoy from the proxy-id written by connect-init.
+							// This is the primary process and runs as the inference-gateway proxy type.
+							Name:    "consul-dataplane",
+							Image:   dataplaneImage,
+							Command: []string{"consul-dataplane"},
+							Args:    dataplaneArgsFor(cc),
+							Env: []corev1.EnvVar{
+								{
+									Name: "NODE_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+									},
+								},
+								{
+									Name:  "DP_SERVICE_NODE_NAME",
+									Value: "$(NODE_NAME)-virtual",
+								},
+								{
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+									},
+								},
+								{
+									Name: "POD_NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+									},
+								},
+								{
+									Name: "HOST_IP",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+									},
+								},
+								{
+									// consul-dataplane has readOnlyRootFilesystem:true so it needs
+									// TMPDIR to point at a writable volume. run-consul is already
+									// mounted read-write on this container.
+									Name:  "TMPDIR",
+									Value: "/run/consul",
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									// Read-only: consul-dataplane only reads the proxy-id written
+									// by connect-init; it never writes to this volume.
+									Name:      "consul-service",
+									MountPath: "/consul/service",
+									ReadOnly:  true,
+								},
+								{
+									// Envoy needs the UDS directory to reach the ext_proc sidecar.
+									Name:      "run-consul",
+									MountPath: "/run/consul",
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: boolPtr(false),
+								ReadOnlyRootFilesystem:   boolPtr(true),
+								RunAsNonRoot:             boolPtr(true),
+								Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+							},
 						},
-						// Named port for Prometheus scraping.
-						Ports: []corev1.ContainerPort{
-							{Name: "metrics", ContainerPort: inferenceGatewayMetricsPort, Protocol: corev1.ProtocolTCP},
+						{
+							// inference-gateway is the ext_proc sidecar that Envoy calls over UDS.
+							// It only handles LLM request/response processing — it does not run Envoy.
+							Name:  "inference-gateway",
+							Image: gatewayImage,
+							Args: []string{
+								"-uds-path=/run/consul/ext_proc.sock",
+								"-config-entry=" + igw.Name,
+								"-consul-http-addr=http://" + fmt.Sprintf("%s:%d", cc.address, cc.httpPort),
+								"-log-level=$(CONSUL_IGW_LOG_LEVEL)",
+							},
+							Ports: []corev1.ContainerPort{
+								{Name: "metrics", ContainerPort: inferenceGatewayMetricsPort, Protocol: corev1.ProtocolTCP},
+							},
+							Env: []corev1.EnvVar{
+								{Name: "POOL_NAME", Value: pool.Name},
+								{Name: "POOL_NAMESPACE", Value: pool.Namespace},
+								// Log level for the inference-gateway process.
+								// Set via spec.logLevel on the InferenceGateway CR.
+								// Valid values: debug, info, warn, error (default: info).
+								{Name: "CONSUL_IGW_LOG_LEVEL", Value: logLevel},
+							},
+							Resources: resources,
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "run-consul",
+								MountPath: "/run/consul",
+							}},
 						},
-						Env: []corev1.EnvVar{
-							{Name: "POOL_NAME", Value: pool.Name},
-							{Name: "POOL_NAMESPACE", Value: pool.Namespace},
+					},
+					Volumes: []corev1.Volume{
+						{
+							// proxy-id file shared between connect-init and consul-dataplane.
+							Name: "consul-service",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
+							},
 						},
-						Resources: resources,
-						VolumeMounts: []corev1.VolumeMount{{
-							// emptyDir so /run/consul/ exists before the binary
-							// tries to create the ext_proc Unix socket there.
-							Name:      "run-consul",
-							MountPath: "/run/consul",
-						}},
-					}},
-					Volumes: []corev1.Volume{{
-						Name: "run-consul",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						{
+							// UDS socket directory shared between consul-dataplane (Envoy) and
+							// the inference-gateway ext_proc sidecar.
+							Name: "run-consul",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
 						},
-					}},
+					},
 				},
 			},
 		},
 	}
 }
+
+// boolPtr returns a pointer to the given bool value.
+func boolPtr(b bool) *bool { return &b }
 
 // serviceFor returns the desired Service for an InferenceGateway.
 func serviceFor(igw *v1alpha1.InferenceGateway, svc v1alpha1.InferenceGatewayService) *corev1.Service {

@@ -121,6 +121,17 @@ spec:
                     description: Requests describes the minimum amount of compute resources required.
                     type: object
                 type: object
+              logLevel:
+                description: |-
+                  logLevel sets the log verbosity of the inference-gateway process.
+                  Valid values: debug, info, warn, error. Defaults to info when not set.
+                enum:
+                  - debug
+                  - info
+                  - warn
+                  - error
+                  - trace
+                type: string
               service:
                 description: |-
                   service configures the ClusterIP Service fronting the gateway Deployment.

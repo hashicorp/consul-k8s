@@ -38,6 +38,12 @@ const (
 	// service is registered.
 	AnnotationMeshGatewayContainerPort = "consul.hashicorp.com/mesh-gateway-container-port"
 
+	// AnnotationInferenceGatewayPort is the Consul catalog service port for an
+	// inference-gateway pod. Stamped by InferenceGatewayController from
+	// spec.service.ports[0] (defaulting to 8443) so createGatewayRegistrations
+	// can read the correct port from the pod without accessing the CRD.
+	AnnotationInferenceGatewayPort = "consul.hashicorp.com/inference-gateway-port"
+
 	// AnnotationGatewayWANSource is the key of the annotation that determines which
 	// source to use to determine the wan address and wan port for the mesh-gateway
 	// service registration.

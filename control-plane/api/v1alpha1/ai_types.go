@@ -1058,6 +1058,12 @@ type InferenceGatewaySpec struct {
 	// via Helm (ai.inferenceGateway.defaults.service).
 	// +optional
 	Service *InferenceGatewayService `json:"service,omitempty"`
+
+	// logLevel sets the log verbosity of the inference-gateway process.
+	// Valid values: trace, debug, info, warn, error. Defaults to info when not set.
+	// +optional
+	// +kubebuilder:validation:Enum=trace;debug;info;warn;error
+	LogLevel string `json:"logLevel,omitempty"`
 }
 
 // InferenceGatewayService describes the ClusterIP Service created for an
