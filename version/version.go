@@ -40,7 +40,7 @@ func GetHumanVersion() string {
 	}
 
 	if IsFIPS() {
-		version += "+fips1402"
+		version += "+fips1403"
 	}
 
 	if release != "" {

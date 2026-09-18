@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: Fix generate-manifest to correctly generate GatewayPolicy manifests.
+```
