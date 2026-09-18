@@ -178,7 +178,7 @@ cli-dev: ## run cli dev
 .PHONY: cli-fips-dev
 cli-fips-dev: ## run cli fips dev
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
-	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
+	@cd cli; CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
 
 .PHONY: cli-lint
 cli-lint: ## Run linter in the control-plane directory.

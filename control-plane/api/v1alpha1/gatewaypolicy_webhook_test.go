@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -53,7 +54,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 				Spec: GatewayPolicySpec{
 					TargetRef: PolicyTargetReference{
-						Group:       gwv1beta1.GroupVersion.String(),
+						Group:       gwv1.GroupVersion.String(),
 						Kind:        "Gateway",
 						Name:        "my-gateway",
 						SectionName: ptrTo(gwv1beta1.SectionName("l1")),
@@ -85,7 +86,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 					},
 					Spec: GatewayPolicySpec{
 						TargetRef: PolicyTargetReference{
-							Group:       gwv1beta1.GroupVersion.String(),
+							Group:       gwv1.GroupVersion.String(),
 							Kind:        "Gateway",
 							Name:        "another-gateway",
 							SectionName: ptrTo(gwv1beta1.SectionName("l1")),
@@ -100,7 +101,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 				Spec: GatewayPolicySpec{
 					TargetRef: PolicyTargetReference{
-						Group:       gwv1beta1.GroupVersion.String(),
+						Group:       gwv1.GroupVersion.String(),
 						Kind:        "Gateway",
 						Name:        "my-gateway",
 						SectionName: ptrTo(gwv1beta1.SectionName("l1")),
@@ -136,7 +137,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 					},
 					Spec: GatewayPolicySpec{
 						TargetRef: PolicyTargetReference{
-							Group:       gwv1beta1.GroupVersion.String(),
+							Group:       gwv1.GroupVersion.String(),
 							Kind:        "Gateway",
 							Name:        "my-gateway",
 							SectionName: ptrTo(gwv1beta1.SectionName("l2")),
@@ -151,7 +152,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 				Spec: GatewayPolicySpec{
 					TargetRef: PolicyTargetReference{
-						Group:       gwv1beta1.GroupVersion.String(),
+						Group:       gwv1.GroupVersion.String(),
 						Kind:        "Gateway",
 						Name:        "my-gateway",
 						SectionName: ptrTo(gwv1beta1.SectionName("l1")),
@@ -186,7 +187,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 					},
 					Spec: GatewayPolicySpec{
 						TargetRef: PolicyTargetReference{
-							Group:       gwv1beta1.GroupVersion.String(),
+							Group:       gwv1.GroupVersion.String(),
 							Kind:        "Gateway",
 							Name:        "my-gateway",
 							SectionName: ptrTo(gwv1beta1.SectionName("l1")),
@@ -201,7 +202,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 				Spec: GatewayPolicySpec{
 					TargetRef: PolicyTargetReference{
-						Group:       gwv1beta1.GroupVersion.String(),
+						Group:       gwv1.GroupVersion.String(),
 						Kind:        "Gateway",
 						Name:        "my-gateway",
 						SectionName: ptrTo(gwv1beta1.SectionName("l1")),
@@ -224,6 +225,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &GatewayPolicy{}, &GatewayPolicyList{})
 			s.AddKnownTypes(gwv1beta1.SchemeGroupVersion, &gwv1beta1.Gateway{})
+			s.AddKnownTypes(gwv1.SchemeGroupVersion, &gwv1.Gateway{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.existingResources...).WithIndex(&GatewayPolicy{}, Gatewaypolicy_GatewayIndex, gatewayForGatewayPolicy).Build()
 
 			var list GatewayPolicyList
@@ -272,7 +274,9 @@ func gatewayForGatewayPolicy(o client.Object) []string {
 
 	targetGateway := gatewayPolicy.Spec.TargetRef
 	// gateway policy is 1to1
-	if targetGateway.Group == "gateway.networking.k8s.io/v1beta1" && targetGateway.Kind == "Gateway" {
+	if (targetGateway.Group == "gateway.networking.k8s.io/v1" ||
+		targetGateway.Group == "gateway.networking.k8s.io/v1beta1") &&
+		targetGateway.Kind == "Gateway" {
 		policyNamespace := gatewayPolicy.Namespace
 		if policyNamespace == "" {
 			policyNamespace = "default"
