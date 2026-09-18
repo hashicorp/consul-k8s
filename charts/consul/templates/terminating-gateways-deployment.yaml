@@ -156,14 +156,24 @@ spec:
         emptyDir:
           medium: "Memory"
       {{- if and $ci $ci.enabled }}
-      # Credential injection (T8): private, memory-backed working volumes and a
-      # projected SA token for the Vault Agent. No secret material at rest;
-      # credentials are rendered by the Vault Agent at runtime and must NOT be
-      # mounted into Envoy.
-      - name: camp-vault-rendered
+      # Credential injection (T8): the shared ext_proc socket and non-secret
+      # processor config are present for every source. The credential source
+      # (Vault Agent-rendered memory volume, or a read-only Kubernetes Secret)
+      # is selected below. Credentials must NOT be mounted into Envoy.
+      - name: camp-auth-socket
         emptyDir:
           medium: "Memory"
-      - name: camp-auth-socket
+      - name: camp-auth-processor-config
+        configMap:
+          name: {{ $ci.processorConfigMap | quote }}
+      {{- if eq (default "vault" $ci.source) "kubernetesSecret" }}
+      # Credentials arrive via a read-only Secret mounted at the rendered path.
+      # The volume keeps its name so the processor container is source-agnostic.
+      - name: camp-vault-rendered
+        secret:
+          secretName: {{ required "credentialInjection.secretName is required when source is kubernetesSecret" $ci.secretName | quote }}
+      {{- else }}
+      - name: camp-vault-rendered
         emptyDir:
           medium: "Memory"
       - name: camp-vault-token
@@ -183,13 +193,11 @@ spec:
       - name: camp-vault-agent-config
         configMap:
           name: {{ $ci.vaultAgentConfigMap | quote }}
-      - name: camp-auth-processor-config
-        configMap:
-          name: {{ $ci.processorConfigMap | quote }}
       {{- if $ci.vaultCAConfigMap }}
       - name: camp-vault-ca
         configMap:
           name: {{ $ci.vaultCAConfigMap | quote }}
+      {{- end }}
       {{- end }}
       {{- end }}
       {{- range (default $defaults.extraVolumes .extraVolumes) }}
@@ -322,7 +330,9 @@ spec:
             limits:
               memory: "16Mi"
               cpu: "10m"
+        {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
         {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent-init" "exitAfterAuth" true "ci" $ci "root" $root) | nindent 8 }}
+        {{- end }}
         {{- end }}
       containers:
         - name: terminating-gateway
@@ -460,7 +470,9 @@ spec:
             - name: gateway
               containerPort: 8443
         {{- if and $ci $ci.enabled }}
+        {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
         {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent" "exitAfterAuth" false "ci" $ci "root" $root) | nindent 8 }}
+        {{- end }}
         {{- include "consul.terminatingGatewayCredentialAuthProcessor" (dict "ci" $ci "logLevel" (default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel) "drainSeconds" (default 30 $ci.drainSeconds)) | nindent 8 }}
         {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}

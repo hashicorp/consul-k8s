@@ -995,6 +995,21 @@ spec:
                           description: ProcessorImage is the container image reference
                             for the credential processor sidecar.
                           type: string
+                        secretName:
+                          description: |-
+                            SecretName names the Kubernetes Secret, in the gateway's namespace, whose data
+                            keys are per-binding credential envelope files. Required when source is
+                            "kubernetesSecret"; ignored otherwise.
+                          type: string
+                        source:
+                          description: |-
+                            Source selects the credential delivery mechanism. "vault" (the default when
+                            empty) runs the Vault Agent sidecars; "kubernetesSecret" mounts a Kubernetes
+                            Secret read-only into the credential processor instead.
+                          enum:
+                          - vault
+                          - kubernetesSecret
+                          type: string
                         tokenAudience:
                           description: |-
                             TokenAudience is the audience requested for the projected Kubernetes service

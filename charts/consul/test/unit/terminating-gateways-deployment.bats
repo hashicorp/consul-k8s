@@ -1512,6 +1512,84 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
+# credentialInjection kubernetesSecret source
+
+@test "terminatingGateways/Deployment: credentialInjection kubernetesSecret source mounts a read-only secret at camp-vault-rendered" {
+  cd `chart_dir`
+  local out=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      . | tee /dev/stderr)
+
+  local rendered=$(echo "$out" | yq -s '.[0].spec.template.spec.volumes[] | select(.name=="camp-vault-rendered")')
+  [ "$(echo "$rendered" | yq -r '.secret.secretName')" = "camp-egress-credentials" ]
+  [ "$(echo "$rendered" | yq -r '.emptyDir')" = "null" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection kubernetesSecret source has no vault agent containers or token" {
+  cd `chart_dir`
+  local out=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      . | tee /dev/stderr)
+
+  local names=$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[].name, .[0].spec.template.spec.initContainers[].name')
+  [[ "$names" != *"camp-vault-agent"* ]]
+  [[ "$names" == *"camp-auth-processor"* ]]
+  [[ "$names" == *"camp-auth-socket-init"* ]]
+
+  local vols=$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes[].name')
+  [[ "$vols" != *"camp-vault-token"* ]]
+  [[ "$vols" != *"camp-vault-agent-config"* ]]
+  [[ "$vols" != *"camp-vault-agent-private"* ]]
+  [[ "$vols" == *"camp-auth-socket"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection kubernetesSecret source still mounts only the socket into Envoy" {
+  cd `chart_dir`
+  local mounts=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway").volumeMounts[].name')
+  [[ "$mounts" == *"camp-auth-socket"* ]]
+  [[ "$mounts" != *"camp-vault-rendered"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection kubernetesSecret source requires secretName" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"secretName is required when source is kubernetesSecret"* ]]
+}
+
+#--------------------------------------------------------------------
 # credentialInjection Vault Agent containers (T8 Task 3)
 
 @test "terminatingGateways/Deployment: credentialInjection disabled has no vault agent containers" {

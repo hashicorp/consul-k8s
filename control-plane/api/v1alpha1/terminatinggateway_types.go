@@ -153,6 +153,19 @@ type TerminatingGatewayCredentialInjection struct {
 	// +kubebuilder:validation:Optional
 	Enabled bool `json:"enabled,omitempty"`
 
+	// Source selects the credential delivery mechanism. "vault" (the default when
+	// empty) runs the Vault Agent sidecars; "kubernetesSecret" mounts a Kubernetes
+	// Secret read-only into the credential processor instead.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=vault;kubernetesSecret
+	Source string `json:"source,omitempty"`
+
+	// SecretName names the Kubernetes Secret, in the gateway's namespace, whose data
+	// keys are per-binding credential envelope files. Required when source is
+	// "kubernetesSecret"; ignored otherwise.
+	// +kubebuilder:validation:Optional
+	SecretName string `json:"secretName,omitempty"`
+
 	// ProcessorImage is the container image reference for the credential processor sidecar.
 	// +kubebuilder:validation:Optional
 	ProcessorImage string `json:"processorImage,omitempty"`
@@ -210,6 +223,22 @@ type TerminatingGatewayCredentialInjection struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Minimum=0
 	DrainSeconds *int64 `json:"drainSeconds,omitempty"`
+}
+
+// Credential-injection delivery sources for
+// spec.deployment.credentialInjection.source.
+const (
+	CredentialSourceVault            = "vault"
+	CredentialSourceKubernetesSecret = "kubernetesSecret"
+)
+
+// EffectiveSource returns the configured credential source, defaulting to
+// CredentialSourceVault when unset.
+func (in *TerminatingGatewayCredentialInjection) EffectiveSource() string {
+	if in.Source == "" {
+		return CredentialSourceVault
+	}
+	return in.Source
 }
 
 // ExtraVolume defines a volume to be mounted in the pod.
@@ -507,23 +536,34 @@ func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool
 			"credentialInjection.enabled requires spec.deployment.enabledDeployment to be true"))
 	}
 
-	// Missing image/config maps.
+	// The credential processor runs in every source.
 	if in.ProcessorImage == "" {
 		errs = append(errs, field.Required(path.Child("processorImage"), "processorImage is required when credentialInjection is enabled"))
-	}
-	if in.VaultAgentImage == "" {
-		errs = append(errs, field.Required(path.Child("vaultAgentImage"), "vaultAgentImage is required when credentialInjection is enabled"))
 	}
 	if in.ProcessorConfigMap == "" {
 		errs = append(errs, field.Required(path.Child("processorConfigMap"), "processorConfigMap is required when credentialInjection is enabled"))
 	}
-	if in.VaultAgentConfigMap == "" {
-		errs = append(errs, field.Required(path.Child("vaultAgentConfigMap"), "vaultAgentConfigMap is required when credentialInjection is enabled"))
-	}
 
-	errs = append(errs, in.validateVaultAddress(path.Child("vaultAddress"))...)
-	errs = append(errs, in.validateProjectedToken(path)...)
-	errs = append(errs, in.validateWildcardAndModeCombinations(path)...)
+	switch in.EffectiveSource() {
+	case CredentialSourceKubernetesSecret:
+		if in.SecretName == "" {
+			errs = append(errs, field.Required(path.Child("secretName"),
+				`secretName is required when credentialInjection.source is "kubernetesSecret"`))
+		}
+		if strings.Contains(in.SecretName, WildcardSpecifier) {
+			errs = append(errs, field.Invalid(path.Child("secretName"), in.SecretName, `must not contain the wildcard character "*"`))
+		}
+	default: // vault
+		if in.VaultAgentImage == "" {
+			errs = append(errs, field.Required(path.Child("vaultAgentImage"), "vaultAgentImage is required when credentialInjection is enabled"))
+		}
+		if in.VaultAgentConfigMap == "" {
+			errs = append(errs, field.Required(path.Child("vaultAgentConfigMap"), "vaultAgentConfigMap is required when credentialInjection is enabled"))
+		}
+		errs = append(errs, in.validateVaultAddress(path.Child("vaultAddress"))...)
+		errs = append(errs, in.validateProjectedToken(path)...)
+		errs = append(errs, in.validateWildcardAndModeCombinations(path)...)
+	}
 
 	return errs
 }
