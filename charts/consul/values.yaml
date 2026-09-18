@@ -3666,7 +3666,9 @@ terminatingGateways:
       processorConfigMap: ""
 
       # VaultAgentConfigMap names a ConfigMap (in the gateway's namespace) carrying
-      # the Vault Agent configuration and credential templates.
+      # the Vault Agent configuration and credential templates. This ConfigMap
+      # exclusively owns the Vault auth configuration (auto-auth method, role, and
+      # mount); there are no separate auth role/mount fields.
       # @type: string
       vaultAgentConfigMap: ""
 
@@ -3678,14 +3680,6 @@ terminatingGateways:
       # VaultNamespace is the optional Vault Enterprise namespace.
       # @type: string
       vaultNamespace: ""
-
-      # VaultAuthRole is the Vault Kubernetes auth role assumed by the sidecar.
-      # @type: string
-      vaultAuthRole: ""
-
-      # VaultAuthMount is the mount path of the Vault Kubernetes auth method.
-      # @type: string
-      vaultAuthMount: ""
 
       # VaultCAConfigMap optionally names a ConfigMap (in the gateway's namespace)
       # carrying the CA certificate used to verify the Vault server.

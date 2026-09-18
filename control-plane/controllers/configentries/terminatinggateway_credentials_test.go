@@ -36,7 +36,7 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, "consul-k8s-control-plane:test", corev1.PullIfNotPresent, "info")
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info")
 
 	// Envoy (main container) gets only the socket mount, never credentials/token.
 	envoy := containerByName(t, podSpec.Containers, "terminating-gateway")
@@ -45,30 +45,30 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 		require.Falsef(t, hasMount(envoy, v), "Envoy must not mount %q", v)
 	}
 
-	// Narrowest-capability socket init container, socket-only mount.
-	si := containerByName(t, podSpec.InitContainers, "camp-auth-socket-init")
-	require.Len(t, si.VolumeMounts, 1)
-	require.Equal(t, campAuthSocketVolume, si.VolumeMounts[0].Name)
-	require.Contains(t, si.SecurityContext.Capabilities.Drop, corev1.Capability("ALL"))
-	require.Contains(t, si.SecurityContext.Capabilities.Add, corev1.Capability("CHOWN"))
-	require.Equal(t, ptr.To(false), si.SecurityContext.AllowPrivilegeEscalation)
+	// No privileged socket-init container: the shared socket dir is group-owned
+	// via the pod fsGroup instead.
+	require.False(t, hasContainer(podSpec.InitContainers, "camp-auth-socket-init"))
 
-	// Vault Agent init: hardened 10001, exits after auth, read-only token mount.
+	// Vault Agent init: hardened non-root (no pinned UID/GID so an OpenShift
+	// assigned UID works), exits after auth, read-only token mount.
 	ai := containerByName(t, podSpec.InitContainers, "camp-vault-agent-init")
 	require.Contains(t, ai.Args, "-exit-after-auth")
-	require.Equal(t, campCredentialUID, *ai.SecurityContext.RunAsUser)
-	require.Equal(t, campCredentialUID, *ai.SecurityContext.RunAsGroup)
+	require.Equal(t, ptr.To(true), ai.SecurityContext.RunAsNonRoot)
+	require.Nil(t, ai.SecurityContext.RunAsUser)
+	require.Nil(t, ai.SecurityContext.RunAsGroup)
 	require.True(t, mountReadOnly(ai, campVaultTokenVolume))
 
 	// Vault Agent sidecar runs continuously (no exit-after-auth).
 	as := containerByName(t, podSpec.Containers, "camp-vault-agent")
 	require.NotContains(t, as.Args, "-exit-after-auth")
-	require.Equal(t, campCredentialUID, *as.SecurityContext.RunAsUser)
+	require.Equal(t, ptr.To(true), as.SecurityContext.RunAsNonRoot)
+	require.Nil(t, as.SecurityContext.RunAsUser)
 
-	// Processor: 10001, read-only creds, writable socket, no token/token-sink,
+	// Processor: non-root, read-only creds, writable socket, no token/token-sink,
 	// health + drain contract.
 	proc := containerByName(t, podSpec.Containers, "camp-auth-processor")
-	require.Equal(t, campCredentialUID, *proc.SecurityContext.RunAsUser)
+	require.Equal(t, ptr.To(true), proc.SecurityContext.RunAsNonRoot)
+	require.Nil(t, proc.SecurityContext.RunAsUser)
 	require.True(t, mountReadOnly(proc, campVaultRenderedVolume))
 	require.True(t, hasMount(proc, campAuthSocketVolume))
 	require.False(t, mountReadOnly(proc, campAuthSocketVolume), "socket must be writable")
@@ -89,8 +89,9 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 	require.NotNil(t, podSpec.TerminationGracePeriodSeconds)
 	require.Equal(t, int64(60), *podSpec.TerminationGracePeriodSeconds)
 
-	// Shared supplemental group for the socket.
-	require.Contains(t, podSpec.SecurityContext.SupplementalGroups, campCredentialUID)
+	// Shared fsGroup group-owns the socket without a privileged init container.
+	require.NotNil(t, podSpec.SecurityContext.FSGroup)
+	require.Equal(t, campCredentialFSGroup, *podSpec.SecurityContext.FSGroup)
 
 	// All credential volumes present; token projection carries audience/expiration.
 	for _, v := range []string{campVaultRenderedVolume, campAuthSocketVolume, campVaultTokenVolume, campVaultAgentPrivateVolume, campVaultAgentConfigVolume, campAuthProcessorConfigVolume, campVaultCAVolume} {
@@ -107,8 +108,8 @@ func TestTerminatingGatewayCredentialPodDisabled(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 	// nil and disabled are both no-ops.
-	applyTerminatingGatewayCredentialInjection(&podSpec, nil, "img", corev1.PullIfNotPresent, "info")
-	applyTerminatingGatewayCredentialInjection(&podSpec, &consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, "img", corev1.PullIfNotPresent, "info")
+	applyTerminatingGatewayCredentialInjection(&podSpec, nil, corev1.PullIfNotPresent, "info")
+	applyTerminatingGatewayCredentialInjection(&podSpec, &consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, corev1.PullIfNotPresent, "info")
 	require.Len(t, podSpec.Containers, 1)
 	require.Len(t, podSpec.InitContainers, 1)
 	require.Empty(t, podSpec.Volumes)
@@ -133,7 +134,7 @@ func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, "consul-k8s-control-plane:test", corev1.PullIfNotPresent, "info")
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info")
 
 	// No Vault Agent containers in either init or main containers.
 	for _, n := range []string{"camp-vault-agent", "camp-vault-agent-init"} {
@@ -152,18 +153,19 @@ func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
 		require.Falsef(t, hasVolume(podSpec.Volumes, n), "unexpected volume %q", n)
 	}
 
-	// Processor still present, reads rendered read-only; socket init present.
+	// Processor still present, reads rendered read-only; no socket-init container.
 	proc := containerByName(t, podSpec.Containers, "camp-auth-processor")
 	require.True(t, mountReadOnly(proc, campVaultRenderedVolume))
-	require.True(t, hasContainer(podSpec.InitContainers, "camp-auth-socket-init"))
+	require.False(t, hasContainer(podSpec.InitContainers, "camp-auth-socket-init"))
 
 	// Envoy mounts only the socket, never credentials.
 	envoy := containerByName(t, podSpec.Containers, "terminating-gateway")
 	require.True(t, hasMount(envoy, campAuthSocketVolume))
 	require.False(t, hasMount(envoy, campVaultRenderedVolume))
 
-	// Shared supplemental group and grace period still applied.
-	require.Contains(t, podSpec.SecurityContext.SupplementalGroups, campCredentialUID)
+	// Shared fsGroup and grace period still applied.
+	require.NotNil(t, podSpec.SecurityContext.FSGroup)
+	require.Equal(t, campCredentialFSGroup, *podSpec.SecurityContext.FSGroup)
 	require.NotNil(t, podSpec.TerminationGracePeriodSeconds)
 }
 

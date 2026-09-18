@@ -36,8 +36,17 @@
 {{ end -}}
 {{- /* Add the gateway name to the $names dict to ensure uniqueness */ -}}
 {{- $_ := set $names .name .name }}
-{{- /* Effective credential-injection config: per-gateway overrides the default (whole-object). */ -}}
-{{- $ci := default $defaults.credentialInjection .credentialInjection }}
+{{- /* Effective credential-injection config: per-gateway fields override the
+       default field-by-field (a deep merge, not a whole-object replace, so a
+       partial per-gateway block keeps the default images/ConfigMap names). */ -}}
+{{- $ci := mergeOverwrite (deepCopy (default (dict) $defaults.credentialInjection)) (default (dict) .credentialInjection) }}
+{{- /* Nil-aware drain default: preserve an explicit drainSeconds: 0 (the sprig
+       "default" helper treats numeric zero as empty, which the controller does
+       not). Only meaningful when credential injection is enabled. */ -}}
+{{- $drainSeconds := 30 }}
+{{- if not (kindIs "invalid" $ci.drainSeconds) }}
+{{- $drainSeconds = int $ci.drainSeconds }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -134,16 +143,18 @@ spec:
         {{ tpl (default $defaults.topologySpreadConstraints .topologySpreadConstraints) $root | nindent 8 | trim }}
       {{- end }}
       {{- if and $ci $ci.enabled }}
-      # Shared supplemental group so Envoy (non-10001) can reach the credential
-      # processor's ext_proc socket in the group-owned socket directory.
+      # Shared fsGroup so the kubelet group-owns the ext_proc socket and rendered
+      # credential volumes (with the setgid bit); no privileged root init
+      # container is required. Every container joins this group, so a sidecar
+      # running under an OpenShift-assigned UID can create and reach the socket
+      # and Envoy (a group member) can connect to it.
       securityContext:
-        supplementalGroups:
-        - 10001
+        fsGroup: 10001
       {{- end }}
       {{- if and $ci $ci.enabled }}
       # Grace period must exceed the processor's preStop drain plus a shutdown
       # allowance so in-flight requests drain before the pod is killed.
-      terminationGracePeriodSeconds: {{ add (int (default 30 $ci.drainSeconds)) 15 }}
+      terminationGracePeriodSeconds: {{ add $drainSeconds 15 }}
       {{- else }}
       terminationGracePeriodSeconds: 10
       {{- end }}
@@ -294,42 +305,6 @@ spec:
               memory: "50Mi"
               cpu: "50m"
         {{- if and $ci $ci.enabled }}
-        # camp-auth-socket-init prepares the shared ext_proc socket directory so
-        # the processor (uid 10001) owns it and Envoy (a member of the shared
-        # supplemental group) can reach the socket. Runs with the narrowest
-        # capabilities needed (CHOWN/FOWNER) and mounts only the socket volume.
-        - name: camp-auth-socket-init
-          image: {{ $root.Values.global.imageK8S | quote }}
-          {{ template "consul.imagePullPolicy" $root }}
-          command:
-          - "/bin/sh"
-          - "-ec"
-          - |
-            chown 10001:10001 /consul/auth-socket
-            chmod 2770 /consul/auth-socket
-          securityContext:
-            runAsUser: 0
-            runAsNonRoot: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-              - ALL
-              add:
-              - CHOWN
-              - FOWNER
-            seccompProfile:
-              type: RuntimeDefault
-          volumeMounts:
-          - name: camp-auth-socket
-            mountPath: /consul/auth-socket
-          resources:
-            requests:
-              memory: "16Mi"
-              cpu: "10m"
-            limits:
-              memory: "16Mi"
-              cpu: "10m"
         {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
         {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent-init" "exitAfterAuth" true "ci" $ci "root" $root) | nindent 8 }}
         {{- end }}
@@ -473,7 +448,7 @@ spec:
         {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
         {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent" "exitAfterAuth" false "ci" $ci "root" $root) | nindent 8 }}
         {{- end }}
-        {{- include "consul.terminatingGatewayCredentialAuthProcessor" (dict "ci" $ci "logLevel" (default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel) "drainSeconds" (default 30 $ci.drainSeconds)) | nindent 8 }}
+        {{- include "consul.terminatingGatewayCredentialAuthProcessor" (dict "ci" $ci "logLevel" (default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel) "drainSeconds" $drainSeconds) | nindent 8 }}
         {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}
       priorityClassName: {{ (default $defaults.priorityClassName .priorityClassName) | quote }}

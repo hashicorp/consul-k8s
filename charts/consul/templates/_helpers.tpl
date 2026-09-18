@@ -797,8 +797,6 @@ It carries no secret material. Input dict: name, exitAfterAuth (bool), ci, root.
       drop:
       - ALL
     runAsNonRoot: true
-    runAsUser: 10001
-    runAsGroup: 10001
     seccompProfile:
       type: RuntimeDefault
   volumeMounts:
@@ -843,8 +841,6 @@ drainSeconds.
       drop:
       - ALL
     runAsNonRoot: true
-    runAsUser: 10001
-    runAsGroup: 10001
     seccompProfile:
       type: RuntimeDefault
   volumeMounts:
