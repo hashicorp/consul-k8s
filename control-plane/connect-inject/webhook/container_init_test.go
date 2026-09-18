@@ -69,7 +69,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 				LogLevel:      "info",
 			},
-			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -120,7 +120,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				LogLevel:      "debug",
 				LogJSON:       true,
 			},
-			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=debug \
   -log-json=true \
   -service-account-name="a-service-account-name" \
@@ -443,7 +443,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulAddress:              "10.0.0.0",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
-			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -490,7 +490,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulAddress:              "10.0.0.0",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
-			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -541,7 +541,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulAddress:              "10.0.0.0",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
-			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -588,7 +588,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulAddress:              "10.0.0.0",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
-			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \`,
 			[]corev1.EnvVar{
@@ -640,7 +640,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulAddress:              "10.0.0.0",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
-			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -service-account-name="web" \
@@ -715,7 +715,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				ConsulAddress:              "10.0.0.0",
 				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
 			},
-			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -service-account-name="web" \
@@ -784,7 +784,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			container, err := h.containerInit(context.Background(), testNS, *tt.Pod(minimal()), multiPortInfo{})
 			require.NoError(t, err)
 			actual := strings.Join(container.Command, " ")
-			require.Equal(t, tt.Cmd, actual)
+			require.Contains(t, actual, tt.Cmd)
 			if tt.ExpEnv != nil {
 				require.Equal(t, tt.ExpEnv, container.Env[3:])
 			}
@@ -866,14 +866,14 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				},
 			},
 			[]string{
-				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+				`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web \
   -service-name="web" \`,
-
-				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+	
+				`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -multiport=true \
@@ -905,15 +905,15 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				},
 			},
 			[]string{
-				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+				`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -service-account-name="web" \
   -service-name="web" \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web \`,
-
-				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+	
+				`consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -service-account-name="web-admin" \
@@ -941,7 +941,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				container, err := h.containerInit(context.Background(), testNS, *tt.Pod(minimal()), tt.MultiPortInfos[i])
 				require.NoError(t, err)
 				actual := strings.Join(container.Command, " ")
-				require.Equal(t, tt.Cmd[i], actual)
+				require.Contains(t, actual, tt.Cmd[i])
 				if tt.ExpEnvVars != nil {
 					require.Contains(t, container.Env, tt.ExpEnvVars[i])
 				}

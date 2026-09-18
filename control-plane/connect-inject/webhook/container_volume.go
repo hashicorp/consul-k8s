@@ -14,6 +14,11 @@ import (
 const volumeName = "consul-connect-inject-data"
 const accessLogVolumeName = "envoy-access-logs"
 
+// hostXtablesLegacyVolumeName is the name of the hostPath volume that mounts
+// the kind node's /usr/sbin directory into the init container so the
+// iptables-legacy fallback shell snippet can copy xtables-legacy-multi.
+const hostXtablesLegacyVolumeName = "host-xtables-legacy"
+
 // containerVolume returns the volume data to add to the pod. This volume
 // is used for shared data between containers.
 func (w *MeshWebhook) containerVolume() corev1.Volume {

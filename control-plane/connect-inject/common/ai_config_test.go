@@ -271,3 +271,51 @@ func TestAIConfigFromPod_ConfigMapNotFound_ReturnsError(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to get AI agent MCP ConfigMap")
 }
+
+// TestNeedsOBOSidecars verifies OBO is gated on ai-agent only.
+func TestNeedsOBOSidecars(t *testing.T) {
+	cases := map[string]struct {
+		annotations map[string]string
+		expected    bool
+	}{
+		"ai-agent annotation": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole: constants.AIAgentRole,
+			},
+			expected: true,
+		},
+		"mcp-server does not get OBO": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole: constants.AIMCPServerRole,
+			},
+			expected: false,
+		},
+		"no annotations": {
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		"unrelated ai-role value": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole: "inference-model",
+			},
+			expected: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: tc.annotations}}
+			require.Equal(t, tc.expected, NeedsOBOSidecars(pod))
+		})
+	}
+}
+
+func TestIsMCPServer(t *testing.T) {
+	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+		constants.AnnotationAIRole: constants.AIMCPServerRole,
+	}}}
+	require.True(t, IsMCPServer(pod))
+	require.False(t, IsAIAgent(pod))
+	require.Equal(t, constants.AIMCPServerRole, DefaultMCPServerAIConfig().Role)
+}
+

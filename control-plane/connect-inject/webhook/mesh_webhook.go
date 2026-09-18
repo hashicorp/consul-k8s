@@ -226,6 +226,18 @@ type MeshWebhook struct {
 	// in the Helm values.
 	ImageConsulAIMCPInterceptor string
 
+	// ImageConsulOBOInbound is the container image used for the consul-obo-inbound
+	// sidecar injected into AI agent pods (ai-role=ai-agent).
+	// It handles the INBOUND OBO plane: strips forged identity headers, verifies
+	// the OBO JWT, and projects x-user-role / x-user-aud / x-claim-* before jwt_authn.
+	ImageConsulOBOInbound string
+
+	// ImageConsulOBOOutbound is the container image used for the consul-obo-outbound
+	// sidecar injected into AI agent pods (ai-role=ai-agent).
+	// It handles OUTBOUND OBO (A2A, A2REST, A2MCP, A2LLM): RFC 8693 exchange and
+	// Authorization header replacement before the request leaves the mesh.
+	ImageConsulOBOOutbound string
+
 	// ReleaseNamespace is the Kubernetes namespace where this webhook is running.
 	ReleaseNamespace string
 
@@ -305,6 +317,22 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
 	pod.Spec.Volumes = append(pod.Spec.Volumes, w.containerVolume())
+
+	// Add a hostPath volume exposing the kind node's /usr/sbin so the init
+	// container can copy xtables-legacy-multi when iptables-nft is unavailable
+	// (Podman Desktop / Apple Silicon Fedora aarch64 kernel).
+	// The volume is always added but the init container script only uses it
+	// when the file is present — harmless on Docker Desktop / Linux nodes.
+	hostUSrSbin := corev1.HostPathDirectoryOrCreate
+	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+		Name: hostXtablesLegacyVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/usr/sbin",
+				Type: &hostUSrSbin,
+			},
+		},
+	})
 
 	// Optionally mount data volume to other containers
 	w.injectVolumeMount(pod)
@@ -399,7 +427,11 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 		}
 
-		// Inject the AI agent mcp-gateway sidecar when the pod carries the AI role annotation.
+		// ── MCP gateway (AI agents only) ────────────────────────────────────────
+		// Inject the consul-mcp-gateway sidecar only when the pod carries the AI
+		// agent role annotation.  This sidecar owns MCP-specific concerns:
+		// protocol routing, tool RBAC, HITL, and delegating MCP-path RFC 8693
+		// exchange to consul-obo-outbound.
 		if common.IsAIAgent(pod) {
 			aiSidecar, err := w.aiAgentSidecar(pod)
 			if err != nil {
@@ -408,6 +440,28 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 					fmt.Errorf("error configuring ai agent mcp-gateway container: %s", err))
 			}
 			pod.Spec.Containers = append(pod.Spec.Containers, aiSidecar)
+		}
+
+		// ── OBO identity plane (AI agents only) ──────────────────────────────────
+		// Inject consul-obo-inbound and consul-obo-outbound only for ai-agent pods
+		// (same gate as mcp-gateway). MCP servers use ai-role=mcp-server for DCR
+		// audiences and do not receive OBO ext_proc sidecars.
+		if common.NeedsOBOSidecars(pod) {
+			oboInbound, err := w.oboInboundSidecar(*ns, pod)
+			if err != nil {
+				w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError,
+					fmt.Errorf("error configuring consul-obo-inbound container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
+
+			oboOutbound, err := w.oboOutboundSidecar(*ns, pod)
+			if err != nil {
+				w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError,
+					fmt.Errorf("error configuring consul-obo-outbound container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, oboOutbound)
 		}
 
 	} else {

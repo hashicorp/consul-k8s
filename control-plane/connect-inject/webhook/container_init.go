@@ -24,6 +24,7 @@ const (
 	sidecarUserAndGroupID        = 5995
 	initContainersUserAndGroupID = 5996
 	netAdminCapability           = "NET_ADMIN"
+	netRawCapability             = "NET_RAW"
 )
 
 type initContainerCommandData struct {
@@ -63,6 +64,17 @@ func (w *MeshWebhook) containerInit(ctx context.Context, namespace corev1.Namesp
 		{
 			Name:      volumeName,
 			MountPath: "/consul/connect-inject",
+		},
+		// Mount the host's xtables-legacy-multi directory into the init container
+		// so the iptables-legacy fallback in initContainerCommandTpl can copy it.
+		// On kind nodes (Podman Desktop / Apple Silicon) this provides the legacy
+		// xtables backend when iptables-nft fails with EPROTONOSUPPORT.
+		// ReadOnly=true — the shell script copies the binary into the container's
+		// own writable /usr/sbin/ before creating symlinks.
+		{
+			Name:      "host-xtables-legacy",
+			MountPath: "/host-xtables-legacy",
+			ReadOnly:  true,
 		},
 	}
 
@@ -295,7 +307,11 @@ func (w *MeshWebhook) containerInit(ctx context.Context, namespace corev1.Namesp
 				RunAsNonRoot: ptr.To(false),
 				Privileged:   ptr.To(privileged),
 				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{netAdminCapability},
+					// NET_ADMIN is required for iptables rules.
+					// NET_RAW is required by iptables-nft (nf_tables backend) on
+					// kernels where nft socket operations need raw socket access —
+					// e.g. Fedora/aarch64 Podman VM used by Podman Desktop on macOS.
+					Add: []corev1.Capability{netAdminCapability, netRawCapability},
 				},
 			}
 		}
@@ -356,7 +372,36 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
+//
+// iptables-legacy fallback (Podman Desktop / Apple Silicon):
+// ubi9-minimal ships only iptables-nft; on some kernels the nf_tables socket
+// inside a non-privileged pod network namespace returns EPROTONOSUPPORT even
+// with NET_ADMIN+NET_RAW. The kind node may ship xtables-legacy-multi at
+// /usr/sbin/xtables-legacy-multi.  We copy it into the init container's own
+// writable filesystem so that /usr/sbin/iptables resolves to the legacy
+// backend instead of nft — but ONLY when the binary is actually executable
+// (i.e. its shared library deps are satisfied inside the container).
+//
+// On Debian-based kind nodes (kindest/node:v1.33+) the host's
+// xtables-legacy-multi is linked against /usr/lib/aarch64-linux-gnu/libip4tc.so.2
+// which does NOT exist in the UBI9 container.  Attempting to run it produces:
+//   "error while loading shared libraries: libip4tc.so.2: not found"
+// In that case we skip the legacy symlinks entirely and fall through to the
+// container's native iptables-nft, which works correctly on Fedora/Debian
+// kernels with nf_tables compiled in.
 const initContainerCommandTpl = `
+if [ -f /host-xtables-legacy/xtables-legacy-multi ]; then
+  cp /host-xtables-legacy/xtables-legacy-multi /usr/sbin/xtables-legacy-multi 2>/dev/null || true
+  # Verify the binary is actually runnable inside this container before symlinking.
+  # On Debian kind nodes it is linked against libip4tc.so.2 (Debian path) which
+  # does not exist in UBI9 — running it would crash with a missing-library error.
+  # If the exec fails (non-zero), skip the legacy symlinks; iptables-nft is used.
+  if /usr/sbin/xtables-legacy-multi --version >/dev/null 2>&1; then
+    ln -sf /usr/sbin/xtables-legacy-multi /usr/sbin/iptables          2>/dev/null || true
+    ln -sf /usr/sbin/xtables-legacy-multi /usr/sbin/iptables-restore  2>/dev/null || true
+    ln -sf /usr/sbin/xtables-legacy-multi /usr/sbin/iptables-save     2>/dev/null || true
+  fi
+fi
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \

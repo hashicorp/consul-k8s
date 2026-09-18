@@ -245,9 +245,10 @@ const (
 	AnnotationConsulSidecarAccessLogEnabled = "consul.hashicorp.com/consul-sidecar-access-log-enabled"
 	AnnotationConsulSidecarAccessLogPath    = "consul.hashicorp.com/consul-sidecar-access-log-path"
 
-	// AnnotationAIRole indicates this pod is an AI workload and specifies its role.
-	// The only supported value is "ai-agent". When set, a consul-mcp-gateway sidecar
-	// container is injected alongside the standard consul-dataplane sidecar.
+	// AnnotationAIRole indicates this pod is a CAMP AI workload and specifies its
+	// role. Supported values:
+	//   - "ai-agent"   — injects mcp-gateway + OBO inbound/outbound; DCR as signer
+	//   - "mcp-server" — DCR as OBO audience only; no OBO / mcp-gateway sidecars
 	AnnotationAIRole = "consul.hashicorp.com/ai-role"
 
 	// AnnotationAIAgentMCPConfig is the name of the Kubernetes ConfigMap that holds

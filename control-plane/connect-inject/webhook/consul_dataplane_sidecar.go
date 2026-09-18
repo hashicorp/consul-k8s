@@ -334,6 +334,10 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
 		"-consul-dns-bind-addr=" + consulDNSBindAddress,
 		"-xds-bind-addr=" + xdsBindAddress,
+		// Fix the xDS ADS port to a known value so consul-obo-outbound can
+		// subscribe to the GenericSecret SDS resource without requiring
+		// dynamic port discovery.
+		"-xds-bind-port=" + strconv.Itoa(constants.DefaultDataplaneXDSPort),
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
@@ -501,6 +505,10 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 				"-telemetry-prom-cert-file="+prometheusCertFile,
 				"-telemetry-prom-key-file="+prometheusKeyFile)
 		}
+	}
+
+	if common.NeedsOBOSidecars(pod) {
+		args = append(args, "-credential-broker-bind-addr=unix:///consul/connect-inject/credential-broker.sock")
 	}
 
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
