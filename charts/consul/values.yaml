@@ -2429,6 +2429,20 @@ connectInject:
   # to explicitly opt-out of injection.
   default: false
 
+  # Controls whether one Consul service registration may contain multiple
+  # named ports. When disabled, a multi-port workload must select exactly one
+  # port with consul.hashicorp.com/connect-service-port.
+  multiportServiceRegistration:
+    # @type: boolean
+    enabled: false
+    # Controls how existing mesh-injected Deployments, StatefulSets, and
+    # DaemonSets are handled during a Helm upgrade while multi-port
+    # registration is disabled. NONE leaves existing workload specifications
+    # untouched. TRANSLATE selects one service port. DECOMMISSION removes
+    # eligible workloads from the mesh.
+    # @type: string
+    conversionStrategy: "NONE"
+
   # Configures Transparent Proxy for Consul Service mesh services.
   # Using this feature requires Consul 1.10.0-beta1+.
   transparentProxy:
@@ -2700,6 +2714,24 @@ connectInject:
       runAsNonRoot: false
       runAsGroup: 0
       runAsUser: 0
+
+    # Toleration settings for the CNI installer DaemonSet pods.
+    # This should be a multi-line string matching the Tolerations
+    # array in a Pod spec. If not set, defaults to tolerating
+    # CriticalAddonsOnly and NoExecute taints.
+    # 
+    # Example:
+    #
+    # ```yaml
+    # tolerations: |
+    #   - key: dd
+    #     operator: Exists
+    #   - effect: bb
+    #     operator: Exists
+    # ```
+    # 
+    # @type: string
+    tolerations: null
 
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.
