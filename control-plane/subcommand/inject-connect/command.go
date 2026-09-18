@@ -59,8 +59,8 @@ type Command struct {
 	flagConsulDataplaneImage           string // Docker image for Envoy
 	flagConsulK8sImage                 string // Docker image for consul-k8s
 	flagConsulAIMCPInterceptorImage string // Docker image for consul-ai-mcp-interceptor (AI agent MCP gateway sidecar)
-	flagConsulOBOInboundImage       string // Docker image for consul-obo-inbound (INBOUND OBO sidecar, all oauth-client pods)
-	flagConsulOBOOutboundImage      string // Docker image for consul-obo-outbound (OUTBOUND OBO sidecar, all oauth-client pods)
+	flagConsulOBOInboundImage       string // Docker image for consul-obo-inbound (INBOUND OBO sidecar, ai-agent pods)
+	flagConsulOBOOutboundImage      string // Docker image for consul-obo-outbound (OUTBOUND OBO sidecar, ai-agent pods)
 	flagGlobalImagePullPolicy          string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	flagACLAuthMethod                  string // Auth Method to use for ACLs, if enabled
 	flagGlobalConfigACLToken           string // Optional ACL token used for global config entry reconciliations
@@ -229,9 +229,9 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagConsulAIMCPInterceptorImage, "consul-ai-mcp-interceptor-image", "",
 		"Docker image for the consul-ai-mcp-interceptor. Container image for the consul-mcp-gateway EGRESS OBO sidecar in AI agent pods.")
 	c.flagSet.StringVar(&c.flagConsulOBOInboundImage, "consul-obo-inbound-image", "",
-		"Docker image for consul-obo-inbound. INBOUND OBO sidecar injected into all oauth-client pods. Falls back to consul-k8s image when empty.")
+		"Docker image for consul-obo-inbound. INBOUND OBO sidecar injected into ai-agent pods. Falls back to consul-k8s image when empty.")
 	c.flagSet.StringVar(&c.flagConsulOBOOutboundImage, "consul-obo-outbound-image", "",
-		"Docker image for consul-obo-outbound. OUTBOUND OBO sidecar injected into all oauth-client pods. Falls back to consul-k8s image when empty.")
+		"Docker image for consul-obo-outbound. OUTBOUND OBO sidecar injected into ai-agent pods. Falls back to consul-k8s image when empty.")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
 	c.flagSet.StringVar(&c.flagGlobalConfigACLToken, "global-config-acl-token", "",

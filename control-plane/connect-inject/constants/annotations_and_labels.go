@@ -245,28 +245,16 @@ const (
 	AnnotationConsulSidecarAccessLogEnabled = "consul.hashicorp.com/consul-sidecar-access-log-enabled"
 	AnnotationConsulSidecarAccessLogPath    = "consul.hashicorp.com/consul-sidecar-access-log-path"
 
-	// AnnotationAIRole indicates this pod is an AI workload and specifies its role.
-	// The only supported value is "ai-agent". When set, a consul-mcp-gateway sidecar
-	// container is injected alongside the standard consul-dataplane sidecar.
+	// AnnotationAIRole indicates this pod is a CAMP AI workload and specifies its
+	// role. Supported values:
+	//   - "ai-agent"   — injects mcp-gateway + OBO inbound/outbound; DCR as signer
+	//   - "mcp-server" — DCR as OBO audience only; no OBO / mcp-gateway sidecars
 	AnnotationAIRole = "consul.hashicorp.com/ai-role"
 
 	// AnnotationAIAgentMCPConfig is the name of the Kubernetes ConfigMap that holds
 	// the MCP agent configuration (inference, mcp, rate_limits, and interceptor blocks).
 	// Required when AnnotationAIRole is set to "ai-agent".
 	AnnotationAIAgentMCPConfig = "consul.hashicorp.com/ai-agent-mcp-config"
-
-	// AnnotationOAuthClient opts this pod into the OBO identity plane. When set to
-	// "true", the mesh webhook injects both OBO sidecars:
-	//   - consul-obo-inbound  (:21102) — strips forged headers, performs inbound
-	//     RFC 8693 token exchange, and projects x-user-role / x-claim-* before
-	//     jwt_authn evaluates the request.
-	//   - consul-obo-outbound (:21103) — performs outbound RFC 8693 token exchange
-	//     for non-MCP A2A / A2REST / A2LLM calls before they leave the mesh.
-	//
-	// AI agent pods (AnnotationAIRole=ai-agent) are implicitly treated as
-	// oauth-client=true and therefore always receive both OBO sidecars in addition
-	// to the MCP-specific consul-mcp-gateway sidecar.
-	AnnotationOAuthClient = "consul.hashicorp.com/oauth-client"
 )
 
 // Annotations used by Prometheus.

@@ -46,9 +46,9 @@ func baseAIWebhook(t *testing.T) *MeshWebhook {
 // aiPod returns a Pod annotated as an AI agent for use in tests.
 func aiPod(serviceName, cmName string) corev1.Pod {
 	annotations := map[string]string{
-		constants.AnnotationService:         serviceName,
-		constants.AnnotationInject:          "true",
-		constants.AnnotationAIRole:          constants.AIAgentRole,
+		constants.AnnotationService:          serviceName,
+		constants.AnnotationInject:           "true",
+		constants.AnnotationAIRole:           constants.AIAgentRole,
 		constants.AnnotationAIAgentMCPConfig: cmName,
 	}
 	return corev1.Pod{
@@ -255,7 +255,7 @@ func TestOBOInboundSidecar(t *testing.T) {
 	w.ImageConsulOBOInbound = "hashicorp/consul-obo-inbound:test"
 	pod := aiPod("my-ai-app", "my-mcp-config")
 
-	container, err := w.oboInboundSidecar(pod)
+	container, err := w.oboInboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
 	require.NoError(t, err)
 
 	// Container name must match the OBO inbound constant.
@@ -288,6 +288,15 @@ func TestOBOInboundSidecar(t *testing.T) {
 	require.NotContains(t, args, "--obo=true",
 		"--obo flag removed: consul-obo-inbound is always inbound-only; no flag needed")
 
+	// The service name binds the sidecar to its own Consul identity so it can
+	// reject an expected-hop naming a different destination.
+	require.Contains(t, args, "--service-name=my-ai-app")
+
+	// Namespaces and partitions are off in the base webhook, so no tenancy
+	// flags: the binary defaults both to "default".
+	require.NotContains(t, strings.Join(args, " "), "--namespace=")
+	require.NotContains(t, strings.Join(args, " "), "--partition=")
+
 	// Security context: non-root, no privilege escalation, read-only filesystem.
 	require.NotNil(t, container.SecurityContext)
 	require.True(t, *container.SecurityContext.RunAsNonRoot)
@@ -304,11 +313,46 @@ func TestOBOInboundSidecarImageRequired(t *testing.T) {
 	w.ImageConsulOBOInbound = "" // deliberately missing
 	pod := aiPod("svc", "cm")
 
-	_, err := w.oboInboundSidecar(pod)
+	_, err := w.oboInboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "ImageConsulOBOInbound must be set")
 }
 
+// TestOBOInboundSidecarTenancy verifies that the inbound sidecar carries the
+// real Consul namespace and partition when they are enabled, so the
+// expected-hop cross-check compares fully tenant-qualified destinations.
+func TestOBOInboundSidecarTenancy(t *testing.T) {
+	w := baseAIWebhook(t)
+	w.ImageConsulOBOInbound = "hashicorp/consul-obo-inbound:test"
+	w.EnableNamespaces = true
+	w.ConsulDestinationNamespace = "team-a"
+	w.ConsulPartition = "part-1"
+	pod := aiPod("my-ai-app", "my-mcp-config")
+
+	container, err := w.oboInboundSidecar(
+		corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
+	require.NoError(t, err)
+
+	require.Contains(t, container.Args, "--service-name=my-ai-app")
+	require.Contains(t, container.Args, "--namespace=team-a")
+	require.Contains(t, container.Args, "--partition=part-1")
+}
+
+// TestOBOInboundSidecarWithoutServiceAnnotation verifies the inbound sidecar is
+// still built without the connect-service annotation. Unlike outbound, inbound
+// does not need the service name to derive an SDS resource, and xDS remains the
+// authoritative source of the expected-hop destination.
+func TestOBOInboundSidecarWithoutServiceAnnotation(t *testing.T) {
+	w := baseAIWebhook(t)
+	w.ImageConsulOBOInbound = "hashicorp/consul-obo-inbound:test"
+	pod := aiPod("my-ai-app", "my-mcp-config")
+	delete(pod.Annotations, constants.AnnotationService)
+
+	container, err := w.oboInboundSidecar(
+		corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
+	require.NoError(t, err)
+	require.NotContains(t, strings.Join(container.Args, " "), "--service-name")
+}
 
 // TestOBOOutboundSidecar verifies the container built by oboOutboundSidecar has
 // the correct name, image, volume mount, command, and args.
@@ -345,23 +389,10 @@ func TestOBOOutboundSidecar(t *testing.T) {
 	}
 	require.Greater(t, addrIdx, -1)
 	require.Contains(t, args[addrIdx+1], "21103")
-	// SDS client flags must be present so consul-obo-outbound subscribes to the
-	// GenericSecret for this service's OAuthClientConfig.
-	require.Contains(t, args, "--xds-addr=127.0.0.1:19500")
-	require.Contains(t, args, "--sds-resource=oauth/my-ai-app")
-	// proxy-id-file tells the SDS client which node.Id to send in the first
-	// DeltaDiscoveryRequest so the Consul server starts watching the right proxy.
-	require.Contains(t, args, "--proxy-id-file=/consul/connect-inject/proxyid")
-	// node-name-file supplies node.metadata.node_name so the Consul server resolves
-	// the same proxycfg identity that Envoy uses.  Without it the server falls back
-	// to s.NodeName which may differ, silently watching the wrong snapshot and never
-	// pushing the oauth/<svcName> GenericSecret.
-	require.Contains(t, args, "--node-name-file=/consul/connect-inject/nodename")
-	// dataplane-ready-url must be set to the Envoy admin /ready endpoint so the
-	// SDS subscription waits for Envoy to fully initialise (ADS stream active)
-	// before opening the stream.  Do NOT use graceful_startup (:20600) — with
-	// startupGracePeriodSeconds=0 it returns 200 immediately, before the Consul
-	// server has built the proxy snapshot.
+	require.Contains(t, args, "--envelope-uds=/consul/connect-inject/oauth-envelope.sock")
+	require.Contains(t, args, "--broker-uds=/consul/connect-inject/credential-broker.sock")
+	require.NotContains(t, args, "--xds-addr=127.0.0.1:19500")
+	require.NotContains(t, args, "--sds-resource=oauth/my-ai-app")
 	dataplaneReadyFound := false
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "--dataplane-ready-url=") {
@@ -372,7 +403,9 @@ func TestOBOOutboundSidecar(t *testing.T) {
 		}
 	}
 	require.True(t, dataplaneReadyFound,
-		"--dataplane-ready-url must be present so SDS subscription waits for Envoy to be ready")
+		"--dataplane-ready-url must be present so envelope polling waits for Envoy to be ready")
+
+	require.Empty(t, container.Env)
 
 	// Security context.
 	require.NotNil(t, container.SecurityContext)
@@ -403,17 +436,16 @@ func TestOBOOutboundSidecarImageRequired(t *testing.T) {
 	require.Contains(t, err.Error(), "ImageConsulOBOOutbound must be set")
 }
 
-// oboPod returns a plain (non-AI) Pod annotated as an oauth-client for use in
-// tests that exercise the OBO-only injection path.
-func oboOnlyPod(serviceName string) corev1.Pod {
+// mcpServerPod returns a pod annotated as mcp-server (audience DCR, no OBO).
+func mcpServerPod(serviceName string) corev1.Pod {
 	return corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
 			Namespace: "default",
 			Annotations: map[string]string{
-				constants.AnnotationService:     serviceName,
-				constants.AnnotationInject:      "true",
-				constants.AnnotationOAuthClient: "true",
+				constants.AnnotationService: serviceName,
+				constants.AnnotationInject:  "true",
+				constants.AnnotationAIRole:  constants.AIMCPServerRole,
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -422,29 +454,13 @@ func oboOnlyPod(serviceName string) corev1.Pod {
 	}
 }
 
-// TestOBOSidecarsInjectedForNonAIPod verifies that a non-AI pod annotated with
-// consul.hashicorp.com/oauth-client: "true" receives the consul-obo-inbound and
-// consul-obo-outbound sidecars but NOT the consul-mcp-gateway sidecar.
-func TestOBOSidecarsInjectedForNonAIPod(t *testing.T) {
-	w := baseAIWebhook(t)
-	w.ImageConsulOBOInbound = "hashicorp/consul-obo-inbound:test"
-	w.ImageConsulOBOOutbound = "hashicorp/consul-obo-outbound:test"
-
-	pod := oboOnlyPod("my-svc")
-
-	inbound, err := w.oboInboundSidecar(pod)
-	require.NoError(t, err)
-	outbound, err := w.oboOutboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
-	require.NoError(t, err)
-
-	// Should have OBO containers.
-	require.Equal(t, constants.ConsulOBOInboundContainerName, inbound.Name)
-	require.Equal(t, constants.ConsulOBOOutboundContainerName, outbound.Name)
-
-	// Verify IsOAuthClient recognises the pod.
-	require.True(t, common.IsOAuthClient(pod))
-	// Verify IsAIAgent does NOT recognise the pod (no mcp-gateway injection).
+// TestMCPServerDoesNotGetOBO verifies mcp-server pods are not treated as OBO
+// workloads (no NeedsOBOSidecars).
+func TestMCPServerDoesNotGetOBO(t *testing.T) {
+	pod := mcpServerPod("weatherly")
+	require.True(t, common.IsMCPServer(pod))
 	require.False(t, common.IsAIAgent(pod))
+	require.False(t, common.NeedsOBOSidecars(pod))
 }
 
 // TestAIAgentPodGetsAllThreeSidecars verifies the injection contract for AI
@@ -460,7 +476,7 @@ func TestAIAgentPodGetsAllThreeSidecars(t *testing.T) {
 	// All three sidecar builders must succeed.
 	mcpGW, err := w.aiAgentSidecar(pod)
 	require.NoError(t, err)
-	oboIn, err := w.oboInboundSidecar(pod)
+	oboIn, err := w.oboInboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
 	require.NoError(t, err)
 	oboOut, err := w.oboOutboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
 	require.NoError(t, err)
@@ -469,7 +485,6 @@ func TestAIAgentPodGetsAllThreeSidecars(t *testing.T) {
 	require.Equal(t, constants.ConsulOBOInboundContainerName, oboIn.Name)
 	require.Equal(t, constants.ConsulOBOOutboundContainerName, oboOut.Name)
 
-	// IsOAuthClient must be true for AI agent pods.
-	require.True(t, common.IsOAuthClient(pod))
+	require.True(t, common.NeedsOBOSidecars(pod))
 	require.True(t, common.IsAIAgent(pod))
 }

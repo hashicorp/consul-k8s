@@ -21,24 +21,41 @@ import (
 )
 
 // IsAIAgent returns true when the pod carries the AI agent role annotation with
-// the expected "ai-agent" value.
+// the expected "ai-agent" value. AI agents receive mcp-gateway + OBO sidecars
+// and participate in OAuth DCR as signing clients.
 func IsAIAgent(pod corev1.Pod) bool {
 	return pod.Annotations[constants.AnnotationAIRole] == constants.AIAgentRole
 }
 
-// IsOAuthClient returns true when the pod has opted into the OBO identity plane.
-// This is the case either when the explicit AnnotationOAuthClient annotation is
-// set to "true", or when the pod is an AI agent (which is always an OAuth client
-// by definition).  Both groups receive the consul-obo-inbound and
-// consul-obo-outbound sidecars.
-func IsOAuthClient(pod corev1.Pod) bool {
-	return IsAIAgent(pod) || pod.Annotations[constants.AnnotationOAuthClient] == "true"
+// IsMCPServer returns true when the pod is annotated as an MCP tool server.
+// MCP servers participate in OAuth DCR as audiences only — no OBO / mcp-gateway.
+func IsMCPServer(pod corev1.Pod) bool {
+	return pod.Annotations[constants.AnnotationAIRole] == constants.AIMCPServerRole
+}
+
+// NeedsOBOSidecars reports whether the pod should get consul-obo-inbound and
+// consul-obo-outbound. Only AI agents receive OBO ext_proc sidecars.
+func NeedsOBOSidecars(pod corev1.Pod) bool {
+	return IsAIAgent(pod)
 }
 
 // AIAgentMCPConfigName returns the ConfigMap name from the MCP config annotation,
 // or an empty string if the annotation is absent.
 func AIAgentMCPConfigName(pod corev1.Pod) string {
 	return pod.Annotations[constants.AnnotationAIAgentMCPConfig]
+}
+
+// DefaultMCPServerAIConfig returns a minimal api.AgentServiceAI for mcp-server
+// workloads (audience DCR). Transport/path match the playground MCP servers.
+func DefaultMCPServerAIConfig() *api.AgentServiceAI {
+	return &api.AgentServiceAI{
+		Role: constants.AIMCPServerRole,
+		MCPServer: &api.AgentAIMCPServer{
+			Transport:       "streamable-http",
+			Path:            "/mcp",
+			ProtocolVersion: "2024-11-05",
+		},
+	}
 }
 
 // AIConfigKey is the key in the MCP agent ConfigMap whose value is the JSON

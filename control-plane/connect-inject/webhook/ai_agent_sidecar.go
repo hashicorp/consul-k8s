@@ -97,26 +97,26 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 }
 
 // oboInboundSidecar builds and returns the consul-obo-inbound sidecar container
-// that handles INBOUND OBO for AI agent pods (and any pod with oauth_client=true).
+// that handles INBOUND OBO for AI agent pods (ai-role=ai-agent).
 //
 // It listens on loopback :21102 (DefaultOBOInboundPort) and is wired by the
 // Consul xDS generator as an ext_proc filter on the inbound Envoy listener.
 // Its responsibilities are:
 //
-//  1. Strip any forged x-user-* / x-claim-* headers from the caller (INV-8).
-//  2. Perform RFC 8693 OBO token exchange: swap the inbound bearer token for
-//     an audience-bound JWT signed with the service's EC P-256 key.
-//  3. Project x-user-role (pipe-separated UPPER CASE groups), x-user-aud,
-//     x-claim-sub, x-claim-email so that the downstream jwt_authn / RBAC
-//     filters can evaluate role-based intentions.
+//  1. Verify the inbound OBO JWT against the expected audience carried in the
+//     trusted x-consul-obo-expected-hop stream metadata (INV-7).
+//  2. Validate the projected x-user-* / x-claim-* headers against the verified
+//     claims, rejecting forged or mismatched values (INV-8).
 //
-// The OAuth private key is delivered via xDS (x-consul-oauth-config gRPC
-// stream metadata) — never via file, env var, or Kubernetes Secret.
+// Inbound never exchanges or re-projects a token; that is the outbound
+// sidecar's job. It therefore holds no OAuth credentials at all.
 //
-// This sidecar is injected for all pods that have opted into the OBO identity
-// plane: AI agent pods (AnnotationAIRole=ai-agent) and any pod annotated with
-// consul.hashicorp.com/oauth-client: "true".
-func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) {
+// The expected audience, destination, and IAM issuer all arrive as ext_proc
+// stream metadata from the Consul xDS generator, so no identity flags are
+// strictly required. The flags set below are an independent cross-check.
+//
+// This sidecar is injected only for AI agent pods (AnnotationAIRole=ai-agent).
+func (w *MeshWebhook) oboInboundSidecar(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
 	image := w.ImageConsulOBOInbound
 	if image == "" {
 		return corev1.Container{}, fmt.Errorf(
@@ -174,17 +174,33 @@ func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) 
 		},
 	}
 
+	// Bind this sidecar to its own Consul identity so it can reject an
+	// expected-hop whose destination names a different service. Unlike the
+	// outbound sidecar the service annotation is not mandatory here — it is
+	// only used for the cross-check, not to derive an SDS resource name — so a
+	// pod without it still gets a working verifier driven purely by xDS.
+	if svcName := pod.Annotations[constants.AnnotationService]; svcName != "" {
+		container.Args = append(container.Args, "--service-name="+svcName)
+	}
+	if w.EnableNamespaces {
+		container.Args = append(container.Args,
+			"--namespace="+w.consulNamespace(namespace.Name))
+	}
+	if w.ConsulPartition != "" {
+		container.Args = append(container.Args,
+			"--partition="+w.ConsulPartition)
+	}
+
 	return container, nil
 }
 
 // oboOutboundSidecar builds and returns the consul-obo-outbound sidecar
-// container that handles OUTBOUND OBO for ALL outbound calls from any service
-// with oauth_client=true.  It is not specific to MCP — it covers A2A, A2REST,
-// A2MCP, and A2LLM outbound paths.
+// container that handles OUTBOUND OBO for ALL outbound calls from AI agent
+// pods (ai-role=ai-agent). It covers A2A, A2REST, A2MCP, and A2LLM paths.
 //
 // It listens on loopback :21103 (DefaultOBOOutboundPort) and is wired by the
 // Consul xDS generator as an ext_proc filter on the outbound Envoy listener
-// for every oauth_client=true service.  Its responsibilities are:
+// for every ai-agent service. Its responsibilities are:
 //
 //  1. Detect that the outbound request carries a user-context bearer token.
 //  2. Perform RFC 8693 OBO exchange for the target service audience.
@@ -216,57 +232,25 @@ func (w *MeshWebhook) oboOutboundSidecar(namespace corev1.Namespace, pod corev1.
 			constants.AnnotationService)
 	}
 
-	xdsAddr := net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultDataplaneXDSPort))
-	sdsResource := "oauth/" + svcName
-
 	container := corev1.Container{
 		Name:            constants.ConsulOBOOutboundContainerName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Resources:       w.DefaultConsulSidecarResources,
-		Env: []corev1.EnvVar{
-			{
-				Name: "POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
-				},
-			},
-			{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
-				},
-			},
-		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				// Shared data volume written by consul-connect-inject-init;
-				// the obo-outbound sidecar reads the Consul HTTP address and
-				// token files from here.
 				Name:      volumeName,
 				MountPath: "/consul/connect-inject",
 				ReadOnly:  true,
 			},
 		},
-		// The consul-obo-outbound binary is invoked directly.
 		Command: []string{constants.DefaultOBOOutboundBinary},
 		Args: []string{
 			"--addr",
 			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOOutboundPort)),
 			"--log-level=info",
-			"--xds-addr=" + xdsAddr,
-			"--sds-resource=" + sdsResource,
-			// consul-connect-inject-init writes the sidecar proxy service-ID to
-			// this file.  The SDS client sends it as node.Id in the first
-			// DeltaDiscoveryRequest so the Consul server can locate the correct
-			// proxy snapshot and push the GenericSecret (oauth/<svcName>).
-			"--proxy-id-file=/consul/connect-inject/proxyid",
-			// consul-connect-inject-init writes the Consul node name to this
-			// file (value: $(NODE_NAME)-virtual, same source as DP_SERVICE_NODE_NAME).
-			// The SDS client sends it as node.metadata.node_name so the Consul server
-			// resolves the same proxycfg identity that Envoy uses.
-			"--node-name-file=/consul/connect-inject/nodename",
-			// Poll Envoy admin /ready before opening the SDS subscription.
+			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
+			"--broker-uds=/consul/connect-inject/credential-broker.sock",
 			fmt.Sprintf("--dataplane-ready-url=http://127.0.0.1:%d/ready",
 				constants.DefaultEnvoyAdminPort),
 		},
@@ -285,20 +269,6 @@ func (w *MeshWebhook) oboOutboundSidecar(namespace corev1.Namespace, pod corev1.
 				Drop: []corev1.Capability{"ALL"},
 			},
 		},
-	}
-
-	// Non-default tenancy: pass Consul namespace and partition so the SDS client
-	// includes them in node.metadata and the Consul server resolves the correct
-	// proxycfg identity.  Empty values are safe — the server defaults them to
-	// "default" — but non-default workloads must carry the real values to avoid
-	// watching the wrong snapshot and receiving no credential.
-	if w.EnableNamespaces {
-		container.Args = append(container.Args,
-			"--consul-namespace="+w.consulNamespace(namespace.Name))
-	}
-	if w.ConsulPartition != "" {
-		container.Args = append(container.Args,
-			"--consul-partition="+w.ConsulPartition)
 	}
 
 	return container, nil

@@ -122,12 +122,10 @@ func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns
 		)
 	}
 
-	// Exclude OBO sidecar ports from tproxy interception for all oauth-client
-	// pods. Both OBO processes bind on loopback and are invoked by Envoy via
-	// ext_proc gRPC — they must never be redirected through the iptables rules.
+	// Exclude OBO sidecar ports from tproxy for AI agents only.
 	//   :21102 — consul-obo-inbound   (inbound ext_proc)
 	//   :21103 — consul-obo-outbound  (outbound ext_proc)
-	if common.IsOAuthClient(pod) {
+	if common.NeedsOBOSidecars(pod) {
 		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,
 			strconv.Itoa(constants.DefaultOBOInboundPort),
 		)

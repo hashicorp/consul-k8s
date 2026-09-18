@@ -92,6 +92,11 @@ const (
 	// AIAgentRole is the expected value of AnnotationAIRole for an AI agent workload.
 	AIAgentRole = "ai-agent"
 
+	// AIMCPServerRole is the expected value of AnnotationAIRole for an MCP tool
+	// server. These workloads participate in OAuth DCR as audiences only — they
+	// do not receive OBO or mcp-gateway sidecars.
+	AIMCPServerRole = "mcp-server"
+
 	// AIContainerName is the injected container name for the consul-mcp-gateway sidecar.
 	// This container handles MCP body parsing: stamps x-mcp-method/tool/hitl headers.
 	AIContainerName = "consul-mcp-gateway"
@@ -128,9 +133,8 @@ const (
 
 	// ConsulOBOOutboundContainerName is the injected container name for the
 	// consul-obo-outbound sidecar.
-	// This container handles OUTBOUND OBO for all outbound calls from any service
-	// with oauth_client=true: performs RFC 8693 token exchange and injects the
-	// audience-bound JWT before the request leaves the mesh.
+	// This container handles OUTBOUND OBO for all outbound calls from AI agent
+	// pods (ai-role=ai-agent): RFC 8693 exchange and audience-bound JWT inject.
 	ConsulOBOOutboundContainerName = "consul-obo-outbound"
 
 	// DefaultGatewayBinary is the path to the consul-mcp-gateway binary inside the
