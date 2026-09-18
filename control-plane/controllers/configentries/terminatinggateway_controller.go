@@ -43,6 +43,12 @@ const terminatingGatewayByLinkedServiceName = "linkedServiceName"
 const (
 	secretOwnerKey      = ".metadata.secretOwner"
 	secretTriggerPrefix = "__secret_rotation__"
+
+	// configMapOwnerKey indexes TerminatingGateways by the credential-injection
+	// ConfigMaps they reference so a change to any referenced ConfigMap re-runs
+	// the owning gateway's reconcile (which recomputes the credential-config
+	// checksum annotation and rolls the workload).
+	configMapOwnerKey = ".metadata.configMapOwner"
 )
 
 // TerminatingGatewayController is the controller for TerminatingGateway resources.
@@ -293,6 +299,12 @@ func (r *TerminatingGatewayController) SetupWithManager(ctx context.Context, mgr
 		return err
 	}
 
+	// 3. Indexer: Lookup by referenced credential-injection ConfigMap name so a
+	// change to any referenced ConfigMap rolls the owning gateway's workload.
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.TerminatingGateway{}, configMapOwnerKey, termGWConfigMapIndexer); err != nil {
+		return err
+	}
+
 	return setupWithManager(mgr, &consulv1alpha1.TerminatingGateway{}, r)
 }
 
@@ -340,6 +352,24 @@ func termGWSecretIndexer(o client.Object) []string {
 	}
 
 	return secrets
+}
+
+// termGWConfigMapIndexer indexes a TerminatingGateway by the non-secret
+// credential-injection ConfigMaps it references, so ConfigMap changes can be
+// mapped back to the gateways that must be re-reconciled.
+func termGWConfigMapIndexer(o client.Object) []string {
+	termGW := o.(*v1alpha1.TerminatingGateway)
+	ci := termGW.Spec.Deployment.CredentialInjection
+	if ci == nil || !ci.Enabled {
+		return nil
+	}
+	var configMaps []string
+	for _, name := range []string{ci.ProcessorConfigMap, ci.VaultAgentConfigMap, ci.VaultCAConfigMap} {
+		if name != "" {
+			configMaps = append(configMaps, name)
+		}
+	}
+	return configMaps
 }
 
 func (r *TerminatingGatewayController) UpdateStatusFailedToSetACLs(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway, err error) {
@@ -561,6 +591,27 @@ func (r *TerminatingGatewayController) transformSecret(ctx context.Context, obj 
 	for _, gw := range gateways.Items {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{Name: secretTriggerPrefix + gw.Name, Namespace: gw.Namespace},
+		})
+	}
+	return requests
+}
+
+// transformConfigMap maps a changed ConfigMap to reconcile requests for every
+// TerminatingGateway that references it for credential injection. A normal
+// reconcile recomputes the credential-config checksum annotation, so editing a
+// referenced ConfigMap rolls the workload.
+func (r *TerminatingGatewayController) transformConfigMap(ctx context.Context, obj client.Object) []reconcile.Request {
+	configMap := obj.(*corev1.ConfigMap)
+	var gateways v1alpha1.TerminatingGatewayList
+	_ = r.Client.List(ctx, &gateways,
+		client.InNamespace(configMap.Namespace),
+		client.MatchingFields{configMapOwnerKey: configMap.Name},
+	)
+
+	var requests []reconcile.Request
+	for _, gw := range gateways.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: gw.Name, Namespace: gw.Namespace},
 		})
 	}
 	return requests
@@ -1012,6 +1063,21 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		Containers:                    []corev1.Container{mainContainer},
 	}
 
+	// Reject an incomplete credential-injection config before creating the
+	// workload; never infer a default credential.
+	if err := validateCredentialInjectionWorkload(termGW.Spec.Deployment.CredentialInjection, termGW.Spec.Services); err != nil {
+		return nil, err
+	}
+
+	// Add the Vault-only credential-injection sidecars/volumes when enabled.
+	// This mirrors the Helm chart projection so both deployment paths agree.
+	applyTerminatingGatewayCredentialInjection(
+		&podSpec,
+		termGW.Spec.Deployment.CredentialInjection,
+		imagePullPolicy,
+		logLevel,
+	)
+
 	annotations := map[string]string{
 		"consul.hashicorp.com/connect-inject":              "false",
 		"consul.hashicorp.com/mesh-inject":                 "false",
@@ -1169,6 +1235,19 @@ func (r *TerminatingGatewayController) deployTerminatingGatewayDeployment(
 	deployment, err := r.constructDeploymentFromCRD(termGW, helmValues)
 	if err != nil {
 		return fmt.Errorf("construct deployment from CRD: %w", err)
+	}
+
+	// Roll the workload when the non-secret credential ConfigMaps change (but not
+	// when the rendered credential files rotate, which live on a memory emptyDir).
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled {
+		checksum, err := r.credentialConfigChecksum(ctx, termGW.Namespace, ci)
+		if err != nil {
+			return fmt.Errorf("compute credential config checksum: %w", err)
+		}
+		if deployment.Spec.Template.Annotations == nil {
+			deployment.Spec.Template.Annotations = map[string]string{}
+		}
+		deployment.Spec.Template.Annotations[campCredentialConfigChecksumAnnotation] = checksum
 	}
 
 	// Ensure the referenced ServiceAccount exists before the Deployment is created/updated.

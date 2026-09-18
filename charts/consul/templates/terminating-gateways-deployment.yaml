@@ -36,6 +36,17 @@
 {{ end -}}
 {{- /* Add the gateway name to the $names dict to ensure uniqueness */ -}}
 {{- $_ := set $names .name .name }}
+{{- /* Effective credential-injection config: per-gateway fields override the
+       default field-by-field (a deep merge, not a whole-object replace, so a
+       partial per-gateway block keeps the default images/ConfigMap names). */ -}}
+{{- $ci := mergeOverwrite (deepCopy (default (dict) $defaults.credentialInjection)) (default (dict) .credentialInjection) }}
+{{- /* Nil-aware drain default: preserve an explicit drainSeconds: 0 (the sprig
+       "default" helper treats numeric zero as empty, which the controller does
+       not). Only meaningful when credential injection is enabled. */ -}}
+{{- $drainSeconds := 30 }}
+{{- if not (kindIs "invalid" $ci.drainSeconds) }}
+{{- $drainSeconds = int $ci.drainSeconds }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -79,6 +90,11 @@ spec:
         "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/gateway-kind": "terminating-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
+        {{- if and $ci $ci.enabled }}
+        # Rolls the workload when the non-secret credential ConfigMaps change.
+        # Rendered credential files (memory emptyDir) rotate without a pod restart.
+        "consul.hashicorp.com/credential-config-checksum": {{ cat (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.processorConfigMap))) (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.vaultAgentConfigMap))) (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.vaultCAConfigMap))) | sha256sum | quote }}
+        {{- end }}
         {{- if $root.Values.global.enableConsulNamespaces }}
         "consul.hashicorp.com/gateway-namespace": {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
         {{- end }}
@@ -126,7 +142,22 @@ spec:
       topologySpreadConstraints:
         {{ tpl (default $defaults.topologySpreadConstraints .topologySpreadConstraints) $root | nindent 8 | trim }}
       {{- end }}
+      {{- if and $ci $ci.enabled }}
+      # Shared fsGroup so the kubelet group-owns the ext_proc socket and rendered
+      # credential volumes (with the setgid bit); no privileged root init
+      # container is required. Every container joins this group, so a sidecar
+      # running under an OpenShift-assigned UID can create and reach the socket
+      # and Envoy (a group member) can connect to it.
+      securityContext:
+        fsGroup: 10001
+      {{- end }}
+      {{- if and $ci $ci.enabled }}
+      # Grace period must exceed the processor's preStop drain plus a shutdown
+      # allowance so in-flight requests drain before the pod is killed.
+      terminationGracePeriodSeconds: {{ add $drainSeconds 15 }}
+      {{- else }}
       terminationGracePeriodSeconds: 10
+      {{- end }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
       - name: tmp
@@ -135,6 +166,51 @@ spec:
       - name: consul-service
         emptyDir:
           medium: "Memory"
+      {{- if and $ci $ci.enabled }}
+      # Credential injection (T8): the shared ext_proc socket and non-secret
+      # processor config are present for every source. The credential source
+      # (Vault Agent-rendered memory volume, or a read-only Kubernetes Secret)
+      # is selected below. Credentials must NOT be mounted into Envoy.
+      - name: camp-auth-socket
+        emptyDir:
+          medium: "Memory"
+      - name: camp-auth-processor-config
+        configMap:
+          name: {{ $ci.processorConfigMap | quote }}
+      {{- if eq (default "vault" $ci.source) "kubernetesSecret" }}
+      # Credentials arrive via a read-only Secret mounted at the rendered path.
+      # The volume keeps its name so the processor container is source-agnostic.
+      - name: camp-vault-rendered
+        secret:
+          secretName: {{ required "credentialInjection.secretName is required when source is kubernetesSecret" $ci.secretName | quote }}
+      {{- else }}
+      - name: camp-vault-rendered
+        emptyDir:
+          medium: "Memory"
+      - name: camp-vault-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              audience: {{ $ci.tokenAudience | default "vault" | quote }}
+              {{- if $ci.tokenExpirationSeconds }}
+              expirationSeconds: {{ $ci.tokenExpirationSeconds }}
+              {{- end }}
+      # Private token sink for the Vault Agent (never mounted into the processor
+      # or Envoy) and the operator-provided agent config / Vault CA.
+      - name: camp-vault-agent-private
+        emptyDir:
+          medium: "Memory"
+      - name: camp-vault-agent-config
+        configMap:
+          name: {{ $ci.vaultAgentConfigMap | quote }}
+      {{- if $ci.vaultCAConfigMap }}
+      - name: camp-vault-ca
+        configMap:
+          name: {{ $ci.vaultCAConfigMap | quote }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
       {{- range (default $defaults.extraVolumes .extraVolumes) }}
       - name: userconfig-{{ .name }}
         {{ .type }}:
@@ -228,6 +304,11 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+        {{- if and $ci $ci.enabled }}
+        {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
+        {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent-init" "exitAfterAuth" true "ci" $ci "root" $root) | nindent 8 }}
+        {{- end }}
+        {{- end }}
       containers:
         - name: terminating-gateway
           image: {{ $root.Values.global.imageConsulDataplane | quote }}
@@ -250,6 +331,12 @@ spec:
             - name: userconfig-{{ .name }}
               readOnly: true
               mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
+            {{- if and $ci $ci.enabled }}
+            # Envoy reaches the credential processor over this UDS only. It must
+            # never mount the rendered credentials or the Vault token volumes.
+            - name: camp-auth-socket
+              mountPath: /consul/auth-socket
             {{- end }}
           {{- if (default $defaults.resources .resources) }}
           resources: {{ toYaml (default $defaults.resources .resources) | nindent 12 }}
@@ -357,6 +444,12 @@ spec:
           ports:
             - name: gateway
               containerPort: 8443
+        {{- if and $ci $ci.enabled }}
+        {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
+        {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent" "exitAfterAuth" false "ci" $ci "root" $root) | nindent 8 }}
+        {{- end }}
+        {{- include "consul.terminatingGatewayCredentialAuthProcessor" (dict "ci" $ci "logLevel" (default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel) "drainSeconds" $drainSeconds) | nindent 8 }}
+        {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}
       priorityClassName: {{ (default $defaults.priorityClassName .priorityClassName) | quote }}
       {{- end }}
