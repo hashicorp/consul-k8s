@@ -42,9 +42,16 @@ const (
 	campProcessorConfigFile = "/consul/processor-config/config.json"
 	campVaultCAPath         = "/consul/vault-ca"
 
-	campCredentialUID        = int64(10001)
-	campDefaultAudience      = "vault"
-	campDefaultDrainSecs     = int64(30)
+	// campCredentialFSGroup is the shared supplemental group used for the
+	// group-owned ext_proc socket and rendered-credential volumes. It is applied
+	// via the pod's fsGroup so the kubelet (not a privileged init container) sets
+	// group ownership and the setgid bit on the emptyDir volumes. The sidecars do
+	// not pin a fixed runAsUser/runAsGroup, so an OpenShift-assigned UID from the
+	// restricted-v2 SCC range still works: every container is a member of this
+	// fsGroup and can reach the socket without running as root.
+	campCredentialFSGroup     = int64(10001)
+	campDefaultAudience       = "vault"
+	campDefaultDrainSecs      = int64(30)
 	campShutdownAllowanceSecs = int64(15)
 )
 
@@ -57,7 +64,6 @@ const (
 func applyTerminatingGatewayCredentialInjection(
 	podSpec *corev1.PodSpec,
 	ci *consulv1alpha1.TerminatingGatewayCredentialInjection,
-	imageK8S string,
 	imagePullPolicy corev1.PullPolicy,
 	logLevel string,
 ) {
@@ -67,7 +73,6 @@ func applyTerminatingGatewayCredentialInjection(
 
 	podSpec.Volumes = append(podSpec.Volumes, campCredentialVolumes(ci)...)
 
-	podSpec.InitContainers = append(podSpec.InitContainers, campSocketInitContainer(imageK8S, imagePullPolicy))
 	if ci.EffectiveSource() == consulv1alpha1.CredentialSourceVault {
 		podSpec.InitContainers = append(podSpec.InitContainers,
 			campVaultAgentContainer("camp-vault-agent-init", true, ci, imagePullPolicy),
@@ -89,12 +94,15 @@ func applyTerminatingGatewayCredentialInjection(
 		})
 	}
 
-	// Shared supplemental group so Envoy (non-10001) can reach the group-owned
-	// socket directory.
+	// Shared fsGroup so the kubelet group-owns the ext_proc socket and rendered
+	// credential emptyDir volumes (with the setgid bit) without a privileged
+	// root init container. Every container joins this group, so a sidecar running
+	// under an OpenShift-assigned UID can still create and reach the socket, and
+	// Envoy can connect to it.
 	if podSpec.SecurityContext == nil {
 		podSpec.SecurityContext = &corev1.PodSecurityContext{}
 	}
-	podSpec.SecurityContext.SupplementalGroups = append(podSpec.SecurityContext.SupplementalGroups, campCredentialUID)
+	podSpec.SecurityContext.FSGroup = ptr.To(campCredentialFSGroup)
 
 	// Grace period must exceed the processor's preStop drain plus a shutdown
 	// allowance so in-flight requests drain before the pod is killed.
@@ -159,16 +167,16 @@ func campCredentialVolumes(ci *consulv1alpha1.TerminatingGatewayCredentialInject
 	return volumes
 }
 
-// campCredentialSecurityContext is the hardened, non-root UID/GID 10001 context
-// shared by the Vault Agent and credential processor containers.
+// campCredentialSecurityContext is the hardened, non-root context shared by the
+// Vault Agent and credential processor containers. It intentionally does NOT pin
+// runAsUser/runAsGroup so an OpenShift-assigned UID (restricted-v2 SCC) is
+// honored; shared socket/volume access is provided by the pod's fsGroup instead.
 func campCredentialSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{
 		AllowPrivilegeEscalation: ptr.To(false),
 		ReadOnlyRootFilesystem:   ptr.To(true),
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 		RunAsNonRoot:             ptr.To(true),
-		RunAsUser:                ptr.To(campCredentialUID),
-		RunAsGroup:               ptr.To(campCredentialUID),
 		SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 	}
 }
@@ -263,32 +271,11 @@ func campAuthProcessorContainer(
 	}
 }
 
-// campSocketInitContainer prepares the shared ext_proc socket directory so the
-// processor (uid 10001) owns it and Envoy (a member of the shared supplemental
-// group) can reach the socket. It runs with the narrowest capabilities required
-// (CHOWN/FOWNER) and mounts only the socket volume.
-func campSocketInitContainer(imageK8S string, imagePullPolicy corev1.PullPolicy) corev1.Container {
-	return corev1.Container{
-		Name:            "camp-auth-socket-init",
-		Image:           imageK8S,
-		ImagePullPolicy: imagePullPolicy,
-		Command:         []string{"/bin/sh", "-ec"},
-		Args:            []string{fmt.Sprintf("chown 10001:10001 %s\nchmod 2770 %s\n", campAuthSocketDir, campAuthSocketDir)},
-		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:                ptr.To(int64(0)),
-			RunAsNonRoot:             ptr.To(false),
-			AllowPrivilegeEscalation: ptr.To(false),
-			ReadOnlyRootFilesystem:   ptr.To(true),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-				Add:  []corev1.Capability{"CHOWN", "FOWNER"},
-			},
-			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
-		},
-		VolumeMounts: []corev1.VolumeMount{{Name: campAuthSocketVolume, MountPath: campAuthSocketDir}},
-		Resources:    campBoundedResources("16Mi", "10m"),
-	}
-}
+// campSocketInitContainer removed: the shared ext_proc socket directory is now
+// group-owned by the pod's fsGroup (set by the kubelet with the setgid bit), so
+// no privileged root init container is needed to prepare it. This keeps the
+// workload schedulable under OpenShift restricted-v2 and Kubernetes Restricted
+// Pod Security.
 
 func campBoundedResources(mem, cpu string) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{

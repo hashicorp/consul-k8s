@@ -180,7 +180,9 @@ type TerminatingGatewayCredentialInjection struct {
 	ProcessorConfigMap string `json:"processorConfigMap,omitempty"`
 
 	// VaultAgentConfigMap names the ConfigMap, in the gateway's namespace, carrying
-	// non-secret Vault Agent configuration.
+	// non-secret Vault Agent configuration. This ConfigMap exclusively owns the
+	// Vault auth configuration (auto-auth method, role, and mount); there are no
+	// separate auth role/mount fields on this API.
 	// +kubebuilder:validation:Optional
 	VaultAgentConfigMap string `json:"vaultAgentConfigMap,omitempty"`
 
@@ -192,14 +194,6 @@ type TerminatingGatewayCredentialInjection struct {
 	// VaultNamespace is the optional Vault Enterprise namespace.
 	// +kubebuilder:validation:Optional
 	VaultNamespace string `json:"vaultNamespace,omitempty"`
-
-	// VaultAuthRole is the Vault Kubernetes auth role assumed by the sidecar.
-	// +kubebuilder:validation:Optional
-	VaultAuthRole string `json:"vaultAuthRole,omitempty"`
-
-	// VaultAuthMount is the mount path of the Vault Kubernetes auth method.
-	// +kubebuilder:validation:Optional
-	VaultAuthMount string `json:"vaultAuthMount,omitempty"`
 
 	// VaultCAConfigMap optionally names a ConfigMap, in the gateway's namespace, carrying
 	// the CA bundle used to validate the Vault server's TLS certificate.
@@ -553,6 +547,12 @@ func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool
 		if strings.Contains(in.SecretName, WildcardSpecifier) {
 			errs = append(errs, field.Invalid(path.Child("secretName"), in.SecretName, `must not contain the wildcard character "*"`))
 		}
+		// The processor ConfigMap is used by every source, so guard its
+		// identifier here too (the Vault branch covers it via
+		// validateWildcardAndModeCombinations).
+		if strings.Contains(in.ProcessorConfigMap, WildcardSpecifier) {
+			errs = append(errs, field.Invalid(path.Child("processorConfigMap"), in.ProcessorConfigMap, `must not contain the wildcard character "*"`))
+		}
 	default: // vault
 		if in.VaultAgentImage == "" {
 			errs = append(errs, field.Required(path.Child("vaultAgentImage"), "vaultAgentImage is required when credentialInjection is enabled"))
@@ -626,8 +626,6 @@ func (in *TerminatingGatewayCredentialInjection) validateWildcardAndModeCombinat
 		value string
 	}{
 		{"vaultNamespace", in.VaultNamespace},
-		{"vaultAuthRole", in.VaultAuthRole},
-		{"vaultAuthMount", in.VaultAuthMount},
 		{"vaultCAConfigMap", in.VaultCAConfigMap},
 		{"processorConfigMap", in.ProcessorConfigMap},
 		{"vaultAgentConfigMap", in.VaultAgentConfigMap},
