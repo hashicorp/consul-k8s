@@ -28,14 +28,10 @@ const (
 // It expects the ConfigMap volume (aiAgentConfigVolumeName) to already have been
 // appended to pod.Spec.Volumes by Handle().
 func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
-	gatewayBinary := w.GatewayBinary
-	if gatewayBinary == "" {
-		gatewayBinary = constants.DefaultGatewayBinary
-	}
-
 	// The consul-mcp-gateway container runs from the dedicated
-	// consul-ai-mcp-interceptor image which ships the consul binary with the
-	// `consul connect mcp-gateway` subcommand.
+	// consul-ai-mcp-interceptor image which ships the standalone
+	// consul-mcp-gateway binary at /app/consul-mcp-gateway.
+	// It is invoked directly — there is no `consul connect mcp-gateway` wrapper.
 	image := w.ImageConsulAIMCPInterceptor
 	if image == "" {
 		// Fall back to the consul-k8s image so that the webhook still works in
@@ -78,16 +74,162 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 				ReadOnly:  true,
 			},
 		},
-		Command: []string{constants.ConsulBinarypath},
+		// Invoke the standalone binary directly.
+		Command: []string{constants.DefaultGatewayBinary},
 		Args: []string{
-			"connect",
-			"mcp-gateway",
-			"-gateway-binary",
-			gatewayBinary,
-			"-addr",
+			"--addr",
 			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultAIInterceptorPort)),
 		},
 		SecurityContext: &corev1.SecurityContext{
+			RunAsNonRoot:             ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}
+
+	return container, nil
+}
+
+// oboInboundSidecar builds and returns the consul-obo-inbound sidecar container
+// that handles INBOUND OBO for ai-agent pods.
+//
+// It listens on loopback :21102 (DefaultOBOInboundPort) and is wired by the
+// Consul xDS generator as an ext_proc filter on the inbound Envoy listener.
+// Its responsibilities are:
+//
+//  1. Strip any forged x-user-* / x-claim-* headers from the caller (INV-8).
+//  2. Verify the already-exchanged bearer (JWKS, introspection fallback).
+//     Inbound does not perform RFC 8693 token exchange.
+//  3. Project x-user-role (pipe-separated UPPER CASE groups), x-user-aud,
+//     x-claim-sub, x-claim-email so that the downstream jwt_authn / RBAC
+//     filters can evaluate role-based intentions.
+//
+// Envelope ciphertext is on Envoy's pod-local UDS; the DEK comes from the
+// dataplane credential broker. Never file, env, Kubernetes Secret, or gRPC
+// stream metadata.
+func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) {
+	image := w.ImageConsulOBOInbound
+	if image == "" {
+		return corev1.Container{}, fmt.Errorf(
+			"ImageConsulOBOInbound must be set when OBO is enabled; " +
+				"the consul-k8s image does not contain the consul-obo-inbound binary")
+	}
+
+	container := corev1.Container{
+		Name:            constants.ConsulOBOInboundContainerName,
+		Image:           image,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Resources:       w.DefaultConsulSidecarResources,
+		Env: []corev1.EnvVar{
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+				},
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				// Shared data volume written by consul-connect-inject-init;
+				// the obo-inbound sidecar reads the Consul HTTP address and
+				// token files from here.
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+				ReadOnly:  true,
+			},
+		},
+		// The consul-obo-inbound binary is invoked directly — it does not need
+		// the consul connect mcp-gateway wrapper.
+		Command: []string{constants.DefaultOBOInboundBinary},
+		Args: []string{
+			"--addr",
+			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOInboundPort)),
+			"--log-level=info",
+			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
+			"--broker-uds=/consul/connect-inject/credential-broker.sock",
+			fmt.Sprintf("--dataplane-ready-url=http://127.0.0.1:%d/ready",
+				constants.DefaultEnvoyAdminPort),
+		},
+		SecurityContext: &corev1.SecurityContext{
+			// Same UID as consul-dataplane so FetchKey SO_PEERCRED succeeds.
+			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+			RunAsNonRoot:             ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}
+
+	return container, nil
+}
+
+// oboOutboundSidecar builds and returns the consul-obo-outbound sidecar
+// container that handles OUTBOUND OBO for ai-agent pods. It is not specific
+// to MCP — it covers A2A, A2REST, A2MCP, and A2LLM outbound paths.
+//
+// It listens on loopback :21103 (DefaultOBOOutboundPort) and is wired by the
+// Consul xDS generator as an ext_proc filter. Its responsibilities are:
+//
+//  1. Detect that the outbound request carries a user-context bearer token.
+//  2. Perform RFC 8693 OBO exchange for the target service audience.
+//  3. Replace the Authorization header with the audience-bound JWT before the
+//     request leaves the agent's Envoy sidecar over mTLS.
+//
+// The OAuth private key is delivered as an encrypted envelope on Envoy's
+// pod-local UDS plus a DEK from the dataplane credential broker — never via
+// file, env var, Kubernetes Secret, or gRPC stream metadata.
+func (w *MeshWebhook) oboOutboundSidecar(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
+	image := w.ImageConsulOBOOutbound
+	if image == "" {
+		return corev1.Container{}, fmt.Errorf(
+			"ImageConsulOBOOutbound must be set when OBO is enabled; " +
+				"the consul-k8s image does not contain the consul-obo-outbound binary")
+	}
+
+	container := corev1.Container{
+		Name:            constants.ConsulOBOOutboundContainerName,
+		Image:           image,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Resources:       w.DefaultConsulSidecarResources,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+				ReadOnly:  true,
+			},
+		},
+		Command: []string{constants.DefaultOBOOutboundBinary},
+		Args: []string{
+			"--addr",
+			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOOutboundPort)),
+			"--log-level=info",
+			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
+			"--broker-uds=/consul/connect-inject/credential-broker.sock",
+			fmt.Sprintf("--dataplane-ready-url=http://127.0.0.1:%d/ready",
+				constants.DefaultEnvoyAdminPort),
+		},
+		SecurityContext: &corev1.SecurityContext{
+			// RunAsUser MUST match sidecarUserAndGroupID (5995) — the same UID
+			// that consul-connect-inject-init adds to the iptables RETURN rule
+			// (CONSUL_PROXY_OUTPUT chain, "owner UID match 5995").
+			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
 			RunAsNonRoot:             ptr.To(true),
 			AllowPrivilegeEscalation: ptr.To(false),
 			ReadOnlyRootFilesystem:   ptr.To(true),

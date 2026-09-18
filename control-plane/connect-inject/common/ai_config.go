@@ -20,10 +20,38 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
-// IsAIAgent returns true when the pod carries the AI agent role annotation with
-// the expected "ai-agent" value.
+// IsAIAgent returns true when the pod carries consul.hashicorp.com/ai-role=ai-agent.
+// That is the CAMP gate for envelope credentials, the dataplane Local Credential
+// Broker, and both OBO sidecars (matches enterprise ServiceNeedsOAuthCredential).
+// mcp-server and inference-model pods do not get OBO inject; MCP servers are
+// DCR audiences only.
 func IsAIAgent(pod corev1.Pod) bool {
 	return pod.Annotations[constants.AnnotationAIRole] == constants.AIAgentRole
+}
+
+// IsAIMCPServer returns true when the pod carries
+// consul.hashicorp.com/ai-role=mcp-server. Those workloads register a catalog
+// ai {} block for DCR audience participation but do not receive OBO inject
+// (matches enterprise ServiceParticipatesInOAuthDCR without ServiceNeedsOAuthCredential).
+func IsAIMCPServer(pod corev1.Pod) bool {
+	return pod.Annotations[constants.AnnotationAIRole] == constants.AIMCPServerRole
+}
+
+// ServiceAIFromPod returns the catalog ai {} block for the pod's ai-role, or
+// nil when the pod is not a CAMP AI workload that participates in DCR.
+func ServiceAIFromPod(
+	ctx context.Context,
+	client client.Client,
+	pod corev1.Pod,
+) (*api.AgentServiceAI, error) {
+	switch {
+	case IsAIAgent(pod):
+		return AIConfigFromPod(ctx, client, pod)
+	case IsAIMCPServer(pod):
+		return DefaultMCPServerAIConfig(), nil
+	default:
+		return nil, nil
+	}
 }
 
 // AIAgentMCPConfigName returns the ConfigMap name from the MCP config annotation,
@@ -98,6 +126,20 @@ func DefaultAIConfig() *api.AgentServiceAI {
 			Interceptor: &api.AgentAIAgentInterceptor{
 				Port: constants.DefaultAIInterceptorPort,
 			},
+		},
+	}
+}
+
+// DefaultMCPServerAIConfig returns a minimal valid ai.role=mcp-server block for
+// catalog registration. Consul DCR and Validate require the mcp_server
+// sub-block (transport + protocol_version).
+func DefaultMCPServerAIConfig() *api.AgentServiceAI {
+	return &api.AgentServiceAI{
+		Role: constants.AIMCPServerRole,
+		MCPServer: &api.AgentAIMCPServer{
+			Transport:       constants.DefaultAIMCPServerTransport,
+			Path:            constants.DefaultAIMCPServerPath,
+			ProtocolVersion: constants.DefaultAIMCPServerProtocolVersion,
 		},
 	}
 }

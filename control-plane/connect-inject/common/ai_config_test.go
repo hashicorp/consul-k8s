@@ -271,3 +271,114 @@ func TestAIConfigFromPod_ConfigMapNotFound_ReturnsError(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to get AI agent MCP ConfigMap")
 }
+
+// TestIsAIAgent is the CAMP OBO inject gate. oauth_client / oauth-client is not
+// an opt-in path.
+func TestIsAIAgent(t *testing.T) {
+	cases := map[string]struct {
+		annotations map[string]string
+		expected    bool
+	}{
+		"ai-agent annotation": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole: constants.AIAgentRole,
+			},
+			expected: true,
+		},
+		"mcp-server is audience-only": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole: constants.AIMCPServerRole,
+			},
+			expected: false,
+		},
+		"inference-model": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole: "inference-model",
+			},
+			expected: false,
+		},
+		"legacy oauth-client annotation is ignored": {
+			annotations: map[string]string{
+				"consul.hashicorp.com/oauth-client": "true",
+			},
+			expected: false,
+		},
+		"no annotations": {
+			annotations: map[string]string{},
+			expected:    false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: tc.annotations}}
+			require.Equal(t, tc.expected, IsAIAgent(pod))
+		})
+	}
+}
+
+func TestIsAIMCPServer(t *testing.T) {
+	cases := map[string]struct {
+		annotations map[string]string
+		expected    bool
+	}{
+		"mcp-server": {
+			annotations: map[string]string{constants.AnnotationAIRole: constants.AIMCPServerRole},
+			expected:    true,
+		},
+		"ai-agent": {
+			annotations: map[string]string{constants.AnnotationAIRole: constants.AIAgentRole},
+			expected:    false,
+		},
+		"absent": {
+			annotations: map[string]string{},
+			expected:    false,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: tc.annotations}}
+			require.Equal(t, tc.expected, IsAIMCPServer(pod))
+		})
+	}
+}
+
+func TestDefaultMCPServerAIConfig(t *testing.T) {
+	cfg := DefaultMCPServerAIConfig()
+	require.Equal(t, constants.AIMCPServerRole, cfg.Role)
+	require.NotNil(t, cfg.MCPServer)
+	require.Equal(t, constants.DefaultAIMCPServerTransport, cfg.MCPServer.Transport)
+	require.Equal(t, constants.DefaultAIMCPServerPath, cfg.MCPServer.Path)
+	require.Equal(t, constants.DefaultAIMCPServerProtocolVersion, cfg.MCPServer.ProtocolVersion)
+	require.Nil(t, cfg.Agent)
+}
+
+func TestServiceAIFromPod(t *testing.T) {
+	t.Run("ai-agent defaults without ConfigMap", func(t *testing.T) {
+		fakeClient := ctrlfake.NewClientBuilder().Build()
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{constants.AnnotationAIRole: constants.AIAgentRole},
+		}}
+		cfg, err := ServiceAIFromPod(context.Background(), fakeClient, pod)
+		require.NoError(t, err)
+		require.Equal(t, constants.AIAgentRole, cfg.Role)
+		require.NotNil(t, cfg.Agent)
+	})
+	t.Run("mcp-server defaults", func(t *testing.T) {
+		fakeClient := ctrlfake.NewClientBuilder().Build()
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{constants.AnnotationAIRole: constants.AIMCPServerRole},
+		}}
+		cfg, err := ServiceAIFromPod(context.Background(), fakeClient, pod)
+		require.NoError(t, err)
+		require.Equal(t, constants.AIMCPServerRole, cfg.Role)
+		require.NotNil(t, cfg.MCPServer)
+	})
+	t.Run("non-AI returns nil", func(t *testing.T) {
+		fakeClient := ctrlfake.NewClientBuilder().Build()
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+		cfg, err := ServiceAIFromPod(context.Background(), fakeClient, pod)
+		require.NoError(t, err)
+		require.Nil(t, cfg)
+	})
+}

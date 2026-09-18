@@ -535,15 +535,13 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 		}
 	}
 
-	// If this pod is an AI agent, fetch the MCP config ConfigMap, parse it into
-	// an api.AgentServiceAI struct, and attach it to the service registration so
-	// Consul receives the full ai {} block.
-	var serviceAI *api.AgentServiceAI
-	if common.IsAIAgent(pod) {
-		serviceAI, err = common.AIConfigFromPod(ctx, r.Client, pod)
-		if err != nil {
-			return nil, nil, err
-		}
+	// Attach the catalog ai {} block for CAMP DCR participation:
+	//   ai-agent  → full Agent config (ConfigMap / defaults) + OBO inject elsewhere
+	//   mcp-server → mcp_server defaults only (audience DCR; no OBO inject)
+	// Driven by ai.role, not catalog meta oauth_client.
+	serviceAI, err := common.ServiceAIFromPod(ctx, r.Client, pod)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	tags := consulTags(pod)
