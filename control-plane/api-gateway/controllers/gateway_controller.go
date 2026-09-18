@@ -581,6 +581,10 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Watches(
 			&v1alpha1.RouteExtProc{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteExtProc),
+		).
+		Watches(
+			&v1alpha1.RouteHeaderMatchInvertFilter{},
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteHeaderMatchInvertFilter),
 		)
 
 	if err := builder.Complete(r); err != nil {
@@ -742,6 +746,10 @@ func (r *GatewayController) transformRouteTLSSDSFilter(ctx context.Context, o cl
 }
 func (r *GatewayController) transformRouteExtProc(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteExtProcIndex, client.ObjectKeyFromObject(o).String())
+}
+
+func (r *GatewayController) transformRouteHeaderMatchInvertFilter(ctx context.Context, o client.Object) []reconcile.Request {
+	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteHeaderMatchInvertFilterIndex, client.ObjectKeyFromObject(o).String())
 }
 
 func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
@@ -1099,6 +1107,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			externalFilter = &v1alpha1.RouteTLSSDSFilter{}
 		case v1alpha1.RouteExtProcKind:
 			externalFilter = &v1alpha1.RouteExtProc{}
+		case v1alpha1.RouteHeaderMatchInvertFilterKind:
+			externalFilter = &v1alpha1.RouteHeaderMatchInvertFilter{}
 		default:
 			continue
 		}
