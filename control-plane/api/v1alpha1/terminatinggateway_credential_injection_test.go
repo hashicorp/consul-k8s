@@ -281,6 +281,29 @@ func TestTerminatingGatewayCredentialInjection_Validate(t *testing.T) {
 				`spec.deployment.credentialInjection.drainSeconds`,
 			},
 		},
+		"drainSeconds negative is rejected for the kubernetesSecret source too": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) {
+				ci.Source = CredentialSourceKubernetesSecret
+				ci.SecretName = "camp-egress-credentials"
+				ci.DrainSeconds = ptr.To(int64(-1))
+				ci.VaultAgentImage = ""
+				ci.VaultAgentConfigMap = ""
+				ci.VaultAddress = ""
+				ci.TokenAudience = ""
+			}, ptr.To(true)),
+			expectedErrMsgs: []string{
+				`spec.deployment.credentialInjection.drainSeconds`,
+				`must not be negative`,
+			},
+		},
+		"unsupported source is rejected": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) {
+				ci.Source = "consul"
+			}, ptr.To(true)),
+			expectedErrMsgs: []string{
+				`spec.deployment.credentialInjection.source`,
+			},
+		},
 		"drainSeconds exceeds tokenExpirationSeconds": {
 			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) {
 				ci.TokenExpirationSeconds = ptr.To(int64(600))

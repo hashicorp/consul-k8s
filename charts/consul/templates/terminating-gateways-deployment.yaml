@@ -96,9 +96,23 @@ spec:
         "consul.hashicorp.com/gateway-kind": "terminating-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
         {{- if and $ci $ci.enabled }}
-        # Rolls the workload when the non-secret credential ConfigMaps change.
-        # Rendered credential files (memory emptyDir) rotate without a pod restart.
-        "consul.hashicorp.com/credential-config-checksum": {{ cat (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.processorConfigMap))) (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.vaultAgentConfigMap))) (toString (lookup "v1" "ConfigMap" $root.Release.Namespace (default "" $ci.vaultCAConfigMap))) | sha256sum | quote }}
+        # Rolls the workload when a referenced non-secret credential ConfigMap's
+        # content changes. NOTE: `lookup` only runs during `helm install/upgrade`,
+        # so for Helm-managed gateways this hash is refreshed on the next Helm
+        # operation; editing an externally-managed ConfigMap does not by itself
+        # patch a running Deployment (the controller-managed CRD path watches
+        # ConfigMaps for that). Optional ConfigMaps are skipped rather than looked
+        # up with an empty name (an empty name makes `lookup` return the whole
+        # namespace, pulling unrelated ConfigMaps into the hash). Rendered
+        # credential files (memory emptyDir) rotate without a pod restart and are
+        # intentionally excluded.
+        {{- $cmContents := list }}
+        {{- range $cmName := list $ci.processorConfigMap $ci.vaultAgentConfigMap $ci.vaultCAConfigMap }}
+        {{- if $cmName }}
+        {{- $cmContents = append $cmContents (toString (lookup "v1" "ConfigMap" $root.Release.Namespace $cmName)) }}
+        {{- end }}
+        {{- end }}
+        "consul.hashicorp.com/credential-config-checksum": {{ $cmContents | join "\n" | sha256sum | quote }}
         {{- end }}
         {{- if $root.Values.global.enableConsulNamespaces }}
         "consul.hashicorp.com/gateway-namespace": {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
@@ -485,7 +499,7 @@ spec:
         {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
         {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent" "exitAfterAuth" false "ci" $ci "root" $root) | nindent 8 }}
         {{- end }}
-        {{- include "consul.terminatingGatewayCredentialAuthProcessor" (dict "ci" $ci "logLevel" (default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel) "drainSeconds" $drainSeconds) | nindent 8 }}
+        {{- include "consul.terminatingGatewayCredentialAuthProcessor" (dict "ci" $ci "logLevel" (default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel) "drainSeconds" $drainSeconds "root" $root) | nindent 8 }}
         {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}
       priorityClassName: {{ (default $defaults.priorityClassName .priorityClassName) | quote }}

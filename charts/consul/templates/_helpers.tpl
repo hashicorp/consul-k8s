@@ -773,6 +773,10 @@ Input dict: ci (effective merged config), name (gateway name for messages).
 {{- if empty $ci.processorImage }}{{ fail (printf "%s: processorImage is required when enabled" $prefix) }}{{ end -}}
 {{- if empty $ci.processorConfigMap }}{{ fail (printf "%s: processorConfigMap is required when enabled" $prefix) }}{{ end -}}
 {{- if contains "*" (default "" $ci.processorConfigMap) }}{{ fail (printf "%s: processorConfigMap must not contain the wildcard character \"*\"" $prefix) }}{{ end -}}
+{{- /* Non-negative drain is source-independent: a negative value renders an
+       invalid negative drain-wait / terminationGracePeriodSeconds for both
+       sources. The upper bound vs. tokenExpirationSeconds stays Vault-specific. */ -}}
+{{- if and (not (kindIs "invalid" $ci.drainSeconds)) (lt (int $ci.drainSeconds) 0) }}{{ fail (printf "%s: drainSeconds must not be negative" $prefix) }}{{ end -}}
 {{- $source := default "vault" $ci.source -}}
 {{- if and (ne $source "vault") (ne $source "kubernetesSecret") }}{{ fail (printf "%s: source must be \"vault\" or \"kubernetesSecret\"" $prefix) }}{{ end -}}
 {{- if eq $source "kubernetesSecret" -}}
@@ -788,11 +792,7 @@ Input dict: ci (effective merged config), name (gateway name for messages).
     {{- $exp := int $ci.tokenExpirationSeconds -}}
     {{- if or (lt $exp 600) (gt $exp 43200) }}{{ fail (printf "%s: tokenExpirationSeconds must be between 600 and 43200 seconds" $prefix) }}{{ end -}}
   {{- end -}}
-  {{- if not (kindIs "invalid" $ci.drainSeconds) -}}
-    {{- $drain := int $ci.drainSeconds -}}
-    {{- if lt $drain 0 }}{{ fail (printf "%s: drainSeconds must not be negative" $prefix) }}{{ end -}}
-    {{- if and (not (kindIs "invalid" $ci.tokenExpirationSeconds)) (gt $drain (int $ci.tokenExpirationSeconds)) }}{{ fail (printf "%s: drainSeconds must not exceed tokenExpirationSeconds" $prefix) }}{{ end -}}
-  {{- end -}}
+  {{- if and (not (kindIs "invalid" $ci.drainSeconds)) (not (kindIs "invalid" $ci.tokenExpirationSeconds)) (gt (int $ci.drainSeconds) (int $ci.tokenExpirationSeconds)) }}{{ fail (printf "%s: drainSeconds must not exceed tokenExpirationSeconds" $prefix) }}{{ end -}}
   {{- range $field := list "vaultNamespace" "vaultCAConfigMap" "vaultAgentConfigMap" "tokenAudience" -}}
     {{- if contains "*" (default "" (index $ci $field)) }}{{ fail (printf "%s: %s must not contain the wildcard character \"*\"" $prefix $field) }}{{ end -}}
   {{- end -}}
@@ -811,6 +811,9 @@ It carries no secret material. Input dict: name, exitAfterAuth (bool), ci, root.
 {{- define "consul.terminatingGatewayCredentialVaultAgent" -}}
 - name: {{ .name }}
   image: {{ .ci.vaultAgentImage | quote }}
+  {{- with (include "consul.imagePullPolicy" .root | trim) }}
+  {{ . }}
+  {{- end }}
   command:
   - "vault"
   args:
@@ -863,11 +866,14 @@ sidecar for terminating-gateway credential injection. It reads the Vault
 Agent-rendered credentials read-only, serves the ext_proc UDS on a writable
 socket volume, and loads its non-secret binding config read-only. It must NOT
 mount the Vault token or the private Agent token sink. Input dict: ci, logLevel,
-drainSeconds.
+drainSeconds, root.
 */ -}}
 {{- define "consul.terminatingGatewayCredentialAuthProcessor" -}}
 - name: camp-auth-processor
   image: {{ .ci.processorImage | quote }}
+  {{- with (include "consul.imagePullPolicy" .root | trim) }}
+  {{ . }}
+  {{- end }}
   command:
   - "camp-auth-processor"
   args:

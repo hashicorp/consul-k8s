@@ -279,6 +279,14 @@ func TestValidateCredentialInjectionWorkload(t *testing.T) {
 
 	// Complete config with at least one linked service is valid.
 	require.NoError(t, validateCredentialInjectionWorkload(complete, services))
+
+	// An unsupported source is rejected rather than treated as Vault (the
+	// injection logic only starts a Vault Agent for the exact "vault" value).
+	unknownSource := *complete
+	unknownSource.Source = "consul"
+	err = validateCredentialInjectionWorkload(&unknownSource, services)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported source")
 }
 
 func TestCampCredentialConfigChecksum(t *testing.T) {

@@ -376,11 +376,12 @@ func validateCredentialInjectionWorkload(
 		}
 	}
 
-	if ci.EffectiveSource() == consulv1alpha1.CredentialSourceKubernetesSecret {
+	switch ci.EffectiveSource() {
+	case consulv1alpha1.CredentialSourceKubernetesSecret:
 		if ci.SecretName == "" {
 			missing = append(missing, "secretName")
 		}
-	} else {
+	case consulv1alpha1.CredentialSourceVault:
 		for _, f := range []struct {
 			name  string
 			value string
@@ -393,6 +394,14 @@ func validateCredentialInjectionWorkload(
 				missing = append(missing, f.name)
 			}
 		}
+	default:
+		// applyTerminatingGatewayCredentialInjection only starts a Vault Agent for
+		// the exact "vault" source; an unknown source would otherwise yield Vault
+		// volumes plus a processor but no agent to populate credentials. Reject it
+		// here (this guard is the reconcile-path fallback when admission was
+		// bypassed).
+		return fmt.Errorf("credentialInjection has unsupported source %q; must be %q or %q",
+			ci.Source, consulv1alpha1.CredentialSourceVault, consulv1alpha1.CredentialSourceKubernetesSecret)
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("credentialInjection is enabled but missing required fields: %v", missing)

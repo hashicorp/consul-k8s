@@ -538,6 +538,14 @@ func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool
 		errs = append(errs, field.Required(path.Child("processorConfigMap"), "processorConfigMap is required when credentialInjection is enabled"))
 	}
 
+	// drainSeconds must be non-negative regardless of source: a negative value
+	// produces an invalid negative drain-wait and grace period for both the
+	// Vault and Kubernetes Secret sources. (The upper bound vs. tokenExpiration
+	// stays Vault-specific in validateProjectedToken.)
+	if in.DrainSeconds != nil && *in.DrainSeconds < 0 {
+		errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not be negative"))
+	}
+
 	switch in.EffectiveSource() {
 	case CredentialSourceKubernetesSecret:
 		if in.SecretName == "" {
@@ -553,7 +561,7 @@ func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool
 		if strings.Contains(in.ProcessorConfigMap, WildcardSpecifier) {
 			errs = append(errs, field.Invalid(path.Child("processorConfigMap"), in.ProcessorConfigMap, `must not contain the wildcard character "*"`))
 		}
-	default: // vault
+	case CredentialSourceVault:
 		if in.VaultAgentImage == "" {
 			errs = append(errs, field.Required(path.Child("vaultAgentImage"), "vaultAgentImage is required when credentialInjection is enabled"))
 		}
@@ -563,6 +571,13 @@ func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool
 		errs = append(errs, in.validateVaultAddress(path.Child("vaultAddress"))...)
 		errs = append(errs, in.validateProjectedToken(path)...)
 		errs = append(errs, in.validateWildcardAndModeCombinations(path)...)
+	default:
+		// Reject unsupported source values rather than silently treating them as
+		// Vault: the injection logic only starts a Vault Agent for the exact
+		// "vault" value. (The CRD enum guards normal admission; this is
+		// defense-in-depth for the API validation path.)
+		errs = append(errs, field.NotSupported(path.Child("source"), in.Source,
+			[]string{CredentialSourceVault, CredentialSourceKubernetesSecret}))
 	}
 
 	return errs
@@ -588,8 +603,10 @@ func (in *TerminatingGatewayCredentialInjection) validateVaultAddress(path *fiel
 }
 
 // validateProjectedToken enforces "invalid projected-token fields": tokenAudience
-// is required, tokenExpirationSeconds must fall within the supported range, and
-// drainSeconds must be non-negative and not exceed tokenExpirationSeconds.
+// is required and tokenExpirationSeconds must fall within the supported range.
+// The source-independent non-negative drainSeconds check lives in validate; the
+// only Vault-specific drain rule here is that it must not exceed
+// tokenExpirationSeconds.
 func (in *TerminatingGatewayCredentialInjection) validateProjectedToken(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
 	if in.TokenAudience == "" {
@@ -602,13 +619,8 @@ func (in *TerminatingGatewayCredentialInjection) validateProjectedToken(path *fi
 				fmt.Sprintf("tokenExpirationSeconds must be between %d and %d seconds", minTokenExpirationSeconds, maxTokenExpirationSeconds)))
 		}
 	}
-	if in.DrainSeconds != nil {
-		switch {
-		case *in.DrainSeconds < 0:
-			errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not be negative"))
-		case in.TokenExpirationSeconds != nil && *in.DrainSeconds > *in.TokenExpirationSeconds:
-			errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not exceed tokenExpirationSeconds"))
-		}
+	if in.DrainSeconds != nil && in.TokenExpirationSeconds != nil && *in.DrainSeconds > *in.TokenExpirationSeconds {
+		errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not exceed tokenExpirationSeconds"))
 	}
 	return errs
 }
