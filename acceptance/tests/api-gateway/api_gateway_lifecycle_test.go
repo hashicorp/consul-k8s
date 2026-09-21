@@ -389,6 +389,7 @@ func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o 
 func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1.HTTPRoute {
 	t.Helper()
 
+	port := gwv1.PortNumber(80)
 	route := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -403,7 +404,7 @@ func createRoute(t *testing.T, client client.Client, name, namespace, parent, ta
 			Rules: []gwv1.HTTPRouteRule{
 				{BackendRefs: []gwv1.HTTPBackendRef{
 					{BackendRef: gwv1.BackendRef{
-						BackendObjectReference: gwv1.BackendObjectReference{Name: gwv1.ObjectName(target)},
+						BackendObjectReference: gwv1.BackendObjectReference{Name: gwv1.ObjectName(target), Port: &port},
 					}},
 				}},
 			},
