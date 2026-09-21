@@ -36,7 +36,7 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", false, true)
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", false, true, false)
 
 	// Envoy (main container) gets only the socket mount and the Consul-login
 	// token, never credentials/token-sink/Vault token.
@@ -120,8 +120,8 @@ func TestTerminatingGatewayCredentialPodDisabled(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 	// nil and disabled are both no-ops.
-	applyTerminatingGatewayCredentialInjection(&podSpec, nil, corev1.PullIfNotPresent, "info", false, true)
-	applyTerminatingGatewayCredentialInjection(&podSpec, &consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, corev1.PullIfNotPresent, "info", false, true)
+	applyTerminatingGatewayCredentialInjection(&podSpec, nil, corev1.PullIfNotPresent, "info", false, true, false)
+	applyTerminatingGatewayCredentialInjection(&podSpec, &consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, corev1.PullIfNotPresent, "info", false, true, false)
 	require.Len(t, podSpec.Containers, 1)
 	require.Len(t, podSpec.InitContainers, 1)
 	require.Empty(t, podSpec.Volumes)
@@ -149,7 +149,7 @@ func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
 
 	// OpenShift + ACLs disabled: fsGroup is omitted (SCC-assigned) and no
 	// Consul-login token volume is projected, but automount is still disabled.
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", true, false)
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", true, false, false)
 
 	// No Vault Agent containers in either init or main containers.
 	for _, n := range []string{"camp-vault-agent", "camp-vault-agent-init"} {
@@ -189,6 +189,41 @@ func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
 	require.False(t, hasVolume(podSpec.Volumes, campConsulAuthTokenVolume))
 	require.False(t, hasMount(envoy, campConsulAuthTokenVolume))
 	require.False(t, hasMount(containerByName(t, podSpec.InitContainers, "terminating-gateway-init"), campConsulAuthTokenVolume))
+}
+
+// TestTerminatingGatewayCredentialPodVaultInjectorToken asserts that when the
+// global Vault Agent Injector is active (and ACLs are disabled), disabling the
+// default automount still projects the dedicated ServiceAccount token volume so
+// vault-k8s can discover it — without mounting it into any existing container.
+func TestTerminatingGatewayCredentialPodVaultInjectorToken(t *testing.T) {
+	ci := &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:             true,
+		ProcessorImage:      "camp-auth-processor:test",
+		VaultAgentImage:     "hashicorp/vault:test",
+		ProcessorConfigMap:  "camp-proc",
+		VaultAgentConfigMap: "camp-agent",
+		VaultAddress:        "https://vault:8200",
+		TokenAudience:       "vault",
+	}
+	podSpec := corev1.PodSpec{
+		InitContainers: []corev1.Container{{Name: "terminating-gateway-init"}},
+		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
+	}
+
+	// aclsEnabled=false, vaultAgentInjectorEnabled=true.
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", false, false, true)
+
+	require.NotNil(t, podSpec.AutomountServiceAccountToken)
+	require.False(t, *podSpec.AutomountServiceAccountToken)
+
+	// The token volume exists for the injector to reference.
+	require.True(t, hasVolume(podSpec.Volumes, campConsulAuthTokenVolume))
+
+	// But it is not mounted into any existing container (no Consul login here).
+	envoy := containerByName(t, podSpec.Containers, "terminating-gateway")
+	baseInit := containerByName(t, podSpec.InitContainers, "terminating-gateway-init")
+	require.False(t, hasMount(envoy, campConsulAuthTokenVolume))
+	require.False(t, hasMount(baseInit, campConsulAuthTokenVolume))
 }
 
 func containerByName(t *testing.T, containers []corev1.Container, name string) corev1.Container {
@@ -251,6 +286,7 @@ func volumeByName(t *testing.T, volumes []corev1.Volume, name string) corev1.Vol
 }
 
 func TestValidateCredentialInjectionWorkload(t *testing.T) {
+	enabled := ptr.To(true)
 	complete := &consulv1alpha1.TerminatingGatewayCredentialInjection{
 		Enabled:             true,
 		ProcessorImage:      "camp-auth-processor:test",
@@ -258,35 +294,52 @@ func TestValidateCredentialInjectionWorkload(t *testing.T) {
 		ProcessorConfigMap:  "camp-proc",
 		VaultAgentConfigMap: "camp-agent",
 		VaultAddress:        "https://vault:8200",
+		TokenAudience:       "vault",
 	}
 	services := []consulv1alpha1.LinkedService{{Name: "external-api"}}
 
 	// nil / disabled are always valid no-ops.
-	require.NoError(t, validateCredentialInjectionWorkload(nil, nil))
-	require.NoError(t, validateCredentialInjectionWorkload(&consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, nil))
+	require.NoError(t, validateCredentialInjectionWorkload(nil, nil, enabled))
+	require.NoError(t, validateCredentialInjectionWorkload(&consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, nil, enabled))
 
 	// Missing required field is rejected (no default inferred).
 	missing := *complete
 	missing.ProcessorImage = ""
-	err := validateCredentialInjectionWorkload(&missing, services)
+	err := validateCredentialInjectionWorkload(&missing, services, enabled)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "processorImage")
 
+	// The reconcile guard now reuses the full webhook validation: a plaintext
+	// Vault address is rejected even though only vaultAddress non-emptiness was
+	// checked before.
+	plaintext := *complete
+	plaintext.VaultAddress = "http://vault:8200"
+	err = validateCredentialInjectionWorkload(&plaintext, services, enabled)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "vaultAddress")
+
+	// A missing tokenAudience is likewise rejected via the shared validation.
+	noAudience := *complete
+	noAudience.TokenAudience = ""
+	err = validateCredentialInjectionWorkload(&noAudience, services, enabled)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "tokenAudience")
+
 	// Enabled but no linked services to route to is rejected.
-	err = validateCredentialInjectionWorkload(complete, nil)
+	err = validateCredentialInjectionWorkload(complete, nil, enabled)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no linked services")
 
 	// Complete config with at least one linked service is valid.
-	require.NoError(t, validateCredentialInjectionWorkload(complete, services))
+	require.NoError(t, validateCredentialInjectionWorkload(complete, services, enabled))
 
 	// An unsupported source is rejected rather than treated as Vault (the
 	// injection logic only starts a Vault Agent for the exact "vault" value).
 	unknownSource := *complete
 	unknownSource.Source = "consul"
-	err = validateCredentialInjectionWorkload(&unknownSource, services)
+	err = validateCredentialInjectionWorkload(&unknownSource, services, enabled)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "unsupported source")
+	require.Contains(t, err.Error(), "source")
 }
 
 func TestCampCredentialConfigChecksum(t *testing.T) {

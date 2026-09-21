@@ -1065,7 +1065,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 
 	// Reject an incomplete credential-injection config before creating the
 	// workload; never infer a default credential.
-	if err := validateCredentialInjectionWorkload(termGW.Spec.Deployment.CredentialInjection, termGW.Spec.Services); err != nil {
+	if err := validateCredentialInjectionWorkload(termGW.Spec.Deployment.CredentialInjection, termGW.Spec.Services, termGW.Spec.Deployment.EnableDeployment); err != nil {
 		return nil, err
 	}
 
@@ -1078,6 +1078,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		logLevel,
 		helmConfigValues.Global.OpenShiftEnabled,
 		helmConfigValues.Global.ACLs.ManageSystemACLs,
+		helmConfigValues.Global.SecretsBackend.Vault.Enabled,
 	)
 
 	annotations := map[string]string{
@@ -1104,6 +1105,14 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		}
 		for k, v := range helmConfigValues.Global.SecretsBackend.Vault.AgentAnnotations {
 			annotations[k] = v
+		}
+
+		// When credential injection disables the default ServiceAccount-token
+		// automount, point the Vault Agent Injector at the dedicated projected
+		// token so it can still authenticate (otherwise vault-k8s fails with
+		// "failed to find service account volume mount").
+		if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled {
+			annotations["vault.hashicorp.com/agent-service-account-token-volume-name"] = campConsulAuthTokenVolume
 		}
 	}
 

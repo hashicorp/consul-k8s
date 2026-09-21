@@ -79,6 +79,7 @@ func applyTerminatingGatewayCredentialInjection(
 	logLevel string,
 	openShiftEnabled bool,
 	aclsEnabled bool,
+	vaultAgentInjectorEnabled bool,
 ) {
 	if ci == nil || !ci.Enabled {
 		return
@@ -109,12 +110,19 @@ func applyTerminatingGatewayCredentialInjection(
 
 	// Disable the default ServiceAccount-token automount so no container silently
 	// receives a default-audience JWT for the ServiceAccount used for Vault auth,
-	// keeping the Vault-audience token (camp-vault-token) isolated. When ACLs are
-	// enabled the token is projected explicitly and mounted only into the base
-	// init container and Envoy, which perform Consul login.
+	// keeping the Vault-audience token (camp-vault-token) isolated.
+	//
+	// A dedicated default-audience token is still projected when something needs
+	// it: the base init container and Envoy mount it for Consul login (ACLs), and
+	// the global Vault Agent Injector discovers it via the
+	// vault.hashicorp.com/agent-service-account-token-volume-name annotation set
+	// by the caller (constructDeploymentFromCRD). Without this, disabling automount
+	// would make vault-k8s fail with "failed to find service account volume mount".
 	podSpec.AutomountServiceAccountToken = ptr.To(false)
-	if aclsEnabled {
+	if aclsEnabled || vaultAgentInjectorEnabled {
 		podSpec.Volumes = append(podSpec.Volumes, campConsulAuthMethodTokenVolume())
+	}
+	if aclsEnabled {
 		mount := corev1.VolumeMount{
 			Name:      campConsulAuthTokenVolume,
 			MountPath: campConsulAuthTokenMountPath,
@@ -349,62 +357,25 @@ func campBoundedResources(mem, cpu string) corev1.ResourceRequirements {
 }
 
 // validateCredentialInjectionWorkload is the controller-side guard applied before
-// a credential-injection workload is created. It rejects an enabled config that
-// is missing any required non-secret binding metadata and refuses to inject
-// credentials for a gateway that routes to no linked service. It never infers a
-// default credential: an incomplete config is an error, not a silent fallback.
-// (Admission webhook validation is the first line of defense; this guards the
-// reconcile path even if a resource reaches it unvalidated.)
+// a credential-injection workload is created. It reuses the full admission-webhook
+// validation (so the Vault-specific constraints — HTTPS Vault address, required
+// tokenAudience, supported source, token/drain bounds — are enforced identically)
+// and additionally refuses to inject credentials for a gateway that routes to no
+// linked service. It never infers a default credential: an incomplete config is an
+// error, not a silent fallback. (Admission webhook validation is the first line of
+// defense; this guards the reconcile path even if a resource reaches it
+// unvalidated.)
 func validateCredentialInjectionWorkload(
 	ci *consulv1alpha1.TerminatingGatewayCredentialInjection,
 	services []consulv1alpha1.LinkedService,
+	enableDeployment *bool,
 ) error {
 	if ci == nil || !ci.Enabled {
 		return nil
 	}
 
-	var missing []string
-	for _, f := range []struct {
-		name  string
-		value string
-	}{
-		{"processorImage", ci.ProcessorImage},
-		{"processorConfigMap", ci.ProcessorConfigMap},
-	} {
-		if f.value == "" {
-			missing = append(missing, f.name)
-		}
-	}
-
-	switch ci.EffectiveSource() {
-	case consulv1alpha1.CredentialSourceKubernetesSecret:
-		if ci.SecretName == "" {
-			missing = append(missing, "secretName")
-		}
-	case consulv1alpha1.CredentialSourceVault:
-		for _, f := range []struct {
-			name  string
-			value string
-		}{
-			{"vaultAgentImage", ci.VaultAgentImage},
-			{"vaultAgentConfigMap", ci.VaultAgentConfigMap},
-			{"vaultAddress", ci.VaultAddress},
-		} {
-			if f.value == "" {
-				missing = append(missing, f.name)
-			}
-		}
-	default:
-		// applyTerminatingGatewayCredentialInjection only starts a Vault Agent for
-		// the exact "vault" source; an unknown source would otherwise yield Vault
-		// volumes plus a processor but no agent to populate credentials. Reject it
-		// here (this guard is the reconcile-path fallback when admission was
-		// bypassed).
-		return fmt.Errorf("credentialInjection has unsupported source %q; must be %q or %q",
-			ci.Source, consulv1alpha1.CredentialSourceVault, consulv1alpha1.CredentialSourceKubernetesSecret)
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("credentialInjection is enabled but missing required fields: %v", missing)
+	if err := ci.ValidateForWorkload(enableDeployment); err != nil {
+		return fmt.Errorf("credentialInjection is invalid: %w", err)
 	}
 
 	if len(services) == 0 {

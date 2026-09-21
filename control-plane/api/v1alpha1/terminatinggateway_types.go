@@ -511,6 +511,20 @@ func (in TerminatingGatewayDeploymentSpec) validateCredentialInjection(path *fie
 	return ci.validate(in.EnableDeployment, path.Child("credentialInjection"))
 }
 
+// ValidateForWorkload runs the same structural validation as the admission
+// webhook for an enabled credential-injection block and returns a single
+// aggregated error. It lets the controller's reconcile-path guard reuse the full
+// Vault-specific constraints (HTTPS Vault address, required tokenAudience,
+// supported source, etc.) instead of re-implementing a weaker subset, so a
+// resource admitted without the webhook cannot construct an invalid workload.
+func (in *TerminatingGatewayCredentialInjection) ValidateForWorkload(enableDeployment *bool) error {
+	errs := in.validate(enableDeployment, field.NewPath("spec", "deployment", "credentialInjection"))
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs.ToAggregate()
+}
+
 const (
 	// minTokenExpirationSeconds mirrors Kubernetes' documented floor for
 	// projected service account tokens (10 minutes).
