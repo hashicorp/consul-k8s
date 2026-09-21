@@ -1076,6 +1076,8 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		termGW.Spec.Deployment.CredentialInjection,
 		imagePullPolicy,
 		logLevel,
+		helmConfigValues.Global.OpenShiftEnabled,
+		helmConfigValues.Global.ACLs.ManageSystemACLs,
 	)
 
 	annotations := map[string]string{

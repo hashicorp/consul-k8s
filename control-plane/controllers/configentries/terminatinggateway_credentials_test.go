@@ -36,14 +36,24 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info")
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", false, true)
 
-	// Envoy (main container) gets only the socket mount, never credentials/token.
+	// Envoy (main container) gets only the socket mount and the Consul-login
+	// token, never credentials/token-sink/Vault token.
 	envoy := containerByName(t, podSpec.Containers, "terminating-gateway")
 	require.True(t, hasMount(envoy, campAuthSocketVolume))
 	for _, v := range []string{campVaultRenderedVolume, campVaultTokenVolume, campVaultAgentPrivateVolume, campVaultAgentConfigVolume, campAuthProcessorConfigVolume, campVaultCAVolume} {
 		require.Falsef(t, hasMount(envoy, v), "Envoy must not mount %q", v)
 	}
+
+	// Default ServiceAccount-token automount is disabled; the default-audience
+	// token is projected and mounted only into the base init container and Envoy.
+	require.NotNil(t, podSpec.AutomountServiceAccountToken)
+	require.False(t, *podSpec.AutomountServiceAccountToken)
+	require.True(t, hasVolume(podSpec.Volumes, campConsulAuthTokenVolume))
+	require.True(t, mountReadOnly(envoy, campConsulAuthTokenVolume))
+	baseInit := containerByName(t, podSpec.InitContainers, "terminating-gateway-init")
+	require.True(t, mountReadOnly(baseInit, campConsulAuthTokenVolume))
 
 	// No privileged socket-init container: the shared socket dir is group-owned
 	// via the pod fsGroup instead.
@@ -63,6 +73,7 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 	require.NotContains(t, as.Args, "-exit-after-auth")
 	require.Equal(t, ptr.To(true), as.SecurityContext.RunAsNonRoot)
 	require.Nil(t, as.SecurityContext.RunAsUser)
+	require.False(t, hasMount(as, campConsulAuthTokenVolume), "vault agent must not mount the Consul-login token")
 
 	// Processor: non-root, read-only creds, writable socket, no token/token-sink,
 	// health + drain contract.
@@ -74,6 +85,7 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 	require.False(t, mountReadOnly(proc, campAuthSocketVolume), "socket must be writable")
 	require.False(t, hasMount(proc, campVaultTokenVolume), "processor must not mount the Vault token")
 	require.False(t, hasMount(proc, campVaultAgentPrivateVolume), "processor must not mount the Agent token sink")
+	require.False(t, hasMount(proc, campConsulAuthTokenVolume), "processor must not mount the Consul-login token")
 	require.NotNil(t, proc.ReadinessProbe.Exec)
 	require.Contains(t, proc.ReadinessProbe.Exec.Command, "-ready")
 	require.NotNil(t, proc.LivenessProbe.Exec)
@@ -108,12 +120,13 @@ func TestTerminatingGatewayCredentialPodDisabled(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 	// nil and disabled are both no-ops.
-	applyTerminatingGatewayCredentialInjection(&podSpec, nil, corev1.PullIfNotPresent, "info")
-	applyTerminatingGatewayCredentialInjection(&podSpec, &consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, corev1.PullIfNotPresent, "info")
+	applyTerminatingGatewayCredentialInjection(&podSpec, nil, corev1.PullIfNotPresent, "info", false, true)
+	applyTerminatingGatewayCredentialInjection(&podSpec, &consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, corev1.PullIfNotPresent, "info", false, true)
 	require.Len(t, podSpec.Containers, 1)
 	require.Len(t, podSpec.InitContainers, 1)
 	require.Empty(t, podSpec.Volumes)
 	require.Nil(t, podSpec.SecurityContext)
+	require.Nil(t, podSpec.AutomountServiceAccountToken)
 	require.Empty(t, podSpec.Containers[0].VolumeMounts)
 }
 
@@ -134,7 +147,9 @@ func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info")
+	// OpenShift + ACLs disabled: fsGroup is omitted (SCC-assigned) and no
+	// Consul-login token volume is projected, but automount is still disabled.
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", true, false)
 
 	// No Vault Agent containers in either init or main containers.
 	for _, n := range []string{"camp-vault-agent", "camp-vault-agent-init"} {
@@ -163,10 +178,17 @@ func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
 	require.True(t, hasMount(envoy, campAuthSocketVolume))
 	require.False(t, hasMount(envoy, campVaultRenderedVolume))
 
-	// Shared fsGroup and grace period still applied.
-	require.NotNil(t, podSpec.SecurityContext.FSGroup)
-	require.Equal(t, campCredentialFSGroup, *podSpec.SecurityContext.FSGroup)
+	// On OpenShift the fsGroup is omitted so the SCC can assign the shared group.
+	require.Nil(t, podSpec.SecurityContext)
 	require.NotNil(t, podSpec.TerminationGracePeriodSeconds)
+
+	// Automount is disabled, but with ACLs disabled no Consul-login token is
+	// projected or mounted anywhere.
+	require.NotNil(t, podSpec.AutomountServiceAccountToken)
+	require.False(t, *podSpec.AutomountServiceAccountToken)
+	require.False(t, hasVolume(podSpec.Volumes, campConsulAuthTokenVolume))
+	require.False(t, hasMount(envoy, campConsulAuthTokenVolume))
+	require.False(t, hasMount(containerByName(t, podSpec.InitContainers, "terminating-gateway-init"), campConsulAuthTokenVolume))
 }
 
 func containerByName(t *testing.T, containers []corev1.Container, name string) corev1.Container {

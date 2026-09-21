@@ -53,19 +53,32 @@ const (
 	campDefaultAudience       = "vault"
 	campDefaultDrainSecs      = int64(30)
 	campShutdownAllowanceSecs = int64(15)
+
+	// campConsulAuthTokenVolume projects a default-audience ServiceAccount token
+	// for Consul login. Because credential injection disables the default
+	// ServiceAccount-token automount (to keep the Vault-audience token isolated
+	// from Envoy and the processor), this token is mounted explicitly and only
+	// into the containers that perform Consul login.
+	campConsulAuthTokenVolume         = "consul-auth-method-sa-token"
+	campConsulAuthTokenMountPath      = "/var/run/secrets/kubernetes.io/serviceaccount"
+	campConsulAuthTokenExpirationSecs = int64(7200)
 )
 
 // applyTerminatingGatewayCredentialInjection mutates podSpec in place to add the
 // Vault-only credential-injection sidecars, volumes, and shared-socket wiring
 // when it is enabled. It must produce the same projection as the Helm chart
 // (see charts/consul/templates/terminating-gateways-deployment.yaml). The main
-// (Envoy) container is expected to be podSpec.Containers[0]; it receives ONLY
-// the socket mount and never the rendered-credential or Vault-token volumes.
+// (Envoy) container is expected to be podSpec.Containers[0] and the base init
+// container podSpec.InitContainers[0]; Envoy receives ONLY the socket mount (and
+// the Consul-login token when ACLs are enabled), never the rendered-credential
+// or Vault-token volumes.
 func applyTerminatingGatewayCredentialInjection(
 	podSpec *corev1.PodSpec,
 	ci *consulv1alpha1.TerminatingGatewayCredentialInjection,
 	imagePullPolicy corev1.PullPolicy,
 	logLevel string,
+	openShiftEnabled bool,
+	aclsEnabled bool,
 ) {
 	if ci == nil || !ci.Enabled {
 		return
@@ -94,15 +107,41 @@ func applyTerminatingGatewayCredentialInjection(
 		})
 	}
 
-	// Shared fsGroup so the kubelet group-owns the ext_proc socket and rendered
-	// credential emptyDir volumes (with the setgid bit) without a privileged
-	// root init container. Every container joins this group, so a sidecar running
-	// under an OpenShift-assigned UID can still create and reach the socket, and
-	// Envoy can connect to it.
-	if podSpec.SecurityContext == nil {
-		podSpec.SecurityContext = &corev1.PodSecurityContext{}
+	// Disable the default ServiceAccount-token automount so no container silently
+	// receives a default-audience JWT for the ServiceAccount used for Vault auth,
+	// keeping the Vault-audience token (camp-vault-token) isolated. When ACLs are
+	// enabled the token is projected explicitly and mounted only into the base
+	// init container and Envoy, which perform Consul login.
+	podSpec.AutomountServiceAccountToken = ptr.To(false)
+	if aclsEnabled {
+		podSpec.Volumes = append(podSpec.Volumes, campConsulAuthMethodTokenVolume())
+		mount := corev1.VolumeMount{
+			Name:      campConsulAuthTokenVolume,
+			MountPath: campConsulAuthTokenMountPath,
+			ReadOnly:  true,
+		}
+		if len(podSpec.InitContainers) > 0 {
+			podSpec.InitContainers[0].VolumeMounts = append(podSpec.InitContainers[0].VolumeMounts, mount)
+		}
+		if len(podSpec.Containers) > 0 {
+			podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, mount)
+		}
 	}
-	podSpec.SecurityContext.FSGroup = ptr.To(campCredentialFSGroup)
+
+	// Shared fsGroup so the kubelet group-owns the ext_proc socket and rendered
+	// credential emptyDir volumes (with the setgid bit) without a privileged root
+	// init container. Every container joins this group, so Envoy can connect to
+	// the processor's socket.
+	//
+	// On OpenShift the fsGroup is omitted: the restricted-v2 SCC assigns an
+	// fsGroup from the namespace-allocated range (a fixed group would be
+	// rejected), and that assigned group is shared by every container.
+	if !openShiftEnabled {
+		if podSpec.SecurityContext == nil {
+			podSpec.SecurityContext = &corev1.PodSecurityContext{}
+		}
+		podSpec.SecurityContext.FSGroup = ptr.To(campCredentialFSGroup)
+	}
 
 	// Grace period must exceed the processor's preStop drain plus a shutdown
 	// allowance so in-flight requests drain before the pod is killed.
@@ -111,6 +150,24 @@ func applyTerminatingGatewayCredentialInjection(
 		drainSeconds = *ci.DrainSeconds
 	}
 	podSpec.TerminationGracePeriodSeconds = ptr.To(drainSeconds + campShutdownAllowanceSecs)
+}
+
+// campConsulAuthMethodTokenVolume projects the default-audience ServiceAccount
+// token used for Consul login. It replaces the default automount (disabled for
+// credential-injection pods) and is mounted only into the Consul-login
+// containers, so Envoy and the credential processor cannot read it.
+func campConsulAuthMethodTokenVolume() corev1.Volume {
+	return corev1.Volume{
+		Name: campConsulAuthTokenVolume,
+		VolumeSource: corev1.VolumeSource{Projected: &corev1.ProjectedVolumeSource{
+			Sources: []corev1.VolumeProjection{{
+				ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+					Path:              "token",
+					ExpirationSeconds: ptr.To(campConsulAuthTokenExpirationSecs),
+				},
+			}},
+		}},
+	}
 }
 
 func campCredentialVolumes(ci *consulv1alpha1.TerminatingGatewayCredentialInjection) []corev1.Volume {
