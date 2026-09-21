@@ -2612,6 +2612,39 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 			},
 		},
 		{
+			name: "credentialInjection reserved vault token-volume annotation cannot be overridden by user annotations",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.EnableDeployment = ptr.To(true)
+				gw.Spec.Deployment.Annotations = map[string]string{
+					"vault.hashicorp.com/agent-service-account-token-volume-name": "attacker-volume",
+				}
+				gw.Spec.Services = []v1alpha1.LinkedService{{Name: "external-api"}}
+				gw.Spec.Deployment.CredentialInjection = &v1alpha1.TerminatingGatewayCredentialInjection{
+					Enabled:             true,
+					ProcessorImage:      "camp-auth-processor:test",
+					ProcessorConfigMap:  "camp-proc",
+					VaultAgentImage:     "hashicorp/vault:test",
+					VaultAgentConfigMap: "camp-agent",
+					VaultAddress:        "https://vault:8200",
+					TokenAudience:       "vault",
+				}
+				return gw
+			},
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.TLS.Enabled = true
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				// The reserved annotation is emitted after user annotations, so it wins.
+				require.Equal(t, "consul-auth-method-sa-token",
+					deployment.Spec.Template.Annotations["vault.hashicorp.com/agent-service-account-token-volume-name"])
+			},
+		},
+		{
 			name:       "init container has correct configuration",
 			termGW:     baseTermGW,
 			helmValues: baseHelmValues,

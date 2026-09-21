@@ -1070,6 +1070,11 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 	}
 
 	// Add the Vault-only credential-injection sidecars/volumes when enabled.
+	// Match the Helm chart: the global Vault Agent Injector is only active when
+	// both the Vault secrets backend and TLS are enabled, so credential-injection
+	// pods only need the injector-discoverable token in that case.
+	vaultInjectorEnabled := helmConfigValues.Global.SecretsBackend.Vault.Enabled && helmConfigValues.Global.TLS.Enabled
+
 	// This mirrors the Helm chart projection so both deployment paths agree.
 	applyTerminatingGatewayCredentialInjection(
 		&podSpec,
@@ -1078,7 +1083,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		logLevel,
 		helmConfigValues.Global.OpenShiftEnabled,
 		helmConfigValues.Global.ACLs.ManageSystemACLs,
-		helmConfigValues.Global.SecretsBackend.Vault.Enabled,
+		vaultInjectorEnabled,
 	)
 
 	annotations := map[string]string{
@@ -1106,14 +1111,6 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		for k, v := range helmConfigValues.Global.SecretsBackend.Vault.AgentAnnotations {
 			annotations[k] = v
 		}
-
-		// When credential injection disables the default ServiceAccount-token
-		// automount, point the Vault Agent Injector at the dedicated projected
-		// token so it can still authenticate (otherwise vault-k8s fails with
-		// "failed to find service account volume mount").
-		if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled {
-			annotations["vault.hashicorp.com/agent-service-account-token-volume-name"] = campConsulAuthTokenVolume
-		}
 	}
 
 	if helmConfigValues.Global.Metrics.Enabled && helmConfigValues.Global.Metrics.EnableGatewayMetrics {
@@ -1129,6 +1126,15 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 	}
 	for k, v := range termGW.Spec.Deployment.Annotations {
 		annotations[k] = v
+	}
+
+	// Reserved: set the Vault Agent Injector token-volume annotation AFTER the
+	// user-supplied default/per-gateway annotations so it cannot be overridden.
+	// Credential injection disables the default ServiceAccount-token automount, so
+	// an override to a missing volume would stop the injected agent, and an
+	// override to camp-vault-token would leak the CAMP Vault token to it.
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled && vaultInjectorEnabled {
+		annotations["vault.hashicorp.com/agent-service-account-token-volume-name"] = campConsulAuthTokenVolume
 	}
 
 	deployment := &appsv1.Deployment{
