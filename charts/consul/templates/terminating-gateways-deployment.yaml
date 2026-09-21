@@ -142,12 +142,15 @@ spec:
       topologySpreadConstraints:
         {{ tpl (default $defaults.topologySpreadConstraints .topologySpreadConstraints) $root | nindent 8 | trim }}
       {{- end }}
-      {{- if and $ci $ci.enabled }}
+      {{- if and $ci $ci.enabled (not $root.Values.global.openshift.enabled) }}
       # Shared fsGroup so the kubelet group-owns the ext_proc socket and rendered
       # credential volumes (with the setgid bit); no privileged root init
-      # container is required. Every container joins this group, so a sidecar
-      # running under an OpenShift-assigned UID can create and reach the socket
-      # and Envoy (a group member) can connect to it.
+      # container is required. Every container joins this group, so Envoy (a
+      # group member) can reach the processor's socket.
+      #
+      # On OpenShift the fsGroup is intentionally omitted: the restricted-v2 SCC
+      # uses a MustRunAs range allocated per namespace, so a fixed group would be
+      # rejected. The SCC injects an allowed shared group instead.
       securityContext:
         fsGroup: 10001
       {{- end }}
@@ -159,6 +162,15 @@ spec:
       terminationGracePeriodSeconds: 10
       {{- end }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
+      {{- if and $ci $ci.enabled }}
+      # Credential injection isolates the Vault-audience token (camp-vault-token)
+      # from Envoy and the credential processor. Disable the default
+      # ServiceAccount-token automount so no container silently receives a
+      # default-audience JWT for the same ServiceAccount used for Vault auth; the
+      # token is projected explicitly only into the containers that perform
+      # Consul login (below).
+      automountServiceAccountToken: false
+      {{- end }}
       volumes:
       - name: tmp
         emptyDir:
@@ -166,6 +178,16 @@ spec:
       - name: consul-service
         emptyDir:
           medium: "Memory"
+      {{- if and $ci $ci.enabled $root.Values.global.acls.manageSystemACLs }}
+      # Default-audience ServiceAccount token for Consul login, projected only
+      # into the init and Envoy containers (automount is disabled above).
+      - name: consul-auth-method-sa-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 7200
+      {{- end }}
       {{- if and $ci $ci.enabled }}
       # Credential injection (T8): the shared ext_proc socket and non-secret
       # processor config are present for every source. The credential source
@@ -290,6 +312,11 @@ spec:
               mountPath: /tmp
             - name: consul-service
               mountPath: /consul/service
+            {{- if and $ci $ci.enabled $root.Values.global.acls.manageSystemACLs }}
+            - name: consul-auth-method-sa-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            {{- end }}
             {{- if $root.Values.global.tls.enabled }}
             {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert
@@ -320,6 +347,11 @@ spec:
             - name: consul-service
               mountPath: /consul/service
               readOnly: true
+            {{- if and $ci $ci.enabled $root.Values.global.acls.manageSystemACLs }}
+            - name: consul-auth-method-sa-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            {{- end }}
             {{- if $root.Values.global.tls.enabled }}
             {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert

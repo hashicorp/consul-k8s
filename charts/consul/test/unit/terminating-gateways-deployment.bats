@@ -1743,6 +1743,55 @@ key2: value2' \
   [ "$(echo "$sc" | yq -r '.fsGroup')" = "10001" ]
 }
 
+@test "terminatingGateways/Deployment: credentialInjection omits fixed fsGroup on OpenShift" {
+  cd `chart_dir`
+  local sc=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.openshift.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s -r '.[0].spec.template.spec.securityContext' | tee /dev/stderr)
+  # On OpenShift the SCC assigns the shared group; the pod must not pin fsGroup.
+  [ "$sc" = "null" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection disables SA-token automount and isolates it from Envoy/processor" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.acls.manageSystemACLs=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      . | tee /dev/stderr)
+  # Default automount is disabled.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.automountServiceAccountToken')" = "false" ]
+  # The Consul-login token is projected explicitly.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes | map(.name) | contains(["consul-auth-method-sa-token"])')" = "true" ]
+  # It is mounted into the init container and Envoy only.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.initContainers[] | select(.name=="terminating-gateway-init") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "true" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "true" ]
+  # It must NOT be mounted into the processor or the Vault Agent sidecar.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="camp-vault-agent") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection without ACLs disables automount but projects no login token" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.automountServiceAccountToken')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
+}
+
 @test "terminatingGateways/Deployment: credentialInjection disabled has no socket-init and no Envoy socket mount" {
   cd `chart_dir`
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
