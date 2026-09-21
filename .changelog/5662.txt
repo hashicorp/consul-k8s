@@ -1,3 +1,3 @@
 ```release-note:feature
-connect-inject: For ai-role=ai-agent pods, inject consul-obo-inbound/outbound with envelope+broker UDS, enable dataplane -credential-broker-bind-addr, and register catalog ai{} for mcp-server DCR audiences. Gated on ai.role (not oauth_client).
+connect-inject: For ai-role=ai-agent pods, inject consul-obo-inbound/outbound with envelope+broker UDS and enable dataplane -credential-broker-bind-addr. Also register catalog ai{} for mcp-server DCR audiences. Gated on ai.role (not oauth_client).
 ```

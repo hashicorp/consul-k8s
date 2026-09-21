@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -58,24 +57,23 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 	//   --child-args optional: args for the child binary (from pod annotation)
 	//
 	// Transport selection:
-	//   Enterprise xDS mcp_ext_proc_interceptor dials 127.0.0.1:21101 (TCP).
-	//   Default to TCP so CAMP stacks work without an annotation. Opt into UDS
-	//   with consul.hashicorp.com/ai-agent-transport: uds (shared volume socket).
-	//   When ai-agent-addr is set, that TCP address wins.
+	//   The custom Consul build's mcp_ext_proc_interceptor cluster dials
+	//   127.0.0.1:21101 (TCP). The binary's listen() opens either UDS or TCP —
+	//   never both. When the ai-agent-addr annotation is set we use TCP only
+	//   (no --socket) so the Consul ext_proc cluster can connect. Otherwise
+	//   we use UDS (production default, shared with consul-dataplane Envoy).
 	var args []string
 	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
+		// TCP mode: Consul's mcp_ext_proc_interceptor cluster dials this address.
+		// Do NOT pass --socket — listen() only opens one transport.
 		args = []string{
 			"--addr=" + addr,
 			"--log-level=" + w.LogLevel,
 		}
-	} else if pod.Annotations[constants.AnnotationAIAgentTransport] == "uds" {
+	} else {
+		// UDS mode: default production transport shared with consul-dataplane.
 		args = []string{
 			"--socket=" + mcpGatewayUDSPath,
-			"--log-level=" + w.LogLevel,
-		}
-	} else {
-		args = []string{
-			"--addr=127.0.0.1:" + strconv.Itoa(constants.DefaultAIInterceptorPort),
 			"--log-level=" + w.LogLevel,
 		}
 	}
@@ -133,14 +131,28 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 	return container
 }
 
-// mcpGatewayReadinessProbe returns the readiness probe for TCP (default) or UDS mode.
+// mcpGatewayReadinessProbe returns the correct readiness probe depending on
+// whether the mcp-gateway is running in TCP mode (ai-agent-addr annotation set)
+// or UDS mode (default).
+//
+//   - TCP mode: TCPSocket probe on the configured addr port — the binary binds
+//     TCP and no socket file is created.
+//   - UDS mode: exec "test -S <socket>" — Kubernetes does not support UDS probes
+//     natively so we stat the socket file instead.
 func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *corev1.Probe {
-	if pod.Annotations[constants.AnnotationAIAgentTransport] == "uds" &&
-		pod.Annotations[constants.AnnotationAIAgentAddr] == "" {
+	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
+		// Parse the port from the addr string e.g. ":21101" → 21101.
+		// Fall back to hitlPort if the addr is malformed.
+		port := hitlPort
+		if len(addr) > 1 {
+			if p, err := strconv.ParseInt(addr[1:], 10, 32); err == nil {
+				port = int32(p)
+			}
+		}
 		return &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{"test", "-S", mcpGatewayUDSPath},
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt(int(port)),
 				},
 			},
 			InitialDelaySeconds: 1,
@@ -148,22 +160,11 @@ func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *
 			FailureThreshold:    12,
 		}
 	}
-
-	port := int32(constants.DefaultAIInterceptorPort)
-	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
-		// Parse ":21101" or "127.0.0.1:21101".
-		if idx := strings.LastIndex(addr, ":"); idx >= 0 && idx+1 < len(addr) {
-			if p, err := strconv.ParseInt(addr[idx+1:], 10, 32); err == nil {
-				port = int32(p)
-			}
-		} else if hitlPort != 0 {
-			port = hitlPort
-		}
-	}
+	// UDS mode: probe the socket file.
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
-			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt(int(port)),
+			Exec: &corev1.ExecAction{
+				Command: []string{"test", "-S", mcpGatewayUDSPath},
 			},
 		},
 		InitialDelaySeconds: 1,
