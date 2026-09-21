@@ -3633,6 +3633,13 @@ terminatingGateways:
     # Vault Kubernetes auth role/mount must be provisioned by an operator
     # beforehand. Any field set on an individual gateway in the `gateways` list
     # overrides the default here.
+    #
+    # ConfigMap rollout note: editing a referenced non-secret ConfigMap
+    # automatically rolls the workload only for controller-managed (CRD)
+    # TerminatingGateways, which watch those ConfigMaps. For Helm-managed gateways
+    # the content hash is recomputed only on the next `helm install/upgrade`, so
+    # run a `helm upgrade` (or use an external reloader) to roll them after such an
+    # edit.
     credentialInjection:
       # Enabled controls whether the credential processor and Vault Agent
       # sidecars are added to the terminating gateway deployment.

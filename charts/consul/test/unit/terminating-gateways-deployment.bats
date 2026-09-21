@@ -1930,6 +1930,33 @@ key2: value2' \
   [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
 }
 
+@test "terminatingGateways/Deployment: credentialInjection projects a token for the Vault Agent Injector when ACLs are disabled" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.tls.enabled=true --set global.tls.caCert.secretName=consul-ca \
+      --set global.secretsBackend.vault.enabled=true \
+      --set global.secretsBackend.vault.consulCARole=consul-ca \
+      --set global.secretsBackend.vault.consulServerRole=server \
+      --set global.secretsBackend.vault.consulClientRole=client \
+      --set global.secretsBackend.vault.manageSystemACLsRole=acl \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr)
+  # Automount stays disabled, but the dedicated token volume exists so vault-k8s
+  # can discover it via the annotation.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.automountServiceAccountToken')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes | map(.name) | contains(["consul-auth-method-sa-token"])')" = "true" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.metadata.annotations["vault.hashicorp.com/agent-service-account-token-volume-name"]')" = "consul-auth-method-sa-token" ]
+  # It is not mounted into the processor.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
+}
+
 @test "terminatingGateways/Deployment: credentialInjection disabled has no socket-init and no Envoy socket mount" {
   cd `chart_dir`
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
