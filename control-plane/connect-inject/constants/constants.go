@@ -94,21 +94,6 @@ const (
 	// stamps the AI block on the Consul catalog registration for pods with this role.
 	AIAgentRole = "ai-agent"
 
-	// AIMCPServerRole is the expected value of AnnotationAIRole for an MCP server.
-	// Those workloads register catalog ai{} for DCR audience participation but do
-	// not receive OBO sidecars or the dataplane credential broker.
-	AIMCPServerRole = "mcp-server"
-
-	// DefaultAIMCPServerTransport is the catalog default for ai.mcp_server.transport.
-	DefaultAIMCPServerTransport = "streamable-http"
-
-	// DefaultAIMCPServerPath is the catalog default for ai.mcp_server.path.
-	DefaultAIMCPServerPath = "/mcp"
-
-	// DefaultAIMCPServerProtocolVersion is the catalog default for
-	// ai.mcp_server.protocol_version.
-	DefaultAIMCPServerProtocolVersion = "2025-03-26"
-
 	// DefaultAIMCPPort is the loopback port the mcp-gateway outbound listener binds
 	// to inside the pod (ai.agent.mcp.port in the Consul service registration).
 	DefaultAIMCPPort = 15101
