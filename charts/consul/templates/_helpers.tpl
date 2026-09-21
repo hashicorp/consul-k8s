@@ -761,6 +761,46 @@ Usage: {{ template "consul.validateAIConfig" . }}
 {{- end -}}
 
 {{- /*
+consul.validateTerminatingGatewayCredentialInjection fails `helm template/install`
+when an enabled spec.credentialInjection block is incomplete or invalid, mirroring
+the CRD/controller validation so bad input is rejected before a workload is
+submitted (Helm renders without admission/controller validation otherwise).
+Input dict: ci (effective merged config), name (gateway name for messages).
+*/ -}}
+{{- define "consul.validateTerminatingGatewayCredentialInjection" -}}
+{{- $ci := .ci -}}
+{{- $prefix := printf "terminatingGateways gateway %q credentialInjection" .name -}}
+{{- if empty $ci.processorImage }}{{ fail (printf "%s: processorImage is required when enabled" $prefix) }}{{ end -}}
+{{- if empty $ci.processorConfigMap }}{{ fail (printf "%s: processorConfigMap is required when enabled" $prefix) }}{{ end -}}
+{{- if contains "*" (default "" $ci.processorConfigMap) }}{{ fail (printf "%s: processorConfigMap must not contain the wildcard character \"*\"" $prefix) }}{{ end -}}
+{{- $source := default "vault" $ci.source -}}
+{{- if and (ne $source "vault") (ne $source "kubernetesSecret") }}{{ fail (printf "%s: source must be \"vault\" or \"kubernetesSecret\"" $prefix) }}{{ end -}}
+{{- if eq $source "kubernetesSecret" -}}
+  {{- if empty $ci.secretName }}{{ fail (printf "%s: secretName is required when source is kubernetesSecret" $prefix) }}{{ end -}}
+  {{- if contains "*" (default "" $ci.secretName) }}{{ fail (printf "%s: secretName must not contain the wildcard character \"*\"" $prefix) }}{{ end -}}
+{{- else -}}
+  {{- if empty $ci.vaultAgentImage }}{{ fail (printf "%s: vaultAgentImage is required when enabled" $prefix) }}{{ end -}}
+  {{- if empty $ci.vaultAgentConfigMap }}{{ fail (printf "%s: vaultAgentConfigMap is required when enabled" $prefix) }}{{ end -}}
+  {{- if empty $ci.vaultAddress }}{{ fail (printf "%s: vaultAddress is required when enabled" $prefix) }}{{ end -}}
+  {{- if not (regexMatch "^https://[^/]+" (default "" $ci.vaultAddress)) }}{{ fail (printf "%s: vaultAddress must be a valid absolute https:// URL" $prefix) }}{{ end -}}
+  {{- if empty $ci.tokenAudience }}{{ fail (printf "%s: tokenAudience is required when enabled" $prefix) }}{{ end -}}
+  {{- if not (kindIs "invalid" $ci.tokenExpirationSeconds) -}}
+    {{- $exp := int $ci.tokenExpirationSeconds -}}
+    {{- if or (lt $exp 600) (gt $exp 43200) }}{{ fail (printf "%s: tokenExpirationSeconds must be between 600 and 43200 seconds" $prefix) }}{{ end -}}
+  {{- end -}}
+  {{- if not (kindIs "invalid" $ci.drainSeconds) -}}
+    {{- $drain := int $ci.drainSeconds -}}
+    {{- if lt $drain 0 }}{{ fail (printf "%s: drainSeconds must not be negative" $prefix) }}{{ end -}}
+    {{- if and (not (kindIs "invalid" $ci.tokenExpirationSeconds)) (gt $drain (int $ci.tokenExpirationSeconds)) }}{{ fail (printf "%s: drainSeconds must not exceed tokenExpirationSeconds" $prefix) }}{{ end -}}
+  {{- end -}}
+  {{- range $field := list "vaultNamespace" "vaultCAConfigMap" "vaultAgentConfigMap" "tokenAudience" -}}
+    {{- if contains "*" (default "" (index $ci $field)) }}{{ fail (printf "%s: %s must not contain the wildcard character \"*\"" $prefix $field) }}{{ end -}}
+  {{- end -}}
+  {{- if and (not (empty $ci.vaultAgentConfigMap)) (eq $ci.processorConfigMap $ci.vaultAgentConfigMap) }}{{ fail (printf "%s: vaultAgentConfigMap must reference a different ConfigMap than processorConfigMap" $prefix) }}{{ end -}}
+{{- end -}}
+{{- end -}}
+
+{{- /*
 consul.terminatingGatewayCredentialVaultAgent renders a Vault Agent container
 (init or sidecar) for terminating-gateway credential injection. It authenticates
 to Vault with the projected Kubernetes service-account token, verifies the Vault
