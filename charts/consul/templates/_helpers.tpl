@@ -221,6 +221,48 @@ is passed to consul as a -config-file param on command line.
 {{- end -}}
 
 {{/*
+Rehashes the CA certificates written to /trusted-cas so that OpenSSL-based clients
+can discover them via SSL_CERT_DIR. OpenSSL only looks up CAs in a certificate
+directory by their subject hash (<hash>.N), so the .pem files alone are ignored.
+
+Notes on the implementation:
+  - Certificates that share a subject (for example an old and a new revision of the
+    same CA during a rotation) share a subject hash, so suffixes are allocated
+    sequentially instead of always using .0. Otherwise all but the last would be
+    silently dropped.
+  - Pre-existing symlinks are cleared first so that a container restart, which
+    reuses the same emptyDir, does not keep appending duplicate links.
+  - The whole block is a no-op when openssl is not present in the image (the
+    consul-telemetry-collector image does not ship it). The command runs under
+    `sh -ec`, so an unguarded openssl call would abort container startup.
+
+Callers are expected to indent this with nindent.
+*/}}
+{{- define "consul.trustedCAsRehash" -}}
+if command -v openssl > /dev/null 2>&1; then
+  for CERT_LINK in /trusted-cas/*; do
+    if [ -L "${CERT_LINK}" ]; then
+      rm -f "${CERT_LINK}"
+    fi
+  done
+  for CERT_FILE in /trusted-cas/custom-ca-*.pem; do
+    if [ ! -e "${CERT_FILE}" ]; then
+      continue
+    fi
+    CERT_HASH=$(openssl x509 -subject_hash -noout -in "${CERT_FILE}" 2> /dev/null) || CERT_HASH=""
+    if [ -z "${CERT_HASH}" ]; then
+      continue
+    fi
+    CERT_SUFFIX=0
+    while [ -e "/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}" ]; do
+      CERT_SUFFIX=$((CERT_SUFFIX + 1))
+    done
+    ln -sf "${CERT_FILE}" "/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}"
+  done
+fi
+{{- end -}}
+
+{{/*
 Cleanup server.extraConfig entries to avoid conflicting entries:
     - server.enableAgentDebug:
       - `enable_debug` should not exist in extraConfig

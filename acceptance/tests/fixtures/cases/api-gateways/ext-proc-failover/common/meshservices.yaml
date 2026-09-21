@@ -1,0 +1,43 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Gateway route backends are Consul MeshService objects (not raw Kubernetes
+# Services). A MeshService is resolved through its Consul discovery chain, which
+# includes the cross-cluster ServiceResolver failover applied by the test. This
+# is what makes gateway-originated traffic fail over to the peer cluster when the
+# LOCAL backend has zero healthy endpoints. If these routes referenced the raw
+# Kubernetes Service instead, scaling the backend to 0 would make the controller
+# mark the route BackendNotFound and withdraw the whole chain (no failover).
+#
+# Shared by both the single- and two-ext-proc gateways.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: MeshService
+metadata:
+  name: service-a-mesh
+  namespace: default
+spec:
+  name: service-a
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: MeshService
+metadata:
+  name: service-b-mesh
+  namespace: default
+spec:
+  name: service-b
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: MeshService
+metadata:
+  name: service-c-mesh
+  namespace: default
+spec:
+  name: service-c
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: MeshService
+metadata:
+  name: service-d1-mesh
+  namespace: default
+spec:
+  name: service-d1

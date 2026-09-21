@@ -1,0 +1,29 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Connect-proxy ext-proc (HTTP) on service-e1's connect-proxy INBOUND listener.
+# The processor runs as a sidecar in service-e1's pod, so the filter targets a
+# localhost URI (127.0.0.1:9000) rather than a mesh service. The sidecar consults
+# http-decider-connect-proxy (random service-f/service-g) and sets x-route-target;
+# the service-e1 app reads it and proxies to the chosen upstream.
+#
+# This is orthogonal to the gateway ext-proc count, so it is shared by both the
+# single- and two-ext-proc gateway scenarios.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: service-e1
+spec:
+  protocol: http
+  envoyExtensions:
+    - name: builtin/ext-proc
+      required: true
+      arguments:
+        proxyType: connect-proxy
+        listenerType: inbound
+        config:
+          routeCacheAction: CLEAR
+          httpService:
+            target:
+              uri: "127.0.0.1:9000"
+            path: /decide
