@@ -1636,6 +1636,23 @@ key2: value2' \
   [[ "$output" == *"vaultAddress must be a valid absolute https:// URL"* ]]
 }
 
+@test "terminatingGateways/Deployment: credentialInjection rejects a negative drainSeconds for the kubernetesSecret source" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=creds' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      --set 'terminatingGateways.defaults.credentialInjection.drainSeconds=-5' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"drainSeconds must not be negative"* ]]
+}
+
 @test "terminatingGateways/Deployment: credentialInjection rejects identical processor and vault-agent ConfigMaps" {
   cd `chart_dir`
   run helm template \
