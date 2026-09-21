@@ -155,7 +155,8 @@ func applyTerminatingGatewayCredentialInjection(
 // campConsulAuthMethodTokenVolume projects the default-audience ServiceAccount
 // token used for Consul login. It replaces the default automount (disabled for
 // credential-injection pods) and is mounted only into the Consul-login
-// containers, so Envoy and the credential processor cannot read it.
+// containers (the base init container and Envoy), so the credential processor
+// and Vault Agent sidecars cannot read it.
 func campConsulAuthMethodTokenVolume() corev1.Volume {
 	return corev1.Volume{
 		Name: campConsulAuthTokenVolume,

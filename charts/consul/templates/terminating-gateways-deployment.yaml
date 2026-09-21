@@ -47,6 +47,11 @@
 {{- if not (kindIs "invalid" $ci.drainSeconds) }}
 {{- $drainSeconds = int $ci.drainSeconds }}
 {{- end }}
+{{- /* Fail fast on an incomplete/invalid enabled config (Helm renders without
+       CRD/controller validation), mirroring the controller-side checks. */ -}}
+{{- if and $ci $ci.enabled }}
+{{- include "consul.validateTerminatingGatewayCredentialInjection" (dict "ci" $ci "name" .name) }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
