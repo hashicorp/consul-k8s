@@ -133,12 +133,6 @@ spec:
         {{- if (and ($root.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" $root.Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
         "vault.hashicorp.com/namespace": "{{ $root.Values.global.secretsBackend.vault.vaultNamespace }}"
         {{- end }}
-        {{- if and $ci $ci.enabled }}
-        # Credential injection disables the default ServiceAccount-token automount,
-        # so point the Vault Agent Injector at the dedicated projected token (else
-        # vault-k8s fails with "failed to find service account volume mount").
-        "vault.hashicorp.com/agent-service-account-token-volume-name": "consul-auth-method-sa-token"
-        {{- end }}
         {{- end }}
         {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
         "prometheus.io/scrape": "true"
@@ -153,6 +147,14 @@ spec:
         {{- end }}
         {{- if .annotations }}
         {{- tpl .annotations $root | nindent 8 }}
+        {{- end }}
+        {{- if and $ci $ci.enabled (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled) }}
+        # Reserved: credential injection disables the default ServiceAccount-token
+        # automount, so the Vault Agent Injector is pointed at the dedicated
+        # projected token (else vault-k8s fails with "failed to find service
+        # account volume mount"). Emitted last so user annotations cannot override
+        # it and break injection or leak the CAMP Vault token to the agent.
+        "vault.hashicorp.com/agent-service-account-token-volume-name": "consul-auth-method-sa-token"
         {{- end }}
     spec:
       {{- if (or $defaults.affinity .affinity) }}

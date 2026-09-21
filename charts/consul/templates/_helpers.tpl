@@ -786,7 +786,7 @@ Input dict: ci (effective merged config), name (gateway name for messages).
   {{- if empty $ci.vaultAgentImage }}{{ fail (printf "%s: vaultAgentImage is required when enabled" $prefix) }}{{ end -}}
   {{- if empty $ci.vaultAgentConfigMap }}{{ fail (printf "%s: vaultAgentConfigMap is required when enabled" $prefix) }}{{ end -}}
   {{- if empty $ci.vaultAddress }}{{ fail (printf "%s: vaultAddress is required when enabled" $prefix) }}{{ end -}}
-  {{- if not (regexMatch "^https://[^/]+" (default "" $ci.vaultAddress)) }}{{ fail (printf "%s: vaultAddress must be a valid absolute https:// URL" $prefix) }}{{ end -}}
+  {{- if not (regexMatch "^https://[a-zA-Z0-9._-]+(:[0-9]+)?(/.*)?$" (default "" $ci.vaultAddress)) }}{{ fail (printf "%s: vaultAddress must be a valid absolute https:// URL with a host" $prefix) }}{{ end -}}
   {{- if empty $ci.tokenAudience }}{{ fail (printf "%s: tokenAudience is required when enabled" $prefix) }}{{ end -}}
   {{- if not (kindIs "invalid" $ci.tokenExpirationSeconds) -}}
     {{- $exp := int $ci.tokenExpirationSeconds -}}
