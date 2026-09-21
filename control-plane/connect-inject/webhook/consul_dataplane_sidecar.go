@@ -503,6 +503,12 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 	}
 
+	// Local Credential Broker for CAMP OBO: ai-agent pods only. Pairs with
+	// consul-obo-outbound/inbound --broker-uds on the shared volume.
+	if common.IsAIAgent(pod) {
+		args = append(args, "-credential-broker-bind-addr=unix:///consul/connect-inject/credential-broker.sock")
+	}
+
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
 	// for Consul DNS in the pod.
 	dnsEnabled, err := consulDNSEnabled(namespace, pod, w.EnableConsulDNS, w.EnableTransparentProxy)

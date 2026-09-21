@@ -92,6 +92,16 @@ type MeshWebhook struct {
 	// annotation, the webhook injects this image as an additional sidecar.
 	ImageAIAgent string
 
+	// ImageConsulOBOInbound is the container image for consul-obo-inbound.
+	// Injected into ai-agent pods for inbound JWT verify + claim projection
+	// (ext_proc on loopback :21102). Required when IsAIAgent — no silent fallback.
+	ImageConsulOBOInbound string
+
+	// ImageConsulOBOOutbound is the container image for consul-obo-outbound.
+	// Injected into ai-agent pods for outbound RFC 8693 OBO exchange
+	// (ext_proc on loopback :21103). Required when IsAIAgent — no silent fallback.
+	ImageConsulOBOOutbound string
+
 	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	GlobalImagePullPolicy string
 
@@ -507,6 +517,24 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 		agentContainer := w.aiAgentSidecar(pod, agentDefaults)
 		pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
+
+		// OBO identity plane (ai-agent only): envelope UDS + Local Credential Broker.
+		// consul-obo-outbound is not an SDS/xDS client.
+		oboInbound, err := w.oboInboundSidecar(pod)
+		if err != nil {
+			w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError,
+				fmt.Errorf("error configuring consul-obo-inbound container: %s", err))
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
+
+		oboOutbound, err := w.oboOutboundSidecar(*ns, pod)
+		if err != nil {
+			w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError,
+				fmt.Errorf("error configuring consul-obo-outbound container: %s", err))
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, oboOutbound)
 	}
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
@@ -847,6 +875,9 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 	metricsMergingEnabled, err := w.MetricsConfig.EnableMetricsMerging(pod)
 	if err != nil {
 		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
+	}
+	if common.IsAIAgent(pod) {
+		return fmt.Errorf("ai-agent role is not supported on multi-port pods")
 	}
 	if tproxyEnabled {
 		return fmt.Errorf("multi protocol multi port services are not compatible with transparent proxy")

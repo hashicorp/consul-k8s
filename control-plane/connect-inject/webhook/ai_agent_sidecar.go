@@ -4,7 +4,10 @@
 package webhook
 
 import (
+	"fmt"
+	"net"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -55,23 +58,24 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 	//   --child-args optional: args for the child binary (from pod annotation)
 	//
 	// Transport selection:
-	//   The custom Consul build's mcp_ext_proc_interceptor cluster dials
-	//   127.0.0.1:21101 (TCP). The binary's listen() opens either UDS or TCP —
-	//   never both. When the ai-agent-addr annotation is set we use TCP only
-	//   (no --socket) so the Consul ext_proc cluster can connect. Otherwise
-	//   we use UDS (production default, shared with consul-dataplane Envoy).
+	//   Enterprise xDS mcp_ext_proc_interceptor dials 127.0.0.1:21101 (TCP).
+	//   Default to TCP so CAMP stacks work without an annotation. Opt into UDS
+	//   with consul.hashicorp.com/ai-agent-transport: uds (shared volume socket).
+	//   When ai-agent-addr is set, that TCP address wins.
 	var args []string
 	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
-		// TCP mode: Consul's mcp_ext_proc_interceptor cluster dials this address.
-		// Do NOT pass --socket — listen() only opens one transport.
 		args = []string{
 			"--addr=" + addr,
 			"--log-level=" + w.LogLevel,
 		}
-	} else {
-		// UDS mode: default production transport shared with consul-dataplane.
+	} else if pod.Annotations[constants.AnnotationAIAgentTransport] == "uds" {
 		args = []string{
 			"--socket=" + mcpGatewayUDSPath,
+			"--log-level=" + w.LogLevel,
+		}
+	} else {
+		args = []string{
+			"--addr=127.0.0.1:" + strconv.Itoa(constants.DefaultAIInterceptorPort),
 			"--log-level=" + w.LogLevel,
 		}
 	}
@@ -129,28 +133,14 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 	return container
 }
 
-// mcpGatewayReadinessProbe returns the correct readiness probe depending on
-// whether the mcp-gateway is running in TCP mode (ai-agent-addr annotation set)
-// or UDS mode (default).
-//
-//   - TCP mode: TCPSocket probe on the configured addr port — the binary binds
-//     TCP and no socket file is created.
-//   - UDS mode: exec "test -S <socket>" — Kubernetes does not support UDS probes
-//     natively so we stat the socket file instead.
+// mcpGatewayReadinessProbe returns the readiness probe for TCP (default) or UDS mode.
 func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *corev1.Probe {
-	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
-		// Parse the port from the addr string e.g. ":21101" → 21101.
-		// Fall back to hitlPort if the addr is malformed.
-		port := hitlPort
-		if len(addr) > 1 {
-			if p, err := strconv.ParseInt(addr[1:], 10, 32); err == nil {
-				port = int32(p)
-			}
-		}
+	if pod.Annotations[constants.AnnotationAIAgentTransport] == "uds" &&
+		pod.Annotations[constants.AnnotationAIAgentAddr] == "" {
 		return &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt(int(port)),
+				Exec: &corev1.ExecAction{
+					Command: []string{"test", "-S", mcpGatewayUDSPath},
 				},
 			},
 			InitialDelaySeconds: 1,
@@ -158,15 +148,122 @@ func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *
 			FailureThreshold:    12,
 		}
 	}
-	// UDS mode: probe the socket file.
+
+	port := int32(constants.DefaultAIInterceptorPort)
+	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
+		// Parse ":21101" or "127.0.0.1:21101".
+		if idx := strings.LastIndex(addr, ":"); idx >= 0 && idx+1 < len(addr) {
+			if p, err := strconv.ParseInt(addr[idx+1:], 10, 32); err == nil {
+				port = int32(p)
+			}
+		} else if hitlPort != 0 {
+			port = hitlPort
+		}
+	}
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
-			Exec: &corev1.ExecAction{
-				Command: []string{"test", "-S", mcpGatewayUDSPath},
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.FromInt(int(port)),
 			},
 		},
 		InitialDelaySeconds: 1,
 		PeriodSeconds:       5,
 		FailureThreshold:    12,
 	}
+}
+
+// oboInboundSidecar builds consul-obo-inbound for ai-agent pods.
+// Listens on loopback :21102; envelope + broker UDS for split-knowledge credentials.
+// Verify-only — no private key material in this process beyond envelope decrypt.
+func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) {
+	image := w.ImageConsulOBOInbound
+	if image == "" {
+		return corev1.Container{}, fmt.Errorf(
+			"ImageConsulOBOInbound must be set for ai-agent pods; " +
+				"configure ai.obo.inbound.image (or -consul-obo-inbound-image)")
+	}
+
+	return corev1.Container{
+		Name:            constants.ConsulOBOInboundContainerName,
+		Image:           image,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Resources:       w.DefaultConsulSidecarResources,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+				ReadOnly:  true,
+			},
+		},
+		Command: []string{constants.DefaultOBOInboundBinary},
+		Args: []string{
+			"--addr",
+			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOInboundPort)),
+			"--log-level=info",
+			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
+			"--broker-uds=/consul/connect-inject/credential-broker.sock",
+			fmt.Sprintf("--dataplane-ready-url=http://127.0.0.1:%d/ready",
+				constants.DefaultEnvoyAdminPort),
+		},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+			RunAsNonRoot:             ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}, nil
+}
+
+// oboOutboundSidecar builds consul-obo-outbound for ai-agent pods.
+// Listens on loopback :21103; RFC 8693 exchange after envelope decrypt via broker.
+// Not an SDS/xDS client — envelope UDS + Local Credential Broker only.
+func (w *MeshWebhook) oboOutboundSidecar(_ corev1.Namespace, _ corev1.Pod) (corev1.Container, error) {
+	image := w.ImageConsulOBOOutbound
+	if image == "" {
+		return corev1.Container{}, fmt.Errorf(
+			"ImageConsulOBOOutbound must be set for ai-agent pods; " +
+				"configure ai.obo.outbound.image (or -consul-obo-outbound-image)")
+	}
+
+	return corev1.Container{
+		Name:            constants.ConsulOBOOutboundContainerName,
+		Image:           image,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Resources:       w.DefaultConsulSidecarResources,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+				ReadOnly:  true,
+			},
+		},
+		Command: []string{constants.DefaultOBOOutboundBinary},
+		Args: []string{
+			"--addr",
+			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOOutboundPort)),
+			"--log-level=info",
+			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
+			"--broker-uds=/consul/connect-inject/credential-broker.sock",
+			fmt.Sprintf("--dataplane-ready-url=http://127.0.0.1:%d/ready",
+				constants.DefaultEnvoyAdminPort),
+		},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+			RunAsNonRoot:             ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}, nil
 }

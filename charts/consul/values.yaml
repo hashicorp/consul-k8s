@@ -3982,3 +3982,18 @@ ai:
         limits:
           memory: "256Mi"
           cpu: "500m"
+
+  # OBO (on-behalf-of) identity-plane sidecars for ai-agent pods.
+  # Split-knowledge: envelope ciphertext on Envoy UDS + DEK via dataplane broker.
+  # Required when injecting ai-role=ai-agent; webhook errors if unset.
+  obo:
+    inbound:
+      # Docker image for consul-obo-inbound (loopback :21102).
+      # Binary source: consul-ai-apps/gateways/obo-inbound
+      # @type: string
+      image: ""
+    outbound:
+      # Docker image for consul-obo-outbound (loopback :21103).
+      # Binary source: consul-ai-apps/gateways/obo-outbound
+      # @type: string
+      image: ""
