@@ -1072,7 +1072,7 @@ func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient clien
 	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
@@ -1435,7 +1435,7 @@ func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClien
 	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
