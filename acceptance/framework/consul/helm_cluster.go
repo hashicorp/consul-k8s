@@ -230,6 +230,16 @@ func (h *HelmCluster) Create(t *testing.T) {
 			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
 		}
 	}
+	// terratest's helm.UpgradeE ignores Options.Version, so `helm upgrade
+    // --install` would pull the latest published chart instead of the pinned
+    // one. Pass --version explicitly for this install and restore the args so
+    // a later UpgradeToLocalChart still targets the local chart path. An empty
+    // version is left unpinned so it keeps resolving to the latest release.
+    if h.helmOptions.Version != "" {
+		upgradeArgs := h.helmOptions.ExtraArgs["upgrade"]
+		h.helmOptions.ExtraArgs["upgrade"] = append(append([]string{}, upgradeArgs...), "--version", h.helmOptions.Version)
+		defer func() { h.helmOptions.ExtraArgs["upgrade"] = upgradeArgs }()
+}
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
