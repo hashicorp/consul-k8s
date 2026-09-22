@@ -15,10 +15,12 @@ import (
 
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -162,6 +164,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
 			require.NoError(t, err)
+			deletedAt := time.Now()
 
 			// Exec into terminating pod, not just any static-client pod
 			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
@@ -174,6 +177,18 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			if gracePeriodSeconds > 0 {
 				// Ensure outbound requests are still successful during grace period.
+				//
+				// The pod disappears as soon as its last container exits, which
+				// is when the proxy's shutdown grace period elapses, so this
+				// loop and the teardown it observes end at the same instant by
+				// construction. An exec that lands on the far side of that
+				// instant is the end of the window, not a failed request, so it
+				// closes the loop rather than failing the test. The assertions
+				// after the loop are what keep the window honest.
+				var (
+					connectivityConfirmed bool
+					proxyStoppedAfter     time.Duration
+				)
 				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
 			gracePeriodLoop:
 				for {
@@ -181,18 +196,29 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					case <-gracePeriodTimer.C:
 						break gracePeriodLoop
 					default:
+						var proxyStopped bool
 						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
 						retry.RunWith(retrier, t, func(r *retry.R) {
 							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
+								if podShutdownComplete(r, ctx, ns, clientPodName) {
+									proxyStopped = true
+									return
+								}
 								r.Errorf("%v", err.Error())
 								return
 							}
 							require.Condition(r, func() bool {
 								return !strings.Contains(output, "curl: (7) Failed to connect")
 							}, fmt.Sprintf("Error: %s", output))
+							connectivityConfirmed = true
 						})
+						if proxyStopped {
+							proxyStoppedAfter = time.Since(deletedAt)
+							logger.Logf(t, "pod %q finished shutting down %s after it was deleted", clientPodName, proxyStoppedAfter)
+							break gracePeriodLoop
+						}
 
 						// If listener draining is disabled, ensure inbound
 						// requests are accepted during grace period.
@@ -205,11 +231,33 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 						time.Sleep(2 * time.Second)
 					}
 				}
+
+				require.True(t, connectivityConfirmed,
+					"expected at least one successful outbound request from terminating pod %s during its %ds shutdown grace period",
+					clientPodName, gracePeriodSeconds)
+				if proxyStoppedAfter > 0 {
+					// Shutting down early is a real regression and must not be
+					// waved through as the benign end-of-window case above. The
+					// tolerance only absorbs the delay between the delete call
+					// returning and the kubelet acting on it, which can only
+					// make the pod outlive the grace period, never cut it short.
+					require.GreaterOrEqual(t, proxyStoppedAfter,
+						time.Duration(gracePeriodSeconds)*time.Second-proxyShutdownTolerance,
+						"pod %s stopped serving after %s, before its %ds shutdown grace period elapsed",
+						clientPodName, proxyStoppedAfter, gracePeriodSeconds)
+				}
 			} else {
 				// Ensure outbound requests fail because proxy has terminated
 				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
 					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
 					require.Error(r, err)
+					// With no grace period the proxy stops at once, so the pod
+					// can finish shutting down before a request is even
+					// attempted. Both outcomes show the same thing: the
+					// terminating pod no longer reaches the mesh.
+					if podShutdownComplete(r, ctx, ns, clientPodName) {
+						return
+					}
 					require.Condition(r, func() bool {
 						exists := false
 						if strings.Contains(output, "curl: (7) Failed to connect") {
@@ -262,6 +310,37 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			})
 		})
 	}
+}
+
+// proxyShutdownTolerance is the slack allowed between the configured shutdown
+// grace period and how long the terminating pod is observed to survive it. It
+// covers the delay between the delete call returning and the kubelet sending
+// SIGTERM, which is the only clock skew between the two.
+const proxyShutdownTolerance = 1 * time.Second
+
+// podShutdownComplete reports whether a terminating pod has finished shutting
+// down, so that there is nothing left to exec into.
+//
+// The pod's own state is the reliable signal. Depending on how far the teardown
+// had got when an exec landed, kubectl reports a finished pod as a NotFound, a
+// failed connection upgrade, or a missing container, and matching on those
+// strings would turn a genuine connectivity failure into a pass the first time
+// the wording changed.
+func podShutdownComplete(r *retry.R, ctx environment.TestContext, namespace, podName string) bool {
+	pod, err := ctx.KubernetesClient(r).CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return true
+	}
+	require.NoError(r, err)
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+		return true
+	}
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == connhelper.StaticClientName {
+			return status.State.Terminated != nil
+		}
+	}
+	return false
 }
 
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
