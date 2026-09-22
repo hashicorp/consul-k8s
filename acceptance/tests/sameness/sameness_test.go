@@ -66,10 +66,6 @@ func TestFailover_Connect(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
-	if cfg.EnableCNI {
-		t.Skipf("skipping this test because -enable-cni is set")
-	}
-
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
