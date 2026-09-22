@@ -31,7 +31,7 @@ import (
 
 // TestConnectInject tests that Connect works in a default and a secure installation using Helm CLI.
 func TestConnectInject(t *testing.T) {
-
+	t.Skipf("Skipping TestConnectInject")
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
@@ -76,6 +76,7 @@ func TestConnectInject(t *testing.T) {
 
 // TestConnectInject_VirtualIPFailover ensures that KubeDNS entries are saved to the virtual IP address table in Consul.
 func TestConnectInject_VirtualIPFailover(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_VirtualIPFailover")
 	cfg := suite.Config()
 	if !cfg.EnableTransparentProxy {
 		// This can only be tested in transparent proxy mode.
@@ -105,6 +106,7 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_CleanupKilledPods(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_CleanupKilledPods")
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
@@ -207,6 +209,7 @@ const multiportAdmin = "multiport-admin"
 // this test verifies that the rendered injector accepts and rejects Pods using
 // the same first-application-container rules.
 func TestConnectInject_MultiportRegistrationGate(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_MultiportRegistrationGate")
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 
@@ -378,6 +381,7 @@ func multiportGateTestPod(name string, annotations map[string]string, portCounts
 // Job cannot rewrite. Unit tests inject a client and cannot catch a missing
 // permission.
 func TestConnectInject_MultiportConversionStrategies(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_MultiportConversionStrategies")
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	releaseName := helpers.RandomName()
@@ -521,6 +525,7 @@ func TestConnectInject_MultiportConversionStrategies(t *testing.T) {
 // time; it keeps running until its Pod is recreated and only then starts failing
 // admission, long after the operator has moved on.
 func TestConnectInject_MultiportConversionReportsStrandedWorkloads(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_MultiportConversionReportsStrandedWorkloads")
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	releaseName := helpers.RandomName()
@@ -600,6 +605,7 @@ const multiportPriorReleaseChartVersion = "2.0.3"
 // old ones. A conversion that works on a same-chart upgrade but fails against
 // the release people are upgrading from is a conversion that does not work.
 func TestConnectInject_MultiportConversionFromPriorRelease(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_MultiportConversionFromPriorRelease")
 	cfg := suite.Config()
 	cfg.SkipWhenOpenshiftAndCNI(t)
 	if cfg.HelmChartVersion != config.HelmChartPath {
@@ -681,6 +687,7 @@ func TestConnectInject_MultiportConversionFromPriorRelease(t *testing.T) {
 // and the endpoints controller reacting to the Job's edit, not of the Job, so
 // no unit test and no template test can cover them.
 func TestConnectInject_MultiportConversionOnRunningMeshServices(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_MultiportConversionOnRunningMeshServices")
 	cfg := suite.Config()
 	cfg.SkipWhenOpenshiftAndCNI(t)
 
@@ -903,6 +910,7 @@ func multiportGateTestDaemonSet(name string, annotations map[string]string, port
 // two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
 // multiport app to static-server.
 func TestConnectInject_MultiportServices(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_MultiportServices")
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {

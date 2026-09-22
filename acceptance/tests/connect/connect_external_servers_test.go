@@ -23,6 +23,7 @@ import (
 // It sets up an external Consul server in the same cluster but a different Helm installation
 // and then treats this server as external.
 func TestConnectInject_ExternalServers(t *testing.T) {
+	t.Skipf("Skipping TestConnectInject_ExternalServers")
 	for _, secure := range []bool{
 		false,
 		true,

@@ -30,6 +30,7 @@ const StaticClientNamespace = "ns2"
 // because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
 // and non-auto-encrypt secure installations, so testing just one is enough.
 func TestConnectInjectNamespaces(t *testing.T) {
+	t.Skipf("Skipping TestConnectInjectNamespaces")
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")

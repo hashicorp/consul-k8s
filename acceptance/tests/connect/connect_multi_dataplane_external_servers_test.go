@@ -65,14 +65,6 @@ func TestConnectInject_MultiDataplane_ExternalServers(t *testing.T) {
 				serverHelmValues["server.exposeService.nodePort.http"] = "32500"
 				serverHelmValues["server.exposeService.nodePort.https"] = "32501"
 				serverHelmValues["server.exposeService.nodePort.grpc"] = "32502"
-
-				// Add the node IP to the server's TLS certificate SANs so that Dataplane 2
-				// can verify the certificate when connecting via the NodePort.
-				nodeList, err := ctx1.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-				require.NoError(t, err)
-				if len(nodeList.Items) > 0 && len(nodeList.Items[0].Status.Addresses) > 0 {
-					serverHelmValues["global.tls.serverAdditionalIPSANs[0]"] = nodeList.Items[0].Status.Addresses[0].Address
-				}
 			}
 			serverReleaseName := helpers.RandomName()
 			consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx1, cfg, serverReleaseName)
@@ -122,6 +114,19 @@ func TestConnectInject_MultiDataplane_ExternalServers(t *testing.T) {
 				}
 				dp2HelmValues["global.tls.caCert.secretName"] = fmt.Sprintf("%s-consul-ca-cert", serverReleaseName)
 				dp2HelmValues["global.tls.caCert.secretKey"] = "tls.crt"
+
+				// Verify the external servers' TLS certificate by its Consul server DNS
+				// SAN (server.dc1.consul) rather than by the raw address in
+				// externalServers.hosts[0]. That address is the NodePort/LoadBalancer
+				// host and is IP-family dependent: on dual-stack (IPv6) clusters it is a
+				// bare IPv6 address, and verifying the certificate against a bare IPv6 IP
+				// SAN does not work the way it does for IPv4. Without this, Dataplane 2's
+				// server-acl-init job cannot complete the TLS handshake to the control
+				// plane, never succeeds, and blocks the server-acl-init-cleanup Helm hook,
+				// which hangs the install until the test times out. The DNS SAN is always
+				// present in the Consul server certificate and is address-family agnostic.
+				dp2HelmValues["externalServers.tlsServerName"] = "server.dc1.consul"
+
 				dp2HelmValues["global.acls.bootstrapToken.secretName"] = fmt.Sprintf("%s-consul-bootstrap-acl-token", serverReleaseName)
 				dp2HelmValues["global.acls.bootstrapToken.secretKey"] = "token"
 
