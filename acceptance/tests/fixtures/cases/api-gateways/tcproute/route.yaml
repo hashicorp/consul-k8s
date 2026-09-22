@@ -12,3 +12,4 @@ spec:
   - backendRefs:
     - kind: Service
       name: static-server-tcp
+      port: 8080
