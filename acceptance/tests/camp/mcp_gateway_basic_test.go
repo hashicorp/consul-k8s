@@ -310,35 +310,47 @@ func TestMCPGateway_Basic(t *testing.T) {
 	})
 
 	// § 7 — L7 intentions: allowed tool (hotel.search) passes
+	//
+	// ai-app's /ai-mcp/<tool> handler ALWAYS returns HTTP 200 to the caller and
+	// embeds the upstream response status in the body as "HTTP <N>". The L7
+	// intention verdict is therefore visible in the body, not the HTTP status
+	// code.  We retry up to 12× to absorb random HITL rejections (the HITL
+	// approver at 0% fail-rate may still occasionally reject due to timing).
 	t.Run("intentions/hotel-search-allowed", func(t *testing.T) {
 		addr := portForwardSvc(t, opts, "ai-app", 8080)
-		// Retry up to 12× to absorb random HITL rejections (~25% fail rate by default).
-		var lastStatus int
+		var lastBodyStatus string
 		retryCheckWithWait(t, 12, 3*time.Second, func(r *retry.R) {
 			resp, err := http.Get(fmt.Sprintf("http://%s/ai-mcp/ameduss__hotel.search", addr))
 			require.NoError(r, err)
 			defer resp.Body.Close()
-			lastStatus = resp.StatusCode
-			if resp.StatusCode == http.StatusForbidden {
-				// Random HITL rejection — retry.
-				r.Errorf("hotel.search got 403 (random HITL rejection) — retrying")
+			body, _ := io.ReadAll(resp.Body)
+			lastBodyStatus = string(body)
+			if strings.Contains(lastBodyStatus, "HTTP 403") {
+				// HITL random rejection — retry.
+				r.Errorf("hotel.search body shows HTTP 403 (HITL rejection) — retrying")
 				return
 			}
-			require.Equalf(r, http.StatusOK, resp.StatusCode,
-				"hotel.search (whitelisted) expected HTTP 200 from L7 intention, got %d", resp.StatusCode)
+			require.Containsf(r, lastBodyStatus, "HTTP 200",
+				"hotel.search (whitelisted) expected 'HTTP 200' in body from L7 intention, got: %s", lastBodyStatus)
 		})
-		logger.Logf(t, "hotel.search allowed by L7 intention (last status %d)", lastStatus)
+		logger.Logf(t, "hotel.search allowed by L7 intention (body: %s)", strings.TrimSpace(lastBodyStatus))
 	})
 
 	// § 7 — L7 intentions: denied tool (hotel.book) is blocked
+	//
+	// Same reasoning: ai-app always returns HTTP 200 to the caller; the denial
+	// from the L7 intention shows up as "HTTP 403" (or similar non-200) embedded
+	// in the response body.
 	t.Run("intentions/hotel-book-denied", func(t *testing.T) {
 		addr := portForwardSvc(t, opts, "ai-app", 8080)
 		resp, err := http.Get(fmt.Sprintf("http://%s/ai-mcp/ameduss__hotel.book", addr))
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		require.NotEqualf(t, http.StatusOK, resp.StatusCode,
-			"hotel.book (non-whitelisted) should have been denied by L7 intention, got HTTP 200")
-		logger.Logf(t, "hotel.book denied by L7 intention (status %d)", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		bodyStr := string(body)
+		require.NotContainsf(t, bodyStr, "HTTP 200",
+			"hotel.book (non-whitelisted) body should NOT contain 'HTTP 200' — L7 intention should deny it; got: %s", bodyStr)
+		logger.Logf(t, "hotel.book denied by L7 intention (body: %s)", strings.TrimSpace(bodyStr))
 	})
 
 	// § 8 — Consul CRD sync status
@@ -363,17 +375,28 @@ func TestMCPGateway_Basic(t *testing.T) {
 		}
 	})
 
-	// § 9 — Envoy sidecar readiness (already done pre-subtest, re-assert here)
+	// § 9 — Envoy sidecar readiness
+	// consul-dataplane is a distroless image (no shell/curl/wget). We open a
+	// host-side port-forward directly to the pod's Envoy admin port (19000) and
+	// curl from the test host — mirroring exactly what verify.sh §9 does.
 	t.Run("envoy/sidecar-ready", func(t *testing.T) {
 		for _, app := range campDeployments {
 			app := app
+			// Resolve the pod name for this app.
+			podName, err := k8s.RunKubectlAndGetOutputE(t, opts,
+				"get", "pods", "-l", "app="+app,
+				"-o", "jsonpath={.items[0].metadata.name}")
+			require.NoErrorf(t, err, "get pod for app=%s: %v", app, err)
+			require.NotEmptyf(t, podName, "no pod found for app=%s", app)
+
+			addr := portforward.CreateTunnelToResourcePort(t, podName, 19000, opts, terratestLogger.Discard)
 			retryCheckWithWait(t, 20, 3*time.Second, func(r *retry.R) {
-				out, err := k8s.RunKubectlAndGetOutputE(r, opts,
-					"exec", "deploy/"+app, "-c", "envoy-sidecar", "--",
-					"curl", "-fsS", "http://127.0.0.1:19000/ready")
-				require.NoErrorf(r, err, "%s envoy admin /ready: %v", app, err)
-				require.Containsf(r, strings.ToUpper(out), "LIVE",
-					"%s envoy /ready did not return LIVE: %q", app, out)
+				resp, httpErr := http.Get(fmt.Sprintf("http://%s/ready", addr))
+				require.NoErrorf(r, httpErr, "%s envoy admin /ready: %v", app, httpErr)
+				defer resp.Body.Close()
+				body, _ := io.ReadAll(resp.Body)
+				require.Containsf(r, strings.ToUpper(string(body)), "LIVE",
+					"%s envoy /ready did not return LIVE: %q", app, string(body))
 			})
 			logger.Logf(t, "%s envoy sidecar /ready: LIVE", app)
 		}
@@ -465,16 +488,36 @@ func buildAndLoadCAMPImages(t *testing.T, ctx environment.TestContext) {
 	logger.Logf(t, "all %d CAMP images built and loaded into %s", len(campImages), clusterName)
 }
 
-// waitForEnvoySidecarReady polls the Envoy admin /ready endpoint inside the
-// named app's pod until it returns LIVE.
+// waitForEnvoySidecarReady polls the Envoy admin /ready endpoint on the named
+// app's pod until it returns LIVE.
+//
+// consul-dataplane is a distroless image (no shell/curl/wget inside the
+// container), so we cannot use `kubectl exec -c envoy-sidecar -- curl`.
+// Instead we open a host-side port-forward directly to the pod's Envoy admin
+// port (19000) and issue the HTTP request from the test host — mirroring the
+// approach in verify.sh §9.
 func waitForEnvoySidecarReady(t *testing.T, opts *terratestk8s.KubectlOptions, app string) {
 	t.Helper()
+
+	// Resolve the pod name first.
+	podName, err := k8s.RunKubectlAndGetOutputE(t, opts,
+		"get", "pods", "-l", "app="+app,
+		"-o", "jsonpath={.items[0].metadata.name}")
+	require.NoErrorf(t, err, "waitForEnvoySidecarReady: get pod for app=%s: %v", app, err)
+	require.NotEmptyf(t, podName, "waitForEnvoySidecarReady: no pod found for app=%s", app)
+
+	addr := portforward.CreateTunnelToResourcePort(t, podName, 19000, opts, terratestLogger.Discard)
+
 	retryCheckWithWait(t, 30, 5*time.Second, func(r *retry.R) {
-		out, err := k8s.RunKubectlAndGetOutputE(r, opts,
-			"exec", "deploy/"+app, "-c", "envoy-sidecar", "--",
-			"curl", "-fsS", "http://127.0.0.1:19000/ready")
-		if err != nil || !strings.Contains(strings.ToUpper(out), "LIVE") {
-			r.Errorf("%s envoy sidecar not LIVE yet (out=%q err=%v)", app, out, err)
+		resp, httpErr := http.Get(fmt.Sprintf("http://%s/ready", addr))
+		if httpErr != nil {
+			r.Errorf("%s envoy sidecar /ready unreachable: %v", app, httpErr)
+			return
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(strings.ToUpper(string(body)), "LIVE") {
+			r.Errorf("%s envoy sidecar not LIVE yet (body=%q)", app, string(body))
 		}
 	})
 	logger.Logf(t, "%s envoy sidecar ready", app)
@@ -543,7 +586,34 @@ func mcpInitialize(t require.TestingT, baseURL string) (sessID, serverName strin
 		} `json:"result"`
 	}
 	_ = json.Unmarshal([]byte(body), &result)
+	// Complete the MCP handshake with the one-way notifications/initialized
+	// message. Mirrors: mcp_post "$base" "$sid" '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+	// in verify.sh §5. Fire-and-forget: errors are intentionally ignored.
+	mcpNotificationsInitialized(baseURL, sessID)
 	return sessID, result.Result.ServerInfo.Name
+}
+
+// mcpNotificationsInitialized sends the one-way notifications/initialized
+// message that completes the MCP handshake after initialize.
+// Mirrors the notifications/initialized call in verify.sh §5.
+func mcpNotificationsInitialized(baseURL, sessID string) {
+	payload, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "notifications/initialized",
+	})
+	req, err := http.NewRequest(http.MethodPost, baseURL, bytes.NewReader(payload))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	if sessID != "" {
+		req.Header.Set("Mcp-Session-Id", sessID)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil {
+		resp.Body.Close()
+	}
 }
 
 // mcpToolsList sends an MCP tools/list request and returns the list of tool names.
