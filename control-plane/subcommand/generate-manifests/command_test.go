@@ -262,8 +262,8 @@ func TestEnforceGatewayAPIVersion(t *testing.T) {
 		{"HTTPRoute", "HTTPRoute", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1", ""},
 		{"GRPCRoute", "GRPCRoute", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1", ""},
 		{"ReferenceGrant", "ReferenceGrant", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1beta1", ""},
-		{"UDPRoute", "UDPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2", ""},
-		{"TLSRoute", "TLSRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2", ""},
+		{"UDPRoute", "UDPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1", ""},
+		{"TLSRoute", "TLSRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1", ""},
 		{"TCPRoute", "TCPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1", ""},
 		// GatewayPolicy is a Consul CRD — apiVersion stays consul.hashicorp.com/v1alpha1;
 		// only targetRef.group is rewritten from v1beta1 to v1.
