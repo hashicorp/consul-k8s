@@ -866,6 +866,12 @@ global:
   # Storage requirement for generateManifests pvc
   generateManifestsStorage: "1Gi"
 
+  # Image used by the post-upgrade apply-manifests Job to run kubectl (non-OpenShift) or oc (OpenShift).
+  # Override this to supply an air-gapped or security-approved image.
+  # When global.openshift.enabled=true, the image must contain oc; otherwise it must contain kubectl.
+  # If not set, defaults to bitnami/kubectl:latest (non-OpenShift) or registry.redhat.io/openshift4/ose-cli (OpenShift).
+  imageApplyManifests: ""
+
   # During the install:
   # custom crds and gateway TCP crd enabling
   # enableTcpRoute installs the TCP GVK under gateway.networking.k8s.io and enables the stable gatewaycontroller to watch for the resources.
