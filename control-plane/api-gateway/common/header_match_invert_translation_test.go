@@ -36,10 +36,6 @@ func makeInvertFilter(name, namespace string, headerNames []string) *v1alpha1.Ro
 	}
 }
 
-func makeExtRef(kind, name string) gwv1.LocalObjectReference {
-	return gwv1.LocalObjectReference{Kind: gwv1.Kind(kind), Name: gwv1.ObjectName(name)}
-}
-
 func invertExtRefFilter(name string) gwv1.HTTPRouteFilter {
 	return gwv1.HTTPRouteFilter{
 		Type: gwv1.HTTPRouteFilterExtensionRef,

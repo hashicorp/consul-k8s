@@ -439,10 +439,6 @@ var queryMatchTypeTranslation = map[gwv1.QueryParamMatchType]api.HTTPQueryMatchT
 	gwv1.QueryParamMatchRegularExpression: api.HTTPQueryMatchRegularExpression,
 }
 
-func (t ResourceTranslator) translateHTTPMatch(match gwv1.HTTPRouteMatch) api.HTTPMatch {
-	return t.translateHTTPMatchWithInvert(match, nil)
-}
-
 // translateHTTPMatchWithInvert translates an HTTPRouteMatch into an api.HTTPMatch,
 // honouring invertedHeaders: a set of lowercase header names whose Invert flag
 // should be set to true in the translated output.
@@ -465,10 +461,6 @@ func (t ResourceTranslator) translateHTTPPathMatch(match gwv1.HTTPPathMatch) api
 		Match: DerefLookup(match.Type, headerPathMatchTypeTranslation),
 		Value: DerefStringOr(match.Value, ""),
 	}
-}
-
-func (t ResourceTranslator) translateHTTPHeaderMatch(match gwv1.HTTPHeaderMatch) api.HTTPHeaderMatch {
-	return t.translateHTTPHeaderMatchWithInvert(match, nil)
 }
 
 // translateHTTPHeaderMatchWithInvert translates a single HTTPHeaderMatch,
