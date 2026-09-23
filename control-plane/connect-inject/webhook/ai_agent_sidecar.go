@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -181,33 +180,28 @@ func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *
 // oboInboundSidecar builds consul-obo-inbound for ai-agent pods.
 // Listens on loopback :21102; envelope + broker UDS for split-knowledge credentials.
 // Verify-only — no private key material in this process beyond envelope decrypt.
-func (w *MeshWebhook) oboInboundSidecar(pod corev1.Pod) (corev1.Container, error) {
+func (w *MeshWebhook) oboInboundSidecar(runAsUser, runAsGroup int64) (corev1.Container, error) {
 	if w.ImageConsulOBOInbound == "" {
 		return corev1.Container{}, fmt.Errorf(
 			"ImageConsulOBOInbound must be set for ai-agent pods; " +
 				"configure ai.obo.inbound.image (or -consul-obo-inbound-image)")
 	}
-	return w.oboSidecar(pod, constants.ConsulOBOInboundContainerName, w.ImageConsulOBOInbound, constants.DefaultOBOInboundBinary, constants.DefaultOBOInboundPort)
+	return w.oboSidecar(runAsUser, runAsGroup, constants.ConsulOBOInboundContainerName, w.ImageConsulOBOInbound, constants.DefaultOBOInboundBinary, constants.DefaultOBOInboundPort)
 }
 
 // oboOutboundSidecar builds consul-obo-outbound for ai-agent pods.
 // Listens on loopback :21103; RFC 8693 exchange after envelope decrypt via broker.
 // Not an SDS/xDS client — envelope UDS + Local Credential Broker only.
-func (w *MeshWebhook) oboOutboundSidecar(pod corev1.Pod) (corev1.Container, error) {
+func (w *MeshWebhook) oboOutboundSidecar(runAsUser, runAsGroup int64) (corev1.Container, error) {
 	if w.ImageConsulOBOOutbound == "" {
 		return corev1.Container{}, fmt.Errorf(
 			"ImageConsulOBOOutbound must be set for ai-agent pods; " +
 				"configure ai.obo.outbound.image (or -consul-obo-outbound-image)")
 	}
-	return w.oboSidecar(pod, constants.ConsulOBOOutboundContainerName, w.ImageConsulOBOOutbound, constants.DefaultOBOOutboundBinary, constants.DefaultOBOOutboundPort)
+	return w.oboSidecar(runAsUser, runAsGroup, constants.ConsulOBOOutboundContainerName, w.ImageConsulOBOOutbound, constants.DefaultOBOOutboundBinary, constants.DefaultOBOOutboundPort)
 }
 
-func (w *MeshWebhook) oboSidecar(pod corev1.Pod, name, image, binary string, port int) (corev1.Container, error) {
-	uid, group, err := dataplaneRunAs(pod)
-	if err != nil {
-		return corev1.Container{}, err
-	}
-
+func (w *MeshWebhook) oboSidecar(runAsUser, runAsGroup int64, name, image, binary string, port int) (corev1.Container, error) {
 	// Listen address stays 127.0.0.1. xDS OBO clusters dial that address.
 	// Only the Envoy admin readiness URL follows the dual-stack bind.
 	readyHost := constants.Getv4orv6Str("127.0.0.1", "::1")
@@ -235,8 +229,8 @@ func (w *MeshWebhook) oboSidecar(pod corev1.Pod, name, image, binary string, por
 			"--dataplane-ready-url=" + readyURL,
 		},
 		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:                ptr.To(uid),
-			RunAsGroup:               ptr.To(group),
+			RunAsUser:                ptr.To(runAsUser),
+			RunAsGroup:               ptr.To(runAsGroup),
 			RunAsNonRoot:             ptr.To(true),
 			AllowPrivilegeEscalation: ptr.To(false),
 			ReadOnlyRootFilesystem:   ptr.To(true),
@@ -250,21 +244,12 @@ func (w *MeshWebhook) oboSidecar(pod corev1.Pod, name, image, binary string, por
 	}, nil
 }
 
-// dataplaneRunAs returns the user and group already assigned to the injected
-// consul-dataplane container. OBO must use those IDs: the credential broker
-// accepts a peer only when SO_PEERCRED matches the dataplane process, and on
-// OpenShift that UID comes from the namespace range rather than 5995.
-func dataplaneRunAs(pod corev1.Pod) (int64, int64, error) {
-	for _, containers := range [][]corev1.Container{pod.Spec.Containers, pod.Spec.InitContainers} {
-		for _, c := range containers {
-			if c.Name != sidecarContainer && !strings.HasPrefix(c.Name, sidecarContainer+"-") {
-				continue
-			}
-			if c.SecurityContext == nil || c.SecurityContext.RunAsUser == nil || c.SecurityContext.RunAsGroup == nil {
-				return 0, 0, fmt.Errorf("consul-dataplane container %q is missing runAsUser/runAsGroup", c.Name)
-			}
-			return *c.SecurityContext.RunAsUser, *c.SecurityContext.RunAsGroup, nil
-		}
+// dataplaneContainerRunAs returns the user and group on the consul-dataplane
+// container this webhook just built. OBO must use those IDs: the credential
+// broker accepts a peer only when SO_PEERCRED matches the dataplane process.
+func dataplaneContainerRunAs(c corev1.Container) (int64, int64, error) {
+	if c.SecurityContext == nil || c.SecurityContext.RunAsUser == nil || c.SecurityContext.RunAsGroup == nil {
+		return 0, 0, fmt.Errorf("consul-dataplane container %q is missing runAsUser/runAsGroup", c.Name)
 	}
-	return 0, 0, fmt.Errorf("consul-dataplane container not found; cannot assign OBO runAsUser")
+	return *c.SecurityContext.RunAsUser, *c.SecurityContext.RunAsGroup, nil
 }

@@ -350,6 +350,24 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		w.Log.Error(err, "unable to get consul-dataplane as sidecar container in kubernetes enabled status")
 	}
 
+	// OBO must run as the dataplane process. Record the IDs from the container
+	// this webhook just built, not from a name scan: an application container
+	// such as consul-dataplane-metrics would otherwise match first.
+	var dataplaneRunAsUser, dataplaneRunAsGroup int64
+	haveDataplaneRunAs := false
+	recordDataplaneRunAs := func(c corev1.Container) error {
+		if haveDataplaneRunAs {
+			return nil
+		}
+		uid, group, runAsErr := dataplaneContainerRunAs(c)
+		if runAsErr != nil {
+			return runAsErr
+		}
+		dataplaneRunAsUser, dataplaneRunAsGroup = uid, group
+		haveDataplaneRunAs = true
+		return nil
+	}
+
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
@@ -365,6 +383,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		if err != nil {
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
+		}
+		if err := recordDataplaneRunAs(envoySidecar); err != nil {
+			w.Log.Error(err, "error reading consul-dataplane runAs", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error reading consul-dataplane runAs: %s", err))
 		}
 		//Append the Envoy sidecar before the application container only if lifecycle enabled.
 		if lifecycleEnabled && !consulDataplaneSidecarEnabled && ok == nil {
@@ -449,6 +471,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 			}
+			if err := recordDataplaneRunAs(envoySidecar); err != nil {
+				w.Log.Error(err, "error reading consul-dataplane runAs", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error reading consul-dataplane runAs: %s", err))
+			}
 			// If Lifecycle is enabled, add to the list of sidecar containers to be added
 			// to pod containers at the end in order to preserve relative ordering.
 			if lifecycleEnabled && !consulDataplaneSidecarEnabled {
@@ -525,7 +551,12 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 		// OBO identity plane: envelope UDS + Local Credential Broker.
 		// consul-obo-outbound is not an SDS/xDS client.
-		oboInbound, err := w.oboInboundSidecar(pod)
+		if !haveDataplaneRunAs {
+			err := fmt.Errorf("consul-dataplane container not found; cannot assign OBO runAsUser")
+			w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		oboInbound, err := w.oboInboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
 		if err != nil {
 			w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError,
@@ -533,7 +564,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 		pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
 
-		oboOutbound, err := w.oboOutboundSidecar(pod)
+		oboOutbound, err := w.oboOutboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
 		if err != nil {
 			w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError,

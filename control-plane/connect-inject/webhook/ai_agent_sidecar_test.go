@@ -27,12 +27,11 @@ import (
 
 func TestOBOSidecarRequiresImage(t *testing.T) {
 	w := &MeshWebhook{}
-	pod := podWithDataplane(t, sidecarUserAndGroupID, sidecarUserAndGroupID, false)
 
-	_, err := w.oboInboundSidecar(pod)
+	_, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
 	require.ErrorContains(t, err, "ImageConsulOBOInbound must be set")
 
-	_, err = w.oboOutboundSidecar(pod)
+	_, err = w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
 	require.ErrorContains(t, err, "ImageConsulOBOOutbound must be set")
 }
 
@@ -43,10 +42,9 @@ func TestOBOSidecarUsesDataplaneRunAs(t *testing.T) {
 	}
 
 	t.Run("stock kubernetes", func(t *testing.T) {
-		pod := podWithDataplane(t, sidecarUserAndGroupID, sidecarUserAndGroupID, false)
-		inbound, err := w.oboInboundSidecar(pod)
+		inbound, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
 		require.NoError(t, err)
-		outbound, err := w.oboOutboundSidecar(pod)
+		outbound, err := w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
 		require.NoError(t, err)
 
 		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), inbound.SecurityContext.RunAsUser)
@@ -57,18 +55,12 @@ func TestOBOSidecarUsesDataplaneRunAs(t *testing.T) {
 		require.Contains(t, inbound.Args, "127.0.0.1:21102")
 	})
 
-	t.Run("openshift uid copied from dataplane init container", func(t *testing.T) {
+	t.Run("openshift uid", func(t *testing.T) {
 		const openShiftID int64 = 1000799998
-		pod := podWithDataplane(t, openShiftID, openShiftID, true)
-		inbound, err := w.oboInboundSidecar(pod)
+		inbound, err := w.oboInboundSidecar(openShiftID, openShiftID)
 		require.NoError(t, err)
 		require.Equal(t, ptr.To(openShiftID), inbound.SecurityContext.RunAsUser)
 		require.Equal(t, ptr.To(openShiftID), inbound.SecurityContext.RunAsGroup)
-	})
-
-	t.Run("missing dataplane container", func(t *testing.T) {
-		_, err := w.oboInboundSidecar(corev1.Pod{})
-		require.ErrorContains(t, err, "consul-dataplane container not found")
 	})
 }
 
@@ -79,10 +71,9 @@ func TestOBOSidecarReadyURLDualStack(t *testing.T) {
 		ImageConsulOBOInbound:  "obo-inbound:test",
 		ImageConsulOBOOutbound: "obo-outbound:test",
 	}
-	pod := podWithDataplane(t, sidecarUserAndGroupID, sidecarUserAndGroupID, false)
-	inbound, err := w.oboInboundSidecar(pod)
+	inbound, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
 	require.NoError(t, err)
-	outbound, err := w.oboOutboundSidecar(pod)
+	outbound, err := w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
 	require.NoError(t, err)
 
 	require.Contains(t, inbound.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
@@ -158,6 +149,29 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 		require.NotContains(t, containers, constants.ConsulOBOOutboundContainerName)
 	})
 
+	t.Run("application container named consul-dataplane-metrics is ignored", func(t *testing.T) {
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		pod := aiPod()
+		pod.Spec.Containers = []corev1.Container{
+			{
+				Name:  "consul-dataplane-metrics",
+				Image: "app:test",
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser:  ptr.To(int64(1000)),
+					RunAsGroup: ptr.To(int64(1000)),
+				},
+			},
+			{Name: "web", Image: "app:test"},
+		}
+		containers := injectedContainers(t, w, pod)
+		dp := containers[sidecarContainer]
+		inbound := containers[constants.ConsulOBOInboundContainerName]
+		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), dp.SecurityContext.RunAsUser)
+		require.Equal(t, dp.SecurityContext.RunAsUser, inbound.SecurityContext.RunAsUser)
+		require.Equal(t, dp.SecurityContext.RunAsGroup, inbound.SecurityContext.RunAsGroup)
+		require.NotEqual(t, ptr.To(int64(1000)), inbound.SecurityContext.RunAsUser)
+	})
+
 	t.Run("openshift obo uid matches dataplane", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(true)))
 		w.EnableOpenShift = true
@@ -175,29 +189,6 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 		require.Equal(t, dp.SecurityContext.RunAsUser, outbound.SecurityContext.RunAsUser)
 		require.Equal(t, dp.SecurityContext.RunAsGroup, outbound.SecurityContext.RunAsGroup)
 	})
-}
-
-func podWithDataplane(t *testing.T, uid, group int64, init bool) corev1.Pod {
-	t.Helper()
-	dp := corev1.Container{
-		Name:  sidecarContainer,
-		Image: "dataplane:test",
-		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:  ptr.To(uid),
-			RunAsGroup: ptr.To(group),
-		},
-	}
-	pod := corev1.Pod{
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{Name: "web", Image: "app:test"}},
-		},
-	}
-	if init {
-		pod.Spec.InitContainers = []corev1.Container{dp}
-	} else {
-		pod.Spec.Containers = append(pod.Spec.Containers, dp)
-	}
-	return pod
 }
 
 func namespaceWithOpenShift(openShift bool) *corev1.Namespace {
