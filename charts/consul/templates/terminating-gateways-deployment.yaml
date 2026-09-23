@@ -191,7 +191,7 @@ spec:
           {{- end }}
           {{- if $root.Values.global.acls.manageSystemACLs }}
           - name: CONSUL_LOGIN_AUTH_METHOD
-            value: {{ template "consul.fullname" $root }}-k8s-component-auth-method
+            value: {{ template "consul.localComponentAuthMethodName" $root }}
           - name: CONSUL_LOGIN_DATACENTER
             value: {{ $root.Values.global.datacenter }}
           - name: CONSUL_LOGIN_META
@@ -311,7 +311,7 @@ spec:
           {{- if $root.Values.global.acls.manageSystemACLs }}
           - -credential-type=login
           - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
-          - -login-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method
+          - -login-auth-method={{ template "consul.localComponentAuthMethodName" $root }}
           {{- if $root.Values.global.adminPartitions.enabled }}
           - -login-partition={{ $root.Values.global.adminPartitions.name }}
           {{- end }}

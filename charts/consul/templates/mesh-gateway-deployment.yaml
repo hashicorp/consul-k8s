@@ -154,9 +154,9 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_LOGIN_AUTH_METHOD
           {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-          value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+          value: {{ template "consul.globalComponentAuthMethodName" . }}
           {{- else }}
-          value: {{ template "consul.fullname" . }}-k8s-component-auth-method
+          value: {{ template "consul.localComponentAuthMethodName" . }}
           {{- end }}
         - name: CONSUL_LOGIN_DATACENTER
           {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
@@ -298,10 +298,10 @@ spec:
         - -credential-type=login
         - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
         {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-        - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+        - -login-auth-method={{ template "consul.globalComponentAuthMethodName" . }}
         - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
         {{- else }}
-        - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method
+        - -login-auth-method={{ template "consul.localComponentAuthMethodName" . }}
         {{- end }}
         {{- if .Values.global.adminPartitions.enabled }}
         - -login-partition={{ .Values.global.adminPartitions.name }}

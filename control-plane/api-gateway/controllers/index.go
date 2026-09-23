@@ -11,7 +11,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -122,17 +121,17 @@ var indexes = []index{
 	},
 	{
 		name:        TCPRoute_GatewayIndex,
-		target:      &gwv1alpha2.TCPRoute{},
+		target:      &gwv1.TCPRoute{},
 		indexerFunc: gatewaysForTCPRoute,
 	},
 	{
 		name:        TCPRoute_ServiceIndex,
-		target:      &gwv1alpha2.TCPRoute{},
+		target:      &gwv1.TCPRoute{},
 		indexerFunc: servicesForTCPRoute,
 	},
 	{
 		name:        TCPRoute_MeshServiceIndex,
-		target:      &gwv1alpha2.TCPRoute{},
+		target:      &gwv1.TCPRoute{},
 		indexerFunc: meshServicesForTCPRoute,
 	},
 	{
@@ -239,8 +238,8 @@ func gatewaysForHTTPRoute(o client.Object) []string {
 }
 
 func gatewaysForTCPRoute(o client.Object) []string {
-	route := o.(*gwv1alpha2.TCPRoute)
-	statusRefs := common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1alpha2.RouteParentStatus) gwv1alpha2.ParentReference {
+	route := o.(*gwv1.TCPRoute)
+	statusRefs := common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1.RouteParentStatus) gwv1.ParentReference {
 		return parentStatus.ParentRef
 	})
 	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs, statusRefs)
@@ -287,7 +286,7 @@ func meshServicesForHTTPRoute(o client.Object) []string {
 }
 
 func servicesForTCPRoute(o client.Object) []string {
-	route := o.(*gwv1alpha2.TCPRoute)
+	route := o.(*gwv1.TCPRoute)
 	refs := []string{}
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
@@ -307,7 +306,7 @@ func servicesForTCPRoute(o client.Object) []string {
 }
 
 func meshServicesForTCPRoute(o client.Object) []string {
-	route := o.(*gwv1alpha2.TCPRoute)
+	route := o.(*gwv1.TCPRoute)
 	refs := []string{}
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
