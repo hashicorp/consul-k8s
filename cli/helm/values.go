@@ -113,6 +113,12 @@ type Acls struct {
 	BootstrapToken         BootstrapToken   `yaml:"bootstrapToken"`
 	CreateReplicationToken bool             `yaml:"createReplicationToken"`
 	ReplicationToken       ReplicationToken `yaml:"replicationToken"`
+	AuthMethod             AuthMethod       `yaml:"authMethod"`
+}
+
+type AuthMethod struct {
+	Name   string `yaml:"name"`
+	Create bool   `yaml:"create"`
 }
 
 type EnterpriseLicense struct {
