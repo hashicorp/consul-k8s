@@ -2564,6 +2564,187 @@ func TestRun_PrimaryDatacenter_ComponentAuthMethod(t *testing.T) {
 	require.NotNil(t, authMethod)
 }
 
+// Test that when auth method creation is disabled and the auth method has not been
+// pre-created, the command fails fast with an actionable error rather than retrying
+// binding rule creation until the timeout.
+func TestRun_ComponentAuthMethod_CreateDisabled_MissingAuthMethod(t *testing.T) {
+	t.Parallel()
+
+	k8s, testClient := completeSetup(t)
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-addresses", strings.Split(testClient.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testClient.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testClient.TestServer.GRPCAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-create-auth-methods=false",
+	}
+
+	// The command must fail fast rather than retrying binding rule creation until
+	// the timeout, so assert it returns well inside the configured timeout.
+	start := time.Now()
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 1, responseCode)
+	require.Less(t, time.Since(start), 30*time.Second)
+
+	// The auth method must not have been created.
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+	consulConfig := testClient.Cfg
+	consulConfig.APIClientConfig.Token = bootToken
+	consulClient, err := api.NewClient(consulConfig.APIClientConfig)
+	require.NoError(t, err)
+	authMethod, _, err := consulClient.ACL().AuthMethodRead(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.Nil(t, authMethod)
+
+	// No binding rules should have been written either.
+	rules, _, err := consulClient.ACL().BindingRuleList(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.Empty(t, rules)
+}
+
+// Test that when auth method creation is disabled and the auth methods have been
+// pre-created, the command succeeds and still manages the binding rules.
+func TestRun_ComponentAuthMethod_CreateDisabled_PreCreatedAuthMethod(t *testing.T) {
+	t.Parallel()
+
+	bootToken := "bca50e6c-1a1f-4c9b-8b1f-5a2b6b8b0d0a"
+	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+	caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
+
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testAgent.TestServer.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		_, _, err := consulClient.ACL().PolicyList(nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
+
+	// Pre-create the auth methods that the command is expected to consume.
+	componentAuthMethod := "preconfigured-k8s-component-auth-method"
+	connectAuthMethod := "preconfigured-k8s-auth-method"
+	for _, name := range []string{componentAuthMethod, connectAuthMethod} {
+		_, _, err = consulClient.ACL().AuthMethodCreate(&api.ACLAuthMethod{
+			Name: name,
+			Type: "kubernetes",
+			Config: map[string]interface{}{
+				"Host":              "https://kubernetes.default.svc",
+				"CACert":            caCert,
+				"ServiceAccountJWT": jwtToken,
+			},
+		}, &api.WriteOptions{})
+		require.NoError(t, err)
+	}
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+		backend:   &FakeSecretsBackend{bootstrapToken: bootToken},
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-addresses", strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-connect-inject",
+		"-create-auth-methods=false",
+		"-auth-method-name-prefix=preconfigured",
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	// Binding rules must still have been created against the pre-existing auth methods.
+	rules, _, err := consulClient.ACL().BindingRuleList(componentAuthMethod, &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, rules)
+
+	rules, _, err = consulClient.ACL().BindingRuleList(connectAuthMethod, &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, rules)
+}
+
+// Test that -auth-method-name-prefix renames the auth methods while keeping the
+// component and connect inject auth methods distinct from one another.
+func TestRun_AuthMethodNamePrefix(t *testing.T) {
+	t.Parallel()
+
+	k8s, testClient := completeSetup(t)
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-addresses", strings.Split(testClient.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testClient.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testClient.TestServer.GRPCAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-connect-inject",
+		"-auth-method-name-prefix=cluster-b",
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+	consulConfig := testClient.Cfg
+	consulConfig.APIClientConfig.Token = bootToken
+	consulClient, err := api.NewClient(consulConfig.APIClientConfig)
+	require.NoError(t, err)
+
+	// The component and connect inject auth methods must remain distinct so that
+	// the connect inject binding rule is not applied to Consul components.
+	componentAuthMethod, _, err := consulClient.ACL().AuthMethodRead("cluster-b-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, componentAuthMethod)
+
+	connectAuthMethod, _, err := consulClient.ACL().AuthMethodRead("cluster-b-k8s-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, connectAuthMethod)
+
+	// The default names must not have been created.
+	defaultAuthMethod, _, err := consulClient.ACL().AuthMethodRead(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.Nil(t, defaultAuthMethod)
+
+	// The connect inject auth method binds a service identity, the component auth
+	// method binds roles. They must not be mixed.
+	connectRules, _, err := consulClient.ACL().BindingRuleList("cluster-b-k8s-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.Len(t, connectRules, 1)
+	require.Equal(t, api.BindingRuleBindTypeService, connectRules[0].BindType)
+
+	componentRules, _, err := consulClient.ACL().BindingRuleList("cluster-b-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, componentRules)
+	for _, rule := range componentRules {
+		require.Equal(t, api.BindingRuleBindTypeRole, rule.BindType)
+	}
+}
+
 // Test that the local and global component auth methods gets created when run in the
 // secondary datacenter.
 func TestRun_SecondaryDatacenter_ComponentAuthMethod(t *testing.T) {

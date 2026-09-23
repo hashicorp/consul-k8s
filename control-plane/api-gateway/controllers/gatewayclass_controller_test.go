@@ -19,8 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -234,9 +232,8 @@ func TestGatewayClassReconciler(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := runtime.NewScheme()
 			require.NoError(t, clientgoscheme.AddToScheme(s))
-			require.NoError(t, gwv1alpha2.Install(s))
 			require.NoError(t, gwv1.Install(s))
-			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			objs := tc.k8sObjects

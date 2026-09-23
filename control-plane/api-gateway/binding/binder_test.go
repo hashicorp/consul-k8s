@@ -21,8 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	// gwv1beta1 replaced by gwv1.
 
 	"github.com/hashicorp/consul/api"
 
@@ -60,7 +58,7 @@ type resourceMapResources struct {
 	secrets                      []corev1.Secret
 	gateways                     []gwv1.Gateway
 	httpRoutes                   []gwv1.HTTPRoute
-	tcpRoutes                    []gwv1alpha2.TCPRoute
+	tcpRoutes                    []gwv1.TCPRoute
 	meshServices                 []v1alpha1.MeshService
 	services                     []types.NamespacedName
 	jwtProviders                 []*v1alpha1.JWTProvider
@@ -421,7 +419,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 		"gateway tcp route no finalizer": {
 			config: controlledBinder(BinderConfig{
 				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
-				TCPRoutes: []gwv1alpha2.TCPRoute{
+				TCPRoutes: []gwv1.TCPRoute{
 					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "TCPRoute",
@@ -430,9 +428,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "route",
 						},
-						Spec: gwv1alpha2.TCPRouteSpec{
-							CommonRouteSpec: gwv1alpha2.CommonRouteSpec{
-								ParentRefs: []gwv1alpha2.ParentReference{{
+						Spec: gwv1.TCPRouteSpec{
+							CommonRouteSpec: gwv1.CommonRouteSpec{
+								ParentRefs: []gwv1.ParentReference{{
 									Name: "gateway",
 								}},
 							},
@@ -474,15 +472,15 @@ func TestBinder_Lifecycle(t *testing.T) {
 		"gateway tcp route deleting": {
 			config: controlledBinder(BinderConfig{
 				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
-				TCPRoutes: []gwv1alpha2.TCPRoute{{
+				TCPRoutes: []gwv1.TCPRoute{{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "route",
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{common.GatewayFinalizer},
 					},
-					Spec: gwv1alpha2.TCPRouteSpec{
-						CommonRouteSpec: gwv1alpha2.CommonRouteSpec{
-							ParentRefs: []gwv1alpha2.ParentReference{{
+					Spec: gwv1.TCPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{{
 								Name: "gateway",
 							}},
 						},
@@ -499,15 +497,15 @@ func TestBinder_Lifecycle(t *testing.T) {
 				}},
 			},
 			expectedUpdates: []client.Object{
-				&gwv1alpha2.TCPRoute{
+				&gwv1.TCPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "route",
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{},
 					},
-					Spec: gwv1alpha2.TCPRouteSpec{
-						CommonRouteSpec: gwv1alpha2.CommonRouteSpec{
-							ParentRefs: []gwv1alpha2.ParentReference{{
+					Spec: gwv1.TCPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{{
 								Name: "gateway",
 							}},
 						},
@@ -582,7 +580,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 						}},
 					}),
 				},
-				TCPRoutes: []gwv1alpha2.TCPRoute{
+				TCPRoutes: []gwv1.TCPRoute{
 					testTCPRoute("tcp-route-one", []string{"gateway-deleted"}, nil),
 					testTCPRouteStatus("tcp-route-two", nil, []gwv1.RouteParentStatus{
 						{ParentRef: gwv1.ParentReference{Name: "gateway-deleted"}, ControllerName: testControllerName, Conditions: []metav1.Condition{
@@ -704,7 +702,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					},
 					Status: gwv1.HTTPRouteStatus{RouteStatus: gwv1.RouteStatus{Parents: []gwv1.RouteParentStatus{}}},
 				},
-				&gwv1alpha2.TCPRoute{
+				&gwv1.TCPRoute{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "TCPRoute",
 						APIVersion: "gateway.networking.k8s.io/v1",
@@ -713,14 +711,14 @@ func TestBinder_Lifecycle(t *testing.T) {
 						Name:       "tcp-route-one",
 						Finalizers: []string{},
 					},
-					Spec: gwv1alpha2.TCPRouteSpec{
-						CommonRouteSpec: gwv1alpha2.CommonRouteSpec{
+					Spec: gwv1.TCPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
 							ParentRefs: []gwv1.ParentReference{
 								{Name: "gateway-deleted"},
 							},
 						},
 					},
-					Status: gwv1alpha2.TCPRouteStatus{RouteStatus: gwv1.RouteStatus{Parents: []gwv1.RouteParentStatus{}}},
+					Status: gwv1.TCPRouteStatus{RouteStatus: gwv1.RouteStatus{Parents: []gwv1.RouteParentStatus{}}},
 				},
 				addClassConfig(gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1856,7 +1854,7 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 
 	for name, tt := range map[string]struct {
 		httpRoute             *gwv1.HTTPRoute
-		tcpRoute              *gwv1alpha2.TCPRoute
+		tcpRoute              *gwv1.TCPRoute
 		referenceGrants       []gwv1.ReferenceGrant
 		expectedStatusUpdates []client.Object
 	}{
@@ -2933,7 +2931,7 @@ func compareUpdates(t *testing.T, expected []client.Object, actual []client.Obje
 		if _, ok := o.(*gwv1.HTTPRoute); ok {
 			return false
 		}
-		if _, ok := o.(*gwv1alpha2.TCPRoute); ok {
+		if _, ok := o.(*gwv1.TCPRoute); ok {
 			return false
 		}
 		return true
@@ -3061,16 +3059,16 @@ func testHTTPRouteStatus(name string, services []string, parentStatuses []gwv1.R
 	return route
 }
 
-func testTCPRoute(name string, parents []string, services []string) gwv1alpha2.TCPRoute {
+func testTCPRoute(name string, parents []string, services []string) gwv1.TCPRoute {
 	var parentRefs []gwv1.ParentReference
-	var rules []gwv1alpha2.TCPRouteRule
+	var rules []gwv1.TCPRouteRule
 
 	for _, parent := range parents {
 		parentRefs = append(parentRefs, gwv1.ParentReference{Name: gwv1.ObjectName(parent)})
 	}
 
 	for _, service := range services {
-		rules = append(rules, gwv1alpha2.TCPRouteRule{
+		rules = append(rules, gwv1.TCPRouteRule{
 			BackendRefs: []gwv1.BackendRef{
 				{
 					BackendObjectReference: gwv1.BackendObjectReference{
@@ -3084,10 +3082,10 @@ func testTCPRoute(name string, parents []string, services []string) gwv1alpha2.T
 	tcpTypeMeta := metav1.TypeMeta{}
 	tcpTypeMeta.SetGroupVersionKind(gwv1.SchemeGroupVersion.WithKind("TCPRoute"))
 
-	return gwv1alpha2.TCPRoute{
+	return gwv1.TCPRoute{
 		TypeMeta:   tcpTypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{common.GatewayFinalizer}},
-		Spec: gwv1alpha2.TCPRouteSpec{
+		Spec: gwv1.TCPRouteSpec{
 			CommonRouteSpec: gwv1.CommonRouteSpec{
 				ParentRefs: parentRefs,
 			},
@@ -3096,10 +3094,10 @@ func testTCPRoute(name string, parents []string, services []string) gwv1alpha2.T
 	}
 }
 
-func testTCPRouteBackends(name, namespace string, services []gwv1.BackendObjectReference, parents []gwv1.ParentReference) *gwv1alpha2.TCPRoute {
-	var rules []gwv1alpha2.TCPRouteRule
+func testTCPRouteBackends(name, namespace string, services []gwv1.BackendObjectReference, parents []gwv1.ParentReference) *gwv1.TCPRoute {
+	var rules []gwv1.TCPRouteRule
 	for _, service := range services {
-		rules = append(rules, gwv1alpha2.TCPRouteRule{
+		rules = append(rules, gwv1.TCPRouteRule{
 			BackendRefs: []gwv1.BackendRef{
 				{BackendObjectReference: service},
 			},
@@ -3109,10 +3107,10 @@ func testTCPRouteBackends(name, namespace string, services []gwv1.BackendObjectR
 	tcpTypeMeta := metav1.TypeMeta{}
 	tcpTypeMeta.SetGroupVersionKind(gwv1.SchemeGroupVersion.WithKind("TCPRoute"))
 
-	return &gwv1alpha2.TCPRoute{
+	return &gwv1.TCPRoute{
 		TypeMeta:   tcpTypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Finalizers: []string{common.GatewayFinalizer}},
-		Spec: gwv1alpha2.TCPRouteSpec{
+		Spec: gwv1.TCPRouteSpec{
 			CommonRouteSpec: gwv1.CommonRouteSpec{
 				ParentRefs: parents,
 			},
@@ -3121,7 +3119,7 @@ func testTCPRouteBackends(name, namespace string, services []gwv1.BackendObjectR
 	}
 }
 
-func testTCPRouteStatusBackends(name, namespace string, services []gwv1.BackendObjectReference, parentStatuses []gwv1.RouteParentStatus) *gwv1alpha2.TCPRoute {
+func testTCPRouteStatusBackends(name, namespace string, services []gwv1.BackendObjectReference, parentStatuses []gwv1.RouteParentStatus) *gwv1.TCPRoute {
 	var parentRefs []gwv1.ParentReference
 
 	for _, parent := range parentStatuses {
@@ -3133,7 +3131,7 @@ func testTCPRouteStatusBackends(name, namespace string, services []gwv1.BackendO
 	return route
 }
 
-func testTCPRouteStatus(name string, services []string, parentStatuses []gwv1.RouteParentStatus, extraParents ...string) gwv1alpha2.TCPRoute {
+func testTCPRouteStatus(name string, services []string, parentStatuses []gwv1.RouteParentStatus, extraParents ...string) gwv1.TCPRoute {
 	parentRefs := extraParents
 
 	for _, parent := range parentStatuses {
