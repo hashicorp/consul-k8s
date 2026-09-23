@@ -828,7 +828,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		initEnv = setOrAppendEnv(
 			initEnv,
 			"CONSUL_LOGIN_AUTH_METHOD",
-			fmt.Sprintf("%s-k8s-component-auth-method", fullName),
+			helmvalues.LocalComponentAuthMethodName(helmConfigValues),
 		)
 	}
 
@@ -898,7 +898,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		dataplaneArgs = append(dataplaneArgs,
 			"-credential-type=login",
 			"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token",
-			fmt.Sprintf("-login-auth-method=%s-k8s-component-auth-method", fullName),
+			fmt.Sprintf("-login-auth-method=%s", helmvalues.LocalComponentAuthMethodName(helmConfigValues)),
 		)
 		if helmConfigValues.Global.AdminPartitions.Enabled {
 			dataplaneArgs = append(dataplaneArgs, fmt.Sprintf("-login-partition=%s", helmConfigValues.Global.AdminPartitions.Name))
@@ -1394,7 +1394,7 @@ func (r *TerminatingGatewayController) consulK8sConsulServerEnvVars(
 		envVars = append(envVars,
 			corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_AUTH_METHOD",
-				Value: fmt.Sprintf("%s-k8s-component-auth-method", helmvalues.ConsulFullName(helmConfigValues)),
+				Value: helmvalues.LocalComponentAuthMethodName(helmConfigValues),
 			},
 			corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_DATACENTER",
@@ -1482,7 +1482,7 @@ func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
 	fullName := helmvalues.ConsulFullName(helmValues)
 	gatewayName := defaultIfEmpty(termGW.Spec.Deployment.GatewayName, termGW.Name)
 	serviceAccountName := fmt.Sprintf("%s-%s", fullName, gatewayName)
-	authMethodName := fmt.Sprintf("%s-k8s-component-auth-method", fullName)
+	authMethodName := helmvalues.LocalComponentAuthMethodName(helmValues)
 
 	consulNamespace := r.terminatingGatewayConsulNamespace(termGW, helmValues)
 
