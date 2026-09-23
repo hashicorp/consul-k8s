@@ -79,6 +79,107 @@ func TestTranslateGatewayDefaults(t *testing.T) {
 		}
 		require.Nil(t, translator.translateGatewayDefaults(gateway))
 	})
+
+	t.Run("negative numeric values are ignored", func(t *testing.T) {
+		for _, key := range []string{
+			annotationDefaultMaxConnections,
+			annotationDefaultMaxPendingRequests,
+			annotationDefaultMaxConcurrentRequests,
+			annotationDefaultPHCMaxFailures,
+			annotationDefaultPHCEnforcingConsecutive5,
+			annotationDefaultPHCMaxEjectionPercent,
+		} {
+			gateway := gwv1.Gateway{}
+			gateway.Annotations = map[string]string{key: "-10"}
+			require.Nil(t, translator.translateGatewayDefaults(gateway), "expected %s=-10 to be ignored", key)
+		}
+	})
+
+	t.Run("negative durations are ignored", func(t *testing.T) {
+		for _, key := range []string{
+			annotationDefaultPHCInterval,
+			annotationDefaultPHCBaseEjectionTime,
+		} {
+			gateway := gwv1.Gateway{}
+			gateway.Annotations = map[string]string{key: "-10s"}
+			require.Nil(t, translator.translateGatewayDefaults(gateway), "expected %s=-10s to be ignored", key)
+		}
+	})
+
+	t.Run("out of range percentages are ignored", func(t *testing.T) {
+		for _, key := range []string{
+			annotationDefaultPHCEnforcingConsecutive5,
+			annotationDefaultPHCMaxEjectionPercent,
+		} {
+			gateway := gwv1.Gateway{}
+			gateway.Annotations = map[string]string{key: "101"}
+			require.Nil(t, translator.translateGatewayDefaults(gateway), "expected %s=101 to be ignored", key)
+		}
+	})
+
+	t.Run("a negative value does not discard the valid values alongside it", func(t *testing.T) {
+		gateway := gwv1.Gateway{}
+		gateway.Annotations = map[string]string{
+			annotationDefaultMaxConnections:     "-10",
+			annotationDefaultMaxPendingRequests: "100",
+		}
+		limits := translator.translateGatewayDefaults(gateway)
+		require.NotNil(t, limits)
+		require.Nil(t, limits.MaxConnections)
+		require.Equal(t, intPtr(100), limits.MaxPendingRequests)
+	})
+
+	t.Run("zero is a valid value", func(t *testing.T) {
+		gateway := gwv1.Gateway{}
+		gateway.Annotations = map[string]string{
+			annotationDefaultMaxConnections:        "0",
+			annotationDefaultPHCMaxEjectionPercent: "0",
+		}
+		limits := translator.translateGatewayDefaults(gateway)
+		require.NotNil(t, limits)
+		require.Equal(t, intPtr(0), limits.MaxConnections)
+		require.NotNil(t, limits.PassiveHealthCheck)
+		require.Equal(t, uint32Ptr(0), limits.PassiveHealthCheck.MaxEjectionPercent)
+	})
+
+	// Partial passive health check configuration: only one PHC annotation is set.
+	// The remaining fields stay at their zero value, which Consul/Envoy treat as
+	// "unset" so Envoy's own outlier detection defaults apply.
+	t.Run("only interval set leaves the other PHC fields unset", func(t *testing.T) {
+		gateway := gwv1.Gateway{}
+		gateway.Annotations = map[string]string{
+			annotationDefaultPHCInterval: "10s",
+		}
+
+		limits := translator.translateGatewayDefaults(gateway)
+		require.NotNil(t, limits)
+		require.Nil(t, limits.MaxConnections)
+		require.Nil(t, limits.MaxPendingRequests)
+		require.Nil(t, limits.MaxConcurrentRequests)
+
+		require.NotNil(t, limits.PassiveHealthCheck)
+		require.Equal(t, 10*time.Second, limits.PassiveHealthCheck.Interval)
+		require.Zero(t, limits.PassiveHealthCheck.MaxFailures)
+		require.Nil(t, limits.PassiveHealthCheck.EnforcingConsecutive5xx)
+		require.Nil(t, limits.PassiveHealthCheck.MaxEjectionPercent)
+		require.Nil(t, limits.PassiveHealthCheck.BaseEjectionTime)
+	})
+
+	t.Run("only max failures set leaves the other PHC fields unset", func(t *testing.T) {
+		gateway := gwv1.Gateway{}
+		gateway.Annotations = map[string]string{
+			annotationDefaultPHCMaxFailures: "5",
+		}
+
+		limits := translator.translateGatewayDefaults(gateway)
+		require.NotNil(t, limits)
+		require.NotNil(t, limits.PassiveHealthCheck)
+		require.Zero(t, limits.PassiveHealthCheck.Interval)
+		require.Equal(t, uint32(5), limits.PassiveHealthCheck.MaxFailures)
+		require.Nil(t, limits.PassiveHealthCheck.EnforcingConsecutive5xx)
+		require.Nil(t, limits.PassiveHealthCheck.MaxEjectionPercent)
+		require.Nil(t, limits.PassiveHealthCheck.BaseEjectionTime)
+	})
 }
 
 func TestToConsulUpstreamLimits(t *testing.T) {
@@ -117,6 +218,29 @@ func TestToConsulUpstreamLimits_NoPassiveHealthCheck(t *testing.T) {
 	limits := toConsulUpstreamLimits(spec)
 	require.Equal(t, intPtr(1), limits.MaxConnections)
 	require.Nil(t, limits.PassiveHealthCheck)
+}
+
+// A RouteUpstreamLimitsFilter that only sets one passive health check field must
+// leave the rest unset so Envoy applies its own outlier detection defaults.
+func TestToConsulUpstreamLimits_PartialPassiveHealthCheck(t *testing.T) {
+	t.Parallel()
+
+	spec := v1alpha1.RouteUpstreamLimitsFilterSpec{
+		PassiveHealthCheck: &v1alpha1.PassiveHealthCheck{
+			Interval: metav1.Duration{Duration: 10 * time.Second},
+		},
+	}
+
+	limits := toConsulUpstreamLimits(spec)
+	require.Nil(t, limits.MaxConnections)
+	require.Nil(t, limits.MaxPendingRequests)
+	require.Nil(t, limits.MaxConcurrentRequests)
+	require.NotNil(t, limits.PassiveHealthCheck)
+	require.Equal(t, 10*time.Second, limits.PassiveHealthCheck.Interval)
+	require.Zero(t, limits.PassiveHealthCheck.MaxFailures)
+	require.Nil(t, limits.PassiveHealthCheck.EnforcingConsecutive5xx)
+	require.Nil(t, limits.PassiveHealthCheck.MaxEjectionPercent)
+	require.Nil(t, limits.PassiveHealthCheck.BaseEjectionTime)
 }
 
 func TestTranslateBackendRefLimits(t *testing.T) {

@@ -111,7 +111,9 @@ func routeExtAuthzFromAnnotations(annotations map[string]string) *api.HTTPRouteE
 
 // Gateway annotations that configure the gateway-wide upstream limit defaults
 // (api-gateway Defaults *UpstreamLimits). Any unset annotation leaves the
-// corresponding field nil so Envoy falls back to its own default.
+// corresponding field nil so Envoy falls back to its own default. Annotations
+// are not covered by CRD schema validation, so values are range-checked here
+// and invalid values are ignored rather than propagated to Consul.
 const (
 	annotationDefaultMaxConnections        = "api-gateway.consul.hashicorp.com/default-max-connections"
 	annotationDefaultMaxPendingRequests    = "api-gateway.consul.hashicorp.com/default-max-pending-requests"
@@ -136,23 +138,17 @@ func (t ResourceTranslator) translateGatewayDefaults(gateway gwv1.Gateway) *api.
 	limits := &api.UpstreamLimits{}
 	set := false
 
-	if v, ok := annotations[annotationDefaultMaxConnections]; ok {
-		if n, err := strconv.Atoi(v); err == nil {
-			limits.MaxConnections = &n
-			set = true
-		}
+	if n, ok := parseNonNegativeInt(annotations, annotationDefaultMaxConnections); ok {
+		limits.MaxConnections = &n
+		set = true
 	}
-	if v, ok := annotations[annotationDefaultMaxPendingRequests]; ok {
-		if n, err := strconv.Atoi(v); err == nil {
-			limits.MaxPendingRequests = &n
-			set = true
-		}
+	if n, ok := parseNonNegativeInt(annotations, annotationDefaultMaxPendingRequests); ok {
+		limits.MaxPendingRequests = &n
+		set = true
 	}
-	if v, ok := annotations[annotationDefaultMaxConcurrentRequests]; ok {
-		if n, err := strconv.Atoi(v); err == nil {
-			limits.MaxConcurrentRequests = &n
-			set = true
-		}
+	if n, ok := parseNonNegativeInt(annotations, annotationDefaultMaxConcurrentRequests); ok {
+		limits.MaxConcurrentRequests = &n
+		set = true
 	}
 
 	if phc := t.translateGatewayDefaultPassiveHealthCheck(annotations); phc != nil {
@@ -170,43 +166,81 @@ func (t ResourceTranslator) translateGatewayDefaultPassiveHealthCheck(annotation
 	phc := &api.PassiveHealthCheck{}
 	set := false
 
-	if v, ok := annotations[annotationDefaultPHCInterval]; ok {
-		if d, err := time.ParseDuration(v); err == nil {
-			phc.Interval = d
-			set = true
-		}
+	if d, ok := parseNonNegativeDuration(annotations, annotationDefaultPHCInterval); ok {
+		phc.Interval = d
+		set = true
 	}
-	if v, ok := annotations[annotationDefaultPHCMaxFailures]; ok {
-		if n, err := strconv.ParseUint(v, 10, 32); err == nil {
-			phc.MaxFailures = uint32(n)
-			set = true
-		}
+	if n, ok := parseUint32(annotations, annotationDefaultPHCMaxFailures, maxUint32); ok {
+		phc.MaxFailures = n
+		set = true
 	}
-	if v, ok := annotations[annotationDefaultPHCEnforcingConsecutive5]; ok {
-		if n, err := strconv.ParseUint(v, 10, 32); err == nil {
-			val := uint32(n)
-			phc.EnforcingConsecutive5xx = &val
-			set = true
-		}
+	if n, ok := parseUint32(annotations, annotationDefaultPHCEnforcingConsecutive5, maxPercent); ok {
+		phc.EnforcingConsecutive5xx = &n
+		set = true
 	}
-	if v, ok := annotations[annotationDefaultPHCMaxEjectionPercent]; ok {
-		if n, err := strconv.ParseUint(v, 10, 32); err == nil {
-			val := uint32(n)
-			phc.MaxEjectionPercent = &val
-			set = true
-		}
+	if n, ok := parseUint32(annotations, annotationDefaultPHCMaxEjectionPercent, maxPercent); ok {
+		phc.MaxEjectionPercent = &n
+		set = true
 	}
-	if v, ok := annotations[annotationDefaultPHCBaseEjectionTime]; ok {
-		if d, err := time.ParseDuration(v); err == nil {
-			phc.BaseEjectionTime = &d
-			set = true
-		}
+	if d, ok := parseNonNegativeDuration(annotations, annotationDefaultPHCBaseEjectionTime); ok {
+		phc.BaseEjectionTime = &d
+		set = true
 	}
 
 	if !set {
 		return nil
 	}
 	return phc
+}
+
+const (
+	maxPercent = uint64(100)
+	maxUint32  = uint64(^uint32(0))
+)
+
+// parseNonNegativeInt reads an integer annotation. Values that are missing,
+// unparseable or negative are ignored so that an operator typo cannot push an
+// invalid config entry to Consul (Envoy rejects negative circuit-breaker
+// thresholds). The corresponding field is then left unset and Envoy's own
+// default applies.
+func parseNonNegativeInt(annotations map[string]string, key string) (int, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
+}
+
+// parseUint32 reads an unsigned integer annotation, ignoring values that are
+// unparseable, negative or greater than max.
+func parseUint32(annotations map[string]string, key string, max uint64) (uint32, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(v, 10, 32)
+	if err != nil || n > max {
+		return 0, false
+	}
+	return uint32(n), true
+}
+
+// parseNonNegativeDuration reads a duration annotation, ignoring values that are
+// unparseable or negative.
+func parseNonNegativeDuration(annotations map[string]string, key string) (time.Duration, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		return 0, false
+	}
+	return d, true
 }
 
 // toConsulUpstreamLimits converts a RouteUpstreamLimitsFilter spec into the
