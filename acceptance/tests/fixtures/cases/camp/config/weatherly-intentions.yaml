@@ -1,0 +1,50 @@
+# ServiceIntentions for weatherly — L7 policy (default-deny).
+#
+# Consul CRD equivalent of weatherly-intentions.hcl.
+#
+# Destination: weatherly (the MCP server for weather information).
+# Source:      ai-app.
+#
+# The interceptor (consul-mcp-gateway) stamps the x-mcp-* headers:
+#   x-mcp-method  — the MCP JSON-RPC method (tools/call, tools/list, …)
+#   x-mcp-tool    — the tool name (weather.current, weather.alerts, …)
+#
+# Policy:
+#   ALLOW  tools/call + weather.current or weather.alerts (read-only tools)
+#   ALLOW  tools/list, initialize, ping (MCP discovery/lifecycle)
+#   DENY   everything else from ai-app
+#   DENY   all other sources outright
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: weatherly
+  namespace: default
+spec:
+  destination:
+    name: weatherly
+  sources:
+    - name: ai-app
+      permissions:
+        # Allow curated read-only weather tool calls.
+        - action: allow
+          http:
+            pathExact: /mcp
+            header:
+              - name: x-mcp-method
+                exact: tools/call
+              - name: x-mcp-tool
+                regex: "^weather\\.(current|alerts)$"
+        # Allow MCP discovery / lifecycle methods.
+        - action: allow
+          http:
+            pathExact: /mcp
+            header:
+              - name: x-mcp-method
+                regex: "^(tools/list|initialize|ping)$"
+        # Catch-all: deny anything else from ai-app.
+        - action: deny
+          http:
+            pathExact: /mcp
+    # Any other source is denied outright.
+    - name: "*"
+      action: deny
