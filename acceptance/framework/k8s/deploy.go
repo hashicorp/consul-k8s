@@ -138,16 +138,6 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		output, err := RunKubectlAndGetOutputE(r, options, args...)
 		if expectSuccess {
-			if err != nil {
-				// Fast failure: if the pod or container does not exist or has already terminated,
-				// fail immediately instead of retrying for the full timeout.
-				errStr := err.Error()
-				if strings.Contains(errStr, "pods \""+sourceApp+"\" not found") ||
-					strings.Contains(errStr, "container not found") ||
-					strings.Contains(errStr, "not found") && strings.Contains(errStr, "NotFound") {
-					r.Fatalf("unrecoverable error executing curl in %s: %v", sourceApp, err)
-				}
-			}
 			require.NoError(r, err)
 			require.Contains(r, output, expectedOutput)
 		} else {
