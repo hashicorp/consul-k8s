@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/hashicorp/consul/api"
 
@@ -249,6 +248,6 @@ func (m mockReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTP
 	return true
 }
 
-func (m mockReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1.BackendRef) bool {
+func (m mockReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1.TCPRoute, backendRef gwv1.BackendRef) bool {
 	return true
 }
