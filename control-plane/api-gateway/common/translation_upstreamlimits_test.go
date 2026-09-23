@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -283,4 +284,97 @@ func TestTranslateBackendRefLimits(t *testing.T) {
 
 	// No matching filter returns nil.
 	require.Nil(t, translator.translateBackendRefLimits(nil, resources, namespace))
+}
+
+// recordingSink captures the log messages emitted while translating annotations
+// so we can assert that rejected values are reported to the operator rather
+// than silently dropped.
+type recordingSink struct {
+	logr.LogSink
+	entries *[]map[string]any
+}
+
+func (s recordingSink) Init(logr.RuntimeInfo) {}
+
+func (s recordingSink) Enabled(int) bool { return true }
+
+func (s recordingSink) WithValues(...any) logr.LogSink { return s }
+
+func (s recordingSink) WithName(string) logr.LogSink { return s }
+
+func (s recordingSink) Error(_ error, msg string, kv ...any) {
+	s.Info(0, msg, kv...)
+}
+
+func (s recordingSink) Info(_ int, msg string, kv ...any) {
+	entry := map[string]any{"msg": msg}
+	for i := 0; i+1 < len(kv); i += 2 {
+		key, ok := kv[i].(string)
+		if !ok {
+			continue
+		}
+		entry[key] = kv[i+1]
+	}
+	*s.entries = append(*s.entries, entry)
+}
+
+func TestTranslateGatewayDefaults_LogsRejectedValues(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		key    string
+		value  string
+		reason string
+	}{
+		"negative int":         {annotationDefaultMaxConnections, "-10", "value must not be negative"},
+		"unparseable int":      {annotationDefaultMaxConnections, "ten", "value must be an integer"},
+		"negative duration":    {annotationDefaultPHCInterval, "-10s", "duration must not be negative"},
+		"unparseable duration": {annotationDefaultPHCInterval, "ten seconds", `value must be a duration such as "10s"`},
+		"percent over 100":     {annotationDefaultPHCMaxEjectionPercent, "101", "value must not be greater than 100"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var entries []map[string]any
+			translator := ResourceTranslator{Logger: logr.New(recordingSink{entries: &entries})}
+
+			gateway := gwv1.Gateway{}
+			gateway.Annotations = map[string]string{tc.key: tc.value}
+
+			require.Nil(t, translator.translateGatewayDefaults(gateway))
+			require.Len(t, entries, 1)
+			require.Equal(t, "ignoring invalid api-gateway annotation value", entries[0]["msg"])
+			require.Equal(t, tc.key, entries[0]["annotation"])
+			require.Equal(t, tc.value, entries[0]["value"])
+			require.Equal(t, tc.reason, entries[0]["reason"])
+		})
+	}
+}
+
+func TestTranslateGatewayDefaults_ValidValuesAreNotLogged(t *testing.T) {
+	t.Parallel()
+
+	var entries []map[string]any
+	translator := ResourceTranslator{Logger: logr.New(recordingSink{entries: &entries})}
+
+	gateway := gwv1.Gateway{}
+	gateway.Annotations = map[string]string{
+		annotationDefaultMaxConnections: "40",
+		annotationDefaultPHCInterval:    "15s",
+		"unrelated":                     "value",
+	}
+
+	require.NotNil(t, translator.translateGatewayDefaults(gateway))
+	require.Empty(t, entries)
+}
+
+// The zero value of ResourceTranslator has no logger configured, which must not
+// panic when an invalid annotation is rejected.
+func TestTranslateGatewayDefaults_NilLoggerIsSafe(t *testing.T) {
+	t.Parallel()
+
+	gateway := gwv1.Gateway{}
+	gateway.Annotations = map[string]string{annotationDefaultMaxConnections: "-10"}
+
+	require.NotPanics(t, func() {
+		require.Nil(t, ResourceTranslator{}.translateGatewayDefaults(gateway))
+	})
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -28,6 +29,10 @@ type ResourceTranslator struct {
 	MirroringPrefix        string
 	ConsulPartition        string
 	Datacenter             string
+	// Logger is used to warn about annotation values that are ignored because
+	// they are malformed or out of range. The zero value is safe to use and
+	// discards all output.
+	Logger logr.Logger
 }
 
 func (t ResourceTranslator) NonNormalizedConfigEntryReference(kind string, id types.NamespacedName) api.ResourceReference {
@@ -138,15 +143,15 @@ func (t ResourceTranslator) translateGatewayDefaults(gateway gwv1.Gateway) *api.
 	limits := &api.UpstreamLimits{}
 	set := false
 
-	if n, ok := parseNonNegativeInt(annotations, annotationDefaultMaxConnections); ok {
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxConnections); ok {
 		limits.MaxConnections = &n
 		set = true
 	}
-	if n, ok := parseNonNegativeInt(annotations, annotationDefaultMaxPendingRequests); ok {
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxPendingRequests); ok {
 		limits.MaxPendingRequests = &n
 		set = true
 	}
-	if n, ok := parseNonNegativeInt(annotations, annotationDefaultMaxConcurrentRequests); ok {
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxConcurrentRequests); ok {
 		limits.MaxConcurrentRequests = &n
 		set = true
 	}
@@ -166,23 +171,23 @@ func (t ResourceTranslator) translateGatewayDefaultPassiveHealthCheck(annotation
 	phc := &api.PassiveHealthCheck{}
 	set := false
 
-	if d, ok := parseNonNegativeDuration(annotations, annotationDefaultPHCInterval); ok {
+	if d, ok := t.parseNonNegativeDuration(annotations, annotationDefaultPHCInterval); ok {
 		phc.Interval = d
 		set = true
 	}
-	if n, ok := parseUint32(annotations, annotationDefaultPHCMaxFailures, maxUint32); ok {
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCMaxFailures, maxUint32); ok {
 		phc.MaxFailures = n
 		set = true
 	}
-	if n, ok := parseUint32(annotations, annotationDefaultPHCEnforcingConsecutive5, maxPercent); ok {
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCEnforcingConsecutive5, maxPercent); ok {
 		phc.EnforcingConsecutive5xx = &n
 		set = true
 	}
-	if n, ok := parseUint32(annotations, annotationDefaultPHCMaxEjectionPercent, maxPercent); ok {
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCMaxEjectionPercent, maxPercent); ok {
 		phc.MaxEjectionPercent = &n
 		set = true
 	}
-	if d, ok := parseNonNegativeDuration(annotations, annotationDefaultPHCBaseEjectionTime); ok {
+	if d, ok := t.parseNonNegativeDuration(annotations, annotationDefaultPHCBaseEjectionTime); ok {
 		phc.BaseEjectionTime = &d
 		set = true
 	}
@@ -198,18 +203,32 @@ const (
 	maxUint32  = uint64(^uint32(0))
 )
 
+// rejectAnnotation warns that an annotation value was ignored. Ignoring rather
+// than failing the reconcile keeps a typo in an optional tuning annotation from
+// tearing down an otherwise healthy gateway, but the operator still gets a
+// signal in the controller logs instead of silently getting Envoy's defaults.
+func (t ResourceTranslator) rejectAnnotation(key, value, reason string) {
+	t.Logger.Info("ignoring invalid api-gateway annotation value",
+		"annotation", key, "value", value, "reason", reason)
+}
+
 // parseNonNegativeInt reads an integer annotation. Values that are missing,
 // unparseable or negative are ignored so that an operator typo cannot push an
 // invalid config entry to Consul (Envoy rejects negative circuit-breaker
 // thresholds). The corresponding field is then left unset and Envoy's own
 // default applies.
-func parseNonNegativeInt(annotations map[string]string, key string) (int, bool) {
+func (t ResourceTranslator) parseNonNegativeInt(annotations map[string]string, key string) (int, bool) {
 	v, ok := annotations[key]
 	if !ok {
 		return 0, false
 	}
 	n, err := strconv.Atoi(v)
-	if err != nil || n < 0 {
+	if err != nil {
+		t.rejectAnnotation(key, v, "value must be an integer")
+		return 0, false
+	}
+	if n < 0 {
+		t.rejectAnnotation(key, v, "value must not be negative")
 		return 0, false
 	}
 	return n, true
@@ -217,13 +236,18 @@ func parseNonNegativeInt(annotations map[string]string, key string) (int, bool) 
 
 // parseUint32 reads an unsigned integer annotation, ignoring values that are
 // unparseable, negative or greater than max.
-func parseUint32(annotations map[string]string, key string, max uint64) (uint32, bool) {
+func (t ResourceTranslator) parseUint32(annotations map[string]string, key string, max uint64) (uint32, bool) {
 	v, ok := annotations[key]
 	if !ok {
 		return 0, false
 	}
 	n, err := strconv.ParseUint(v, 10, 32)
-	if err != nil || n > max {
+	if err != nil {
+		t.rejectAnnotation(key, v, fmt.Sprintf("value must be an integer between 0 and %d", max))
+		return 0, false
+	}
+	if n > max {
+		t.rejectAnnotation(key, v, fmt.Sprintf("value must not be greater than %d", max))
 		return 0, false
 	}
 	return uint32(n), true
@@ -231,13 +255,18 @@ func parseUint32(annotations map[string]string, key string, max uint64) (uint32,
 
 // parseNonNegativeDuration reads a duration annotation, ignoring values that are
 // unparseable or negative.
-func parseNonNegativeDuration(annotations map[string]string, key string) (time.Duration, bool) {
+func (t ResourceTranslator) parseNonNegativeDuration(annotations map[string]string, key string) (time.Duration, bool) {
 	v, ok := annotations[key]
 	if !ok {
 		return 0, false
 	}
 	d, err := time.ParseDuration(v)
-	if err != nil || d < 0 {
+	if err != nil {
+		t.rejectAnnotation(key, v, "value must be a duration such as \"10s\"")
+		return 0, false
+	}
+	if d < 0 {
+		t.rejectAnnotation(key, v, "duration must not be negative")
 		return 0, false
 	}
 	return d, true
