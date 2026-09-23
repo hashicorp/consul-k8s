@@ -141,6 +141,7 @@ func TestAPIGateway_HeaderMatchInvert_Lifecycle(t *testing.T) {
 
 	filterGroup := gwv1.Group("consul.hashicorp.com")
 	filterKind := gwv1.Kind(v1alpha1.RouteHeaderMatchInvertFilterKind)
+	backendPort := gwv1.PortNumber(80)
 
 	route := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
@@ -170,6 +171,7 @@ func TestAPIGateway_HeaderMatchInvert_Lifecycle(t *testing.T) {
 						{BackendRef: gwv1.BackendRef{
 							BackendObjectReference: gwv1.BackendObjectReference{
 								Name: gwv1.ObjectName("static-server"),
+								Port: &backendPort,
 							},
 						}},
 					},
