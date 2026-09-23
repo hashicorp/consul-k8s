@@ -22,6 +22,54 @@ func IsAIAgent(pod corev1.Pod) bool {
 	return pod.Annotations[constants.AnnotationAIRole] == constants.AIAgentRole
 }
 
+// IsMCPServer returns true when the pod carries ai-role: mcp-server.
+// Such pods are registered in the Consul catalog with an AI.MCPServer block
+// so consul-enterprise xDS injects the mcp_router filter into their Envoy listener.
+func IsMCPServer(pod corev1.Pod) bool {
+	return pod.Annotations[constants.AnnotationAIRole] == "mcp-server"
+}
+
+// AIServiceFromMCPServerPod builds the *capi.AgentServiceAI block for a pod
+// annotated with ai-role: mcp-server. Values are resolved with a two-level
+// precedence: pod annotation wins over McpServerConfig CRD default.
+// The resulting block is stamped onto the Consul catalog registration so
+// consul-enterprise xDS sees the mcp-server role and injects the mcp_router
+// filter into the pod's Envoy inbound listener.
+func AIServiceFromMCPServerPod(pod corev1.Pod, defaults v1alpha1.McpServerDefaults) *capi.AgentServiceAI {
+	transport := pod.Annotations[constants.AnnotationAIMCPServerTransport]
+	if transport == "" {
+		transport = defaults.Transport
+	}
+	if transport == "" {
+		transport = "streamable-http"
+	}
+
+	path := pod.Annotations[constants.AnnotationAIMCPServerPath]
+	if path == "" {
+		path = defaults.Path
+	}
+	if path == "" {
+		path = "/mcp"
+	}
+
+	version := pod.Annotations[constants.AnnotationAIMCPServerProtocolVersion]
+	if version == "" {
+		version = defaults.ProtocolVersion
+	}
+	if version == "" {
+		version = "2025-03-26"
+	}
+
+	return &capi.AgentServiceAI{
+		Role: "mcp-server",
+		MCPServer: &capi.AgentAIMCPServer{
+			Transport:       transport,
+			Path:            path,
+			ProtocolVersion: version,
+		},
+	}
+}
+
 // IsInferenceModel returns true when the pod carries ai-role: inference-model.
 // Such pods are registered in the Consul catalog with an AI.InferenceModel block
 // so the InferenceGateway proxycfg discovers them as model upstreams.

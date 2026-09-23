@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -587,13 +588,15 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 	}
 	tags := consulTags(pod)
 
-	// If this pod is an AI agent, fetch the AgentConfig CRD and build the
-	// api.AgentServiceAI block so Consul receives the full ai{} block in the
-	// catalog registration (mcp port, interceptor port, HITL config).
-	// Port resolution follows the same 3-level precedence as the mesh webhook:
-	//   1. AgentConfig named by consul.hashicorp.com/ai-agent-config annotation
-	//   2. AgentConfig named "consul-ai-agent" (Helm-installed cluster default)
-	//   3. Built-in port constants as safety-net for zero values
+	// If this pod carries an AI role annotation, build the api.AgentServiceAI
+	// block so Consul receives the full ai{} block in the catalog registration.
+	// consul-enterprise xDS reads this block to inject the appropriate Envoy
+	// filters (mcp_router for mcp-server, inference ext_proc for inference-model,
+	// mcp egress listener for ai-agent).
+	//
+	// Port / field resolution precedence (later wins):
+	//   1. CRD defaults (AgentConfig / McpServerConfig) — Helm-installed cluster default
+	//   2. Pod annotations                              — per-service team override
 	var serviceAI *api.AgentServiceAI
 	switch {
 	case common.IsAIAgent(pod):
@@ -605,6 +608,20 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 			// Non-fatal: proceed without the AI block rather than blocking registration.
 			serviceAI = nil
 		}
+	case common.IsMCPServer(pod):
+		// Build the AI.MCPServer block from pod annotations + McpServerConfig CRD
+		// defaults so consul-enterprise xDS injects the mcp_router filter into this
+		// pod's Envoy inbound listener. Without this block the mcp_router is absent
+		// and every MCP tools/call returns 500.
+		mcpDefaults := v1alpha1.McpServerDefaults{}
+		var mcpCfg v1alpha1.McpServerConfig
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: "consul-mcp-server", Namespace: pod.Namespace}, &mcpCfg); err == nil {
+			mcpDefaults = mcpCfg.Spec.Defaults
+		} else {
+			r.Log.Info("McpServerConfig not found, using built-in defaults for mcp-server registration",
+				"pod", pod.Name, "namespace", pod.Namespace)
+		}
+		serviceAI = common.AIServiceFromMCPServerPod(pod, mcpDefaults)
 	case common.IsInferenceModel(pod):
 		// Build the AI.InferenceModel block from pod annotations so the
 		// InferenceGateway proxycfg discovers this service as a model upstream

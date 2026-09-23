@@ -2,62 +2,83 @@
 {{- if .Values.ai.inferenceGateway.gateways }}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
+#
+# This ConfigMap holds the InferenceGateway CR manifests rendered from values.yaml.
+# The ai-inference-gateways-job reads this ConfigMap and runs `kubectl apply`
+# so the CRs are created/updated idempotently without Helm ever deleting them.
 
 {{- $root := . }}
 {{- $defaults := .Values.ai.inferenceGateway.defaults }}
 {{- $image := .Values.ai.inferenceGateway.image }}
 
-{{- range .Values.ai.inferenceGateway.gateways }}
----
-apiVersion: consul.hashicorp.com/v1alpha1
-kind: InferenceGateway
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: {{ .name }}
-  namespace: {{ $root.Release.Namespace }}
+  name: {{ template "consul.fullname" . }}-inference-gateways-manifests
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-failed
   labels:
-    app: {{ template "consul.name" $root }}
-    chart: {{ template "consul.chart" $root }}
-    heritage: {{ $root.Release.Service }}
-    release: {{ $root.Release.Name }}
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
     component: inference-gateway
-spec:
-  poolRef:
-    name: {{ if .poolRef }}{{ default .name .poolRef.name }}{{ else }}{{ .name }}{{ end }}
-  image: {{ default $image .image | quote }}
-  replicas: {{ default $defaults.replicas .replicas }}
-  {{- $svc := default $defaults.service .service }}
-  {{- if $svc }}
-  service:
-    type: {{ default "ClusterIP" $svc.type }}
-    {{- if $svc.ports }}
-    ports:
-      {{- range $svc.ports }}
-      - port: {{ .port }}
+data:
+  manifests.yaml: |
+    {{- range .Values.ai.inferenceGateway.gateways }}
+    ---
+    apiVersion: consul.hashicorp.com/v1alpha1
+    kind: InferenceGateway
+    metadata:
+      name: {{ .name }}
+      namespace: {{ $root.Release.Namespace }}
+      labels:
+        app: {{ template "consul.name" $root }}
+        chart: {{ template "consul.chart" $root }}
+        heritage: {{ $root.Release.Service }}
+        release: {{ $root.Release.Name }}
+        component: inference-gateway
+    spec:
+      poolRef:
+        name: {{ if .poolRef }}{{ default .name .poolRef.name }}{{ else }}{{ .name }}{{ end }}
+      image: {{ default $image .image | quote }}
+      replicas: {{ default $defaults.replicas .replicas }}
+      {{- $svc := default $defaults.service .service }}
+      {{- if $svc }}
+      service:
+        type: {{ default "ClusterIP" $svc.type }}
+        {{- if $svc.ports }}
+        ports:
+          {{- range $svc.ports }}
+          - port: {{ .port }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- $res := default $defaults.resources .resources }}
+      {{- if $res }}
+      resources:
+        {{- if $res.requests }}
+        requests:
+          {{- if $res.requests.memory }}
+          memory: {{ $res.requests.memory | quote }}
+          {{- end }}
+          {{- if $res.requests.cpu }}
+          cpu: {{ $res.requests.cpu | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if $res.limits }}
+        limits:
+          {{- if $res.limits.memory }}
+          memory: {{ $res.limits.memory | quote }}
+          {{- end }}
+          {{- if $res.limits.cpu }}
+          cpu: {{ $res.limits.cpu | quote }}
+          {{- end }}
+        {{- end }}
       {{- end }}
     {{- end }}
-  {{- end }}
-  {{- $res := default $defaults.resources .resources }}
-  {{- if $res }}
-  resources:
-    {{- if $res.requests }}
-    requests:
-      {{- if $res.requests.memory }}
-      memory: {{ $res.requests.memory | quote }}
-      {{- end }}
-      {{- if $res.requests.cpu }}
-      cpu: {{ $res.requests.cpu | quote }}
-      {{- end }}
-    {{- end }}
-    {{- if $res.limits }}
-    limits:
-      {{- if $res.limits.memory }}
-      memory: {{ $res.limits.memory | quote }}
-      {{- end }}
-      {{- if $res.limits.cpu }}
-      cpu: {{ $res.limits.cpu | quote }}
-      {{- end }}
-    {{- end }}
-  {{- end }}
-{{- end }}
 {{- end }}
 {{- end }}
