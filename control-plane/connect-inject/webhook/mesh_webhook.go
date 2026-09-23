@@ -485,40 +485,45 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// 	pod.Spec.Containers = append(pod.Spec.Containers, mcpContainer)
 	// }
 
-	// Inject the mcp-gateway sidecar when the pod requests it via annotation and
-	// the webhook has an image configured.
-	//
-	// Port and resource defaults are resolved with a 3-level precedence:
-	//   1. consul.hashicorp.com/ai-agent-config annotation — names a custom
-	//      AgentConfig object in the pod's namespace; use when a team needs
-	//      settings that differ from the cluster default.
-	//   2. "consul-ai-agent" AgentConfig object — the cluster-wide default
-	//      installed by Helm; always present when ai.enabled=true.
-	//   3. Per-pod annotations (e.g. consul.hashicorp.com/ai-agent-hitl-port)
-	//      override individual ports after the CRD defaults are resolved.
-	if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == constants.AIAgentRole && w.ImageAIAgent != "" {
-		agentDefaults := v1alpha1.AgentDefaults{}
-		if w.Client != nil {
-			// Determine which AgentConfig object to read.
-			// Falls back to the Helm-installed "consul-ai-agent" when the
-			// per-pod annotation is absent.
-			configName := "consul-ai-agent"
-			if annotationName := pod.Annotations[constants.AnnotationAIAgentConfig]; annotationName != "" {
-				configName = annotationName
-			}
+	// ai-agent pods get the identity-plane sidecars from the AI role.
+	// mcp-gateway stays optional (only when its image is configured).
+	// OBO inbound/outbound are required: the dataplane credential broker and
+	// Envoy OBO filters are also gated on the role, so skipping them when the
+	// MCP image is unset would leave Envoy dialing sidecars that were never
+	// added. A missing OBO image fails admission.
+	if common.IsAIAgent(pod) {
+		if w.ImageAIAgent != "" {
+			// Port and resource defaults are resolved with a 3-level precedence:
+			//   1. consul.hashicorp.com/ai-agent-config annotation — names a custom
+			//      AgentConfig object in the pod's namespace; use when a team needs
+			//      settings that differ from the cluster default.
+			//   2. "consul-ai-agent" AgentConfig object — the cluster-wide default
+			//      installed by Helm; always present when ai.enabled=true.
+			//   3. Per-pod annotations (e.g. consul.hashicorp.com/ai-agent-hitl-port)
+			//      override individual ports after the CRD defaults are resolved.
+			agentDefaults := v1alpha1.AgentDefaults{}
+			if w.Client != nil {
+				// Determine which AgentConfig object to read.
+				// Falls back to the Helm-installed "consul-ai-agent" when the
+				// per-pod annotation is absent.
+				configName := "consul-ai-agent"
+				if annotationName := pod.Annotations[constants.AnnotationAIAgentConfig]; annotationName != "" {
+					configName = annotationName
+				}
 
-			var agentCfg v1alpha1.AgentConfig
-			if err := w.Client.Get(ctx, client.ObjectKey{Name: configName, Namespace: req.Namespace}, &agentCfg); err == nil {
-				agentDefaults = agentCfg.Spec.Defaults
-			} else {
-				w.Log.Info("AgentConfig not found, continuing with zero defaults; per-pod annotations or built-in constants will apply",
-					"name", configName, "namespace", req.Namespace)
+				var agentCfg v1alpha1.AgentConfig
+				if err := w.Client.Get(ctx, client.ObjectKey{Name: configName, Namespace: req.Namespace}, &agentCfg); err == nil {
+					agentDefaults = agentCfg.Spec.Defaults
+				} else {
+					w.Log.Info("AgentConfig not found, continuing with zero defaults; per-pod annotations or built-in constants will apply",
+						"name", configName, "namespace", req.Namespace)
+				}
 			}
+			agentContainer := w.aiAgentSidecar(pod, agentDefaults)
+			pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
 		}
-		agentContainer := w.aiAgentSidecar(pod, agentDefaults)
-		pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
 
-		// OBO identity plane (ai-agent only): envelope UDS + Local Credential Broker.
+		// OBO identity plane: envelope UDS + Local Credential Broker.
 		// consul-obo-outbound is not an SDS/xDS client.
 		oboInbound, err := w.oboInboundSidecar(pod)
 		if err != nil {
@@ -528,7 +533,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 		pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
 
-		oboOutbound, err := w.oboOutboundSidecar(*ns, pod)
+		oboOutbound, err := w.oboOutboundSidecar(pod)
 		if err != nil {
 			w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError,

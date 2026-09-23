@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -180,16 +181,40 @@ func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *
 // oboInboundSidecar builds consul-obo-inbound for ai-agent pods.
 // Listens on loopback :21102; envelope + broker UDS for split-knowledge credentials.
 // Verify-only — no private key material in this process beyond envelope decrypt.
-func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) {
-	image := w.ImageConsulOBOInbound
-	if image == "" {
+func (w *MeshWebhook) oboInboundSidecar(pod corev1.Pod) (corev1.Container, error) {
+	if w.ImageConsulOBOInbound == "" {
 		return corev1.Container{}, fmt.Errorf(
 			"ImageConsulOBOInbound must be set for ai-agent pods; " +
 				"configure ai.obo.inbound.image (or -consul-obo-inbound-image)")
 	}
+	return w.oboSidecar(pod, constants.ConsulOBOInboundContainerName, w.ImageConsulOBOInbound, constants.DefaultOBOInboundBinary, constants.DefaultOBOInboundPort)
+}
+
+// oboOutboundSidecar builds consul-obo-outbound for ai-agent pods.
+// Listens on loopback :21103; RFC 8693 exchange after envelope decrypt via broker.
+// Not an SDS/xDS client — envelope UDS + Local Credential Broker only.
+func (w *MeshWebhook) oboOutboundSidecar(pod corev1.Pod) (corev1.Container, error) {
+	if w.ImageConsulOBOOutbound == "" {
+		return corev1.Container{}, fmt.Errorf(
+			"ImageConsulOBOOutbound must be set for ai-agent pods; " +
+				"configure ai.obo.outbound.image (or -consul-obo-outbound-image)")
+	}
+	return w.oboSidecar(pod, constants.ConsulOBOOutboundContainerName, w.ImageConsulOBOOutbound, constants.DefaultOBOOutboundBinary, constants.DefaultOBOOutboundPort)
+}
+
+func (w *MeshWebhook) oboSidecar(pod corev1.Pod, name, image, binary string, port int) (corev1.Container, error) {
+	uid, group, err := dataplaneRunAs(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
+	// Listen address stays 127.0.0.1. xDS OBO clusters dial that address.
+	// Only the Envoy admin readiness URL follows the dual-stack bind.
+	readyHost := constants.Getv4orv6Str("127.0.0.1", "::1")
+	readyURL := "http://" + net.JoinHostPort(readyHost, strconv.Itoa(constants.DefaultEnvoyAdminPort)) + "/ready"
 
 	return corev1.Container{
-		Name:            constants.ConsulOBOInboundContainerName,
+		Name:            name,
 		Image:           image,
 		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Resources:       w.DefaultConsulSidecarResources,
@@ -200,18 +225,18 @@ func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) 
 				ReadOnly:  true,
 			},
 		},
-		Command: []string{constants.DefaultOBOInboundBinary},
+		Command: []string{binary},
 		Args: []string{
 			"--addr",
-			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOInboundPort)),
+			net.JoinHostPort("127.0.0.1", strconv.Itoa(port)),
 			"--log-level=info",
 			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
 			"--broker-uds=/consul/connect-inject/credential-broker.sock",
-			fmt.Sprintf("--dataplane-ready-url=http://127.0.0.1:%d/ready",
-				constants.DefaultEnvoyAdminPort),
+			"--dataplane-ready-url=" + readyURL,
 		},
 		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+			RunAsUser:                ptr.To(uid),
+			RunAsGroup:               ptr.To(group),
 			RunAsNonRoot:             ptr.To(true),
 			AllowPrivilegeEscalation: ptr.To(false),
 			ReadOnlyRootFilesystem:   ptr.To(true),
@@ -225,50 +250,21 @@ func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) 
 	}, nil
 }
 
-// oboOutboundSidecar builds consul-obo-outbound for ai-agent pods.
-// Listens on loopback :21103; RFC 8693 exchange after envelope decrypt via broker.
-// Not an SDS/xDS client — envelope UDS + Local Credential Broker only.
-func (w *MeshWebhook) oboOutboundSidecar(_ corev1.Namespace, _ corev1.Pod) (corev1.Container, error) {
-	image := w.ImageConsulOBOOutbound
-	if image == "" {
-		return corev1.Container{}, fmt.Errorf(
-			"ImageConsulOBOOutbound must be set for ai-agent pods; " +
-				"configure ai.obo.outbound.image (or -consul-obo-outbound-image)")
+// dataplaneRunAs returns the user and group already assigned to the injected
+// consul-dataplane container. OBO must use those IDs: the credential broker
+// accepts a peer only when SO_PEERCRED matches the dataplane process, and on
+// OpenShift that UID comes from the namespace range rather than 5995.
+func dataplaneRunAs(pod corev1.Pod) (int64, int64, error) {
+	for _, containers := range [][]corev1.Container{pod.Spec.Containers, pod.Spec.InitContainers} {
+		for _, c := range containers {
+			if c.Name != sidecarContainer && !strings.HasPrefix(c.Name, sidecarContainer+"-") {
+				continue
+			}
+			if c.SecurityContext == nil || c.SecurityContext.RunAsUser == nil || c.SecurityContext.RunAsGroup == nil {
+				return 0, 0, fmt.Errorf("consul-dataplane container %q is missing runAsUser/runAsGroup", c.Name)
+			}
+			return *c.SecurityContext.RunAsUser, *c.SecurityContext.RunAsGroup, nil
+		}
 	}
-
-	return corev1.Container{
-		Name:            constants.ConsulOBOOutboundContainerName,
-		Image:           image,
-		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
-		Resources:       w.DefaultConsulSidecarResources,
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
-				ReadOnly:  true,
-			},
-		},
-		Command: []string{constants.DefaultOBOOutboundBinary},
-		Args: []string{
-			"--addr",
-			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOOutboundPort)),
-			"--log-level=info",
-			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
-			"--broker-uds=/consul/connect-inject/credential-broker.sock",
-			fmt.Sprintf("--dataplane-ready-url=http://127.0.0.1:%d/ready",
-				constants.DefaultEnvoyAdminPort),
-		},
-		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
-			RunAsNonRoot:             ptr.To(true),
-			AllowPrivilegeEscalation: ptr.To(false),
-			ReadOnlyRootFilesystem:   ptr.To(true),
-			SeccompProfile: &corev1.SeccompProfile{
-				Type: corev1.SeccompProfileTypeRuntimeDefault,
-			},
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-		},
-	}, nil
+	return 0, 0, fmt.Errorf("consul-dataplane container not found; cannot assign OBO runAsUser")
 }
