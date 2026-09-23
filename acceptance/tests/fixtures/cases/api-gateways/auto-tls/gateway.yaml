@@ -21,6 +21,12 @@ spec:
     name: https
     tls:
       mode: Terminate
+      # No certificateRefs: the leaf cert is issued by Consul Connect. Gateway
+      # API >= v1.4 CRDs enforce that a Terminate listener sets certificateRefs
+      # or options, so pin the (default) TLS_AUTO minimum version to satisfy
+      # that rule without altering the gateway's TLS behaviour.
+      options:
+        api-gateway.consul.hashicorp.com/tls_min_version: "TLS_AUTO"
     allowedRoutes:
       namespaces:
         from: "All"
