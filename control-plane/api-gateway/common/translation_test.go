@@ -2321,13 +2321,13 @@ func TestResolveListenerProtocol(t *testing.T) {
 	}
 
 	tests := []struct {
-		name             string
+		name               string
 		gatewayAnnotations map[string]string
-		listener         gwv1.Listener
-		wantProtocol     string
+		listener           gwv1.Listener
+		wantProtocol       string
 	}{
 		{
-			name:         "grpc annotation overrides HTTP listener protocol",
+			name: "grpc annotation overrides HTTP listener protocol",
 			gatewayAnnotations: map[string]string{
 				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "grpc",
 			},
@@ -2335,7 +2335,7 @@ func TestResolveListenerProtocol(t *testing.T) {
 			wantProtocol: "grpc",
 		},
 		{
-			name:         "http2 annotation overrides HTTP listener protocol",
+			name: "http2 annotation overrides HTTP listener protocol",
 			gatewayAnnotations: map[string]string{
 				ListenerProtocolAnnotationPrefix + "h2" + ListenerProtocolAnnotationSuffix: "http2",
 			},
@@ -2343,7 +2343,7 @@ func TestResolveListenerProtocol(t *testing.T) {
 			wantProtocol: "http2",
 		},
 		{
-			name:         "annotation is case-insensitive",
+			name: "annotation is case-insensitive",
 			gatewayAnnotations: map[string]string{
 				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "GRPC",
 			},
@@ -2351,7 +2351,7 @@ func TestResolveListenerProtocol(t *testing.T) {
 			wantProtocol: "grpc",
 		},
 		{
-			name:         "invalid annotation value falls back to protocol map",
+			name: "invalid annotation value falls back to protocol map",
 			gatewayAnnotations: map[string]string{
 				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "invalid-protocol",
 			},
@@ -2374,7 +2374,7 @@ func TestResolveListenerProtocol(t *testing.T) {
 			wantProtocol: "tcp",
 		},
 		{
-			name:         "annotation on different section does not affect this listener",
+			name: "annotation on different section does not affect this listener",
 			gatewayAnnotations: map[string]string{
 				ListenerProtocolAnnotationPrefix + "other-listener" + ListenerProtocolAnnotationSuffix: "grpc",
 			},

@@ -9,13 +9,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
-	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -100,17 +98,6 @@ func TestAPIGateway_MultiListenerProtocol(t *testing.T) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	k8sOpts := ctx.KubectlOptions(t)
 	ns := k8sOpts.Namespace
-
-	// The dev OSS binary always registers a watch for routeextprocs.consul.hashicorp.com
-	// but the Helm chart only creates that CRD for enterprise installs.  Without it the
-	// gateway-v1 controller loops forever trying to list the missing resource and never
-	// starts its workers, so Gateways are never reconciled.  Apply a minimal stub CRD
-	// immediately after the Helm install so the controller can start cleanly.
-	applyRouteExtProcCRDStub(t, k8sOpts)
-
-	// Bounce the connect-injector (which hosts the gateway controller) so it
-	// picks up the newly-registered CRD and starts its gateway-v1 workers.
-	bounceConnectInjector(t, k8sOpts, releaseName)
 
 	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 
@@ -731,59 +718,4 @@ func listenerNames(gwEntry *api.APIGatewayConfigEntry) []string {
 		names[i] = l.Name
 	}
 	return names
-}
-
-// applyRouteExtProcCRDStub applies a minimal stub CRD for
-// routeextprocs.consul.hashicorp.com.  The Helm chart only installs this CRD
-// for enterprise, but the OSS dev binary always registers a watch for it.
-// Without the CRD the gateway-v1 controller never starts its workers.
-func applyRouteExtProcCRDStub(t *testing.T, k8sOpts *terratestk8s.KubectlOptions) {
-	t.Helper()
-	const stubCRD = `
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: routeextprocs.consul.hashicorp.com
-spec:
-  group: consul.hashicorp.com
-  names:
-    kind: RouteExtProc
-    listKind: RouteExtProcList
-    plural: routeextprocs
-    singular: routeextproc
-  scope: Namespaced
-  versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          x-kubernetes-preserve-unknown-fields: true
-`
-	tmpFile, err := os.CreateTemp("", "routeextproc-crd-*.yaml")
-	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
-	_, err = tmpFile.WriteString(stubCRD)
-	require.NoError(t, err)
-	require.NoError(t, tmpFile.Close())
-
-	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOpts, "apply", "-f", tmpFile.Name())
-	require.NoError(t, err, "failed to apply RouteExtProc CRD stub: %s", out)
-	logger.Log(t, "routeextprocs CRD stub applied")
-}
-
-// bounceConnectInjector restarts the connect-injector deployment (which hosts
-// the gateway-v1 controller) so it picks up the newly-registered CRD and
-// starts its gateway workers, then waits for the rollout to complete.
-func bounceConnectInjector(t *testing.T, k8sOpts *terratestk8s.KubectlOptions, releaseName string) {
-	t.Helper()
-	deployName := releaseName + "-consul-connect-injector"
-	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOpts,
-		"rollout", "restart", "deployment/"+deployName)
-	require.NoError(t, err, "failed to restart connect-injector: %s", out)
-	out, err = k8s.RunKubectlAndGetOutputE(t, k8sOpts,
-		"rollout", "status", "deployment/"+deployName, "--timeout=120s")
-	require.NoError(t, err, "connect-injector rollout did not complete: %s", out)
-	logger.Log(t, "connect-injector restarted and ready")
 }

@@ -1904,7 +1904,7 @@ func TestOrphanedProtocolAnnotations(t *testing.T) {
 			gateway: mkGW(
 				map[string]string{
 					// "grpc-listner" (missing 'e') does not match listener "grpc-listener"
-					pfx + "grpc-listner" + sfx: "grpc",
+					pfx + "grpc-listner" + sfx:  "grpc",
 					pfx + "http-listener" + sfx: "http",
 				},
 				"http-listener", "grpc-listener",
@@ -1916,7 +1916,7 @@ func TestOrphanedProtocolAnnotations(t *testing.T) {
 			gateway: mkGW(
 				map[string]string{
 					// old-listener was removed but annotation was not cleaned up
-					pfx + "old-listener" + sfx: "grpc",
+					pfx + "old-listener" + sfx:  "grpc",
 					pfx + "http-listener" + sfx: "http",
 				},
 				"http-listener",
@@ -1956,6 +1956,28 @@ func TestOrphanedProtocolAnnotations(t *testing.T) {
 				pfx + "grpc-lstener" + sfx,
 				pfx + "stale-listener" + sfx,
 			},
+		},
+		{
+			name: "prefix/suffix overlapping key with no section name is skipped",
+			gateway: mkGW(
+				map[string]string{
+					// "api-gateway.consul.hashicorp.com/listener-protocol" has both
+					// the prefix and the suffix but no section name between them.
+					// It must not panic and must not be reported as an orphan.
+					"api-gateway.consul.hashicorp.com/listener-protocol": "grpc",
+					pfx + "http-listener" + sfx:                          "http",
+				},
+				"http-listener",
+			),
+			wantOrphans: nil,
+		},
+		{
+			name: "key with empty section name is skipped",
+			gateway: mkGW(
+				map[string]string{pfx + sfx: "grpc"},
+				"http-listener",
+			),
+			wantOrphans: nil,
 		},
 	}
 

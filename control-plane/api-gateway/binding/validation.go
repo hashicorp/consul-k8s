@@ -526,6 +526,13 @@ func orphanedProtocolAnnotations(gateway gwv1.Gateway) []string {
 		if !strings.HasSuffix(key, common.ListenerProtocolAnnotationSuffix) {
 			continue
 		}
+		// Guard against keys that are too short to contain a section name
+		// between the prefix and suffix, e.g. the prefix and suffix overlapping
+		// in "api-gateway.consul.hashicorp.com/listener-protocol".  Slicing
+		// those would panic, and they carry no section name to orphan.
+		if len(key) <= len(common.ListenerProtocolAnnotationPrefix)+len(common.ListenerProtocolAnnotationSuffix) {
+			continue
+		}
 		// Extract the embedded section name between the prefix and suffix.
 		inner := key[len(common.ListenerProtocolAnnotationPrefix) : len(key)-len(common.ListenerProtocolAnnotationSuffix)]
 		if _, ok := known[inner]; !ok {

@@ -78,7 +78,7 @@ func (noopReferenceValidator) GatewayCanReferenceSecret(_ gwv1.Gateway, _ gwv1.S
 func (noopReferenceValidator) HTTPRouteCanReferenceBackend(_ gwv1.HTTPRoute, _ gwv1.BackendRef) bool {
 	return true
 }
-func (noopReferenceValidator) TCPRouteCanReferenceBackend(_ gwv1alpha2.TCPRoute, _ gwv1alpha2.BackendRef) bool {
+func (noopReferenceValidator) TCPRouteCanReferenceBackend(_ gwv1.TCPRoute, _ gwv1.BackendRef) bool {
 	return true
 }
 
