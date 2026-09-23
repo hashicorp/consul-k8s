@@ -27,7 +27,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -413,48 +412,6 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 }
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.
-// hasListenerProtocolAnnotation reports whether obj carries at least one
-// api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol annotation.
-func hasListenerProtocolAnnotation(obj client.Object) bool {
-	if obj == nil {
-		return false
-	}
-	for key := range obj.GetAnnotations() {
-		if strings.HasPrefix(key, common.ListenerProtocolAnnotationPrefix) &&
-			strings.HasSuffix(key, common.ListenerProtocolAnnotationSuffix) {
-			return true
-		}
-	}
-	return false
-}
-
-// listenerProtocolAnnotationPredicate admits Gateway events that concern the
-// listener-protocol annotation.
-//
-// Update is deliberately checked against BOTH the old and the new object. The
-// removal of the last listener-protocol annotation is exactly the case where the
-// new object no longer has one, and it still has to be reconciled so the Consul
-// listener reverts to http; looking only at the new object would leave the
-// gateway stranded on the previous protocol with no way for an operator to
-// change it back.
-func listenerProtocolAnnotationPredicate() predicate.Predicate {
-	return predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return hasListenerProtocolAnnotation(e.Object)
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return hasListenerProtocolAnnotation(e.ObjectOld) ||
-				hasListenerProtocolAnnotation(e.ObjectNew)
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return hasListenerProtocolAnnotation(e.Object)
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return hasListenerProtocolAnnotation(e.Object)
-		},
-	}
-}
-
 func SetupGatewayControllerWithManager(ctx context.Context,
 	mgr ctrl.Manager,
 	config GatewayControllerConfig,
@@ -478,30 +435,6 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			common.ComponentLabel: "api-gateway",
 		}),
 	)
-	gwPredicate, _ := predicate.LabelSelectorPredicate(
-		*metav1.SetAsLabelSelector(map[string]string{
-			common.ComponentLabel: "api-gateway",
-		}),
-	)
-
-	// The label selector above matches the component=api-gateway label that this
-	// controller applies to the Deployment/Service it GENERATES. A user-authored
-	// Gateway does not carry that label, so on its own the selector discards
-	// Gateway events and the object is only reconciled incidentally, whenever
-	// one of the secondary watches below happens to fire. That makes edits to a
-	// Gateway appear to do nothing — in particular, adding, changing or removing
-	// api-gateway.consul.hashicorp.com/listener-<name>-protocol has no effect
-	// until an unrelated event arrives, and the Consul api-gateway config entry
-	// keeps serving the previous listener protocol indefinitely.
-	//
-	// Rather than widen the watch to every Gateway, admit exactly the events the
-	// listener-protocol feature needs: those where a listener-protocol
-	// annotation is present, or where one was just added or removed. Gateways
-	// from other implementations are still filtered out by Reconcile, which
-	// returns early unless the GatewayClass ControllerName matches
-	// common.GatewayClassControllerName.
-	gatewayEventPredicate := predicate.Or(gwPredicate, listenerProtocolAnnotationPredicate())
-
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
@@ -541,7 +474,16 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-v1").
-		For(&gwv1.Gateway{}, builder.WithPredicates(gatewayEventPredicate)).
+		// Deliberately unfiltered. The ComponentLabel is only applied to the
+		// resources consul-k8s generates for a gateway (Deployment, Service,
+		// Pod), never to the user-authored Gateway CR, so filtering the root
+		// watch on it drops every Gateway event. Narrowing instead to "has a
+		// listener-protocol annotation" is not viable either: it strands every
+		// Gateway that does not use this feature, so a bare Gateway is never
+		// provisioned and spec-only edits such as a listener port change are
+		// silently lost. Reconcile performs the authoritative ownership check
+		// via gatewayClass.Spec.ControllerName, so admit all Gateways here.
+		For(&gwv1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{})
