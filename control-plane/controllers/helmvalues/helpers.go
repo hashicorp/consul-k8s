@@ -27,6 +27,24 @@ func ConsulFullName(hv *HelmValues) string {
 	return truncateAndTrim(fmt.Sprintf("%s-%s", hv.Release.Name, name), 63)
 }
 
+// LocalComponentAuthMethodName returns the name of the Kubernetes auth method that
+// Consul components use to log in for local tokens. This mirrors the Helm template
+// "consul.localComponentAuthMethodName".
+func LocalComponentAuthMethodName(hv *HelmValues) string {
+	return fmt.Sprintf("%s-k8s-component-auth-method", authMethodPrefix(hv))
+}
+
+// authMethodPrefix mirrors the Helm template "consul.authMethodPrefix": the
+// configured auth method name if set, otherwise the Consul full name.
+func authMethodPrefix(hv *HelmValues) string {
+	if hv != nil {
+		if name := strings.TrimSpace(hv.Global.ACLs.AuthMethod.Name); name != "" {
+			return name
+		}
+	}
+	return ConsulFullName(hv)
+}
+
 // truncateAndTrim truncates a string to maxLen and trims trailing hyphens.
 func truncateAndTrim(s string, maxLen int) string {
 	if len(s) > maxLen {
