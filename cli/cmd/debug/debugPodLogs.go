@@ -202,7 +202,7 @@ func (l *LogCapture) pushWorkloadContainers() {
 // - and fetches log for each of the pods and write it to /pod dir within debug archive
 // - also, writes log capture status to logCaptureAudit file and errors to logCaptureErrors file.
 func (l *LogCapture) captureLogs() error {
-	l.UI.Output("\nCapturing pods logs.....")
+	l.UI.Output("\nCapturing pod logs.....")
 	err := l.getConsulK8sComponents()
 	if err != nil {
 		l.UI.Output("%s", err, terminal.WithWarningStyle())

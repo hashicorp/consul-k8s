@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/hashicorp/consul/api"
 
@@ -66,7 +65,7 @@ func (k *KubernetesUpdates) Operations() []client.Object {
 type ReferenceValidator interface {
 	GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1.SecretObjectReference) bool
 	HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1.BackendRef) bool
-	TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1alpha2.BackendRef) bool
+	TCPRouteCanReferenceBackend(tcpRoute gwv1.TCPRoute, backendRef gwv1.BackendRef) bool
 }
 
 // noopReferenceValidator is a ReferenceValidator that always returns true.
@@ -98,7 +97,7 @@ type httpRoute struct {
 }
 
 type tcpRoute struct {
-	route    gwv1alpha2.TCPRoute
+	route    gwv1.TCPRoute
 	gateways mapset.Set
 }
 
@@ -645,7 +644,7 @@ func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1.Gateway, gatewayL
 	return value, exists
 }
 
-func (s *ResourceMap) ReferenceCountTCPRoute(route gwv1alpha2.TCPRoute) {
+func (s *ResourceMap) ReferenceCountTCPRoute(route gwv1.TCPRoute) {
 	key := client.ObjectKeyFromObject(&route)
 	consulKey := NormalizeMeta(s.toConsulReference(api.TCPRoute, key))
 
@@ -879,6 +878,6 @@ func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1.HTTPRoute, ref gwv
 	return s.referenceValidator.HTTPRouteCanReferenceBackend(route, ref)
 }
 
-func (s *ResourceMap) TCPRouteCanReferenceBackend(route gwv1alpha2.TCPRoute, ref gwv1.BackendRef) bool {
+func (s *ResourceMap) TCPRouteCanReferenceBackend(route gwv1.TCPRoute, ref gwv1.BackendRef) bool {
 	return s.referenceValidator.TCPRouteCanReferenceBackend(route, ref)
 }
