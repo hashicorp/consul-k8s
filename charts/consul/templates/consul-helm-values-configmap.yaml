@@ -43,7 +43,10 @@ data:
         },
 
         "acls": {
-          "manageSystemACLs": {{ .Values.global.acls.manageSystemACLs | default false | toJson }}
+          "manageSystemACLs": {{ .Values.global.acls.manageSystemACLs | default false | toJson }},
+          "authMethod": {
+            "name": {{ .Values.global.acls.authMethod.name | default "" | toJson }}
+          }
         },
 
         "secretsBackend": {
