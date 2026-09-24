@@ -36,6 +36,22 @@
 {{ end -}}
 {{- /* Add the gateway name to the $names dict to ensure uniqueness */ -}}
 {{- $_ := set $names .name .name }}
+{{- /* Effective credential-injection config: per-gateway fields override the
+       default field-by-field (a deep merge, not a whole-object replace, so a
+       partial per-gateway block keeps the default images/ConfigMap names). */ -}}
+{{- $ci := mergeOverwrite (deepCopy (default (dict) $defaults.credentialInjection)) (default (dict) .credentialInjection) }}
+{{- /* Nil-aware drain default: preserve an explicit drainSeconds: 0 (the sprig
+       "default" helper treats numeric zero as empty, which the controller does
+       not). Only meaningful when credential injection is enabled. */ -}}
+{{- $drainSeconds := 30 }}
+{{- if not (kindIs "invalid" $ci.drainSeconds) }}
+{{- $drainSeconds = int $ci.drainSeconds }}
+{{- end }}
+{{- /* Fail fast on an incomplete/invalid enabled config (Helm renders without
+       CRD/controller validation), mirroring the controller-side checks. */ -}}
+{{- if and $ci $ci.enabled }}
+{{- include "consul.validateTerminatingGatewayCredentialInjection" (dict "ci" $ci "name" .name) }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -79,6 +95,25 @@ spec:
         "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/gateway-kind": "terminating-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
+        {{- if and $ci $ci.enabled }}
+        # Rolls the workload when a referenced non-secret credential ConfigMap's
+        # content changes. NOTE: `lookup` only runs during `helm install/upgrade`,
+        # so for Helm-managed gateways this hash is refreshed on the next Helm
+        # operation; editing an externally-managed ConfigMap does not by itself
+        # patch a running Deployment (the controller-managed CRD path watches
+        # ConfigMaps for that). Optional ConfigMaps are skipped rather than looked
+        # up with an empty name (an empty name makes `lookup` return the whole
+        # namespace, pulling unrelated ConfigMaps into the hash). Rendered
+        # credential files (memory emptyDir) rotate without a pod restart and are
+        # intentionally excluded.
+        {{- $cmContents := list }}
+        {{- range $cmName := list $ci.processorConfigMap $ci.vaultAgentConfigMap $ci.vaultCAConfigMap }}
+        {{- if $cmName }}
+        {{- $cmContents = append $cmContents (toString (lookup "v1" "ConfigMap" $root.Release.Namespace $cmName)) }}
+        {{- end }}
+        {{- end }}
+        "consul.hashicorp.com/credential-config-checksum": {{ $cmContents | join "\n" | sha256sum | quote }}
+        {{- end }}
         {{- if $root.Values.global.enableConsulNamespaces }}
         "consul.hashicorp.com/gateway-namespace": {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
         {{- end }}
@@ -113,6 +148,14 @@ spec:
         {{- if .annotations }}
         {{- tpl .annotations $root | nindent 8 }}
         {{- end }}
+        {{- if and $ci $ci.enabled (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled) }}
+        # Reserved: credential injection disables the default ServiceAccount-token
+        # automount, so the Vault Agent Injector is pointed at the dedicated
+        # projected token (else vault-k8s fails with "failed to find service
+        # account volume mount"). Emitted last so user annotations cannot override
+        # it and break injection or leak the CAMP Vault token to the agent.
+        "vault.hashicorp.com/agent-service-account-token-volume-name": "consul-auth-method-sa-token"
+        {{- end }}
     spec:
       {{- if (or $defaults.affinity .affinity) }}
       affinity:
@@ -126,8 +169,35 @@ spec:
       topologySpreadConstraints:
         {{ tpl (default $defaults.topologySpreadConstraints .topologySpreadConstraints) $root | nindent 8 | trim }}
       {{- end }}
+      {{- if and $ci $ci.enabled (not $root.Values.global.openshift.enabled) }}
+      # Shared fsGroup so the kubelet group-owns the ext_proc socket and rendered
+      # credential volumes (with the setgid bit); no privileged root init
+      # container is required. Every container joins this group, so Envoy (a
+      # group member) can reach the processor's socket.
+      #
+      # On OpenShift the fsGroup is intentionally omitted: the restricted-v2 SCC
+      # uses a MustRunAs range allocated per namespace, so a fixed group would be
+      # rejected. The SCC injects an allowed shared group instead.
+      securityContext:
+        fsGroup: 10001
+      {{- end }}
+      {{- if and $ci $ci.enabled }}
+      # Grace period must exceed the processor's preStop drain plus a shutdown
+      # allowance so in-flight requests drain before the pod is killed.
+      terminationGracePeriodSeconds: {{ add $drainSeconds 15 }}
+      {{- else }}
       terminationGracePeriodSeconds: 10
+      {{- end }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
+      {{- if and $ci $ci.enabled }}
+      # Credential injection isolates the Vault-audience token (camp-vault-token)
+      # from Envoy and the credential processor. Disable the default
+      # ServiceAccount-token automount so no container silently receives a
+      # default-audience JWT for the same ServiceAccount used for Vault auth; the
+      # token is projected explicitly only into the containers that perform
+      # Consul login (below).
+      automountServiceAccountToken: false
+      {{- end }}
       volumes:
       - name: tmp
         emptyDir:
@@ -135,6 +205,64 @@ spec:
       - name: consul-service
         emptyDir:
           medium: "Memory"
+      {{- if and $ci $ci.enabled (or $root.Values.global.acls.manageSystemACLs (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled)) }}
+      # Dedicated default-audience ServiceAccount token. It is mounted into the
+      # init and Envoy containers for Consul login (ACLs), and/or discovered by
+      # the global Vault Agent Injector via the
+      # vault.hashicorp.com/agent-service-account-token-volume-name annotation.
+      # It exists because the default automount is disabled above.
+      - name: consul-auth-method-sa-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 7200
+      {{- end }}
+      {{- if and $ci $ci.enabled }}
+      # Credential injection (T8): the shared ext_proc socket and non-secret
+      # processor config are present for every source. The credential source
+      # (Vault Agent-rendered memory volume, or a read-only Kubernetes Secret)
+      # is selected below. Credentials must NOT be mounted into Envoy.
+      - name: camp-auth-socket
+        emptyDir:
+          medium: "Memory"
+      - name: camp-auth-processor-config
+        configMap:
+          name: {{ $ci.processorConfigMap | quote }}
+      {{- if eq (default "vault" $ci.source) "kubernetesSecret" }}
+      # Credentials arrive via a read-only Secret mounted at the rendered path.
+      # The volume keeps its name so the processor container is source-agnostic.
+      - name: camp-vault-rendered
+        secret:
+          secretName: {{ required "credentialInjection.secretName is required when source is kubernetesSecret" $ci.secretName | quote }}
+      {{- else }}
+      - name: camp-vault-rendered
+        emptyDir:
+          medium: "Memory"
+      - name: camp-vault-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              audience: {{ $ci.tokenAudience | default "vault" | quote }}
+              {{- if $ci.tokenExpirationSeconds }}
+              expirationSeconds: {{ $ci.tokenExpirationSeconds }}
+              {{- end }}
+      # Private token sink for the Vault Agent (never mounted into the processor
+      # or Envoy) and the operator-provided agent config / Vault CA.
+      - name: camp-vault-agent-private
+        emptyDir:
+          medium: "Memory"
+      - name: camp-vault-agent-config
+        configMap:
+          name: {{ $ci.vaultAgentConfigMap | quote }}
+      {{- if $ci.vaultCAConfigMap }}
+      - name: camp-vault-ca
+        configMap:
+          name: {{ $ci.vaultCAConfigMap | quote }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
       {{- range (default $defaults.extraVolumes .extraVolumes) }}
       - name: userconfig-{{ .name }}
         {{ .type }}:
@@ -214,6 +342,11 @@ spec:
               mountPath: /tmp
             - name: consul-service
               mountPath: /consul/service
+            {{- if and $ci $ci.enabled $root.Values.global.acls.manageSystemACLs }}
+            - name: consul-auth-method-sa-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            {{- end }}
             {{- if $root.Values.global.tls.enabled }}
             {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert
@@ -228,6 +361,11 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+        {{- if and $ci $ci.enabled }}
+        {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
+        {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent-init" "exitAfterAuth" true "ci" $ci "root" $root) | nindent 8 }}
+        {{- end }}
+        {{- end }}
       containers:
         - name: terminating-gateway
           image: {{ $root.Values.global.imageConsulDataplane | quote }}
@@ -239,6 +377,11 @@ spec:
             - name: consul-service
               mountPath: /consul/service
               readOnly: true
+            {{- if and $ci $ci.enabled $root.Values.global.acls.manageSystemACLs }}
+            - name: consul-auth-method-sa-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            {{- end }}
             {{- if $root.Values.global.tls.enabled }}
             {{- if not (or (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots) ($root.Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert
@@ -250,6 +393,12 @@ spec:
             - name: userconfig-{{ .name }}
               readOnly: true
               mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
+            {{- if and $ci $ci.enabled }}
+            # Envoy reaches the credential processor over this UDS only. It must
+            # never mount the rendered credentials or the Vault token volumes.
+            - name: camp-auth-socket
+              mountPath: /consul/auth-socket
             {{- end }}
           {{- if (default $defaults.resources .resources) }}
           resources: {{ toYaml (default $defaults.resources .resources) | nindent 12 }}
@@ -357,6 +506,12 @@ spec:
           ports:
             - name: gateway
               containerPort: 8443
+        {{- if and $ci $ci.enabled }}
+        {{- if ne (default "vault" $ci.source) "kubernetesSecret" }}
+        {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent" "exitAfterAuth" false "ci" $ci "root" $root) | nindent 8 }}
+        {{- end }}
+        {{- include "consul.terminatingGatewayCredentialAuthProcessor" (dict "ci" $ci "logLevel" (default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel) "drainSeconds" $drainSeconds "root" $root) | nindent 8 }}
+        {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}
       priorityClassName: {{ (default $defaults.priorityClassName .priorityClassName) | quote }}
       {{- end }}

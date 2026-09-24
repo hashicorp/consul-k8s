@@ -81,6 +81,76 @@ func TestTerminatingGatewayController_termGWSecretIndexer(t *testing.T) {
 	require.Equal(t, []string{"tls-a", "tls-b"}, indexed)
 }
 
+func ciGateway(name, namespace string, ci *consulv1alpha1.TerminatingGatewayCredentialInjection) *consulv1alpha1.TerminatingGateway {
+	return &consulv1alpha1.TerminatingGateway{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: consulv1alpha1.TerminatingGatewaySpec{
+			Deployment: consulv1alpha1.TerminatingGatewayDeploymentSpec{CredentialInjection: ci},
+		},
+	}
+}
+
+func TestTerminatingGatewayController_termGWConfigMapIndexer(t *testing.T) {
+	t.Parallel()
+
+	// Enabled gateway with all three credential ConfigMaps set (plus one empty).
+	indexed := termGWConfigMapIndexer(ciGateway("gw", "default", &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:             true,
+		ProcessorConfigMap:  "camp-proc",
+		VaultAgentConfigMap: "camp-agent",
+		VaultCAConfigMap:    "camp-ca",
+	}))
+	require.Equal(t, []string{"camp-proc", "camp-agent", "camp-ca"}, indexed)
+
+	// Disabled credential injection contributes no index keys.
+	require.Nil(t, termGWConfigMapIndexer(ciGateway("gw", "default", &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:            false,
+		ProcessorConfigMap: "camp-proc",
+	})))
+
+	// No credential injection block at all contributes no index keys.
+	require.Nil(t, termGWConfigMapIndexer(ciGateway("gw", "default", nil)))
+}
+
+func TestTerminatingGatewayController_transformConfigMap(t *testing.T) {
+	t.Parallel()
+
+	s := runtime.NewScheme()
+	require.NoError(t, consulv1alpha1.AddToScheme(s))
+	require.NoError(t, corev1.AddToScheme(s))
+
+	gwReferencing := ciGateway("gw-referencing", "default", &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:             true,
+		ProcessorConfigMap:  "camp-proc",
+		VaultAgentConfigMap: "camp-agent",
+	})
+	gwOtherConfigMap := ciGateway("gw-other-cm", "default", &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:            true,
+		ProcessorConfigMap: "unrelated",
+	})
+	// Same ConfigMap name but a different namespace: must NOT be enqueued.
+	gwOtherNamespace := ciGateway("gw-other-ns", "other", &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:            true,
+		ProcessorConfigMap: "camp-proc",
+	})
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(gwReferencing, gwOtherConfigMap, gwOtherNamespace).
+		WithIndex(&consulv1alpha1.TerminatingGateway{}, configMapOwnerKey, termGWConfigMapIndexer).
+		Build()
+	controller := &TerminatingGatewayController{Client: fakeClient}
+
+	// A referenced ConfigMap enqueues only the same-namespace referencing gateway
+	// (no secretTriggerPrefix, so a normal reconcile recomputes the checksum).
+	requests := controller.transformConfigMap(context.Background(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "camp-proc", Namespace: "default"}})
+	require.Equal(t, []reconcile.Request{{NamespacedName: types.NamespacedName{Name: "gw-referencing", Namespace: "default"}}}, requests)
+
+	// A ConfigMap no gateway references enqueues nothing.
+	requests = controller.transformConfigMap(context.Background(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "non-matching", Namespace: "default"}})
+	require.Empty(t, requests)
+}
+
 func TestTerminatingGatewayController_ReconcileSecretTriggerPrefixDoesNotTrimGatewayName(t *testing.T) {
 	t.Parallel()
 

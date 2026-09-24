@@ -1449,3 +1449,639 @@ key2: value2' \
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# credentialInjection volumes (T8 Task 2)
+
+@test "terminatingGateways/Deployment: credentialInjection disabled by default has no camp volumes" {
+  cd `chart_dir`
+  local vols=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.volumes[].name' | tee /dev/stderr)
+  [[ "$vols" != *"camp-vault-rendered"* ]]
+  [[ "$vols" != *"camp-auth-socket"* ]]
+  [[ "$vols" != *"camp-vault-token"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection enabled adds memory + projected token volumes" {
+  cd `chart_dir`
+  local vols=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
+      . | tee /dev/stderr |
+      yq -s '.[0].spec.template.spec.volumes' | tee /dev/stderr)
+
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-rendered") | .emptyDir.medium')" = "Memory" ]
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-auth-socket") | .emptyDir.medium')" = "Memory" ]
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-token") | .projected.sources[0].serviceAccountToken.path')" = "token" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection token uses configured audience and expiration" {
+  cd `chart_dir`
+  local tok=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenExpirationSeconds=600' \
+      . | tee /dev/stderr |
+      yq -s '.[0].spec.template.spec.volumes[] | select(.name=="camp-vault-token").projected.sources[0].serviceAccountToken' | tee /dev/stderr)
+  [ "$(echo "$tok" | yq -r '.audience')" = "vault" ]
+  [ "$(echo "$tok" | yq -r '.expirationSeconds')" = "600" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection per-gateway override enables volumes" {
+  cd `chart_dir`
+  local vols=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=tgw' \
+      --set 'terminatingGateways.gateways[0].credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.volumes[].name' | tee /dev/stderr)
+  [[ "$vols" == *"camp-vault-rendered"* ]]
+  [[ "$vols" == *"camp-auth-socket"* ]]
+  [[ "$vols" == *"camp-vault-token"* ]]
+}
+
+#--------------------------------------------------------------------
+# credentialInjection kubernetesSecret source
+
+@test "terminatingGateways/Deployment: credentialInjection kubernetesSecret source mounts a read-only secret at camp-vault-rendered" {
+  cd `chart_dir`
+  local out=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      . | tee /dev/stderr)
+
+  local rendered=$(echo "$out" | yq -s '.[0].spec.template.spec.volumes[] | select(.name=="camp-vault-rendered")')
+  [ "$(echo "$rendered" | yq -r '.secret.secretName')" = "camp-egress-credentials" ]
+  [ "$(echo "$rendered" | yq -r '.emptyDir')" = "null" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection kubernetesSecret source has no vault agent containers or token" {
+  cd `chart_dir`
+  local out=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      . | tee /dev/stderr)
+
+  local names=$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[].name, .[0].spec.template.spec.initContainers[].name')
+  [[ "$names" != *"camp-vault-agent"* ]]
+  [[ "$names" == *"camp-auth-processor"* ]]
+  [[ "$names" != *"camp-auth-socket-init"* ]]
+
+  local vols=$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes[].name')
+  [[ "$vols" != *"camp-vault-token"* ]]
+  [[ "$vols" != *"camp-vault-agent-config"* ]]
+  [[ "$vols" != *"camp-vault-agent-private"* ]]
+  [[ "$vols" == *"camp-auth-socket"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection kubernetesSecret source still mounts only the socket into Envoy" {
+  cd `chart_dir`
+  local mounts=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway").volumeMounts[].name')
+  [[ "$mounts" == *"camp-auth-socket"* ]]
+  [[ "$mounts" != *"camp-vault-rendered"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection kubernetesSecret source requires secretName" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"secretName is required when source is kubernetesSecret"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection enabled with only enabled=true fails validation" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"processorImage is required when enabled"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection rejects a non-https vaultAddress" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentImage=v:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAddress=http://vault:8200' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"vaultAddress must be a valid absolute https:// URL"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection rejects a negative drainSeconds for the kubernetesSecret source" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=creds' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      --set 'terminatingGateways.defaults.credentialInjection.drainSeconds=-5' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"drainSeconds must not be negative"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection rejects identical processor and vault-agent ConfigMaps" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-shared' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentImage=v:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-shared' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"vaultAgentConfigMap must reference a different ConfigMap than processorConfigMap"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection a fully-specified vault config renders successfully" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentImage=v:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent' \
+      --set 'terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
+      .
+  [ "$status" -eq 0 ]
+}
+
+#--------------------------------------------------------------------
+# credentialInjection Vault Agent containers (T8 Task 3)
+
+@test "terminatingGateways/Deployment: credentialInjection disabled has no vault agent containers" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.initContainers | map(.name) | contains(["camp-vault-agent-init"])')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers | map(.name) | contains(["camp-vault-agent"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection vault agent init container is hardened and exits after auth" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.vaultCAConfigMap=camp-ca \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.initContainers[] | select(.name=="camp-vault-agent-init")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.image')" = "hashicorp/vault:1.15" ]
+  [ "$(echo "$c" | yq -r '.args | contains(["-exit-after-auth"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsNonRoot')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "null" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsGroup')" = "null" ]
+  [ "$(echo "$c" | yq -r '.securityContext.readOnlyRootFilesystem')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.allowPrivilegeEscalation')" = "false" ]
+  [ "$(echo "$c" | yq -r '.env | map(.name) | contains(["VAULT_ADDR"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.env | map(.name) | contains(["VAULT_CAPATH"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-vault-token").readOnly')" = "true" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-rendered"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-agent-private"])')" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection vault agent sidecar runs continuously" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-vault-agent")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.image')" = "hashicorp/vault:1.15" ]
+  [ "$(echo "$c" | yq -r '.args | contains(["-exit-after-auth"])')" = "false" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsNonRoot')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "null" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection adds private token-sink and config volumes" {
+  cd `chart_dir`
+  local vols=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.vaultCAConfigMap=camp-ca \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.volumes' | tee /dev/stderr)
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-agent-private").emptyDir.medium')" = "Memory" ]
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-agent-config").configMap.name')" = "camp-agent" ]
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-ca").configMap.name')" = "camp-ca" ]
+}
+
+#--------------------------------------------------------------------
+# credentialInjection auth processor (T8 Task 4)
+
+@test "terminatingGateways/Deployment: credentialInjection disabled has no auth processor" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers | map(.name) | contains(["camp-auth-processor"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection auth processor is hardened, read-only creds, writable socket, and cannot read the token sink" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.image')" = "camp-auth-processor:test" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsNonRoot')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "null" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsGroup')" = "null" ]
+  [ "$(echo "$c" | yq -r '.securityContext.readOnlyRootFilesystem')" = "true" ]
+  # rendered credentials are read-only
+  [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-vault-rendered").readOnly')" = "true" ]
+  # socket volume is writable (readOnly not true)
+  [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-auth-socket").readOnly')" = "null" ]
+  # config is mounted read-only
+  [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-auth-processor-config").readOnly')" = "true" ]
+  # MUST NOT mount the Vault token or the private agent token sink
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-token"])')" = "false" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-agent-private"])')" = "false" ]
+  # health + drain contract
+  [ "$(echo "$c" | yq -r '.readinessProbe.exec.command | contains(["-ready"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.livenessProbe.exec.command | contains(["-live"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.lifecycle.preStop.exec.command | contains(["drain-wait"])')" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection auth processor config volume references processorConfigMap" {
+  cd `chart_dir`
+  local vols=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.volumes' | tee /dev/stderr)
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-auth-processor-config").configMap.name')" = "camp-proc" ]
+}
+
+#--------------------------------------------------------------------
+# credentialInjection Envoy socket-only mount + socket-dir init (T8 Task 5)
+
+@test "terminatingGateways/Deployment: credentialInjection Envoy mounts only the socket, never credentials or token" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-auth-socket"])')" = "true" ]
+  for v in camp-vault-rendered camp-vault-token camp-vault-agent-private camp-vault-agent-config camp-auth-processor-config camp-vault-ca; do
+    [ "$(echo "$c" | yq -r ".volumeMounts | map(.name) | contains([\"$v\"])")" = "false" ]
+  done
+}
+
+@test "terminatingGateways/Deployment: credentialInjection uses no privileged socket-init container" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.initContainers | map(.name) | contains(["camp-auth-socket-init"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection sets shared fsGroup for the socket" {
+  cd `chart_dir`
+  local sc=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.securityContext' | tee /dev/stderr)
+  [ "$(echo "$sc" | yq -r '.fsGroup')" = "10001" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection omits fixed fsGroup on OpenShift" {
+  cd `chart_dir`
+  local sc=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.openshift.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s -r '.[0].spec.template.spec.securityContext' | tee /dev/stderr)
+  # On OpenShift the SCC assigns the shared group; the pod must not pin fsGroup.
+  [ "$sc" = "null" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection disables SA-token automount and isolates it from Envoy/processor" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.acls.manageSystemACLs=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      . | tee /dev/stderr)
+  # Default automount is disabled.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.automountServiceAccountToken')" = "false" ]
+  # The Consul-login token is projected explicitly.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes | map(.name) | contains(["consul-auth-method-sa-token"])')" = "true" ]
+  # It is mounted into the init container and Envoy only.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.initContainers[] | select(.name=="terminating-gateway-init") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "true" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "true" ]
+  # It must NOT be mounted into the processor or the Vault Agent sidecar.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="camp-vault-agent") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection without ACLs disables automount but projects no login token" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.automountServiceAccountToken')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection projects a token for the Vault Agent Injector when ACLs are disabled" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.tls.enabled=true --set global.tls.caCert.secretName=consul-ca \
+      --set global.secretsBackend.vault.enabled=true \
+      --set global.secretsBackend.vault.consulCARole=consul-ca \
+      --set global.secretsBackend.vault.consulServerRole=server \
+      --set global.secretsBackend.vault.consulClientRole=client \
+      --set global.secretsBackend.vault.manageSystemACLsRole=acl \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr)
+  # Automount stays disabled, but the dedicated token volume exists so vault-k8s
+  # can discover it via the annotation.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.automountServiceAccountToken')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes | map(.name) | contains(["consul-auth-method-sa-token"])')" = "true" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.metadata.annotations["vault.hashicorp.com/agent-service-account-token-volume-name"]')" = "consul-auth-method-sa-token" ]
+  # It is not mounted into the processor.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor") | .volumeMounts | map(.name) | contains(["consul-auth-method-sa-token"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection reserved Vault token-volume annotation cannot be overridden by user annotations" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.tls.enabled=true --set global.tls.caCert.secretName=consul-ca \
+      --set global.secretsBackend.vault.enabled=true \
+      --set global.secretsBackend.vault.consulCARole=consul-ca \
+      --set global.secretsBackend.vault.consulServerRole=server \
+      --set global.secretsBackend.vault.consulClientRole=client \
+      --set global.secretsBackend.vault.manageSystemACLsRole=acl \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set 'terminatingGateways.defaults.annotations=vault.hashicorp.com/agent-service-account-token-volume-name: attacker-volume' \
+      . | tee /dev/stderr)
+  # The reserved annotation is emitted after user annotations, so it wins.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.metadata.annotations["vault.hashicorp.com/agent-service-account-token-volume-name"]')" = "consul-auth-method-sa-token" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection disabled has no socket-init and no Envoy socket mount" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.initContainers | map(.name) | contains(["camp-auth-socket-init"])')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway") | .volumeMounts | map(.name) | contains(["camp-auth-socket"])')" = "false" ]
+}
+
+#--------------------------------------------------------------------
+# credentialInjection readiness/grace (T8 Task 8)
+
+@test "terminatingGateways/Deployment: credentialInjection raises grace period above drain, tolerant liveness" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.drainSeconds=45 \
+      . | tee /dev/stderr)
+  # 45 (drain) + 15 (shutdown allowance)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds')" = "60" ]
+  local proc=$(echo "$out" | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")')
+  [ "$(echo "$proc" | yq -r '.livenessProbe.failureThreshold')" = "6" ]
+  [ "$(echo "$proc" | yq -r '.readinessProbe.failureThreshold')" = "3" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection disabled keeps default grace period" {
+  cd `chart_dir`
+  local g=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      . | tee /dev/stderr | yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds')
+  [ "$g" = "10" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection drainSeconds=0 yields a 15s grace period" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.drainSeconds=0 \
+      . | tee /dev/stderr)
+  # 0 (drain) + 15 (shutdown allowance); the nil-aware default must not treat 0 as unset.
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds')" = "15" ]
+  local proc=$(echo "$out" | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")')
+  [ "$(echo "$proc" | yq -r '.lifecycle.preStop.exec.command | contains(["-duration=0s"])')" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection per-gateway partial override merges with defaults field-by-field" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:default \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:default \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set 'terminatingGateways.gateways[0].name=tgw' \
+      --set 'terminatingGateways.gateways[0].credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
+      . | tee /dev/stderr)
+  # The per-gateway block only set enabled=true; default images/ConfigMaps must survive the merge.
+  local proc=$(echo "$out" | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")')
+  [ "$(echo "$proc" | yq -r '.image')" = "camp-auth-processor:default" ]
+  local agent=$(echo "$out" | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-vault-agent")')
+  [ "$(echo "$agent" | yq -r '.image')" = "hashicorp/vault:default" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes[] | select(.name=="camp-auth-processor-config").configMap.name')" = "camp-proc" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.volumes[] | select(.name=="camp-vault-agent-config").configMap.name')" = "camp-agent" ]
+}
+
+#--------------------------------------------------------------------
+# credentialInjection config checksum (T8 Task 9)
+
+@test "terminatingGateways/Deployment: credentialInjection adds a config-checksum annotation" {
+  cd `chart_dir`
+  local ann=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s -r '.[0].spec.template.metadata.annotations["consul.hashicorp.com/credential-config-checksum"]' | tee /dev/stderr)
+  [ -n "$ann" ] && [ "$ann" != "null" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection disabled has no config-checksum annotation" {
+  cd `chart_dir`
+  local ann=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      . | tee /dev/stderr | yq -s -r '.[0].spec.template.metadata.annotations["consul.hashicorp.com/credential-config-checksum"]' | tee /dev/stderr)
+  [ "$ann" = "null" ]
+}
