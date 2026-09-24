@@ -142,6 +142,17 @@ spec:
                         type: object
                     type: object
                 type: object
+              externalTrafficPolicy:
+                description: |-
+                  ExternalTrafficPolicy determines whether the gateway service routes external
+                  traffic to node-local or cluster-wide endpoints. If unspecified, Kubernetes
+                  defaults this to "Cluster". Only applies to NodePort and LoadBalancer
+                  ServiceTypes; it is ignored for ClusterIP, which Kubernetes does not permit
+                  to set this field.
+                enum:
+                - Cluster
+                - Local
+                type: string
               mapPrivilegedContainerPorts:
                 description: The value to add to privileged ports ( ports < 1024)
                   for gateway containers
