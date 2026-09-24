@@ -354,6 +354,12 @@ spec:
                 {{- if .Values.ai.agent.image }}
                 -ai-agent-image="{{ .Values.ai.agent.image }}" \
                 {{- end }}
+                {{- if .Values.ai.obo.inbound.image }}
+                -consul-obo-inbound-image="{{ .Values.ai.obo.inbound.image }}" \
+                {{- end }}
+                {{- if .Values.ai.obo.outbound.image }}
+                -consul-obo-outbound-image="{{ .Values.ai.obo.outbound.image }}" \
+                {{- end }}
                 {{- end }}
 
 

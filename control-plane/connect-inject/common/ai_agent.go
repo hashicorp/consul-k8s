@@ -16,8 +16,9 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
-// IsAIAgent returns true when the pod carries the AI agent role annotation with
-// the expected "ai-agent" value.
+// IsAIAgent returns true when the pod carries consul.hashicorp.com/ai-role=ai-agent.
+// That is the CAMP gate for envelope credentials, the dataplane Local Credential
+// Broker, and both OBO sidecars (matches enterprise ServiceNeedsOAuthCredential).
 func IsAIAgent(pod corev1.Pod) bool {
 	return pod.Annotations[constants.AnnotationAIRole] == constants.AIAgentRole
 }
@@ -25,6 +26,9 @@ func IsAIAgent(pod corev1.Pod) bool {
 // IsMCPServer returns true when the pod carries ai-role: mcp-server.
 // Such pods are registered in the Consul catalog with an AI.MCPServer block
 // so consul-enterprise xDS injects the mcp_router filter into their Envoy listener.
+// They participate in OAuth DCR but do not receive OBO sidecars or the dataplane
+// credential broker (enterprise ServiceParticipatesInOAuthDCR without
+// ServiceNeedsOAuthCredential).
 func IsMCPServer(pod corev1.Pod) bool {
 	return pod.Annotations[constants.AnnotationAIRole] == "mcp-server"
 }

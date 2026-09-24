@@ -90,8 +90,8 @@ const (
 	// AI agent role and port constants.
 
 	// AIAgentRole is the expected value of AnnotationAIRole for an AI agent workload.
-	// The webhook injects the mcp-gateway sidecar and the endpoints controller stamps
-	// the AI block on the Consul catalog registration for pods with this role.
+	// The webhook injects the mcp-gateway + OBO sidecars and the endpoints controller
+	// stamps the AI block on the Consul catalog registration for pods with this role.
 	AIAgentRole = "ai-agent"
 
 	// DefaultAIMCPPort is the loopback port the mcp-gateway outbound listener binds
@@ -105,6 +105,31 @@ const (
 	// DefaultAIInterceptorPort is the loopback port the governance interceptor proxy
 	// binds to for inbound MCP traffic inspection (ai.agent.interceptor.port).
 	DefaultAIInterceptorPort = 21101
+
+	// ConsulOBOInboundContainerName is the injected container name for consul-obo-inbound.
+	ConsulOBOInboundContainerName = "consul-obo-inbound"
+
+	// ConsulOBOOutboundContainerName is the injected container name for consul-obo-outbound.
+	ConsulOBOOutboundContainerName = "consul-obo-outbound"
+
+	// DefaultOBOInboundPort is the loopback port for consul-obo-inbound ext_proc
+	// (inbound JWT verify + claim projection). Must not collide with
+	// DefaultAIInterceptorPort (21101).
+	DefaultOBOInboundPort = 21102
+
+	// DefaultOBOOutboundPort is the loopback port for consul-obo-outbound ext_proc
+	// (RFC 8693 OBO exchange). Must not collide with 21101 or 21102.
+	DefaultOBOOutboundPort = 21103
+
+	// DefaultOBOInboundBinary is the path to consul-obo-inbound inside its image.
+	DefaultOBOInboundBinary = "/usr/local/bin/consul-obo-inbound"
+
+	// DefaultOBOOutboundBinary is the path to consul-obo-outbound inside its image.
+	DefaultOBOOutboundBinary = "/usr/local/bin/consul-obo-outbound"
+
+	// DefaultEnvoyAdminPort is the loopback port for Envoy admin (/ready) that
+	// OBO sidecars poll before opening the envelope UDS.
+	DefaultEnvoyAdminPort = 19000
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace

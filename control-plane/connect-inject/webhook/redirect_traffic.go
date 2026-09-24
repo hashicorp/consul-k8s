@@ -105,10 +105,10 @@ func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns
 	}
 
 	// If this pod is an AI agent, exclude its loopback ports from iptables so
-	// that mcp-gateway traffic is never redirected through Envoy.
+	// that mcp-gateway and OBO ext_proc traffic is never redirected through Envoy.
 	// Port resolution mirrors the mesh webhook: AgentConfig CRD → built-in constants.
-	//   ExcludeInbound:  MCP port, HITL port, interceptor port
-	//   ExcludeOutbound: MCP port (mcp-gateway dials upstream MCP servers on this port)
+	//   ExcludeInbound:  MCP port, HITL port, interceptor port, OBO inbound/outbound
+	//   ExcludeOutbound: MCP port, OBO inbound/outbound
 	if common.IsAIAgent(pod) {
 		aiCfg, err := common.AIConfigFromAgentCRD(ctx, w.Client, pod)
 		if err != nil {
@@ -121,9 +121,13 @@ func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns
 			strconv.Itoa(aiCfg.Agent.MCP.Port),
 			strconv.Itoa(aiCfg.Agent.MCP.HITL.Port),
 			strconv.Itoa(aiCfg.Agent.Interceptor.Port),
+			strconv.Itoa(constants.DefaultOBOInboundPort),
+			strconv.Itoa(constants.DefaultOBOOutboundPort),
 		)
 		cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts,
 			strconv.Itoa(aiCfg.Agent.MCP.Port),
+			strconv.Itoa(constants.DefaultOBOInboundPort),
+			strconv.Itoa(constants.DefaultOBOOutboundPort),
 		)
 	}
 

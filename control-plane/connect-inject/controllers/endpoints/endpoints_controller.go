@@ -597,6 +597,9 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 	// Port / field resolution precedence (later wins):
 	//   1. CRD defaults (AgentConfig / McpServerConfig) — Helm-installed cluster default
 	//   2. Pod annotations                              — per-service team override
+	//
+	// OBO sidecars and the dataplane credential broker are injected only for
+	// ai-agent. mcp-server registers ai{} for DCR and mcp_router, without OBO.
 	var serviceAI *api.AgentServiceAI
 	switch {
 	case common.IsAIAgent(pod):
@@ -612,7 +615,8 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 		// Build the AI.MCPServer block from pod annotations + McpServerConfig CRD
 		// defaults so consul-enterprise xDS injects the mcp_router filter into this
 		// pod's Envoy inbound listener. Without this block the mcp_router is absent
-		// and every MCP tools/call returns 500.
+		// and every MCP tools/call returns 500. This is also the DCR audience
+		// registration; OBO sidecars are not injected for this role.
 		mcpDefaults := v1alpha1.McpServerDefaults{}
 		var mcpCfg v1alpha1.McpServerConfig
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: "consul-mcp-server", Namespace: pod.Namespace}, &mcpCfg); err == nil {
