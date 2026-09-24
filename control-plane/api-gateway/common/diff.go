@@ -130,6 +130,10 @@ func apiGatewayExtAuthzEqual(a, b *api.APIGatewayExtAuthz) bool {
 	if a == nil || b == nil {
 		return false
 	}
+		bothNilOrEqualFunc(a.ExtAuthz, b.ExtAuthz, gatewayExtAuthzEqual)
+}
+
+func gatewayExtAuthzEqual(a, b api.APIGatewayExtAuthz) bool {
 	return a.Enabled == b.Enabled
 }
 

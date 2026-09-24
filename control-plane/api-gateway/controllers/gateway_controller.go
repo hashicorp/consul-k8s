@@ -477,12 +477,12 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		// Deliberately unfiltered. The ComponentLabel is only applied to the
 		// resources consul-k8s generates for a gateway (Deployment, Service,
 		// Pod), never to the user-authored Gateway CR, so filtering the root
-		// watch on it drops every Gateway event -- metadata-only edits such as
-		// adding or removing consul.hashicorp.com/tls-enabled never reached
-		// Consul while the Gateway still reported Synced=True. Reconcile
-		// performs the authoritative ownership check by comparing
-		// gatewayClass.Spec.ControllerName against GatewayClassControllerName,
-		// so admit all Gateways here.
+		// watch on it drops every Gateway event. Narrowing instead to "has a
+		// listener-protocol annotation" is not viable either: it strands every
+		// Gateway that does not use this feature, so a bare Gateway is never
+		// provisioned and spec-only edits such as a listener port change are
+		// silently lost. Reconcile performs the authoritative ownership check
+		// via gatewayClass.Spec.ControllerName, so admit all Gateways here.
 		For(&gwv1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
