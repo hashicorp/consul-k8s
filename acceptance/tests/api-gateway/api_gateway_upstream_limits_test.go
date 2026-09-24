@@ -180,7 +180,7 @@ func TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck(t *testing.T) {
 	t.Run("day1/envoy-config-has-circuit-breaker-and-outlier-detection", func(t *testing.T) {
 		requireEnvoyUpstreamLimitsFields(t, ctx.KubectlOptions(t), "limits-gateway",
 			envoyLimitsExpectation{
-				maxConnections: 25,
+				maxConnections:      25,
 				hasOutlierDetection: true,
 			})
 	})

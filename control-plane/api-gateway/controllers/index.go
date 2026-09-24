@@ -32,7 +32,7 @@ const (
 	HTTPRoute_RouteTLSSDSFilterIndex            = "__httproute_referencing_routetlssdsfilter"
 	HTTPRoute_RouteExtProcIndex                 = "__httproute_referencing_routeextproc"
 	HTTPRoute_RouteHeaderMatchInvertFilterIndex = "__httproute_referencing_routeheadermatchinvertfilter"
-  HTTPRoute_RouteUpstreamLimitsFilterIndex    = "__httproute_referencing_upstreamlimitsfilter"
+	HTTPRoute_RouteUpstreamLimitsFilterIndex    = "__httproute_referencing_upstreamlimitsfilter"
 
 	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
 	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
@@ -170,7 +170,7 @@ var indexes = []index{
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
-  {
+	{
 		name:        HTTPRoute_RouteHeaderMatchInvertFilterIndex,
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,

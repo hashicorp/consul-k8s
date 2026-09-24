@@ -778,6 +778,9 @@ func (r *GatewayController) transformRouteExtProc(ctx context.Context, o client.
 // transformRouteUpstreamLimitsFilter will return a list of routes that need to be reconciled.
 func (r *GatewayController) transformRouteUpstreamLimitsFilter(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteUpstreamLimitsFilterIndex, client.ObjectKeyFromObject(o).String())
+}
+
+// transformRouteHeaderMatchInvertFilter will return a list of routes that need to be reconciled.
 func (r *GatewayController) transformRouteHeaderMatchInvertFilter(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteHeaderMatchInvertFilterIndex, client.ObjectKeyFromObject(o).String())
 }
