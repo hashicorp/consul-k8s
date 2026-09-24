@@ -68,6 +68,24 @@ type ReferenceValidator interface {
 	TCPRouteCanReferenceBackend(tcpRoute gwv1.TCPRoute, backendRef gwv1.BackendRef) bool
 }
 
+// noopReferenceValidator is a ReferenceValidator that always returns true.
+// It is used in tests where reference-grant checking is not the focus.
+type noopReferenceValidator struct{}
+
+func (noopReferenceValidator) GatewayCanReferenceSecret(_ gwv1.Gateway, _ gwv1.SecretObjectReference) bool {
+	return true
+}
+func (noopReferenceValidator) HTTPRouteCanReferenceBackend(_ gwv1.HTTPRoute, _ gwv1.BackendRef) bool {
+	return true
+}
+func (noopReferenceValidator) TCPRouteCanReferenceBackend(_ gwv1.TCPRoute, _ gwv1.BackendRef) bool {
+	return true
+}
+
+// NoopReferenceValidator is an exported ReferenceValidator that always returns
+// true. Use it in tests where reference-grant checking is not under test.
+var NoopReferenceValidator ReferenceValidator = noopReferenceValidator{}
+
 type certificate struct {
 	secret   *corev1.Secret
 	gateways mapset.Set
