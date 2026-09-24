@@ -133,7 +133,7 @@ github.com/gruntwork-io/go-commons v0.8.0 h1:k/yypwrPqSeYHevLlEDmvmgQzcyTwrlZGRa
 github.com/gruntwork-io/go-commons v0.8.0/go.mod h1:gtp0yTtIBExIZp7vyIV9I0XQkVwiQZze678hvDXof78=
 github.com/gruntwork-io/terratest v0.46.7 h1:oqGPBBO87SEsvBYaA0R5xOq+Lm2Xc5dmFVfxEolfZeU=
 github.com/gruntwork-io/terratest v0.46.7/go.mod h1:6gI5MlLeyF+SLwqocA5GBzcTix+XiuxCy1BPwKuT+WM=
-github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.9 h1:JkS2UXIJ7WI3lopCXjrlMZ3SaUyrMAtGjtGUzT31Zow=
+github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.9 h1:Y1d31PhhNgSPFWehJXPbDFEddqNq/QKkGjhbmGkOucg=
 github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.9/go.mod h1:qMvLQgb5k9+oLTFkK11xE+co2islg47S9CH+iyTc9HE=
 github.com/hashicorp/consul/api v1.32.2-0.20260916074132-9ef2b8e09ce0 h1:T1/q4ZS5Thoxw2CDaNo2MAX1v1XCumv8/YzBijtmoEw=
 github.com/hashicorp/consul/api v1.32.2-0.20260916074132-9ef2b8e09ce0/go.mod h1:upIXNT5LnTUMX9AdFkjKRtF5C5k3tKnBQSEvRcyHQyk=
