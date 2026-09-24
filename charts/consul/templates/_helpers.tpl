@@ -804,8 +804,9 @@ Input dict: ci (effective merged config), name (gateway name for messages).
 consul.terminatingGatewayCredentialVaultAgent renders a Vault Agent container
 (init or sidecar) for terminating-gateway credential injection. It authenticates
 to Vault with the projected Kubernetes service-account token, verifies the Vault
-server via VAULT_CAPATH (when a CA ConfigMap is configured), keeps its token sink
-private, and renders external-model credentials into the shared memory volume.
+server via VAULT_CACERT (when a CA ConfigMap is configured, using its ca.crt key),
+keeps its token sink private, and renders external-model credentials into the
+shared memory volume.
 It carries no secret material. Input dict: name, exitAfterAuth (bool), ci, root.
 */ -}}
 {{- define "consul.terminatingGatewayCredentialVaultAgent" -}}
@@ -830,8 +831,8 @@ It carries no secret material. Input dict: name, exitAfterAuth (bool), ci, root.
     value: {{ .ci.vaultNamespace | quote }}
   {{- end }}
   {{- if .ci.vaultCAConfigMap }}
-  - name: VAULT_CAPATH
-    value: /consul/vault-ca
+  - name: VAULT_CACERT
+    value: /consul/vault-ca/ca.crt
   {{- end }}
   securityContext:
     allowPrivilegeEscalation: false
