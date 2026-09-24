@@ -841,6 +841,11 @@ It carries no secret material. Input dict: name, exitAfterAuth (bool), ci, root.
       drop:
       - ALL
     runAsNonRoot: true
+    # The upstream Vault image defaults to root (uid 0); running `vault agent`
+    # directly bypasses the entrypoint that would drop privileges, so pin the
+    # non-root vault user (uid 100) to satisfy runAsNonRoot. Shared file access to
+    # the rendered-credential volume is provided by the pod fsGroup.
+    runAsUser: 100
     seccompProfile:
       type: RuntimeDefault
   volumeMounts:
