@@ -161,6 +161,9 @@ func NewHelmClusterFromReleasedChart(
 		}
 	}
 	cluster.helmOptions.Version = chartVersion
+	cluster.helmOptions.ExtraArgs["upgrade"] = append(
+		cluster.helmOptions.ExtraArgs["upgrade"], "--version", chartVersion,
+	)
 	return cluster
 }
 
@@ -182,7 +185,21 @@ func (h *HelmCluster) UpgradeToLocalChart(t *testing.T, helmValues map[string]st
 		}
 	}
 	h.helmOptions.Version = config.HelmChartPath
+	h.removeReleasedChartVersion()
 	h.Upgrade(t, helmValues)
+}
+
+func (h *HelmCluster) removeReleasedChartVersion() {
+	args := h.helmOptions.ExtraArgs["upgrade"]
+	filtered := args[:0]
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--version" && i+1 < len(args) {
+			i++
+			continue
+		}
+		filtered = append(filtered, args[i])
+	}
+	h.helmOptions.ExtraArgs["upgrade"] = filtered
 }
 
 func (h *HelmCluster) Create(t *testing.T) {

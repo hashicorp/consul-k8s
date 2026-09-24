@@ -2576,6 +2576,60 @@ func TestEntriesEqual_HTTPRoute_ExtAuthz(t *testing.T) {
 	}
 }
 
+// TestEntriesEqual_APIGateway_GatewayLevelTLS verifies that toggling the
+// gateway-level TLS.Enabled field is detected as a change by EntriesEqual.
+// This exercises the bug-fix path: before the fix apiGatewaysEqual did not
+// compare TLS or ExtAuthz, so adding the consul.hashicorp.com/tls-enabled
+// annotation would not cause the reconciler to write the updated config entry
+// to Consul.
+func TestEntriesEqual_APIGateway_GatewayLevelTLS(t *testing.T) {
+	t.Parallel()
+
+	base := func(tlsEnabled bool) *api.APIGatewayConfigEntry {
+		return &api.APIGatewayConfigEntry{
+			Kind:      api.APIGateway,
+			Name:      "gw",
+			Namespace: "default",
+			Partition: "default",
+			TLS:       api.GatewayTLSConfig{Enabled: tlsEnabled},
+		}
+	}
+
+	testCases := map[string]struct {
+		a, b           *api.APIGatewayConfigEntry
+		expectedResult bool
+	}{
+		"both TLS disabled are equal": {
+			a:              base(false),
+			b:              base(false),
+			expectedResult: true,
+		},
+		"both TLS enabled are equal": {
+			a:              base(true),
+			b:              base(true),
+			expectedResult: true,
+		},
+		"TLS disabled vs enabled are NOT equal": {
+			a:              base(false),
+			b:              base(true),
+			expectedResult: false,
+		},
+		"TLS enabled vs disabled are NOT equal": {
+			a:              base(true),
+			b:              base(false),
+			expectedResult: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.expectedResult, EntriesEqual(tc.a, tc.b))
+		})
+	}
+}
+
 // TestEntriesEqual_APIGateway_Defaults exercises that changes to the gateway-wide
 // UpstreamLimits Defaults (set via annotations) are detected as unequal so the
 // reconciler writes the updated config entry to Consul.
