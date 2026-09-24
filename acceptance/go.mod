@@ -8,8 +8,6 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 // replace these so we always use the latest version of the control-plane types
 replace github.com/hashicorp/consul-k8s/control-plane => ../control-plane
 
-//replace github.com/hashicorp/consul/api => /Users/bharath/hashicorp/consul/api
-
 require (
 	github.com/go-logr/logr v1.4.3
 	github.com/gruntwork-io/terratest v0.46.7
@@ -138,4 +136,4 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20260918054451-c6011ea025ea
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20260921130648-12d9521c6406
