@@ -17,14 +17,13 @@ USER root
 ENV BATS_VERSION "1.11.0"
 ENV TERRAFORM_VERSION "1.9.6"
 
-RUN apt-get update
-
 # base packages
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
   openssl \
   python3 \
   python3-pip \
-  jq
+  jq \
+  && rm -rf /var/lib/apt/lists/*
 
 # yq
 RUN pip3 install yq

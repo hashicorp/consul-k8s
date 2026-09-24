@@ -4,20 +4,20 @@
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
 - {runner: 0, test-packages: "partitions", num-clusters: "2"}
 - {runner: 1, test-packages: "peering", num-clusters: "2"}
-- {runner: 2, test-packages: "sameness"}
-- {runner: 3, test-packages: "connect"}
-- {runner: 4, test-packages: "snapshot-agent"}
+- {runner: 2, test-packages: "sameness", num-clusters: "4"}
+- {runner: 3, test-packages: "connect", num-clusters: "1"}
+- {runner: 4, test-packages: "snapshot-agent", num-clusters: "1"}
 - {runner: 5, test-packages: "wan-federation", num-clusters: "2"}
-- {runner: 6, test-packages: "cli"}
-- {runner: 7, test-packages: "vault"}
-- {runner: 8, test-packages: "metrics"}
-- {runner: 9, test-packages: "server"}
+- {runner: 6, test-packages: "cli", num-clusters: "1"}
+- {runner: 7, test-packages: "vault", num-clusters: "2"}
+- {runner: 8, test-packages: "metrics", num-clusters: "1"}
+- {runner: 9, test-packages: "server", num-clusters: "1"}
 - {runner: 10, test-packages: "api-gateway", num-clusters: "2"}
-- {runner: 11, test-packages: "connect-lifecycle"}
-- {runner: 12, test-packages: "sync"}
-- {runner: 13, test-packages: "api-gateway-external"}
-- {runner: 14, test-packages: "example"}
-- {runner: 15, test-packages: "consul-dns"}
-- {runner: 16, test-packages: "config-entries"}
-- {runner: 17, test-packages: "terminating-gateway"}
-- {runner: 18, test-packages: "basic"}
+- {runner: 11, test-packages: "connect-lifecycle", num-clusters: "1"}
+- {runner: 12, test-packages: "sync", num-clusters: "1"}
+- {runner: 13, test-packages: "api-gateway-external", num-clusters: "1"}
+- {runner: 14, test-packages: "example", num-clusters: "1"}
+- {runner: 15, test-packages: "consul-dns", num-clusters: "1"}
+- {runner: 16, test-packages: "config-entries", num-clusters: "1"}
+- {runner: 17, test-packages: "terminating-gateway", num-clusters: "1"}
+- {runner: 18, test-packages: "basic", num-clusters: "1"}
