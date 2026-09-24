@@ -447,6 +447,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			MirroringPrefix:        config.HelmConfig.NamespaceMirroringPrefix,
 			ConsulPartition:        config.HelmConfig.ConsulPartition,
 			Datacenter:             config.Datacenter,
+			Logger:                 mgr.GetLogger(),
 		},
 		denyK8sNamespacesSet:  config.DenyK8sNamespacesSet,
 		allowK8sNamespacesSet: config.AllowK8sNamespacesSet,
@@ -601,6 +602,11 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			// Subscribe to changes in RouteTLSSDSFilter custom resources referenced by HTTPRoutes.
 			&v1alpha1.RouteTLSSDSFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteTLSSDSFilter),
+		).
+		Watches(
+			// Subscribe to changes in RouteUpstreamLimitsFilter custom resources referenced by HTTPRoutes.
+			&v1alpha1.RouteUpstreamLimitsFilter{},
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteUpstreamLimitsFilter),
 		).
 		Watches(
 			&v1alpha1.RouteExtProc{},
@@ -772,6 +778,12 @@ func (r *GatewayController) transformRouteExtProc(ctx context.Context, o client.
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteExtProcIndex, client.ObjectKeyFromObject(o).String())
 }
 
+// transformRouteUpstreamLimitsFilter will return a list of routes that need to be reconciled.
+func (r *GatewayController) transformRouteUpstreamLimitsFilter(ctx context.Context, o client.Object) []reconcile.Request {
+	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteUpstreamLimitsFilterIndex, client.ObjectKeyFromObject(o).String())
+}
+
+// transformRouteHeaderMatchInvertFilter will return a list of routes that need to be reconciled.
 func (r *GatewayController) transformRouteHeaderMatchInvertFilter(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteHeaderMatchInvertFilterIndex, client.ObjectKeyFromObject(o).String())
 }
@@ -1129,6 +1141,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			externalFilter = &v1alpha1.RouteAuthFilter{}
 		case v1alpha1.RouteTLSSDSFilterKind:
 			externalFilter = &v1alpha1.RouteTLSSDSFilter{}
+		case v1alpha1.RouteUpstreamLimitsFilterKind:
+			externalFilter = &v1alpha1.RouteUpstreamLimitsFilter{}
 		case v1alpha1.RouteExtProcKind:
 			externalFilter = &v1alpha1.RouteExtProc{}
 		case v1alpha1.RouteHeaderMatchInvertFilterKind:

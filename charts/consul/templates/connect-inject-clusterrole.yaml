@@ -33,6 +33,7 @@ rules:
   - routetimeoutfilters
   - routeauthfilters
   - routetlssdsfilters
+  - routeupstreamlimitsfilters
   - routeextprocs
   - routeheadermatchinvertfilters
   - gatewaypolicies
@@ -76,6 +77,7 @@ rules:
   - jwtproviders/status
   - routeauthfilters/status
   - routetlssdsfilters/status
+  - routeupstreamlimitsfilters/status
   - routeextprocs/status
   - routeheadermatchinvertfilters/status
   - gatewaypolicies/status
