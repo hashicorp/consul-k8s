@@ -121,11 +121,6 @@ const (
 	// (RFC 8693 OBO exchange). Must not collide with 21101 or 21102.
 	DefaultOBOOutboundPort = 21103
 
-	// DefaultMCPGatewayBinary is the path to consul-mcp-gateway inside its image.
-	// Must be set as container Command: playground images use CMD (not ENTRYPOINT),
-	// and Kubernetes Args replace CMD entirely.
-	DefaultMCPGatewayBinary = "/usr/local/bin/consul-mcp-gateway"
-
 	// DefaultOBOInboundBinary is the path to consul-obo-inbound inside its image.
 	DefaultOBOInboundBinary = "/usr/local/bin/consul-obo-inbound"
 

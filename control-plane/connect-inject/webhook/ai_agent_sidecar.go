@@ -96,11 +96,7 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 		Image:           w.ImageAIAgent,
 		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Resources:       defaults.Resources,
-		// Explicit Command required: Args alone replace image CMD, and the
-		// playground mcp-gateway image has CMD not ENTRYPOINT — without this,
-		// kubelet tries to exec "--socket=..." as the binary (exit 128).
-		Command: []string{constants.DefaultMCPGatewayBinary},
-		Args:    args,
+		Args:            args,
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "hitl",
