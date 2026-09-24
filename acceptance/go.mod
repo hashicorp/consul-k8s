@@ -136,4 +136,4 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20260918054451-c6011ea025ea
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20260921130648-12d9521c6406
