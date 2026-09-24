@@ -435,12 +435,6 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			common.ComponentLabel: "api-gateway",
 		}),
 	)
-	gwPredicate, _ := predicate.LabelSelectorPredicate(
-		*metav1.SetAsLabelSelector(map[string]string{
-			common.ComponentLabel: "api-gateway",
-		}),
-	)
-
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
@@ -481,7 +475,16 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-v1").
-		For(&gwv1.Gateway{}, builder.WithPredicates(gwPredicate)).
+		// Deliberately unfiltered. The ComponentLabel is only applied to the
+		// resources consul-k8s generates for a gateway (Deployment, Service,
+		// Pod), never to the user-authored Gateway CR, so filtering the root
+		// watch on it drops every Gateway event. Narrowing instead to "has a
+		// listener-protocol annotation" is not viable either: it strands every
+		// Gateway that does not use this feature, so a bare Gateway is never
+		// provisioned and spec-only edits such as a listener port change are
+		// silently lost. Reconcile performs the authoritative ownership check
+		// via gatewayClass.Spec.ControllerName, so admit all Gateways here.
+		For(&gwv1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{})
