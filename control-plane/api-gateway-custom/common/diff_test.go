@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 )
 
 func TestEntriesEqual(t *testing.T) {
@@ -2335,6 +2335,40 @@ func TestEntriesEqual_HTTPRoute_ExtAuthz(t *testing.T) {
 			b:              makeEntry(disabled),
 			expectedResult: false,
 		},
+	}
+
+	for name, tc := range testCases {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.expectedResult, EntriesEqual(tc.a, tc.b))
+		})
+	}
+}
+
+// TestEntriesEqual_APIGateway_GatewayLevelTLS verifies that toggling the
+// gateway-level TLS.Enabled field is detected as a change by EntriesEqual.
+func TestEntriesEqual_APIGateway_GatewayLevelTLS(t *testing.T) {
+	t.Parallel()
+
+	base := func(tlsEnabled bool) *api.APIGatewayConfigEntry {
+		return &api.APIGatewayConfigEntry{
+			Kind:      api.APIGateway,
+			Name:      "gw",
+			Namespace: "default",
+			Partition: "default",
+			TLS:       api.GatewayTLSConfig{Enabled: tlsEnabled},
+		}
+	}
+
+	testCases := map[string]struct {
+		a, b           *api.APIGatewayConfigEntry
+		expectedResult bool
+	}{
+		"both TLS disabled are equal":           {a: base(false), b: base(false), expectedResult: true},
+		"both TLS enabled are equal":            {a: base(true), b: base(true), expectedResult: true},
+		"TLS disabled vs enabled are NOT equal": {a: base(false), b: base(true), expectedResult: false},
+		"TLS enabled vs disabled are NOT equal": {a: base(true), b: base(false), expectedResult: false},
 	}
 
 	for name, tc := range testCases {

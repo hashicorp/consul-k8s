@@ -5,8 +5,11 @@ package common
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -26,6 +29,10 @@ type ResourceTranslator struct {
 	MirroringPrefix        string
 	ConsulPartition        string
 	Datacenter             string
+	// Logger is used to warn about annotation values that are ignored because
+	// they are malformed or out of range. The zero value is safe to use and
+	// discards all output.
+	Logger logr.Logger
 }
 
 func (t ResourceTranslator) NonNormalizedConfigEntryReference(kind string, id types.NamespacedName) api.ResourceReference {
@@ -73,8 +80,22 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1.Gateway, resources *Resour
 			constants.MetaKeyKubeName: gateway.Name,
 		}),
 		Listeners: listeners,
+		TLS:       gatewayTLS(gateway.Annotations),
+		Defaults:  t.translateGatewayDefaults(gateway),
 		ExtAuthz:  gatewayExtAuthz(gateway.Annotations),
 	}
+}
+
+// gatewayTLS translates the gateway-wide tls-enabled annotation into the Consul
+// APIGateway gateway-level TLS configuration. When the annotation is set to
+// "true" it returns a config with Enabled=true, opting the gateway into
+// zero-touch, Connect-leaf TLS termination. Otherwise it returns the zero value
+// (Enabled=false), which preserves the prior per-listener-only behavior.
+func gatewayTLS(annotations map[string]string) api.GatewayTLSConfig {
+	if annotations[AnnotationTLSEnabled] == TLSEnabledValue {
+		return api.GatewayTLSConfig{Enabled: true}
+	}
+	return api.GatewayTLSConfig{}
 }
 
 // gatewayExtAuthz translates the gateway-wide ext_authz annotation into the
@@ -104,6 +125,193 @@ func routeExtAuthzFromAnnotations(annotations map[string]string) *api.HTTPRouteE
 	default:
 		return nil
 	}
+}
+
+// Gateway annotations that configure the gateway-wide upstream limit defaults
+// (api-gateway Defaults *UpstreamLimits). Any unset annotation leaves the
+// corresponding field nil so Envoy falls back to its own default. Annotations
+// are not covered by CRD schema validation, so values are range-checked here
+// and invalid values are ignored rather than propagated to Consul.
+const (
+	annotationDefaultMaxConnections        = "api-gateway.consul.hashicorp.com/default-max-connections"
+	annotationDefaultMaxPendingRequests    = "api-gateway.consul.hashicorp.com/default-max-pending-requests"
+	annotationDefaultMaxConcurrentRequests = "api-gateway.consul.hashicorp.com/default-max-concurrent-requests"
+
+	annotationDefaultPHCInterval              = "api-gateway.consul.hashicorp.com/default-passive-health-check-interval"
+	annotationDefaultPHCMaxFailures           = "api-gateway.consul.hashicorp.com/default-passive-health-check-max-failures"
+	annotationDefaultPHCEnforcingConsecutive5 = "api-gateway.consul.hashicorp.com/default-passive-health-check-enforcing-consecutive-5xx"
+	annotationDefaultPHCMaxEjectionPercent    = "api-gateway.consul.hashicorp.com/default-passive-health-check-max-ejection-percent"
+	annotationDefaultPHCBaseEjectionTime      = "api-gateway.consul.hashicorp.com/default-passive-health-check-base-ejection-time"
+)
+
+// translateGatewayDefaults reads the gateway-wide upstream limit defaults from
+// annotations on the Gateway resource and returns them as an api.UpstreamLimits.
+// It returns nil when no relevant annotation is set.
+func (t ResourceTranslator) translateGatewayDefaults(gateway gwv1.Gateway) *api.UpstreamLimits {
+	annotations := gateway.Annotations
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	limits := &api.UpstreamLimits{}
+	set := false
+
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxConnections); ok {
+		limits.MaxConnections = &n
+		set = true
+	}
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxPendingRequests); ok {
+		limits.MaxPendingRequests = &n
+		set = true
+	}
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxConcurrentRequests); ok {
+		limits.MaxConcurrentRequests = &n
+		set = true
+	}
+
+	if phc := t.translateGatewayDefaultPassiveHealthCheck(annotations); phc != nil {
+		limits.PassiveHealthCheck = phc
+		set = true
+	}
+
+	if !set {
+		return nil
+	}
+	return limits
+}
+
+func (t ResourceTranslator) translateGatewayDefaultPassiveHealthCheck(annotations map[string]string) *api.PassiveHealthCheck {
+	phc := &api.PassiveHealthCheck{}
+	set := false
+
+	if d, ok := t.parseNonNegativeDuration(annotations, annotationDefaultPHCInterval); ok {
+		phc.Interval = d
+		set = true
+	}
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCMaxFailures, maxUint32); ok {
+		phc.MaxFailures = n
+		set = true
+	}
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCEnforcingConsecutive5, maxPercent); ok {
+		phc.EnforcingConsecutive5xx = &n
+		set = true
+	}
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCMaxEjectionPercent, maxPercent); ok {
+		phc.MaxEjectionPercent = &n
+		set = true
+	}
+	if d, ok := t.parseNonNegativeDuration(annotations, annotationDefaultPHCBaseEjectionTime); ok {
+		phc.BaseEjectionTime = &d
+		set = true
+	}
+
+	if !set {
+		return nil
+	}
+	return phc
+}
+
+const (
+	maxPercent = uint64(100)
+	maxUint32  = uint64(^uint32(0))
+)
+
+// rejectAnnotation warns that an annotation value was ignored. Ignoring rather
+// than failing the reconcile keeps a typo in an optional tuning annotation from
+// tearing down an otherwise healthy gateway, but the operator still gets a
+// signal in the controller logs instead of silently getting Envoy's defaults.
+func (t ResourceTranslator) rejectAnnotation(key, value, reason string) {
+	t.Logger.Info("ignoring invalid api-gateway annotation value",
+		"annotation", key, "value", value, "reason", reason)
+}
+
+// parseNonNegativeInt reads an integer annotation. Values that are missing,
+// unparseable or negative are ignored so that an operator typo cannot push an
+// invalid config entry to Consul (Envoy rejects negative circuit-breaker
+// thresholds). The corresponding field is then left unset and Envoy's own
+// default applies.
+func (t ResourceTranslator) parseNonNegativeInt(annotations map[string]string, key string) (int, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		t.rejectAnnotation(key, v, "value must be an integer")
+		return 0, false
+	}
+	if n < 0 {
+		t.rejectAnnotation(key, v, "value must not be negative")
+		return 0, false
+	}
+	return n, true
+}
+
+// parseUint32 reads an unsigned integer annotation, ignoring values that are
+// unparseable, negative or greater than max.
+func (t ResourceTranslator) parseUint32(annotations map[string]string, key string, max uint64) (uint32, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(v, 10, 32)
+	if err != nil {
+		t.rejectAnnotation(key, v, fmt.Sprintf("value must be an integer between 0 and %d", max))
+		return 0, false
+	}
+	if n > max {
+		t.rejectAnnotation(key, v, fmt.Sprintf("value must not be greater than %d", max))
+		return 0, false
+	}
+	return uint32(n), true
+}
+
+// parseNonNegativeDuration reads a duration annotation, ignoring values that are
+// unparseable or negative.
+func (t ResourceTranslator) parseNonNegativeDuration(annotations map[string]string, key string) (time.Duration, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		t.rejectAnnotation(key, v, "value must be a duration such as \"10s\"")
+		return 0, false
+	}
+	if d < 0 {
+		t.rejectAnnotation(key, v, "duration must not be negative")
+		return 0, false
+	}
+	return d, true
+}
+
+// toConsulUpstreamLimits converts a RouteUpstreamLimitsFilter spec into the
+// Consul api.UpstreamLimits used on a route service's Limits.
+func toConsulUpstreamLimits(spec v1alpha1.RouteUpstreamLimitsFilterSpec) *api.UpstreamLimits {
+	limits := &api.UpstreamLimits{
+		MaxConnections:        spec.MaxConnections,
+		MaxPendingRequests:    spec.MaxPendingRequests,
+		MaxConcurrentRequests: spec.MaxConcurrentRequests,
+		PassiveHealthCheck:    toConsulPassiveHealthCheck(spec.PassiveHealthCheck),
+	}
+	return limits
+}
+
+func toConsulPassiveHealthCheck(phc *v1alpha1.PassiveHealthCheck) *api.PassiveHealthCheck {
+	if phc == nil {
+		return nil
+	}
+	out := &api.PassiveHealthCheck{
+		Interval:                phc.Interval.Duration,
+		MaxFailures:             phc.MaxFailures,
+		EnforcingConsecutive5xx: phc.EnforcingConsecutive5xx,
+		MaxEjectionPercent:      phc.MaxEjectionPercent,
+	}
+	if phc.BaseEjectionTime != nil {
+		d := phc.BaseEjectionTime.Duration
+		out.BaseEjectionTime = &d
+	}
+	return out
 }
 
 // listenerProtocolMap maps Kubernetes Gateway API listener protocol values to
@@ -428,6 +636,7 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1.HTTPRoute, ref gw
 			ResponseFilters: responseFilters,
 			TLS:             tlsConfig,
 			Weight:          DerefIntOr(ref.Weight, 1),
+			Limits:          t.translateBackendRefLimits(ref.Filters, resources, route.Namespace),
 		}, true
 	}
 
@@ -444,10 +653,33 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1.HTTPRoute, ref gw
 			ResponseFilters: responseFilters,
 			TLS:             tlsConfig,
 			Weight:          DerefIntOr(ref.Weight, 1),
+			Limits:          t.translateBackendRefLimits(ref.Filters, resources, route.Namespace),
 		}, true
 	}
 
 	return api.HTTPService{}, false
+}
+
+// translateBackendRefLimits scans a backendRef's filters for a
+// RouteUpstreamLimitsFilter extensionRef and, if present, returns the resolved
+// per-service upstream limits. It returns nil when no such filter is referenced.
+func (t ResourceTranslator) translateBackendRefLimits(filters []gwv1.HTTPRouteFilter, resources *ResourceMap, namespace string) *api.UpstreamLimits {
+	for _, filter := range filters {
+		if filter.Type != gwv1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+			continue
+		}
+		if filter.ExtensionRef.Kind != v1alpha1.RouteUpstreamLimitsFilterKind {
+			continue
+		}
+		crdFilter, exists := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+		if !exists {
+			continue
+		}
+		if limitsFilter, ok := crdFilter.(*v1alpha1.RouteUpstreamLimitsFilter); ok {
+			return toConsulUpstreamLimits(limitsFilter.Spec)
+		}
+	}
+	return nil
 }
 
 var headerMatchTypeTranslation = map[gwv1.HeaderMatchType]api.HTTPHeaderMatchType{
