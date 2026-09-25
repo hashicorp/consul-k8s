@@ -43,8 +43,8 @@ spec:
             httpGet:
               port: 9090
             initialDelaySeconds: 1
-            failureThreshold: 1
-            periodSeconds: 1
+            failureThreshold: 30
+            periodSeconds: 5
           startupProbe:
             httpGet:
               port: 9090
