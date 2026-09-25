@@ -40,8 +40,8 @@ import (
 )
 
 const (
-	targetShardSeconds = 20 * 60 // aim for ≤20 min estimated wall time per shard
-	defaultTestSeconds = 10 * 60 // assumed duration for tests with no recorded history
+	targetShardSeconds = 15 * 60 // aim for ≤15 min estimated wall time per shard
+	defaultTestSeconds = 5 * 60  // assumed duration for tests with no recorded history
 )
 
 // testEntry pairs a test function name with its estimated duration in seconds.

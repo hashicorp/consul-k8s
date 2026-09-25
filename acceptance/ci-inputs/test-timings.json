@@ -9,10 +9,26 @@
     "TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas": 192,
     "TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA": 183,
     "TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations": 163,
-    "TestAPIGateway_GatewayClassConfig": 138
+    "TestAPIGateway_GatewayClassConfig": 138,
+    "TestAPIGateway_AutoTLS": 400,
+    "TestAPIGateway_EntTLSTermination": 5,
+    "TestAPIGateway_ExtAuthz_OIDC_Mesh": 400,
+    "TestAPIGateway_ExtAuthz_OIDC": 400,
+    "TestAPIGateway_ExtProc_MultiClusterFailover": 5,
+    "TestAPIGateway_HeaderMatchInvert_Lifecycle": 217,
+    "TestAPIGateway_KitchenSink": 800,
+    "TestAPIGateway_MultiListenerProtocol": 300,
+    "TestAPIGateway_Scaling_AnnotatedGatewayBeforeUpgradeReconcilesAfterUpgrade": 193,
+    "TestAPIGateway_Scaling_UserManagedHPATakesPrecedenceOverAnnotations": 193,
+    "TestAPIGateway_Scaling_UserManagedHPAPreservesManualScale": 193,
+    "TestAPIGateway_Scaling_UserManagedHPARemovedRestoresControllerHPA": 193,
+    "TestAPIGateway_Scaling_UserManagedHPAUpdatesDriveReplicaChanges": 193,
+    "TestAPIGateway_Scaling_DanglingUserHPABeforeGatewayTakesPrecedence": 193,
+    "TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck": 300
   },
   "api-gateway-external": {
-    "TestAPIGateway_ExternalServers": 216.0
+    "TestAPIGateway_ExternalServers": 216.0,
+    "TestAPIGateway_ExternalServers_Mesh": 216
   },
   "basic": {
     "TestBasicInstallation": 243.23
@@ -37,7 +53,19 @@
     "TestConnectInject_PermissiveMTLS": 196,
     "TestConnectInject_LocalRateLimiting": 182.57,
     "TestConnectInject_ExternalServers": 401.6,
-    "TestConnectInject_MultiportServices": 432.53
+    "TestConnectInject_MultiportServices_NotSecure": 432,
+    "TestConnectInject_MultiportServices_Secure": 432,
+    "TestConnectInject_NotSecure": 5,
+    "TestConnectInject_Secure": 5,
+    "TestConnectInject_VirtualIPFailover": 300,
+    "TestConnectInject_CleanupKilledPods_NotSecure": 300,
+    "TestConnectInject_CleanupKilledPods_Secure": 300,
+    "TestConnectInject_MultiportRegistrationGate": 400,
+    "TestConnectInject_MultiportConversionStrategies": 400,
+    "TestConnectInject_MultiportConversionReportsStrandedWorkloads": 400,
+    "TestConnectInject_MultiportConversionFromPriorRelease": 5,
+    "TestConnectInject_MultiportConversionOnRunningMeshServices": 400,
+    "TestConnectInject_MultiDataplane_ExternalServers": 400
   },
   "connect-lifecycle": {
     "TestConnectInject_ProxyLifecycleShutdown_NotSecure_DrainListeners_GracePeriod5": 370,
@@ -45,7 +73,8 @@
     "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod5": 370,
     "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod5": 370,
     "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod0": 370,
-    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod0": 370
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod0": 370,
+    "TestConnectInject_ProxyLifecycleShutdownJob": 5
   },
   "consul-dns": {
     "TestConsulDNSProxy_WithPartitionsAndCatalogSync_NotSecure_PrivilegedPort": 514,
@@ -63,9 +92,14 @@
     "TestConsulDNS_SecureDNSProxy_NonPrivilegedPort": 151.21,
     "TestConsulDNS_SecureNoInjectDNSProxy_NonPrivilegedPort": 136
   },
+  "example": {
+    "TestExample": 300
+  },
   "metrics": {
     "TestComponentMetrics": 93.07,
-    "TestAppMetrics": 165.36
+    "TestAppMetrics": 165.36,
+    "TestAppMetricsMultiplePorts": 165,
+    "TestAppMetricsMultiplePorts_PortDown": 165
   },
   "partitions": {
     "TestPartitions_Connect_DefaultNamespace": 553,
@@ -100,6 +134,9 @@
     "TestFailover_Connect_DefaultFailover": 1080,
     "TestFailover_Connect_SecureFailover": 1080
   },
+  "server": {
+    "TestServerRestart": 5
+  },
   "snapshot-agent": {
     "TestSnapshotAgent_K8sSecret": 91.52,
     "TestSnapshotAgent_Vault": 45.33
@@ -118,17 +155,23 @@
     "TestTerminatingGatewayNamespaceMirroring_MeshDefaultOthersNonDefault_Secure": 224,
     "TestTerminatingGatewayNamespaceMirroring_ExternalDefaultOthersNonDefault_NotSecure": 224,
     "TestTerminatingGatewayNamespaceMirroring_ExternalDefaultOthersNonDefault_Secure": 224,
-    "TestTerminatingGatewaySingleNamespace": 360
+    "TestTerminatingGatewaySingleNamespace": 360,
+    "TestTerminatingGatewayDestinations": 5,
+    "TestTerminatingGatewaySecretRotation": 360,
+    "TestTerminatingGateway": 450
   },
   "vault": {
     "TestVault_Partitions": 207.1,
     "TestVault": 527.06,
-    "TestVault_TLSAutoReload": 299.58
+    "TestVault_TLSAutoReload": 299.58,
+    "TestVault_VaultNamespace": 5,
+    "TestVault_WANFederationViaGateways": 5
   },
   "wan-federation": {
     "TestWANFederation_NotSecure": 408,
     "TestWANFederation_Secure": 408,
     "TestWANFederationFailover_NotSecure": 739.77,
-    "TestWANFederationFailover_Secure": 686
+    "TestWANFederationFailover_Secure": 686,
+    "TestWANFederation_Gateway": 5
   }
 }

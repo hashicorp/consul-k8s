@@ -57,9 +57,7 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	output, err := RunKubectlAndGetOutputE(t, options, "kustomize", kustomizeDir)
 	require.NoError(t, err)
 
-	deployment := v1.Deployment{}
-	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&deployment)
-	require.NoError(t, err)
+	deployment := findDeploymentInMultiDoc(t, output)
 
 	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
 		// Note: this delete command won't wait for pods to be fully terminated.
@@ -74,6 +72,46 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=10m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
+// findDeploymentInMultiDoc scans a multi-document YAML string and returns the first Deployment found.
+// kubectl kustomize outputs resources in kind-sorted order (ServiceAccount, RoleBinding, Secret, Service, Deployment),
+// so the Deployment is not always the first document.
+func findDeploymentInMultiDoc(t *testing.T, output string) v1.Deployment {
+	t.Helper()
+	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024)
+	for {
+		var deployment v1.Deployment
+		err := decoder.Decode(&deployment)
+		if err != nil {
+			break
+		}
+		if deployment.Kind == "Deployment" && deployment.Name != "" {
+			return deployment
+		}
+	}
+	t.Fatal("no Deployment found in kustomize output")
+	return v1.Deployment{}
+}
+
+// findJobInMultiDoc scans a multi-document YAML string and returns the first Job found.
+// kubectl kustomize outputs resources in kind-sorted order (ServiceAccount, Service, Job),
+// so the Job is not always the first document.
+func findJobInMultiDoc(t *testing.T, output string) batchv1.Job {
+	t.Helper()
+	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024)
+	for {
+		var job batchv1.Job
+		err := decoder.Decode(&job)
+		if err != nil {
+			break
+		}
+		if job.Kind == "Job" && job.Name != "" {
+			return job
+		}
+	}
+	t.Fatal("no Job found in kustomize output")
+	return batchv1.Job{}
+}
+
 func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory, kustomizeDir string) {
 	t.Helper()
 
@@ -82,9 +120,7 @@ func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure boo
 	output, err := RunKubectlAndGetOutputE(t, options, "kustomize", kustomizeDir)
 	require.NoError(t, err)
 
-	job := batchv1.Job{}
-	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&job)
-	require.NoError(t, err)
+	job := findJobInMultiDoc(t, output)
 
 	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
 		// Note: this delete command won't wait for pods to be fully terminated.
