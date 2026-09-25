@@ -18,28 +18,28 @@ import (
 
 const (
 	// mcpGatewayContainer is the injected AI ext_proc sidecar name (historical).
-	// One container runs consul-ai-sidecars, which supervises MCP and/or OBO.
+	// One container runs consul-mcp-sc, which supervises MCP and/or OBO.
 	mcpGatewayContainer = "mcp-gateway"
 
 	// mcpGatewayUDSPath is the Unix domain socket MCP may listen on when not
 	// using TCP. Shared volume with consul-dataplane / Envoy.
 	mcpGatewayUDSPath = "/consul/connect-inject/mcp-extproc.sock"
 
-	// defaultAISidecarsBinary is the supervisor ENTRYPOINT in consul-ai-sidecars images.
-	defaultAISidecarsBinary = "/usr/local/bin/consul-ai-sidecars"
+	// defaultMCPScBinary is the supervisor ENTRYPOINT in consul-mcp-sc images.
+	defaultMCPScBinary = "/usr/local/bin/consul-mcp-sc"
 )
 
 // aiAgentSidecar builds the single AI ext_proc sidecar for ai-agent pods.
-// It runs consul-ai-sidecars --mode=agent (MCP + OBO inbound + OBO outbound).
+// It runs consul-mcp-sc --mode=agent (MCP + OBO inbound + OBO outbound).
 //
 // runAsUser/runAsGroup must match consul-dataplane: Local Credential Broker
 // FetchKey accepts the peer only when SO_PEERCRED UID matches.
 func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefaults, runAsUser, runAsGroup int64) (corev1.Container, error) {
-	image := w.aiSidecarImage()
+	image := w.mcpScImage()
 	if image == "" {
 		return corev1.Container{}, fmt.Errorf(
 			"AI sidecar image must be set for ai-agent pods; " +
-				"configure ai.agent.image (or ai.obo.outbound.image as fallback)")
+				"configure ai.agent.image to the consul-mcp-sc multi-binary image")
 	}
 
 	hitlPort := defaults.HITL.Port
@@ -91,7 +91,7 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 		Image:           image,
 		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Resources:       defaults.Resources,
-		Command:         []string{defaultAISidecarsBinary},
+		Command:         []string{defaultMCPScBinary},
 		Args:            args,
 		Ports: []corev1.ContainerPort{
 			{
@@ -106,7 +106,7 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 				MountPath: "/consul/connect-inject",
 			},
 		},
-		ReadinessProbe: w.aiSidecarReadinessProbe(pod),
+		ReadinessProbe: w.mcpScReadinessProbe(pod),
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser:                ptr.To(runAsUser),
 			RunAsGroup:               ptr.To(runAsGroup),
@@ -123,22 +123,15 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 	}, nil
 }
 
-// aiSidecarImage prefers ai.agent.image; falls back to OBO outbound/inbound
-// image tags when teams point all three Helm values at the same multi-binary image.
-func (w *MeshWebhook) aiSidecarImage() string {
-	if w.ImageAIAgent != "" {
-		return w.ImageAIAgent
-	}
-	if w.ImageConsulOBOOutbound != "" {
-		return w.ImageConsulOBOOutbound
-	}
-	return w.ImageConsulOBOInbound
+// mcpScImage returns ai.agent.image (consul-mcp-sc multi-binary: MCP + OBO).
+func (w *MeshWebhook) mcpScImage() string {
+	return w.ImageAIAgent
 }
 
-// aiSidecarReadinessProbe checks that the supervisor brought up OBO outbound
-// (TCP :21103). That process starts last in --mode=agent and requires the
-// broker path; MCP may be on UDS and is harder to probe alone.
-func (w *MeshWebhook) aiSidecarReadinessProbe(pod corev1.Pod) *corev1.Probe {
+// mcpScReadinessProbe checks that OBO outbound is listening (TCP :21103).
+// Children start concurrently under consul-mcp-sc; :21103 is a stable TCP
+// probe target (MCP may be on UDS). Not a guarantee that MCP is up.
+func (w *MeshWebhook) mcpScReadinessProbe(pod corev1.Pod) *corev1.Probe {
 	_ = pod
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{

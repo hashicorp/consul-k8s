@@ -163,33 +163,6 @@
           },
           "additionalProperties": false
         },
-        "obo": {
-          "type": "object",
-          "description": "OBO (on-behalf-of) identity-plane sidecars injected into ai-role=ai-agent pods.",
-          "properties": {
-            "inbound": {
-              "type": "object",
-              "properties": {
-                "image": {
-                  "type": "string",
-                  "description": "Container image for consul-obo-inbound (loopback :21102)."
-                }
-              },
-              "additionalProperties": false
-            },
-            "outbound": {
-              "type": "object",
-              "properties": {
-                "image": {
-                  "type": "string",
-                  "description": "Container image for consul-obo-outbound (loopback :21103)."
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "additionalProperties": false
-        },
         "inferenceGateway": {
           "type": "object",
           "description": "InferenceGateway feature configuration. Controls the container image, defaults, and the list of gateway instances.",

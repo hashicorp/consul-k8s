@@ -3937,16 +3937,15 @@ ai:
     gateways: []
 
   agent:
-    # The container image used by the AI agent sidecar.
-    # When set and a pod carries consul.hashicorp.com/ai-role: "ai-agent", the
-    # webhook injects this image as an additional sidecar container alongside
-    # consul-dataplane.
+    # Multi-binary image for the AI sidecar (consul-mcp-sc): MCP + OBO in one
+    # container. When set and a pod carries consul.hashicorp.com/ai-role:
+    # "ai-agent", the webhook injects this image alongside consul-dataplane.
     #
     # Examples:
     #
     # ```yaml
-    # image: "hashicorp/consul-ai-agent:0.1.0"
-    # image: "myregistry/my-ai-agent:latest"
+    # image: "hashicorp/consul-mcp-sc:0.1.0"
+    # image: "myregistry/consul-mcp-sc:latest"
     # ```
     # @default: ""
     # @type: string
@@ -3982,18 +3981,3 @@ ai:
         limits:
           memory: "256Mi"
           cpu: "500m"
-
-  # OBO (on-behalf-of) identity-plane sidecars for ai-agent pods.
-  # Split-knowledge: envelope ciphertext on Envoy UDS + DEK via dataplane broker.
-  # Required when injecting ai-role=ai-agent; webhook errors if unset.
-  obo:
-    inbound:
-      # Docker image for consul-obo-inbound (loopback :21102).
-      # Binary source: consul-ai-apps/gateways/obo-inbound
-      # @type: string
-      image: ""
-    outbound:
-      # Docker image for consul-obo-outbound (loopback :21103).
-      # Binary source: consul-ai-apps/gateways/obo-outbound
-      # @type: string
-      image: ""

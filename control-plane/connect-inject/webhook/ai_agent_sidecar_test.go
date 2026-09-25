@@ -34,7 +34,7 @@ func TestAIAgentSidecarRequiresImage(t *testing.T) {
 
 func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 	w := &MeshWebhook{
-		ImageAIAgent: "consul-ai-sidecars:test",
+		ImageAIAgent: "consul-mcp-sc:test",
 		LogLevel:     "info",
 	}
 
@@ -47,10 +47,10 @@ func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 		require.Contains(t, c.Args, "--envelope-uds=/consul/connect-inject/oauth-envelope.sock")
 		require.Contains(t, c.Args, "--broker-uds=/consul/connect-inject/credential-broker.sock")
 		require.Contains(t, c.Args, "--dataplane-ready-url=http://127.0.0.1:19000/ready")
-		require.Contains(t, c.Args, "--obo-inbound-addr=127.0.0.1:21102")
-		require.Contains(t, c.Args, "--obo-outbound-addr=:21103")
 		require.Contains(t, c.Args, "--obo-inbound-addr=:21102")
+		require.Contains(t, c.Args, "--obo-outbound-addr=:21103")
 		require.Contains(t, c.Args, "--mcp-socket="+mcpGatewayUDSPath)
+		require.Equal(t, []string{defaultMCPScBinary}, c.Command)
 	})
 
 	t.Run("openshift uid", func(t *testing.T) {
@@ -65,11 +65,12 @@ func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 func TestAIAgentSidecarReadyURLDualStack(t *testing.T) {
 	t.Setenv(constants.ConsulDualStackEnvVar, "true")
 
-	w := &MeshWebhook{ImageAIAgent: "consul-ai-sidecars:test", LogLevel: "info"}
+	w := &MeshWebhook{ImageAIAgent: "consul-mcp-sc:test", LogLevel: "info"}
 	c, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
 	require.NoError(t, err)
 	require.Contains(t, c.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
-	require.Contains(t, c.Args, "--obo-inbound-addr=127.0.0.1:21102")
+	require.Contains(t, c.Args, "--obo-inbound-addr=:21102")
+	require.Contains(t, c.Args, "--obo-outbound-addr=:21103")
 }
 
 func TestHandleAIAgentCombinedSidecar(t *testing.T) {
@@ -102,7 +103,7 @@ func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 			Clientset:             clientset,
 			ConsulConfig:          &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			ImageConsulDataplane:  "dataplane:test",
-			ImageAIAgent:          "consul-ai-sidecars:test",
+			ImageAIAgent:          "consul-mcp-sc:test",
 			LogLevel:              "info",
 		}
 	}
@@ -128,15 +129,6 @@ func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 		resp := w.Handle(context.Background(), admissionRequest(t, aiPod()))
 		require.False(t, resp.Allowed)
 		require.Contains(t, resp.Result.Message, "AI sidecar image must be set")
-	})
-
-	t.Run("obo image fallback when agent image unset", func(t *testing.T) {
-		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
-		w.ImageAIAgent = ""
-		w.ImageConsulOBOOutbound = "consul-ai-sidecars:obo-tag"
-		containers := injectedContainers(t, w, aiPod())
-		ai := containers[mcpGatewayContainer]
-		require.Equal(t, "consul-ai-sidecars:obo-tag", ai.Image)
 	})
 
 	t.Run("non ai-agent pod has no ai sidecar", func(t *testing.T) {

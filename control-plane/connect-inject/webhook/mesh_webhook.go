@@ -87,20 +87,10 @@ type MeshWebhook struct {
 	// annotation, the webhook injects this image as an additional sidecar.
 	ImageMCPServer string
 
-	// ImageAIAgent is the container image for the AI agent sidecar.
-	// When set and a pod carries the consul.hashicorp.com/ai-role: "ai-agent"
-	// annotation, the webhook injects this image as an additional sidecar.
+	// ImageAIAgent is the container image for the AI agent sidecar
+	// (consul-mcp-sc multi-binary: MCP + OBO). Required when IsAIAgent.
+	// Mirrors ai.agent.image from values.yaml.
 	ImageAIAgent string
-
-	// ImageConsulOBOInbound is the container image for consul-obo-inbound.
-	// Injected into ai-agent pods for inbound JWT verify + claim projection
-	// (ext_proc on loopback :21102). Required when IsAIAgent — no silent fallback.
-	ImageConsulOBOInbound string
-
-	// ImageConsulOBOOutbound is the container image for consul-obo-outbound.
-	// Injected into ai-agent pods for outbound RFC 8693 OBO exchange
-	// (ext_proc on loopback :21103). Required when IsAIAgent — no silent fallback.
-	ImageConsulOBOOutbound string
 
 	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	GlobalImagePullPolicy string
@@ -524,7 +514,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 
-		// One ext_proc sidecar (consul-ai-sidecars --mode=agent): MCP + OBO in/out.
+		// One ext_proc sidecar (consul-mcp-sc --mode=agent): MCP + OBO in/out.
 		// runAsUser must match dataplane for Local Credential Broker FetchKey.
 		agentDefaults := v1alpha1.AgentDefaults{}
 		if w.Client != nil {
