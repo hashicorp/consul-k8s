@@ -179,9 +179,7 @@ type Command struct {
 	flagEnableAI                  bool
 	flagAIInferenceGatewayImage   string // Docker image for the InferenceGateway Deployment
 	flagAIMCPServerImage          string // Docker image for the MCP server sidecar
-	flagAIAgentImage              string // Docker image for the AI agent sidecar
-	flagConsulOBOInboundImage     string // Docker image for consul-obo-inbound (ai-agent pods)
-	flagConsulOBOOutboundImage    string // Docker image for consul-obo-outbound (ai-agent pods)
+	flagAIAgentImage              string // Docker image for the AI agent sidecar (consul-mcp-sc)
 	// InferenceGateway defaults sourced from ai.inferenceGateway.defaults in values.yaml
 	flagAIInferenceGatewayDefaultServiceType  string // default Service type (ClusterIP/NodePort/LoadBalancer)
 	flagAIInferenceGatewayDefaultServicePort  int    // default Service port
@@ -312,14 +310,9 @@ func (c *Command) init() {
 		"Docker image for the MCP server sidecar injected into pods with "+
 			"consul.hashicorp.com/ai-role: mcp-server. Mirrors ai.mcpServer.image from values.yaml.")
 	c.flagSet.StringVar(&c.flagAIAgentImage, "ai-agent-image", "",
-		"Docker image for the AI agent sidecar injected into pods with "+
-			"consul.hashicorp.com/ai-role: ai-agent. Mirrors ai.agent.image from values.yaml.")
-	c.flagSet.StringVar(&c.flagConsulOBOInboundImage, "consul-obo-inbound-image", "",
-		"Docker image for consul-obo-inbound. INBOUND OBO sidecar for ai-agent pods. "+
-			"Mirrors ai.obo.inbound.image from values.yaml.")
-	c.flagSet.StringVar(&c.flagConsulOBOOutboundImage, "consul-obo-outbound-image", "",
-		"Docker image for consul-obo-outbound. OUTBOUND OBO sidecar for ai-agent pods. "+
-			"Mirrors ai.obo.outbound.image from values.yaml.")
+		"Docker image for the AI agent sidecar (consul-mcp-sc multi-binary: MCP + OBO) "+
+			"injected into pods with consul.hashicorp.com/ai-role: ai-agent. "+
+			"Mirrors ai.agent.image from values.yaml.")
 
 	// custom controller flags
 	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")

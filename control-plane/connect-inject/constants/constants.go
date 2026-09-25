@@ -112,12 +112,13 @@ const (
 	// ConsulOBOOutboundContainerName is the injected container name for consul-obo-outbound.
 	ConsulOBOOutboundContainerName = "consul-obo-outbound"
 
-	// DefaultOBOInboundPort is the loopback port for consul-obo-inbound ext_proc
-	// (inbound JWT verify + claim projection). Must not collide with
-	// DefaultAIInterceptorPort (21101).
+	// DefaultOBOInboundPort is the TCP port for consul-obo-inbound ext_proc
+	// (inbound JWT verify + claim projection). Inject binds :port so kubelet can
+	// probe the pod IP; Envoy still dials 127.0.0.1 from the same pod.
+	// Must not collide with DefaultAIInterceptorPort (21101).
 	DefaultOBOInboundPort = 21102
 
-	// DefaultOBOOutboundPort is the loopback port for consul-obo-outbound ext_proc
+	// DefaultOBOOutboundPort is the TCP port for consul-obo-outbound ext_proc
 	// (RFC 8693 OBO exchange). Must not collide with 21101 or 21102.
 	DefaultOBOOutboundPort = 21103
 
