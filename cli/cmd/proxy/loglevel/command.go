@@ -4,6 +4,7 @@
 package loglevel
 
 import (
+	"archive/zip"
 	"context"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/envoy"
@@ -38,6 +40,15 @@ const (
 	flagNameKubeConfig  = "kubeconfig"
 	flagNameKubeContext = "context"
 	flagNameCapture     = "capture"
+	flagNameOutput      = "output"
+
+	// outputFile writes the captured log to a plain .log file (default, preserves existing behavior).
+	outputFile = "file"
+	// outputArchive wraps the captured log in a .zip file.
+	outputArchive = "archive"
+
+	// sidecarContainerName is the name of the Consul-managed proxy container that emits Envoy logs.
+	sidecarContainerName = "consul-dataplane"
 
 	// minimum duration for log capture should be atleast 10seconds
 	minimumCaptureDuration = 10 * time.Second
@@ -73,6 +84,7 @@ type LogLevelCommand struct {
 	level       string
 	reset       bool
 	capture     time.Duration
+	output      string
 	kubeConfig  string
 	kubeContext string
 
@@ -105,6 +117,12 @@ func (l *LogLevelCommand) init() {
 		Target:  &l.capture,
 		Default: 0,
 		Usage:   "Captures pod log for the given duration according to existing/new update-level. It can be used with -update-level <any> flag to capture logs at that level or with -reset flag to capture logs at default info level",
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameOutput,
+		Target:  &l.output,
+		Default: outputFile,
+		Usage:   "Output format for the captured log when used with -capture: 'file' (default, writes a plain .log file) or 'archive' (writes a .zip file).",
 	})
 
 	f.BoolVar(&flag.BoolVar{
@@ -222,6 +240,9 @@ func (l *LogLevelCommand) validateFlags() error {
 	}
 	if l.capture != 0 && l.capture < minimumCaptureDuration {
 		return fmt.Errorf("capture duration must be at least %s", minimumCaptureDuration)
+	}
+	if outputs := []string{outputFile, outputArchive}; !slices.Contains(outputs, l.output) {
+		return fmt.Errorf("-output must be one of %s", strings.Join(outputs, ", "))
 	}
 
 	return nil
@@ -426,22 +447,33 @@ func (l *LogLevelCommand) fetchPodLogs() error {
 
 	var podLogOptions *corev1.PodLogOptions
 	for _, container := range pod.Spec.Containers {
-		if container.Name == "consul-dataplane" {
+		if container.Name == sidecarContainerName {
 			podLogOptions = &corev1.PodLogOptions{
 				Container:    container.Name,
 				SinceSeconds: &sinceSeconds,
 				Timestamps:   true,
 			}
+			break
 		}
 	}
-	proxyLogFilePath := filepath.Join("proxy", fmt.Sprintf("proxy-log-%s.log", l.podName))
+	if podLogOptions == nil {
+		return fmt.Errorf("pod %q in namespace %q does not have a %q container; log capture is only supported for Consul-managed proxy sidecars", l.podName, l.namespace, sidecarContainerName)
+	}
+
+	// NOTE: output paths are relative to cwd /proxy only. Contents will be overwritten if
+	// the command is run multiple times for the same pod name or if the file already exists.
+	logFileName := fmt.Sprintf("proxy-log-%s.log", l.podName)
+	outputPath := filepath.Join("proxy", logFileName)
+	if l.output == outputArchive {
+		outputPath = filepath.Join("proxy", fmt.Sprintf("proxy-log-%s.zip", l.podName))
+	}
 
 	// metadata of log capture
 	l.UI.Output("Pod Name:             %s", pod.Name)
 	l.UI.Output("Container Name:       %s", podLogOptions.Container)
 	l.UI.Output("Namespace:            %s", pod.Namespace)
 	l.UI.Output("Log Capture Duration: %s", l.capture)
-	l.UI.Output("Log File Path:        %s", proxyLogFilePath)
+	l.UI.Output("Log File Path:        %s", outputPath)
 
 	durationChn := time.After(l.capture)
 	select {
@@ -450,20 +482,43 @@ func (l *LogLevelCommand) fetchPodLogs() error {
 		if err != nil {
 			return err
 		}
-		// Create file path and directory for storing logs
-		// NOTE: currently it is writing log file in cwd /proxy only. Also, log file contents will be overwritten if
-		// the command is run multiple times for the same pod name or if file already exists.
-		if err := os.MkdirAll(filepath.Dir(proxyLogFilePath), dirPermission); err != nil {
+
+		if err := os.MkdirAll(filepath.Dir(outputPath), dirPermission); err != nil {
 			return fmt.Errorf("error creating directory for log file: %w", err)
 		}
-		if err := os.WriteFile(proxyLogFilePath, logs, filePermission); err != nil {
+
+		if l.output == outputArchive {
+			if err := writeLogArchive(outputPath, logFileName, logs); err != nil {
+				return err
+			}
+		} else if err := os.WriteFile(outputPath, logs, filePermission); err != nil {
 			return fmt.Errorf("error writing log to file: %v", err)
 		}
-		l.UI.Output("Logs saved to '%s'", proxyLogFilePath, terminal.WithSuccessStyle())
+
+		l.UI.Output("Logs saved to '%s'", outputPath, terminal.WithSuccessStyle())
 		return nil
 	case <-l.Ctx.Done():
 		return fmt.Errorf("stopping collection due to shutdown signal received")
 	}
+}
+
+// writeLogArchive writes logs as a single entry named entryName into a new zip file at archivePath.
+func writeLogArchive(archivePath, entryName string, logs []byte) error {
+	f, err := os.Create(archivePath)
+	if err != nil {
+		return fmt.Errorf("error creating archive file: %w", err)
+	}
+	defer f.Close()
+
+	zw := zip.NewWriter(f)
+	entry, err := zw.Create(entryName)
+	if err != nil {
+		return fmt.Errorf("error creating archive entry: %w", err)
+	}
+	if _, err := entry.Write(logs); err != nil {
+		return fmt.Errorf("error writing archive entry: %w", err)
+	}
+	return zw.Close()
 }
 func (l *LogLevelCommand) getLogs(ctx context.Context, pod *corev1.Pod, podLogOptions *corev1.PodLogOptions) ([]byte, error) {
 	podLogRequest := l.kubernetes.CoreV1().Pods(l.namespace).GetLogs(pod.Name, podLogOptions)
@@ -539,6 +594,7 @@ func (l *LogLevelCommand) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameCapture):     complete.PredictAnything,
 		fmt.Sprintf("-%s", flagNameUpdateLevel): complete.PredictAnything,
 		fmt.Sprintf("-%s", flagNameReset):       complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameOutput):      complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeConfig):  complete.PredictFiles("*"),
 		fmt.Sprintf("-%s", flagNameKubeContext): complete.PredictNothing,
 	}

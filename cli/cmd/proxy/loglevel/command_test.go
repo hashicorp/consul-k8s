@@ -4,6 +4,7 @@
 package loglevel
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"flag"
@@ -66,6 +67,10 @@ func TestFlagParsingFails(t *testing.T) {
 		},
 		"Invalid logger passed, -u newlogger": {
 			args: []string{podName, "-u", "newlogger:info"},
+			out:  1,
+		},
+		"Invalid output arg passed, -output foo": {
+			args: []string{podName, "-output", "foo"},
 			out:  1,
 		},
 	}
@@ -341,6 +346,97 @@ func TestLogCaptureWithNewLogLevels(t *testing.T) {
 	require.NoError(t, err, "expected to read the output file, but got an error")
 	require.Equal(t, expectedFileContent, string(actualFileContent), "log file content did not match expected content")
 }
+func TestLogCaptureWithArchiveOutput(t *testing.T) {
+	tempDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	require.NoError(t, err)
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	defer os.Chdir(originalWD)
+
+	podName := "now-this-is-pod-racing"
+	fakePod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "consul-dataplane",
+				},
+			},
+		},
+	}
+	buf := bytes.NewBuffer([]byte{})
+	c := setupCommand(buf)
+	c.Ctx = context.Background()
+	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
+	expectedLogContent := "2023-09-19T10:15:30Z INFO Sample log entry\n2023-09-19T10:15:31Z DEBUG Another log entry"
+	c.getLogFunc = func(ctx context.Context, pod *corev1.Pod, podLogOptions *corev1.PodLogOptions) ([]byte, error) {
+		return []byte(expectedLogContent), nil
+	}
+	duration := "30s"
+	args := []string{podName, "-capture", duration, "-output", "archive"}
+	out := c.Run(args)
+	require.Equal(t, 0, out)
+
+	expectedArchivePath := filepath.Join(tempDir, "proxy", "proxy-log-"+podName+".zip")
+	_, err = os.Stat(expectedArchivePath)
+	require.NoError(t, err, "expected archive to be created, but it was not")
+
+	zr, err := zip.OpenReader(expectedArchivePath)
+	require.NoError(t, err)
+	defer zr.Close()
+
+	require.Len(t, zr.File, 1)
+	require.Equal(t, "proxy-log-"+podName+".log", zr.File[0].Name)
+
+	rc, err := zr.File[0].Open()
+	require.NoError(t, err)
+	defer rc.Close()
+
+	content, err := io.ReadAll(rc)
+	require.NoError(t, err)
+	require.Equal(t, expectedLogContent, string(content))
+}
+
+func TestLogCaptureFailsWithoutDataplaneContainer(t *testing.T) {
+	tempDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	require.NoError(t, err)
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	defer os.Chdir(originalWD)
+
+	podName := "now-this-is-pod-racing"
+	fakePod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "some-app-container",
+				},
+			},
+		},
+	}
+	buf := bytes.NewBuffer([]byte{})
+	c := setupCommand(buf)
+	c.Ctx = context.Background()
+	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
+
+	duration := "30s"
+	args := []string{podName, "-capture", duration}
+	out := c.Run(args)
+	require.Equal(t, 1, out)
+
+	_, err = os.Stat(filepath.Join(tempDir, "proxy", "proxy-log-"+podName+".log"))
+	require.True(t, os.IsNotExist(err), "expected no log file to be created")
+}
+
 func TestHelp(t *testing.T) {
 	t.Parallel()
 	buf := bytes.NewBuffer([]byte{})
