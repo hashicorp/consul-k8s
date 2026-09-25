@@ -20,70 +20,59 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
-func TestOBOSidecarRequiresImage(t *testing.T) {
+func TestAIAgentSidecarRequiresImage(t *testing.T) {
 	w := &MeshWebhook{}
-
-	_, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
-	require.ErrorContains(t, err, "ImageConsulOBOInbound must be set")
-
-	_, err = w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
-	require.ErrorContains(t, err, "ImageConsulOBOOutbound must be set")
+	_, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
+	require.ErrorContains(t, err, "AI sidecar image must be set")
 }
 
-func TestOBOSidecarUsesDataplaneRunAs(t *testing.T) {
+func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 	w := &MeshWebhook{
-		ImageConsulOBOInbound:  "obo-inbound:test",
-		ImageConsulOBOOutbound: "obo-outbound:test",
+		ImageAIAgent: "consul-ai-sidecars:test",
+		LogLevel:     "info",
 	}
 
-	t.Run("stock kubernetes", func(t *testing.T) {
-		inbound, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
+	t.Run("stock uid", func(t *testing.T) {
+		c, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
 		require.NoError(t, err)
-		outbound, err := w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
-		require.NoError(t, err)
-
-		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), inbound.SecurityContext.RunAsUser)
-		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), inbound.SecurityContext.RunAsGroup)
-		require.Equal(t, inbound.SecurityContext.RunAsUser, outbound.SecurityContext.RunAsUser)
-		require.Equal(t, inbound.SecurityContext.RunAsGroup, outbound.SecurityContext.RunAsGroup)
-		require.Contains(t, inbound.Args, "--dataplane-ready-url=http://127.0.0.1:19000/ready")
-		require.Contains(t, inbound.Args, "127.0.0.1:21102")
+		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), c.SecurityContext.RunAsUser)
+		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), c.SecurityContext.RunAsGroup)
+		require.Contains(t, c.Args, "--mode=agent")
+		require.Contains(t, c.Args, "--envelope-uds=/consul/connect-inject/oauth-envelope.sock")
+		require.Contains(t, c.Args, "--broker-uds=/consul/connect-inject/credential-broker.sock")
+		require.Contains(t, c.Args, "--dataplane-ready-url=http://127.0.0.1:19000/ready")
+		require.Contains(t, c.Args, "--obo-inbound-addr=127.0.0.1:21102")
+		require.Contains(t, c.Args, "--obo-outbound-addr=:21103")
+		require.Contains(t, c.Args, "--obo-inbound-addr=:21102")
+		require.Contains(t, c.Args, "--mcp-socket="+mcpGatewayUDSPath)
 	})
 
 	t.Run("openshift uid", func(t *testing.T) {
 		const openShiftID int64 = 1000799998
-		inbound, err := w.oboInboundSidecar(openShiftID, openShiftID)
+		c, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, openShiftID, openShiftID)
 		require.NoError(t, err)
-		require.Equal(t, ptr.To(openShiftID), inbound.SecurityContext.RunAsUser)
-		require.Equal(t, ptr.To(openShiftID), inbound.SecurityContext.RunAsGroup)
+		require.Equal(t, ptr.To(openShiftID), c.SecurityContext.RunAsUser)
+		require.Equal(t, ptr.To(openShiftID), c.SecurityContext.RunAsGroup)
 	})
 }
 
-func TestOBOSidecarReadyURLDualStack(t *testing.T) {
+func TestAIAgentSidecarReadyURLDualStack(t *testing.T) {
 	t.Setenv(constants.ConsulDualStackEnvVar, "true")
 
-	w := &MeshWebhook{
-		ImageConsulOBOInbound:  "obo-inbound:test",
-		ImageConsulOBOOutbound: "obo-outbound:test",
-	}
-	inbound, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
+	w := &MeshWebhook{ImageAIAgent: "consul-ai-sidecars:test", LogLevel: "info"}
+	c, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
 	require.NoError(t, err)
-	outbound, err := w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
-	require.NoError(t, err)
-
-	require.Contains(t, inbound.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
-	require.Contains(t, outbound.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
-	// xDS OBO clusters stay on IPv4 loopback.
-	require.Contains(t, inbound.Args, "127.0.0.1:21102")
-	require.Contains(t, outbound.Args, "127.0.0.1:21103")
+	require.Contains(t, c.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
+	require.Contains(t, c.Args, "--obo-inbound-addr=127.0.0.1:21102")
 }
 
-func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
+func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 	s := runtime.NewScheme()
 	s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
 	decoder := admission.NewDecoder(s)
@@ -106,88 +95,70 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 
 	baseWebhook := func(clientset *fake.Clientset) MeshWebhook {
 		return MeshWebhook{
-			Log:                    logrtest.New(t),
-			AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:   mapset.NewSet(),
-			decoder:                decoder,
-			Clientset:              clientset,
-			ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
-			ImageConsulDataplane:   "dataplane:test",
-			ImageConsulOBOInbound:  "obo-inbound:test",
-			ImageConsulOBOOutbound: "obo-outbound:test",
+			Log:                   logrtest.New(t),
+			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+			DenyK8sNamespacesSet:  mapset.NewSet(),
+			decoder:               decoder,
+			Clientset:             clientset,
+			ConsulConfig:          &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+			ImageConsulDataplane:  "dataplane:test",
+			ImageAIAgent:          "consul-ai-sidecars:test",
+			LogLevel:              "info",
 		}
 	}
 
-	t.Run("obo injected when mcp gateway image is unset", func(t *testing.T) {
+	t.Run("one combined sidecar uses dataplane uid", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
 		containers := injectedContainers(t, w, aiPod())
-		require.NotContains(t, containers, mcpGatewayContainer)
-		require.Contains(t, containers, constants.ConsulOBOInboundContainerName)
-		require.Contains(t, containers, constants.ConsulOBOOutboundContainerName)
+		require.Contains(t, containers, mcpGatewayContainer)
+		require.NotContains(t, containers, constants.ConsulOBOInboundContainerName)
+		require.NotContains(t, containers, constants.ConsulOBOOutboundContainerName)
 
 		dp := containers[sidecarContainer]
-		inbound := containers[constants.ConsulOBOInboundContainerName]
-		require.Equal(t, dp.SecurityContext.RunAsUser, inbound.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsGroup, inbound.SecurityContext.RunAsGroup)
-		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), inbound.SecurityContext.RunAsUser)
+		ai := containers[mcpGatewayContainer]
+		require.Equal(t, dp.SecurityContext.RunAsUser, ai.SecurityContext.RunAsUser)
+		require.Equal(t, dp.SecurityContext.RunAsGroup, ai.SecurityContext.RunAsGroup)
+		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), ai.SecurityContext.RunAsUser)
+		require.Contains(t, ai.Args, "--mode=agent")
 	})
 
-	t.Run("missing obo image fails admission", func(t *testing.T) {
+	t.Run("missing image fails admission", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
-		w.ImageConsulOBOInbound = ""
+		w.ImageAIAgent = ""
 		resp := w.Handle(context.Background(), admissionRequest(t, aiPod()))
 		require.False(t, resp.Allowed)
-		require.Contains(t, resp.Result.Message, "ImageConsulOBOInbound must be set")
+		require.Contains(t, resp.Result.Message, "AI sidecar image must be set")
 	})
 
-	t.Run("non ai-agent pod has no obo", func(t *testing.T) {
+	t.Run("obo image fallback when agent image unset", func(t *testing.T) {
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		w.ImageAIAgent = ""
+		w.ImageConsulOBOOutbound = "consul-ai-sidecars:obo-tag"
+		containers := injectedContainers(t, w, aiPod())
+		ai := containers[mcpGatewayContainer]
+		require.Equal(t, "consul-ai-sidecars:obo-tag", ai.Image)
+	})
+
+	t.Run("non ai-agent pod has no ai sidecar", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
 		pod := aiPod()
 		delete(pod.Annotations, constants.AnnotationAIRole)
 		containers := injectedContainers(t, w, pod)
-		require.NotContains(t, containers, constants.ConsulOBOInboundContainerName)
-		require.NotContains(t, containers, constants.ConsulOBOOutboundContainerName)
+		require.NotContains(t, containers, mcpGatewayContainer)
 	})
 
-	t.Run("application container named consul-dataplane-metrics is ignored", func(t *testing.T) {
-		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
-		pod := aiPod()
-		pod.Spec.Containers = []corev1.Container{
-			{
-				Name:  "consul-dataplane-metrics",
-				Image: "app:test",
-				SecurityContext: &corev1.SecurityContext{
-					RunAsUser:  ptr.To(int64(1000)),
-					RunAsGroup: ptr.To(int64(1000)),
-				},
-			},
-			{Name: "web", Image: "app:test"},
-		}
-		containers := injectedContainers(t, w, pod)
-		dp := containers[sidecarContainer]
-		inbound := containers[constants.ConsulOBOInboundContainerName]
-		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), dp.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsUser, inbound.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsGroup, inbound.SecurityContext.RunAsGroup)
-		require.NotEqual(t, ptr.To(int64(1000)), inbound.SecurityContext.RunAsUser)
-	})
-
-	t.Run("openshift obo uid matches dataplane", func(t *testing.T) {
+	t.Run("openshift ai sidecar uid matches dataplane", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(true)))
 		w.EnableOpenShift = true
-		w.ImageAIAgent = "mcp-gateway:test"
 		containers := injectedContainers(t, w, aiPod())
 		require.Contains(t, containers, mcpGatewayContainer)
 
 		dp := containers[sidecarContainer]
-		inbound := containers[constants.ConsulOBOInboundContainerName]
-		outbound := containers[constants.ConsulOBOOutboundContainerName]
+		ai := containers[mcpGatewayContainer]
 		require.NotNil(t, dp.SecurityContext.RunAsUser)
 		require.NotEqual(t, int64(sidecarUserAndGroupID), *dp.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsUser, inbound.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsGroup, inbound.SecurityContext.RunAsGroup)
-		require.Equal(t, dp.SecurityContext.RunAsUser, outbound.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsGroup, outbound.SecurityContext.RunAsGroup)
+		require.Equal(t, dp.SecurityContext.RunAsUser, ai.SecurityContext.RunAsUser)
+		require.Equal(t, dp.SecurityContext.RunAsGroup, ai.SecurityContext.RunAsGroup)
 	})
 }
 
