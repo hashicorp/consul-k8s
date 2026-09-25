@@ -22,6 +22,12 @@ import (
 const multiportServiceName = "multiport"
 const multiportAdminServiceName = "multiport-admin"
 
+// multiportFeatureGate gates the per-port upstream expansion (clusters, filter
+// chains and routes) that multi-port services depend on. It is registered with
+// DefaultEnabled=false, so it must be turned on explicitly before any multi-port
+// workload is registered.
+const multiportFeatureGate = "peering-multiport-upstreams"
+
 // TestPartitions_Connect_MultiportServices validates cross-partition connectivity to
 // three ports exposed by a single Consul service registered from a multi-port workload.
 func TestPartitions_Connect_MultiportServices(t *testing.T) {
@@ -158,6 +164,28 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s-consul-mesh-gateway", releaseName))
 
 				consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.aclsEnabled)
+
+				// Enable the multi-port feature gate before anything registers.
+				// While it is off the mesh gateway carries no per-port topology for
+				// the exported service, so every named port collapses onto the
+				// service's default port and a request for "metrics" silently
+				// returns the api-port response rather than failing.
+				logger.Logf(t, "enabling the %s feature gate", multiportFeatureGate)
+				_, err := consulClient.Operator().FeatureGateSet(multiportFeatureGate, true, 0, &api.WriteOptions{})
+				require.NoError(t, err)
+
+				// The leader resolves the gate against the cluster's server versions
+				// and publishes it asynchronously, and each proxy's config handler
+				// then picks it up from that published snapshot. Wait for it to be
+				// effective so the gate state is not racing workload registration.
+				retry.Run(t, func(r *retry.R) {
+					gate, _, err := consulClient.Operator().FeatureGateGet(multiportFeatureGate, nil)
+					require.NoError(r, err)
+					require.True(r, gate.Eligible,
+						"feature gate %s is not eligible (reason: %s)", multiportFeatureGate, gate.Reason)
+					require.True(r, gate.EffectiveEnabled,
+						"feature gate %s is not effective (reason: %s)", multiportFeatureGate, gate.Reason)
+				})
 
 				// Apply config entries (ProxyDefaults, ServiceDefaults, ServiceResolver) as CRDs
 				// in each cluster. The connect-injector syncs CRDs to Consul. Using CRDs
