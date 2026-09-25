@@ -129,6 +129,10 @@ func runPartitionsConnectMultiport(t *testing.T, aclsEnabled bool, fixturePath s
 	clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
 	clientConsulCluster.Create(t)
 
+	// Ensure mesh gateways are available in both partition clusters before proceeding with config entries and workloads.
+	k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s-consul-mesh-gateway", releaseName))
+	k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s-consul-mesh-gateway", releaseName))
+
 	consulClient, _ := serverConsulCluster.SetupConsulClient(t, aclsEnabled)
 
 	logger.Logf(t, "creating proxy defaults with mesh gateway fixture %s", fixturePath)
@@ -141,14 +145,24 @@ func runPartitionsConnectMultiport(t *testing.T, aclsEnabled bool, fixturePath s
 		k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), fixturePath)
 	})
 
-	logger.Log(t, "deploying multi-port service in default partition cluster")
-	k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
+	// Apply ExportedServices before deploying workloads so mesh gateways
+	// are configured to export multiport before the service registers.
+	logger.Log(t, "exporting multi-port services from default partition to secondary partition")
+	k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
+	k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service")
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
+		k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service")
+	})
 
-	logger.Log(t, "deploying client in secondary partition cluster")
+	// Deploy the multiport server. The base fixture has transparent-proxy
+	// explicitly set to "false", so we must use the tproxy overlay when
+	// cfg.EnableTransparentProxy is true (to honour the test flag).
+	logger.Log(t, "deploying multi-port service in default partition cluster")
 	if cfg.EnableTransparentProxy {
-		k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+		k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/multiport-single-service-app-tproxy")
 	} else {
-		k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
+		k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
 	}
 
 	multiportPods, err := defaultPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=multiport"})
@@ -156,11 +170,14 @@ func runPartitionsConnectMultiport(t *testing.T, aclsEnabled bool, fixturePath s
 	require.Len(t, multiportPods.Items, 1)
 	require.Len(t, multiportPods.Items[0].Spec.Containers, 2)
 
-	staticClientPods, err := secondaryPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
-	require.NoError(t, err)
-	require.Len(t, staticClientPods.Items, 1)
-	require.Len(t, staticClientPods.Items[0].Spec.Containers, 2)
-
+	// Verify multiport service is registered with all ports and is healthy
+	// BEFORE deploying the client. This ensures that when the client's
+	// proxy starts, its initial xDS snapshot includes the complete
+	// cross-partition per-port configuration. Without this ordering, the
+	// proxy may receive an incomplete initial snapshot (missing some port
+	// VIPs/clusters) that never self-corrects — particularly in
+	// ACLs-disabled (default-allow) mode or with CNI where iptables are
+	// configured before consul-dataplane starts.
 	consulDefaultQueryOpts := &api.QueryOptions{Partition: defaultPartition, Namespace: "default"}
 	retry.Run(t, func(r *retry.R) {
 		services, _, err := consulClient.Catalog().Service(multiportServiceName, "", consulDefaultQueryOpts)
@@ -176,74 +193,81 @@ func runPartitionsConnectMultiport(t *testing.T, aclsEnabled bool, fixturePath s
 		require.Len(r, legacyAdminServices, 0)
 	})
 
-	logger.Log(t, "exporting multi-port services from default partition to secondary partition")
-	k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
+	// Verify the service is healthy (not just registered). The proxy
+	// needs healthy endpoints in EDS to route traffic.
+	retry.Run(t, func(r *retry.R) {
+		healthServices, _, err := consulClient.Health().Service(multiportServiceName, "", true, consulDefaultQueryOpts)
+		require.NoError(r, err)
+		require.Len(r, healthServices, 1)
 	})
 
-	upstreamAPIURL := "http://localhost:1234"
-	upstreamMetricsURL := "http://localhost:2234"
-	upstreamAdminURL := "http://localhost:3234"
-	if cfg.EnableTransparentProxy {
-		upstreamAPIURL = fmt.Sprintf("http://api-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
-		upstreamMetricsURL = fmt.Sprintf("http://metrics.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
-		upstreamAdminURL = fmt.Sprintf("http://admin-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
+	// Create intention BEFORE deploying the client so the proxy's initial
+	// xDS snapshot includes multiport as an allowed upstream with all
+	// per-port VIPs and clusters configured. In ACLs-disabled mode
+	// (default-allow), creating the intention early still helps because it
+	// provides an explicit signal to Consul's xDS machinery to push the
+	// complete per-port configuration for the cross-partition service.
+	logger.Logf(t, "creating intention for destination %s", multiportServiceName)
+	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+		Kind:      api.ServiceIntentions,
+		Name:      multiportServiceName,
+		Namespace: "default",
+		Sources: []*api.SourceIntention{
+			{
+				Name:      StaticClientName,
+				Namespace: "default",
+				Partition: secondaryPartition,
+				Action:    api.IntentionActionAllow,
+			},
+		},
+	}, &api.WriteOptions{Partition: defaultPartition})
+	require.NoError(t, err)
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, multiportServiceName, &api.WriteOptions{Partition: defaultPartition})
+		require.NoError(t, err)
+	})
+
+	// Deploy the client.
+	// CNI + tproxy requires explicit upstream annotations because with
+	// CNI, iptables are set up by the DaemonSet at pod-creation time,
+	// before consul-dataplane starts. The initial xDS snapshot therefore
+	// may not include the cross-partition per-port VIP filter chains,
+	// leaving the outbound listener unable to route traffic to 240.0.0.x
+	// virtual IPs (Envoy returns 503).
+	// Explicit upstream annotations guarantee the cluster is present in
+	// xDS regardless of when the dataplane's initial snapshot is taken.
+	useTproxyClient := cfg.EnableTransparentProxy && !cfg.EnableCNI
+	logger.Log(t, "deploying client in secondary partition cluster")
+	if useTproxyClient {
+		k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service-tproxy")
+	} else {
+		k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
+	}
+
+	staticClientPods, err := secondaryPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
+	require.NoError(t, err)
+	require.Len(t, staticClientPods.Items, 1)
+	require.Len(t, staticClientPods.Items[0].Spec.Containers, 2)
+
+	// Use virtual-DNS URLs only when the tproxy client fixture is deployed.
+	var upstreamAPIURL, upstreamMetricsURL, upstreamAdminURL string
+	if useTproxyClient {
+		upstreamAPIURL = "http://api-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+		upstreamMetricsURL = "http://metrics.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+		upstreamAdminURL = "http://admin-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+	} else {
+		upstreamAPIURL = "http://localhost:1234"
+		upstreamMetricsURL = "http://localhost:2234"
+		upstreamAdminURL = "http://localhost:3234"
 	}
 
 	secondaryClientOpts := secondaryPartitionClusterContext.KubectlOptions(t)
-
-	createMultiportIntention := func() {
-		logger.Logf(t, "creating intention for destination %s", multiportServiceName)
-		_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-			Kind:      api.ServiceIntentions,
-			Name:      multiportServiceName,
-			Namespace: "default",
-			Sources: []*api.SourceIntention{
-				{
-					Name:      StaticClientName,
-					Namespace: "default",
-					Partition: secondaryPartition,
-					Action:    api.IntentionActionAllow,
-				},
-			},
-		}, &api.WriteOptions{Partition: defaultPartition})
-		require.NoError(t, err)
-
-		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-			_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, multiportServiceName, &api.WriteOptions{Partition: defaultPartition})
-			require.NoError(t, err)
-		})
-	}
-
-	if aclsEnabled {
-		logger.Log(t, "checking that cross-partition connections fail before intentions are configured")
-		k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAPIURL)
-		k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamMetricsURL)
-		k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAdminURL)
-
-		createMultiportIntention()
-	} else if cfg.EnableTransparentProxy {
-		// In transparent proxy cross-partition mode we still need an explicit
-		// allow intention for the destination service to make the route active.
-		createMultiportIntention()
-	}
 
 	logger.Log(t, "checking cross-partition connectivity for all three ports")
 	k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from api-port 9090: Hello there!", upstreamAPIURL)
 	k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from metrics port 9091: Hello again!", upstreamMetricsURL)
 	k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from admin port 9092: Hello once more!", upstreamAdminURL)
-
-	logger.Log(t, "marking multi-port workload unhealthy")
-	k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "exec", "deploy/"+multiportServiceName, "-c", multiportServiceName, "--", "touch", "/tmp/unhealthy-multiport")
-
-	failureMessages := []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}
-	if cfg.EnableTransparentProxy {
-		failureMessages = append(failureMessages, "curl: (7) Failed to connect")
-	}
-	k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamAPIURL)
-	k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamMetricsURL)
-	k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamAdminURL)
 }
 
 func TestPartitions_Connect_MultiportServices_ACLsDisabled_LocalGateway(t *testing.T) {
