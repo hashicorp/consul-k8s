@@ -17,7 +17,7 @@
 - {runner: 12, test-packages: "sync", num-clusters: "1"}
 - {runner: 13, test-packages: "api-gateway-external", num-clusters: "1"}
 - {runner: 14, test-packages: "example", num-clusters: "1"}
-- {runner: 15, test-packages: "consul-dns", num-clusters: "1"}
+- {runner: 15, test-packages: "consul-dns", num-clusters: "2"}
 - {runner: 16, test-packages: "config-entries", num-clusters: "1"}
 - {runner: 17, test-packages: "terminating-gateway", num-clusters: "1"}
 - {runner: 18, test-packages: "basic", num-clusters: "1"}
