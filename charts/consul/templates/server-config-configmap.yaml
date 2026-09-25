@@ -225,4 +225,14 @@ data:
       }
     }
   {{- end }}
+  {{- if .Values.global.globalRegistry.enabled }}
+  {{- $globalRegistry := dict "enabled" true }}
+  {{- if .Values.global.globalRegistry.address }}{{- $_ := set $globalRegistry "address" .Values.global.globalRegistry.address }}{{- end }}
+  {{- if (and .Values.global.globalRegistry.tokenSecretName .Values.global.globalRegistry.tokenSecretKey) }}{{- $_ := set $globalRegistry "token_file" (printf "/consul/global-registry-token/%s" .Values.global.globalRegistry.tokenSecretKey) }}{{- end }}
+  {{- if .Values.global.globalRegistry.clusterId }}{{- $_ := set $globalRegistry "cluster_id" .Values.global.globalRegistry.clusterId }}{{- end }}
+  global-registry-config.json: |-
+    {
+      "global_registry": {{ $globalRegistry | toJson }}
+    }
+  {{- end }}
 {{- end }}

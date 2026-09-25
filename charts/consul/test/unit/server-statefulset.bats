@@ -3195,3 +3195,86 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
+
+#--------------------------------------------------------------------
+# global.globalRegistry
+
+@test "server/StatefulSet: globalRegistry: no volume when tokenSecretName/Key are absent" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.globalRegistry.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '[.spec.template.spec.volumes[] | select(.name == "consul-global-registry-token")] | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
+@test "server/StatefulSet: globalRegistry: volume secretName when enabled and tokenSecretName and tokenSecretKey are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.globalRegistry.enabled=true' \
+      --set 'global.globalRegistry.tokenSecretName=my-registry-secret' \
+      --set 'global.globalRegistry.tokenSecretKey=token.txt' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.volumes[] | select(.name == "consul-global-registry-token") | .secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = 'my-registry-secret' ]
+}
+
+@test "server/StatefulSet: globalRegistry: no volume when disabled even if tokenSecretName and tokenSecretKey are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.globalRegistry.enabled=false' \
+      --set 'global.globalRegistry.tokenSecretName=my-registry-secret' \
+      --set 'global.globalRegistry.tokenSecretKey=token.txt' \
+      . | tee /dev/stderr |
+      yq -r '[.spec.template.spec.volumes[] | select(.name == "consul-global-registry-token")] | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
+@test "server/StatefulSet: globalRegistry: volumeMount mountPath when enabled and tokenSecretName and tokenSecretKey are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.globalRegistry.enabled=true' \
+      --set 'global.globalRegistry.tokenSecretName=my-registry-secret' \
+      --set 'global.globalRegistry.tokenSecretKey=token.txt' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-global-registry-token") | .mountPath' | tee /dev/stderr)
+  [ "${actual}" = '/consul/global-registry-token' ]
+}
+
+@test "server/StatefulSet: globalRegistry: no volumeMount when disabled even if tokenSecretName and tokenSecretKey are provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.globalRegistry.enabled=false' \
+      --set 'global.globalRegistry.tokenSecretName=my-registry-secret' \
+      --set 'global.globalRegistry.tokenSecretKey=token.txt' \
+      . | tee /dev/stderr |
+      yq -r '[.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-global-registry-token")] | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
+@test "server/StatefulSet: globalRegistry: fails when tokenSecretName set but tokenSecretKey is empty" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.globalRegistry.tokenSecretName=my-registry-secret' \
+      --set 'global.globalRegistry.tokenSecretKey=' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "globalRegistry.tokenSecretKey and tokenSecretName must both be specified." ]]
+}
+
+@test "server/StatefulSet: globalRegistry: fails when tokenSecretKey set but tokenSecretName is empty" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.globalRegistry.tokenSecretName=' \
+      --set 'global.globalRegistry.tokenSecretKey=token.txt' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "globalRegistry.tokenSecretKey and tokenSecretName must both be specified." ]]
+}

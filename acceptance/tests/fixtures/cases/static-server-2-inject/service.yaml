@@ -1,0 +1,14 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-server-2
+spec:
+  selector:
+    app: static-server-2
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

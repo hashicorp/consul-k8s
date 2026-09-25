@@ -31,7 +31,6 @@ import (
 
 // TestConnectInject tests that Connect works in a default and a secure installation using Helm CLI.
 func TestConnectInject(t *testing.T) {
-
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
@@ -595,7 +594,7 @@ const multiportPriorReleaseChartVersion = "2.0.3"
 // This is the only test that starts from a cluster an operator could actually
 // have today. The other conversion tests install this chart with the gate
 // explicitly enabled, which tests a flag flip rather than a version upgrade:
-// on 2.0.3 the value does not exist at all, the workloads carry no
+// on the prior release the value does not exist at all, the workloads carry no
 // connect-service-port annotation, and the CRDs and injector arguments are the
 // old ones. A conversion that works on a same-chart upgrade but fails against
 // the release people are upgrading from is a conversion that does not work.

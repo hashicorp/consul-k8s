@@ -2328,6 +2328,166 @@ func TestEntriesEqual(t *testing.T) {
 	}
 }
 
+// TestEntriesEqual_APIGateway_Protocol verifies that a protocol change on a
+// Consul APIGatewayListener (e.g. http → grpc, http → http2) is detected by
+// EntriesEqual so the reconciler writes the updated config entry to Consul.
+func TestEntriesEqual_APIGateway_Protocol(t *testing.T) {
+	t.Parallel()
+
+	makeGateway := func(protocol string) *api.APIGatewayConfigEntry {
+		return &api.APIGatewayConfigEntry{
+			Kind:      api.APIGateway,
+			Name:      "edge",
+			Namespace: "default",
+			Partition: "default",
+			Listeners: []api.APIGatewayListener{
+				{Name: "listener", Port: 9080, Protocol: protocol},
+			},
+		}
+	}
+
+	tests := []struct {
+		name   string
+		a, b   *api.APIGatewayConfigEntry
+		wantEq bool
+	}{
+		{
+			name:   "same protocol http is equal",
+			a:      makeGateway("http"),
+			b:      makeGateway("http"),
+			wantEq: true,
+		},
+		{
+			name:   "same protocol grpc is equal",
+			a:      makeGateway("grpc"),
+			b:      makeGateway("grpc"),
+			wantEq: true,
+		},
+		{
+			name:   "same protocol http2 is equal",
+			a:      makeGateway("http2"),
+			b:      makeGateway("http2"),
+			wantEq: true,
+		},
+		{
+			// protocols should be compared case-insensitively (EqualFold)
+			name:   "protocol GRPC vs grpc is equal (case-insensitive)",
+			a:      makeGateway("GRPC"),
+			b:      makeGateway("grpc"),
+			wantEq: true,
+		},
+		{
+			// Day-2 update: operator adds grpc annotation → protocol changes http→grpc.
+			// The reconciler must detect inequality and write the update to Consul.
+			name:   "http vs grpc are NOT equal (day-2 protocol change)",
+			a:      makeGateway("http"),
+			b:      makeGateway("grpc"),
+			wantEq: false,
+		},
+		{
+			name:   "http vs http2 are NOT equal (day-2 protocol change)",
+			a:      makeGateway("http"),
+			b:      makeGateway("http2"),
+			wantEq: false,
+		},
+		{
+			name:   "grpc vs http2 are NOT equal",
+			a:      makeGateway("grpc"),
+			b:      makeGateway("http2"),
+			wantEq: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.wantEq, EntriesEqual(tt.a, tt.b))
+		})
+	}
+}
+
+// TestEntriesEqual_APIGateway_ExtAuthz exercises the bug-fix path: changes to
+// the gateway-wide ExtAuthz field must be detected as unequal so the reconciler
+// writes the updated config entry to Consul.
+func TestEntriesEqual_APIGateway_ExtAuthz(t *testing.T) {
+	t.Parallel()
+
+	makeGateway := func(extAuthz *api.APIGatewayExtAuthz) *api.APIGatewayConfigEntry {
+		return &api.APIGatewayConfigEntry{
+			Kind:      api.APIGateway,
+			Name:      "edge",
+			Namespace: "default",
+			Partition: "default",
+			Listeners: []api.APIGatewayListener{
+				{Name: "listener", Port: 9080, Protocol: "http"},
+			},
+			ExtAuthz: extAuthz,
+		}
+	}
+
+	enabled := &api.APIGatewayExtAuthz{Enabled: true}
+	disabled := &api.APIGatewayExtAuthz{Enabled: false}
+
+	tests := []struct {
+		name   string
+		a, b   *api.APIGatewayConfigEntry
+		wantEq bool
+	}{
+		{
+			name:   "both nil ExtAuthz are equal",
+			a:      makeGateway(nil),
+			b:      makeGateway(nil),
+			wantEq: true,
+		},
+		{
+			name:   "both enabled are equal",
+			a:      makeGateway(enabled),
+			b:      makeGateway(enabled),
+			wantEq: true,
+		},
+		{
+			name:   "both disabled are equal",
+			a:      makeGateway(disabled),
+			b:      makeGateway(disabled),
+			wantEq: true,
+		},
+		{
+			// Day-2 update: operator disables ext_authz on the gateway.
+			name:   "enabled vs disabled are NOT equal",
+			a:      makeGateway(enabled),
+			b:      makeGateway(disabled),
+			wantEq: false,
+		},
+		{
+			name:   "disabled vs enabled are NOT equal",
+			a:      makeGateway(disabled),
+			b:      makeGateway(enabled),
+			wantEq: false,
+		},
+		{
+			name:   "nil vs enabled are NOT equal",
+			a:      makeGateway(nil),
+			b:      makeGateway(enabled),
+			wantEq: false,
+		},
+		{
+			name:   "nil vs disabled are NOT equal",
+			a:      makeGateway(nil),
+			b:      makeGateway(disabled),
+			wantEq: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.wantEq, EntriesEqual(tt.a, tt.b))
+		})
+	}
+}
+
 // TestEntriesEqual_HTTPRoute_ExtAuthz exercises the bug-fix path: changes to
 // Filters.ExtAuthz on an HTTPRouteConfigEntry rule must be detected as unequal
 // so the reconciler writes the updated config entry to Consul.
@@ -2357,45 +2517,271 @@ func TestEntriesEqual_HTTPRoute_ExtAuthz(t *testing.T) {
 		}
 	}
 
+	tests := []struct {
+		name   string
+		a, b   *api.HTTPRouteConfigEntry
+		wantEq bool
+	}{
+		{
+			name:   "both nil ExtAuthz are equal",
+			a:      makeEntry(nil),
+			b:      makeEntry(nil),
+			wantEq: true,
+		},
+		{
+			name:   "both enabled are equal",
+			a:      makeEntry(enabled),
+			b:      makeEntry(enabled),
+			wantEq: true,
+		},
+		{
+			name:   "both disabled are equal",
+			a:      makeEntry(disabled),
+			b:      makeEntry(disabled),
+			wantEq: true,
+		},
+		{
+			// This was the regression: toggling enabled→disabled was not detected.
+			name:   "enabled vs disabled are NOT equal",
+			a:      makeEntry(enabled),
+			b:      makeEntry(disabled),
+			wantEq: false,
+		},
+		{
+			name:   "disabled vs enabled are NOT equal",
+			a:      makeEntry(disabled),
+			b:      makeEntry(enabled),
+			wantEq: false,
+		},
+		{
+			name:   "nil vs enabled are NOT equal",
+			a:      makeEntry(nil),
+			b:      makeEntry(enabled),
+			wantEq: false,
+		},
+		{
+			name:   "nil vs disabled are NOT equal",
+			a:      makeEntry(nil),
+			b:      makeEntry(disabled),
+			wantEq: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.wantEq, EntriesEqual(tt.a, tt.b))
+		})
+	}
+}
+
+// TestEntriesEqual_APIGateway_GatewayLevelTLS verifies that toggling the
+// gateway-level TLS.Enabled field is detected as a change by EntriesEqual.
+// This exercises the bug-fix path: before the fix apiGatewaysEqual did not
+// compare TLS or ExtAuthz, so adding the consul.hashicorp.com/tls-enabled
+// annotation would not cause the reconciler to write the updated config entry
+// to Consul.
+func TestEntriesEqual_APIGateway_GatewayLevelTLS(t *testing.T) {
+	t.Parallel()
+
+	base := func(tlsEnabled bool) *api.APIGatewayConfigEntry {
+		return &api.APIGatewayConfigEntry{
+			Kind:      api.APIGateway,
+			Name:      "gw",
+			Namespace: "default",
+			Partition: "default",
+			TLS:       api.GatewayTLSConfig{Enabled: tlsEnabled},
+		}
+	}
+
 	testCases := map[string]struct {
-		a, b           *api.HTTPRouteConfigEntry
+		a, b           *api.APIGatewayConfigEntry
 		expectedResult bool
 	}{
-		"both nil ExtAuthz are equal": {
+		"both TLS disabled are equal": {
+			a:              base(false),
+			b:              base(false),
+			expectedResult: true,
+		},
+		"both TLS enabled are equal": {
+			a:              base(true),
+			b:              base(true),
+			expectedResult: true,
+		},
+		"TLS disabled vs enabled are NOT equal": {
+			a:              base(false),
+			b:              base(true),
+			expectedResult: false,
+		},
+		"TLS enabled vs disabled are NOT equal": {
+			a:              base(true),
+			b:              base(false),
+			expectedResult: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.expectedResult, EntriesEqual(tc.a, tc.b))
+		})
+	}
+}
+
+// TestEntriesEqual_APIGateway_Defaults exercises that changes to the gateway-wide
+// UpstreamLimits Defaults (set via annotations) are detected as unequal so the
+// reconciler writes the updated config entry to Consul.
+func TestEntriesEqual_APIGateway_Defaults(t *testing.T) {
+	t.Parallel()
+
+	makeEntry := func(defaults *api.UpstreamLimits) *api.APIGatewayConfigEntry {
+		return &api.APIGatewayConfigEntry{
+			Kind:      api.APIGateway,
+			Name:      "gw",
+			Namespace: "default",
+			Partition: "default",
+			Defaults:  defaults,
+		}
+	}
+	conn := intPtr(10)
+	conn2 := intPtr(20)
+
+	testCases := map[string]struct {
+		a, b           *api.APIGatewayConfigEntry
+		expectedResult bool
+	}{
+		"both nil Defaults are equal": {
 			a:              makeEntry(nil),
 			b:              makeEntry(nil),
 			expectedResult: true,
 		},
-		"both enabled are equal": {
-			a:              makeEntry(enabled),
-			b:              makeEntry(enabled),
+		"identical Defaults are equal": {
+			a:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
 			expectedResult: true,
 		},
-		"both disabled are equal": {
-			a:              makeEntry(disabled),
-			b:              makeEntry(disabled),
+		"nil vs non-nil Defaults are NOT equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			expectedResult: false,
+		},
+		"different MaxConnections are NOT equal": {
+			a:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn2}),
+			expectedResult: false,
+		},
+		"Defaults with PassiveHealthCheck equal": {
+			a: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
 			expectedResult: true,
 		},
-		// This was the regression: toggling enabled→disabled was not detected.
-		"enabled vs disabled are NOT equal": {
-			a:              makeEntry(enabled),
-			b:              makeEntry(disabled),
+		"Defaults with different PassiveHealthCheck are NOT equal": {
+			a: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 5},
+			}),
 			expectedResult: false,
 		},
-		"disabled vs enabled are NOT equal": {
-			a:              makeEntry(disabled),
-			b:              makeEntry(enabled),
+		"Defaults with nil vs set PassiveHealthCheck are NOT equal": {
+			a: makeEntry(&api.UpstreamLimits{}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 1},
+			}),
 			expectedResult: false,
 		},
-		// nil ExtAuthz (inherit gateway default) vs explicit override are NOT equal.
-		"nil vs enabled are NOT equal": {
+	}
+
+	for name, tc := range testCases {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.expectedResult, EntriesEqual(tc.a, tc.b))
+		})
+	}
+}
+
+// TestEntriesEqual_HTTPRoute_Limits exercises that per-service UpstreamLimits
+// (set via a RouteUpstreamLimitsFilter backendRef) are detected as unequal so
+// the reconciler writes the updated config entry to Consul.
+func TestEntriesEqual_HTTPRoute_Limits(t *testing.T) {
+	t.Parallel()
+
+	makeEntry := func(limits *api.UpstreamLimits) *api.HTTPRouteConfigEntry {
+		return &api.HTTPRouteConfigEntry{
+			Kind:      api.HTTPRoute,
+			Name:      "test-route",
+			Namespace: "default",
+			Partition: "default",
+			Rules: []api.HTTPRouteRule{
+				{
+					Matches: []api.HTTPMatch{
+						{Path: api.HTTPPathMatch{Match: api.HTTPPathMatchPrefix, Value: "/"}},
+					},
+					Services: []api.HTTPService{
+						{Name: "svc", Namespace: "default", Weight: 1, Limits: limits},
+					},
+				},
+			},
+		}
+	}
+	conn := intPtr(50)
+	conn2 := intPtr(100)
+
+	testCases := map[string]struct {
+		a, b           *api.HTTPRouteConfigEntry
+		expectedResult bool
+	}{
+		"both nil Limits are equal": {
 			a:              makeEntry(nil),
-			b:              makeEntry(enabled),
+			b:              makeEntry(nil),
+			expectedResult: true,
+		},
+		"identical Limits are equal": {
+			a:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			expectedResult: true,
+		},
+		"nil vs non-nil Limits are NOT equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
 			expectedResult: false,
 		},
-		"nil vs disabled are NOT equal": {
-			a:              makeEntry(nil),
-			b:              makeEntry(disabled),
+		"different MaxConnections are NOT equal": {
+			a:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn2}),
+			expectedResult: false,
+		},
+		"Limits with PassiveHealthCheck equal": {
+			a: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			expectedResult: true,
+		},
+		"Limits with different PassiveHealthCheck are NOT equal": {
+			a: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 5},
+			}),
+			expectedResult: false,
+		},
+		"Limits with nil vs set PassiveHealthCheck are NOT equal": {
+			a: makeEntry(&api.UpstreamLimits{}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 1},
+			}),
 			expectedResult: false,
 		},
 	}
