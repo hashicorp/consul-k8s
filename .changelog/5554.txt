@@ -1,3 +1,3 @@
 ```release-note:improvement
-control-plane: Migrate traffic redirection from `iptables`/`ip6tables` to `nftables`. Traffic redirection behavior for end users with transparent proxy (`tproxy`) enabled remains unchanged; this is an internal implementation change with no user-facing impact.
+control-plane: Migrate traffic redirection from `iptables`/`ip6tables` to `nftables`. This requires the `nft` binary and Linux kernel support for stateful NAT in `nftables` `inet` chains (Linux 5.2+ or distro backports); hosts without this support will fail to set up transparent-proxy traffic redirection.
 ```
