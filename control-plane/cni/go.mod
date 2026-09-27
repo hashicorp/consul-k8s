@@ -15,7 +15,7 @@ require (
 	k8s.io/client-go v0.35.2
 )
 
-require github.com/hashicorp/consul/sdk v0.18.3-0.20260922143634-a221db5d588a
+require github.com/hashicorp/consul/sdk v0.19.0-rc1
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -60,5 +60,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
-
-//replace github.com/hashicorp/consul/sdk => /Users/manishakumari/Work/oidc_test/consul/sdk
