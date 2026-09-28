@@ -139,7 +139,7 @@ func (c *Command) cleanupInferenceGateways() error {
 	c.UI.Info(fmt.Sprintf("Found %d InferenceGateway(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.deleteAndWait(obj); err != nil {
+		if err := c.deleteAndWait(obj, false); err != nil {
 			return fmt.Errorf("cleanup InferenceGateway %q in namespace %q: %w", obj.Name, obj.Namespace, err)
 		}
 	}
@@ -162,7 +162,7 @@ func (c *Command) cleanupInferenceModelConfigs() error {
 	c.UI.Info(fmt.Sprintf("Found %d InferenceModelConfig(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.deleteAndWait(obj); err != nil {
+		if err := c.deleteAndWait(obj, true); err != nil {
 			return fmt.Errorf("cleanup InferenceModelConfig %q: %w", obj.Name, err)
 		}
 	}
@@ -185,7 +185,7 @@ func (c *Command) cleanupMcpServerConfigs() error {
 	c.UI.Info(fmt.Sprintf("Found %d McpServerConfig(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.deleteAndWait(obj); err != nil {
+		if err := c.deleteAndWait(obj, true); err != nil {
 			return fmt.Errorf("cleanup McpServerConfig %q: %w", obj.Name, err)
 		}
 	}
@@ -208,7 +208,7 @@ func (c *Command) cleanupAgentConfigs() error {
 	c.UI.Info(fmt.Sprintf("Found %d AgentConfig(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.deleteAndWait(obj); err != nil {
+		if err := c.deleteAndWait(obj, true); err != nil {
 			return fmt.Errorf("cleanup AgentConfig %q: %w", obj.Name, err)
 		}
 	}
@@ -231,27 +231,40 @@ func (c *Command) cleanupInferencePoolConfigs() error {
 	c.UI.Info(fmt.Sprintf("Found %d InferencePoolConfig(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.deleteAndWait(obj); err != nil {
+		if err := c.deleteAndWait(obj, true); err != nil {
 			return fmt.Errorf("cleanup InferencePoolConfig %q in namespace %q: %w", obj.Name, obj.Namespace, err)
 		}
 	}
 	return nil
 }
 
-// deleteAndWait issues a Delete for obj and polls until the object is fully
-// gone from the API server. It does NOT touch finalizers — the owning
-// controller is responsible for removing them after completing its cleanup
-// (e.g. deleting the Consul config entry). The backoff gives the controller
-// enough time to finish before we give up.
-func (c *Command) deleteAndWait(obj client.Object) error {
+// deleteAndWait issues a Delete for obj and polls until it is fully removed.
+// InferenceGateway finalizers must be preserved because their controller
+// handles dependent resource cleanup. The remaining AI CRs have their
+// finalizers removed so the cleanup hook can complete after their controllers
+// have been disabled.
+func (c *Command) deleteAndWait(obj client.Object, removeFinalizers bool) error {
 	c.UI.Info(fmt.Sprintf("  deleting %s/%s", obj.GetNamespace(), obj.GetName()))
 
 	if err := c.k8sClient.Delete(c.ctx, obj); err != nil && !k8serrors.IsNotFound(err) {
 		return fmt.Errorf("delete: %w", err)
 	}
 
-	// Poll until the object is fully gone (finalizer removed by the controller).
 	key := client.ObjectKeyFromObject(obj)
+	if removeFinalizers {
+		if err := c.k8sClient.Get(c.ctx, key, obj); err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("get after delete: %w", err)
+		}
+		obj.SetFinalizers(nil)
+		if err := c.k8sClient.Update(c.ctx, obj); err != nil && !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("remove finalizers: %w", err)
+		}
+	}
+
+	// Poll until the object is fully gone.
 	return backoff.Retry(func() error {
 		if err := c.k8sClient.Get(c.ctx, key, obj); err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -260,7 +273,7 @@ func (c *Command) deleteAndWait(obj client.Object) error {
 			return err
 		}
 		return errors.New("object still exists, waiting for controller to finish cleanup")
-	}, exponentialBackoff())
+	}, backoff.WithContext(exponentialBackoff(), c.ctx))
 }
 
 // isCRDAbsent returns true when the error indicates the CRD is not registered

@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,6 +38,15 @@ const (
 	nodeName       = "test-node"
 	consulNodeName = "test-node-virtual"
 )
+
+func endpointSliceTestScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, discoveryv1.AddToScheme(scheme))
+	return scheme
+}
 
 func TestHasBeenInjected(t *testing.T) {
 	t.Parallel()
@@ -753,42 +763,41 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 				pod1.Annotations[constants.AnnotationPort] = "8080,9090"
 				pod1.Annotations[constants.AnnotationService] = "web,web-admin"
 				pod1.Annotations[constants.AnnotationUpstreams] = "upstream1:1234"
-				endpoint1 := &corev1.Endpoints{
+				ready := true
+				endpoint1 := &discoveryv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "web",
 						Namespace: "default",
+						Labels:    map[string]string{discoveryv1.LabelServiceName: "web"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					AddressType: discoveryv1.AddressTypeIPv4,
+					Endpoints: []discoveryv1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP: "1.2.3.4",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: discoveryv1.EndpointConditions{Ready: &ready},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
 						},
 					},
 				}
-				endpoint2 := &corev1.Endpoints{
+				endpoint2 := &discoveryv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "web-admin",
 						Namespace: "default",
+						Labels:    map[string]string{discoveryv1.LabelServiceName: "web-admin"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					AddressType: discoveryv1.AddressTypeIPv4,
+					Endpoints: []discoveryv1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP: "1.2.3.4",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: discoveryv1.EndpointConditions{Ready: &ready},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
 						},
 					},
@@ -1757,22 +1766,22 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Annotations[constants.AnnotationProxyConfigMap] = `{ "xds_fetch_timeout_ms": 9999 }`
-				endpoint := &corev1.Endpoints{
+				ready := true
+				endpoint := &discoveryv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: "default",
+						Labels:    map[string]string{discoveryv1.LabelServiceName: "service-created"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					AddressType: discoveryv1.AddressTypeIPv4,
+					Endpoints: []discoveryv1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP: "1.2.3.4",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: discoveryv1.EndpointConditions{Ready: &ready},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
 						},
 					},
@@ -2900,7 +2909,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			// Create fake k8s client
 			k8sObjects := append(tt.k8sObjects(), &ns, &node)
 
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(endpointSliceTestScheme(t)).
+				WithRuntimeObjects(k8sObjects...).
+				Build()
 
 			// Create test consulServer server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
@@ -3056,22 +3068,22 @@ func TestReconcile_PodErrorPreservesToken(t *testing.T) {
 			pod1Err: "some fake error while fetching pod",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
-				endpoint := &corev1.Endpoints{
+				ready := true
+				endpoint := &discoveryv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: "default",
+						Labels:    map[string]string{discoveryv1.LabelServiceName: "service-created"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					AddressType: discoveryv1.AddressTypeIPv4,
+					Endpoints: []discoveryv1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP: "1.2.3.4",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: "default",
-									},
-								},
+							Addresses:  []string{"1.2.3.4"},
+							Conditions: discoveryv1.EndpointConditions{Ready: &ready},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: "default",
 							},
 						},
 					},
@@ -3145,9 +3157,17 @@ func TestReconcile_PodErrorPreservesToken(t *testing.T) {
 			// Create fake k8s client
 			k8sObjects := append(tt.k8sObjects(), &ns, &node)
 
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(endpointSliceTestScheme(t)).
+				WithRuntimeObjects(k8sObjects...).
+				Build()
 
 			customClient := fakeClientWithPodCustomization{fakeClient}
+			var endpointSlices discoveryv1.EndpointSliceList
+			require.NoError(t, fakeClient.List(context.Background(), &endpointSlices,
+				client.InNamespace("default"),
+				client.MatchingLabels{discoveryv1.LabelServiceName: tt.svcName}))
+			require.Len(t, endpointSlices.Items, 1)
 
 			// Create test consulServer server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
@@ -3193,7 +3213,7 @@ func TestReconcile_PodErrorPreservesToken(t *testing.T) {
 			resp, err = ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
-			require.Contains(t, err.Error(), tt.pod1Err)
+			require.ErrorContains(t, err, tt.pod1Err)
 			require.False(t, resp.Requeue)
 
 			// These are the same assertions in the Reconcile-Create test cases, ensuring the state in Consul is correct.
