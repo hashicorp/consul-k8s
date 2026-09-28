@@ -1,0 +1,3 @@
+```release-note:feature
+connect-inject: Support for ai-crds, ai agent and inference gtw
+```

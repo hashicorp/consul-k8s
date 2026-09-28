@@ -305,12 +305,12 @@ const (
 	// AnnotationAIInferenceModelProtocol sets the wire protocol for an inference-model
 	// service registration. Valid values: openai | anthropic | passthrough.
 	// Stamped on the Consul service's AI.InferenceModel.Protocol field.
-	// e.g. consul.hashicorp.com/ai-inference-model-protocol: "openai"
+	// e.g. consul.hashicorp.com/ai-inference-model-protocol: "openai".
 	AnnotationAIInferenceModelProtocol = "consul.hashicorp.com/ai-inference-model-protocol"
 
 	// AnnotationAIInferenceModelPath sets the base URL path for an inference-model
 	// service registration (e.g. "/v1"). Stamped on AI.InferenceModel.Path.
-	// e.g. consul.hashicorp.com/ai-inference-model-path: "/v1"
+	// e.g. consul.hashicorp.com/ai-inference-model-path: "/v1".
 	AnnotationAIInferenceModelPath = "consul.hashicorp.com/ai-inference-model-path"
 
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.
