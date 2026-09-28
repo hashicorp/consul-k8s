@@ -209,8 +209,8 @@ func (w *MeshWebhook) oboSidecar(runAsUser, runAsGroup int64, name, image, binar
 		Image:           image,
 		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Resources:       w.DefaultConsulSidecarResources,
-		VolumeMounts: []corev1.VolumeMount{{Name: volumeName, MountPath: "/consul/connect-inject", ReadOnly: true}},
-		Command:      []string{binary},
+		VolumeMounts:    []corev1.VolumeMount{{Name: volumeName, MountPath: "/consul/connect-inject", ReadOnly: true}},
+		Command:         []string{binary},
 		Args: []string{
 			"--addr", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)),
 			"--log-level=info",

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 
+	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/nftables"
 	corev1 "k8s.io/api/core/v1"
 
@@ -110,11 +111,19 @@ func (w *MeshWebhook) nftablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	//   ExcludeInbound:  MCP port, HITL port, interceptor port, OBO inbound/outbound
 	//   ExcludeOutbound: MCP port, OBO inbound/outbound
 	if common.IsAIAgent(pod) {
-		aiCfg, err := common.AIConfigFromAgentCRD(context.Background(), w.Client, pod)
-		if err != nil {
+		var (
+			aiCfg *capi.AgentServiceAI
+			err   error
+		)
+		if w.Client != nil {
+			aiCfg, err = common.AIConfigFromAgentCRD(context.Background(), w.Client, pod)
+		}
+		if w.Client == nil || err != nil {
 			// Non-fatal: fall back to built-in constants so iptables rules are
 			// still applied with sensible defaults rather than blocking injection.
-			w.Log.Error(err, "failed to resolve AgentConfig for iptables exclusion; using built-in defaults")
+			if err != nil {
+				w.Log.Error(err, "failed to resolve AgentConfig for iptables exclusion; using built-in defaults")
+			}
 			aiCfg = common.DefaultAIConfig()
 		}
 		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,

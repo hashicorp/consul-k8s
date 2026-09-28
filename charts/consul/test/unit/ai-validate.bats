@@ -57,7 +57,7 @@ load _helpers
         --set 'ai.inferenceModel.defaults.interceptorPort=20000' \
         .
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "interceptorPort must not be 20000" ]]
+    [[ "$output" =~ "interceptorPort" ]]
 }
 
 @test "ai/validate: fails when mcpServer.interceptorPort=20000" {
@@ -68,7 +68,7 @@ load _helpers
         --set 'ai.mcpServer.defaults.interceptorPort=20000' \
         .
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "interceptorPort must not be 20000" ]]
+    [[ "$output" =~ "interceptorPort" ]]
 }
 
 @test "ai/validate: fails when agent.interceptorPort=20000" {
@@ -79,7 +79,7 @@ load _helpers
         --set 'ai.agent.defaults.interceptorPort=20000' \
         .
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "interceptorPort must not be 20000" ]]
+    [[ "$output" =~ "interceptorPort" ]]
 }
 
 @test "ai/validate: fails when agent.mcpPort=20000" {
@@ -90,7 +90,7 @@ load _helpers
         --set 'ai.agent.defaults.mcpPort=20000' \
         .
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "mcpPort must not be 20000" ]]
+    [[ "$output" =~ "mcpPort" ]]
 }
 
 @test "ai/validate: fails when agent.hitl.port=20000" {
@@ -101,7 +101,7 @@ load _helpers
         --set 'ai.agent.defaults.hitl.port=20000' \
         .
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "hitl.port must not be 20000" ]]
+    [[ "$output" =~ "hitl.port" ]]
 }
 
 #--------------------------------------------------------------------

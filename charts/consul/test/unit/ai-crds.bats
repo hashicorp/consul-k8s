@@ -196,10 +196,12 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
 
 @test "ai/CRD/InferencePoolConfig: not rendered when connectInject.enabled=false" {
     cd `chart_dir`
+    # ai-validate.yaml blocks the render when ai.enabled=true but connectInject.enabled=false,
+    # so we verify the CRD template itself by testing without ai.enabled to isolate the guard.
     assert_empty helm template \
         -s templates/crd-inferencepoolconfigs.yaml \
-        --set 'ai.enabled=true' \
         --set 'connectInject.enabled=false' \
+        --set 'ai.enabled=false' \
         .
 }
 

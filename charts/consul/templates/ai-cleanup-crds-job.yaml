@@ -1,3 +1,4 @@
+{{- if not (and .Values.ai .Values.ai.enabled) }}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 #
@@ -15,7 +16,6 @@
 # Execution order (Helm hook-weight):
 #   -10 = SA + ClusterRole + ClusterRoleBinding created first
 #    -5 = this Job runs (deletes CRs + waits for controller cleanup)
-{{- if not (and .Values.ai .Values.ai.enabled) }}
 apiVersion: batch/v1
 kind: Job
 metadata:

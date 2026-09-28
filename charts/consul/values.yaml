@@ -4039,10 +4039,7 @@ ai:
     #         cpu: "1000m"
     # ```
     # @type: array<map>
-    gateways:
-    - name: travel-gateway
-      poolRef:
-        name: travel-inference-pool
+    gateways: []
 
   agent:
     # The container image used by the AI agent sidecar.

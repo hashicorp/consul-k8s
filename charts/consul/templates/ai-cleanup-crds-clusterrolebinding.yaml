@@ -1,6 +1,6 @@
+{{- if not (and .Values.ai .Values.ai.enabled) }}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
-{{- if not (and .Values.ai .Values.ai.enabled) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

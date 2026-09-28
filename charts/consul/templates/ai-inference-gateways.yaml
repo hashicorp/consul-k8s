@@ -1,5 +1,4 @@
-{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled .Values.ai.inferenceGateway.enabled }}
-{{- if .Values.ai.inferenceGateway.gateways }}
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled .Values.ai.inferenceGateway.enabled .Values.ai.inferenceGateway.gateways }}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 #
@@ -80,5 +79,4 @@ data:
         {{- end }}
       {{- end }}
     {{- end }}
-{{- end }}
 {{- end }}

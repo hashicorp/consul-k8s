@@ -387,6 +387,39 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 				ExcludeUIDs:          []string{"4444", "44444", strconv.Itoa(initContainersUserAndGroupID)},
 			},
 		},
+		{
+			name: "AI agent pod excludes MCP, HITL, interceptor, and OBO ports",
+			webhook: MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: defaultNamespace,
+					Name:      defaultPodName,
+					Annotations: map[string]string{
+						constants.AnnotationAIRole: constants.AIAgentRole,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "test",
+						},
+					},
+				},
+			},
+			expCfg: nftables.Config{
+				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
+				ProxyInboundPort:     constants.ProxyDefaultInboundPort,
+				ProxyOutboundPort:    nftables.DefaultTProxyOutboundPort,
+				ExcludeInboundPorts:  []string{"21003", "21004", "21005", "21102", "21103"},
+				ExcludeOutboundPorts: []string{"21003", "21102", "21103"},
+				ExcludeUIDs:          []string{strconv.Itoa(initContainersUserAndGroupID)},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
