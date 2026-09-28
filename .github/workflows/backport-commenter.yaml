@@ -26,7 +26,7 @@ env:
   BPA_COMMENTER_BEGIN_DATE: ${{ github.event.inputs['begin-date'] || '2026-08-05' }}
   # This needs to be updated to the versions that are currently being backported.
   # Active releases: 1.8, 1.9, 2.0
-  BPA_COMMENTER_VERSIONS: ${{ github.event.inputs.versions || '1.8.x,1.9.x,2.0.x' }}
+  BPA_COMMENTER_VERSIONS: ${{ github.event.inputs.versions || '1.8.x,1.9.x,2.0.x,2.1.x' }}
 
 jobs:
   validate-backports:
