@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -109,7 +110,7 @@ func (w *MeshWebhook) nftablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	//   ExcludeInbound:  MCP port, HITL port, interceptor port, OBO inbound/outbound
 	//   ExcludeOutbound: MCP port, OBO inbound/outbound
 	if common.IsAIAgent(pod) {
-		aiCfg, err := common.AIConfigFromAgentCRD(ctx, w.Client, pod)
+		aiCfg, err := common.AIConfigFromAgentCRD(context.Background(), w.Client, pod)
 		if err != nil {
 			// Non-fatal: fall back to built-in constants so iptables rules are
 			// still applied with sensible defaults rather than blocking injection.

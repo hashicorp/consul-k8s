@@ -648,7 +648,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the traffic redirection config so that the CNI
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
-		if err = w.addRedirectTrafficConfigAnnotation(ctx, &pod, *ns); err != nil {
+		if err = w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
 			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
 		}

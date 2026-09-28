@@ -4,7 +4,6 @@
 package webhook
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -391,7 +390,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := c.webhook.addRedirectTrafficConfigAnnotation(context.Background(), c.pod, c.namespace)
+			err := c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
 
 			// Only compare annotation and nft config on successful runs
 			if c.expErr == nil {
