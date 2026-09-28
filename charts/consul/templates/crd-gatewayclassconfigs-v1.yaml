@@ -64,24 +64,26 @@ spec:
                 properties:
                   defaultInstances:
                     default: 1
-                    description: Number of gateway instances that should be deployed
-                      by default
+                    description: |-
+                      Number of gateway instances that should be deployed by default
+                      DEPRECATED: Use Gateway annotations (consul.hashicorp.com/default-replicas) instead
                     format: int32
-                    maximum: 8
                     minimum: 1
                     type: integer
                   maxInstances:
                     default: 8
-                    description: Max allowed number of gateway instances
+                    description: |-
+                      Max allowed number of gateway instances
+                      DEPRECATED: Use HPA maxReplicas instead via Gateway annotations
                     format: int32
-                    maximum: 8
                     minimum: 1
                     type: integer
                   minInstances:
                     default: 1
-                    description: Minimum allowed number of gateway instances
+                    description: |-
+                      Minimum allowed number of gateway instances
+                      DEPRECATED: Use HPA minReplicas instead via Gateway annotations
                     format: int32
-                    maximum: 8
                     minimum: 1
                     type: integer
                   resources:
@@ -143,9 +145,10 @@ spec:
                 type: object
               envoyConcurrency:
                 description: EnvoyConcurrency sets the number of Envoy worker threads
-                  for API Gateway pods. Setting to 0 uses the number of CPU cores
-                  on the node. Defaults to 1 if unset. Overrides the global default
-                  set via the Helm value connectInject.apiGateway.managedGatewayClass.envoyConcurrency.
+                  for API Gateway pods. Setting to 0 allows Envoy to automatically
+                  determine concurrency based on the number of vCPUs available to
+                  the pod (via cgroup limits). Defaults to 1 if unset. Overrides the
+                  global default set via the Helm value connectInject.apiGateway.managedGatewayClass.envoyConcurrency.
                 format: int32
                 minimum: 0
                 type: integer

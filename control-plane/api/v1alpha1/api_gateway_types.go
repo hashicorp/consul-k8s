@@ -71,7 +71,8 @@ type GatewayClassConfigSpec struct {
 
 	// +kubebuilder:validation:Minimum=0
 	// EnvoyConcurrency sets the number of Envoy worker threads for API Gateway pods.
-	// Setting to 0 uses the number of CPU cores on the node. Defaults to 1 if unset.
+	// Setting to 0 allows Envoy to automatically determine concurrency based on the
+	// number of vCPUs available to the pod (via cgroup limits). Defaults to 1 if unset.
 	// Overrides the global default set via the Helm value
 	// connectInject.apiGateway.managedGatewayClass.envoyConcurrency.
 	// Maps to the -envoy-concurrency flag on consul-dataplane.
