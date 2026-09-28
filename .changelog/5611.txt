@@ -1,0 +1,7 @@
+```release-note:feature
+helm: add `global.acls.authMethod.name` to configure the base name of the Kubernetes auth methods created by the `server-acl-init` job. Set this to a unique value per Kubernetes cluster when multiple clusters share a single Consul control plane, so that the clusters do not overwrite each other's auth methods.
+```
+
+```release-note:feature
+helm: add `global.acls.authMethod.create` to allow using Kubernetes auth methods that were configured outside of the Helm release. When set to `false`, the `server-acl-init` job requires the auth methods to already exist and only manages the ACL policies, roles and binding rules.
+```

@@ -45,6 +45,7 @@ rules:
     - creferencegrants
     - cgrpcroutes
     - cudproutes
+    - gatewaypolicies
   verbs:
     - get
     - create

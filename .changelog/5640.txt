@@ -1,0 +1,3 @@
+```release-note:security
+dockerfile: Remove unnecessary `root` group membership for the user in ubi-based consul-k8s-control-plane image.
+```

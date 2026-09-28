@@ -24,7 +24,7 @@ FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
 RUN mkdir /build && cd /build && \
     go mod init godisc_builder && \
     go get github.com/hashicorp/go-discover/cmd/discover@v1.2.0 && \
-    go get golang.org/x/crypto@v0.52.0 golang.org/x/net@v0.55.0 google.golang.org/grpc@v1.81.1 && \
+    go get golang.org/x/crypto@v0.54.0 golang.org/x/net@v0.57.0 google.golang.org/grpc@v1.83.0 && \
     CGO_ENABLED=0 GOFLAGS=-mod=mod go build -o /go/bin/discover github.com/hashicorp/go-discover/cmd/discover
 
 # dev copies the binary from a local build
@@ -42,13 +42,13 @@ ARG TARGETOS
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=${BIN_NAME} \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=${VERSION} \
-      release=${VERSION} \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=${VERSION} \
+    release=${VERSION} \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
@@ -57,7 +57,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -95,13 +95,13 @@ ARG PRODUCT_VERSION
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=${BIN_NAME} \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=${PRODUCT_VERSION} \
-      release=${PRODUCT_VERSION} \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=${PRODUCT_VERSION} \
+    release=${PRODUCT_VERSION} \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
@@ -110,7 +110,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ nftables
 
 # for FIPS CGO glibc compatibility in alpine
 # see https://github.com/golang/go/issues/59305
@@ -161,13 +161,13 @@ ENV PRODUCT_VERSION=$PRODUCT_VERSION
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=$PRODUCT_NAME \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=$PRODUCT_VERSION \
-      release=$PRODUCT_VERSION \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=$PRODUCT_VERSION \
+    release=$PRODUCT_VERSION \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
@@ -183,15 +183,14 @@ ARG TARGETARCH
 COPY LICENSE /licenses/mozilla.txt
 
 RUN microdnf update -y && \
-    microdnf install -y ca-certificates libcap openssl shadow-utils iptables && \
+    microdnf install -y ca-certificates libcap openssl shadow-utils nftables && \
     microdnf clean all
 
 # Create a non-root user to run the software. On OpenShift, this
 # will not matter since the container is run as a random user and group
 # but this is kept for consistency with our other images.
 RUN groupadd --gid 1000 ${BIN_NAME} && \
-    adduser --uid 100 --system -g ${BIN_NAME} ${BIN_NAME} && \
-    usermod -a -G root ${BIN_NAME}
+    adduser --uid 100 --system -g ${BIN_NAME} ${BIN_NAME}
 
 COPY --from=go-discover /go/bin/discover /bin/
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/

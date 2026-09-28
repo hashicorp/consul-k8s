@@ -11,7 +11,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -24,14 +23,16 @@ const (
 
 	Gateway_GatewayClassIndex = "__gateway_referencing_gatewayclass"
 
-	HTTPRoute_GatewayIndex            = "__httproute_referencing_gateway"
-	HTTPRoute_ServiceIndex            = "__httproute_referencing_service"
-	HTTPRoute_MeshServiceIndex        = "__httproute_referencing_mesh_service"
-	HTTPRoute_RouteRetryFilterIndex   = "__httproute_referencing_retryfilter"
-	HTTPRoute_RouteTimeoutFilterIndex = "__httproute_referencing_timeoutfilter"
-	HTTPRoute_RouteAuthFilterIndex    = "__httproute_referencing_routeauthfilter"
-	HTTPRoute_RouteTLSSDSFilterIndex  = "__httproute_referencing_routetlssdsfilter"
-	HTTPRoute_RouteExtProcIndex       = "__httproute_referencing_routeextproc"
+	HTTPRoute_GatewayIndex                      = "__httproute_referencing_gateway"
+	HTTPRoute_ServiceIndex                      = "__httproute_referencing_service"
+	HTTPRoute_MeshServiceIndex                  = "__httproute_referencing_mesh_service"
+	HTTPRoute_RouteRetryFilterIndex             = "__httproute_referencing_retryfilter"
+	HTTPRoute_RouteTimeoutFilterIndex           = "__httproute_referencing_timeoutfilter"
+	HTTPRoute_RouteAuthFilterIndex              = "__httproute_referencing_routeauthfilter"
+	HTTPRoute_RouteTLSSDSFilterIndex            = "__httproute_referencing_routetlssdsfilter"
+	HTTPRoute_RouteExtProcIndex                 = "__httproute_referencing_routeextproc"
+	HTTPRoute_RouteHeaderMatchInvertFilterIndex = "__httproute_referencing_routeheadermatchinvertfilter"
+	HTTPRoute_RouteUpstreamLimitsFilterIndex    = "__httproute_referencing_upstreamlimitsfilter"
 
 	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
 	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
@@ -121,17 +122,17 @@ var indexes = []index{
 	},
 	{
 		name:        TCPRoute_GatewayIndex,
-		target:      &gwv1alpha2.TCPRoute{},
+		target:      &gwv1.TCPRoute{},
 		indexerFunc: gatewaysForTCPRoute,
 	},
 	{
 		name:        TCPRoute_ServiceIndex,
-		target:      &gwv1alpha2.TCPRoute{},
+		target:      &gwv1.TCPRoute{},
 		indexerFunc: servicesForTCPRoute,
 	},
 	{
 		name:        TCPRoute_MeshServiceIndex,
-		target:      &gwv1alpha2.TCPRoute{},
+		target:      &gwv1.TCPRoute{},
 		indexerFunc: meshServicesForTCPRoute,
 	},
 	{
@@ -161,6 +162,16 @@ var indexes = []index{
 	},
 	{
 		name:        HTTPRoute_RouteExtProcIndex,
+		target:      &gwv1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
+	},
+	{
+		name:        HTTPRoute_RouteUpstreamLimitsFilterIndex,
+		target:      &gwv1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
+	},
+	{
+		name:        HTTPRoute_RouteHeaderMatchInvertFilterIndex,
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
@@ -233,8 +244,8 @@ func gatewaysForHTTPRoute(o client.Object) []string {
 }
 
 func gatewaysForTCPRoute(o client.Object) []string {
-	route := o.(*gwv1alpha2.TCPRoute)
-	statusRefs := common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1alpha2.RouteParentStatus) gwv1alpha2.ParentReference {
+	route := o.(*gwv1.TCPRoute)
+	statusRefs := common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1.RouteParentStatus) gwv1.ParentReference {
 		return parentStatus.ParentRef
 	})
 	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs, statusRefs)
@@ -281,7 +292,7 @@ func meshServicesForHTTPRoute(o client.Object) []string {
 }
 
 func servicesForTCPRoute(o client.Object) []string {
-	route := o.(*gwv1alpha2.TCPRoute)
+	route := o.(*gwv1.TCPRoute)
 	refs := []string{}
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
@@ -301,7 +312,7 @@ func servicesForTCPRoute(o client.Object) []string {
 }
 
 func meshServicesForTCPRoute(o client.Object) []string {
-	route := o.(*gwv1alpha2.TCPRoute)
+	route := o.(*gwv1.TCPRoute)
 	refs := []string{}
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
