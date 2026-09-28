@@ -43,10 +43,6 @@ const (
 	reasonPoolNotReady = "PoolNotReady"
 	reasonPoolResolved = "PoolResolved"
 
-	// inferenceGatewayPort is the gRPC ext_proc port the gateway binary binds to
-	// (consul-inference-gateway default: -addr=:9000).
-	inferenceGatewayPort = int32(9000)
-
 	// inferenceGatewayServicePort is the default Kubernetes Service port exposed
 	// to callers in the mesh. Matches the convention used by other inference
 	// gateway deployments in this cluster (8443).
@@ -714,27 +710,6 @@ func normaliseWindow(w string) string {
 //	"ssn"         → "ssn"  (no hyphens, unchanged)
 func piiDetectorName(name string) string {
 	return strings.ReplaceAll(name, "-", "_")
-}
-
-// customLabelKeys normalises a CustomLabels slice so that each entry contains
-// only the label key. The Consul API validates every entry against
-// ^[a-zA-Z_][a-zA-Z0-9_]*$ and rejects "key=value" pairs with "too many
-// colons" / "is invalid". Users may supply either bare keys ("env") or
-// key=value pairs ("env=production") in the CRD; this function strips any
-// "=..." suffix so Consul always receives a bare identifier.
-func customLabelKeys(labels []string) []string {
-	if len(labels) == 0 {
-		return labels
-	}
-	out := make([]string, len(labels))
-	for i, l := range labels {
-		if idx := strings.IndexByte(l, '='); idx >= 0 {
-			out[i] = l[:idx]
-		} else {
-			out[i] = l
-		}
-	}
-	return out
 }
 
 // otlpHostPort strips any URL scheme (http:// or https://) from an OTLP
