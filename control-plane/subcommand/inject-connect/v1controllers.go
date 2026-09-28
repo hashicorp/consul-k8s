@@ -275,7 +275,9 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			ConsulPartition:        c.consul.Partition,
 			ConsulNamespace:        c.flagConsulDestinationNamespace,
 			EnableConsulNamespaces: c.flagEnableNamespaces,
+			EnableK8SNSMirroring:   c.flagEnableK8SNSMirroring,
 			Datacenter:             c.consul.Datacenter,
+			AuthMethod:             c.flagACLAuthMethod,
 		}).SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InferenceGateway")
 			return err
@@ -569,6 +571,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ImageAIAgent:                              c.flagAIAgentImage,
 		ImageConsulOBOInbound:                     c.flagConsulOBOInboundImage,
 		ImageConsulOBOOutbound:                    c.flagConsulOBOOutboundImage,
+		EnableOBO:                                 c.flagEnableOBO,
 		EnvoyExtraArgs:                            c.flagEnvoyExtraArgs,
 		ImageConsulK8S:                            c.flagConsulK8sImage,
 		GlobalImagePullPolicy:                     c.flagGlobalImagePullPolicy,

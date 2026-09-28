@@ -174,8 +174,6 @@ func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *
 }
 
 // oboInboundSidecar builds consul-obo-inbound for ai-agent pods.
-// Listens on loopback :21102; envelope + broker UDS for split-knowledge credentials.
-// Verify-only — no private key material in this process beyond envelope decrypt.
 func (w *MeshWebhook) oboInboundSidecar(runAsUser, runAsGroup int64) (corev1.Container, error) {
 	if w.ImageConsulOBOInbound == "" {
 		return corev1.Container{}, fmt.Errorf(
@@ -186,8 +184,6 @@ func (w *MeshWebhook) oboInboundSidecar(runAsUser, runAsGroup int64) (corev1.Con
 }
 
 // oboOutboundSidecar builds consul-obo-outbound for ai-agent pods.
-// Listens on loopback :21103; RFC 8693 exchange after envelope decrypt via broker.
-// Not an SDS/xDS client — envelope UDS + Local Credential Broker only.
 func (w *MeshWebhook) oboOutboundSidecar(runAsUser, runAsGroup int64) (corev1.Container, error) {
 	if w.ImageConsulOBOOutbound == "" {
 		return corev1.Container{}, fmt.Errorf(
@@ -198,44 +194,28 @@ func (w *MeshWebhook) oboOutboundSidecar(runAsUser, runAsGroup int64) (corev1.Co
 }
 
 func (w *MeshWebhook) oboSidecar(runAsUser, runAsGroup int64, name, image, binary string, port int) (corev1.Container, error) {
-	// Listen address stays 127.0.0.1. xDS OBO clusters dial that address.
-	// Only the Envoy admin readiness URL follows the dual-stack bind.
 	readyHost := constants.Getv4orv6Str("127.0.0.1", "::1")
 	readyURL := "http://" + net.JoinHostPort(readyHost, strconv.Itoa(constants.DefaultEnvoyAdminPort)) + "/ready"
-
 	return corev1.Container{
 		Name:            name,
 		Image:           image,
 		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Resources:       w.DefaultConsulSidecarResources,
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
-				ReadOnly:  true,
-			},
-		},
-		Command: []string{binary},
+		VolumeMounts: []corev1.VolumeMount{{Name: volumeName, MountPath: "/consul/connect-inject", ReadOnly: true}},
+		Command:      []string{binary},
 		Args: []string{
-			"--addr",
-			net.JoinHostPort("127.0.0.1", strconv.Itoa(port)),
+			"--addr", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)),
 			"--log-level=info",
 			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
 			"--broker-uds=/consul/connect-inject/credential-broker.sock",
 			"--dataplane-ready-url=" + readyURL,
 		},
 		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:                ptr.To(runAsUser),
-			RunAsGroup:               ptr.To(runAsGroup),
-			RunAsNonRoot:             ptr.To(true),
-			AllowPrivilegeEscalation: ptr.To(false),
-			ReadOnlyRootFilesystem:   ptr.To(true),
-			SeccompProfile: &corev1.SeccompProfile{
-				Type: corev1.SeccompProfileTypeRuntimeDefault,
-			},
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
+			RunAsUser: ptr.To(runAsUser), RunAsGroup: ptr.To(runAsGroup),
+			RunAsNonRoot: ptr.To(true), AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem: ptr.To(true),
+			SeccompProfile:         &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+			Capabilities:           &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 		},
 	}, nil
 }

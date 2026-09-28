@@ -424,10 +424,15 @@ func TestInferenceGatewayReconcile_ChildResources(t *testing.T) {
 		require.Equal(t, "pool", envMap["POOL_NAME"])
 		require.Equal(t, "default", envMap["POOL_NAMESPACE"])
 
-		// Two shared volumes: consul-service (proxy-id) and run-consul (UDS socket).
-		require.Len(t, dep.Spec.Template.Spec.Volumes, 2)
-		volNames := []string{dep.Spec.Template.Spec.Volumes[0].Name, dep.Spec.Template.Spec.Volumes[1].Name}
+		// Three shared volumes: consul-service (proxy-id), consul-connect-inject-data
+		// (CA cert + proxy token written by connect-init), and run-consul (UDS socket).
+		require.Len(t, dep.Spec.Template.Spec.Volumes, 3)
+		volNames := make([]string, len(dep.Spec.Template.Spec.Volumes))
+		for i, v := range dep.Spec.Template.Spec.Volumes {
+			volNames[i] = v.Name
+		}
 		require.Contains(t, volNames, "consul-service")
+		require.Contains(t, volNames, "consul-connect-inject-data")
 		require.Contains(t, volNames, "run-consul")
 
 		// Service must exist with the controller's DefaultService values.
@@ -884,6 +889,9 @@ func TestToConsulConfigEntry(t *testing.T) {
 		// No failover on a minimal pool.
 		// TODO: re-add require.Nil(t, aige.RateLimit) when RateLimit returns to the API.
 		require.Nil(t, aige.Failover)
+		// Default FailureMode when pool.Spec.Processor is unset.
+		require.Equal(t, "closed", aige.Processor.FailureMode)
+		require.False(t, aige.Processor.BodyModelRouting)
 	})
 
 	t.Run("pool with routing.Fallback maps to InferenceGatewayFailover", func(t *testing.T) {
@@ -987,6 +995,125 @@ func TestToConsulConfigEntry(t *testing.T) {
 		aige := entry.(*capi.InferenceGatewayConfigEntry)
 		require.Equal(t, "my-ns", aige.Namespace,
 			"Enterprise mode: entry.Namespace must be set when EnableConsulNamespaces=true")
+	})
+
+	t.Run("pool with Processor.FailureMode from pool.Spec.Processor", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		pool.Spec.Processor = &v1alpha1.InferencePoolProcessor{
+			FailureMode:      "open",
+			BodyModelRouting: true,
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.Equal(t, "open", aige.Processor.FailureMode)
+		require.True(t, aige.Processor.BodyModelRouting)
+	})
+
+	t.Run("pool without Observability leaves Observability nil", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.Nil(t, aige.Observability,
+			"Observability must be nil when pool.Spec.Observability is not set")
+	})
+
+	t.Run("pool with Observability.Metrics maps to capi.InferenceGatewayMetrics", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		enabled := true
+		pool.Spec.Observability = &v1alpha1.InferencePoolObservability{
+			Metrics: &v1alpha1.InferencePoolObservabilityMetrics{
+				Enabled:       &enabled,
+				SemconvSchema: "https://opentelemetry.io/schemas/1.21.0",
+				CustomLabels:  []string{"env=prod", "team=ai"},
+				Prometheus: &v1alpha1.InferencePoolObservabilityMetricsPrometheus{
+					Port: 9090,
+					Path: "/metrics",
+				},
+				OTLP: &v1alpha1.InferencePoolOTLPExport{
+					Endpoint: "http://otel-collector:4318",
+					Insecure: true,
+				},
+			},
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.NotNil(t, aige.Observability)
+		require.NotNil(t, aige.Observability.Metrics)
+		require.True(t, *aige.Observability.Metrics.Enabled)
+		// SemconvSchema and CustomLabels are not yet on capi.InferenceGatewayMetrics;
+		// they are dropped at the controller→API boundary until the API adds them.
+		require.NotNil(t, aige.Observability.Metrics.Prometheus)
+		require.Equal(t, 9090, *aige.Observability.Metrics.Prometheus.Port)
+		// Path is not on capi.InferenceGatewayMetricsPrometheus; always served on /metrics.
+		require.NotNil(t, aige.Observability.Metrics.OTLP)
+		require.Equal(t, "otel-collector:4318", aige.Observability.Metrics.OTLP.Endpoint)
+		require.True(t, aige.Observability.Metrics.OTLP.Insecure)
+		require.Nil(t, aige.Observability.Tracing)
+	})
+
+	t.Run("pool with Observability.Tracing maps to capi.InferenceGatewayTracing", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		pool.Spec.Observability = &v1alpha1.InferencePoolObservability{
+			Tracing: &v1alpha1.InferencePoolObservabilityTracing{
+				Enabled:     true,
+				SampleRatio: 0.01,
+				OTLP: &v1alpha1.InferencePoolOTLPExport{
+					Endpoint: "http://otel-collector:4317",
+					Insecure: false,
+				},
+			},
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.NotNil(t, aige.Observability)
+		require.NotNil(t, aige.Observability.Tracing)
+		require.True(t, aige.Observability.Tracing.Enabled)
+		require.Equal(t, 0.01, aige.Observability.Tracing.SampleRatio)
+		require.NotNil(t, aige.Observability.Tracing.OTLP)
+		// otlpHostPort strips the http:// scheme before writing to the Consul API.
+		require.Equal(t, "otel-collector:4317", aige.Observability.Tracing.OTLP.Endpoint)
+		require.False(t, aige.Observability.Tracing.OTLP.Insecure)
+		require.Nil(t, aige.Observability.Metrics)
+	})
+
+	t.Run("pool with both Observability pillars maps Metrics and Tracing", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		enabled := false
+		pool.Spec.Observability = &v1alpha1.InferencePoolObservability{
+			Metrics: &v1alpha1.InferencePoolObservabilityMetrics{
+				Enabled: &enabled,
+			},
+			Tracing: &v1alpha1.InferencePoolObservabilityTracing{
+				Enabled: true,
+			},
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.NotNil(t, aige.Observability)
+		require.NotNil(t, aige.Observability.Metrics)
+		require.False(t, *aige.Observability.Metrics.Enabled)
+		require.NotNil(t, aige.Observability.Tracing)
+		require.True(t, aige.Observability.Tracing.Enabled)
 	})
 }
 

@@ -1010,6 +1010,10 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 		// consistent with other gateway types but don't return an error below.
 	case inferenceGateway:
 		service.Kind = api.ServiceKindInferenceGateway
+		if r.EnableConsulNamespaces {
+			service.Namespace = defaultNS
+			consulNS = defaultNS
+		}
 		// Use the port stamped on the pod by the controller (from spec.service.ports[0]).
 		// Fall back to 8443 if the annotation is absent or unparseable.
 		service.Port = 8443
@@ -1018,6 +1022,13 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 				service.Port = p
 			}
 		}
+		// Tell consul-enterprise xDS where the co-located ext_proc socket lives.
+		// InferenceExtProcSocketPath() (inference_gateway_socket.go) reads
+		// proxy.config["inference_ext_proc_socket"] first; if set it is used as-is
+		// and delivered as the local_ext_proc cluster endpoint over CDS.
+		// In K8s the socket is at a fixed path on the shared emptyDir volume,
+		// so one pod = one gateway = no collision; no derived hash needed.
+		service.Proxy.Config["inference_ext_proc_socket"] = "/run/consul/ext_proc.sock"
 	default:
 		return nil, fmt.Errorf("%s must be one of %s, %s, %s, %s, %s, or %s ", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway, apiGatewayConsul, inferenceGateway)
 	}

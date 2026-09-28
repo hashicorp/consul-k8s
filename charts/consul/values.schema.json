@@ -167,6 +167,10 @@
           "type": "object",
           "description": "OBO (on-behalf-of) identity-plane sidecars injected into ai-role=ai-agent pods.",
           "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Inject OBO sidecars into ai-role=ai-agent pods. Set false for environments without an IBM Verify tenant."
+            },
             "inbound": {
               "type": "object",
               "properties": {
