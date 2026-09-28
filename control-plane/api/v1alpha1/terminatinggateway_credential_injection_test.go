@@ -405,6 +405,37 @@ func TestTerminatingGatewayCredentialInjection_Validate(t *testing.T) {
 				`spec.deployment.credentialInjection.drainSeconds`,
 			},
 		},
+		"drainSeconds above the processor's 300s drain-wait limit": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) { ci.DrainSeconds = ptr.To(int64(301)) }, ptr.To(true)),
+			expectedErrMsgs: []string{
+				`spec.deployment.credentialInjection.drainSeconds`,
+				`must not exceed 300`,
+			},
+		},
+		"drainSeconds above 300 is rejected for the kubernetesSecret source too": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) {
+				ci.Source = CredentialSourceKubernetesSecret
+				ci.SecretName = "camp-egress-credentials"
+				ci.DrainSeconds = ptr.To(int64(600))
+				ci.VaultAgentImage = ""
+				ci.VaultAgentConfigMap = ""
+				ci.VaultAddress = ""
+				ci.TokenAudience = ""
+			}, ptr.To(true)),
+			expectedErrMsgs: []string{
+				`spec.deployment.credentialInjection.drainSeconds`,
+				`must not exceed 300`,
+			},
+		},
+		"drainSeconds at the 300s limit is valid": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) { ci.DrainSeconds = ptr.To(int64(300)) }, ptr.To(true)),
+		},
+		"drainSeconds zero (drain disabled) is valid": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) { ci.DrainSeconds = ptr.To(int64(0)) }, ptr.To(true)),
+		},
+		"IPv6 vault address is valid": {
+			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) { ci.VaultAddress = "https://[fd00::1]:8200" }, ptr.To(true)),
+		},
 		"forbidden wildcard in processorConfigMap": {
 			input: baseGateway(func(ci *TerminatingGatewayCredentialInjection) { ci.ProcessorConfigMap = "camp-*" }, ptr.To(true)),
 			expectedErrMsgs: []string{

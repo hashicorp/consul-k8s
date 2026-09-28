@@ -123,6 +123,49 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 	require.Equal(t, int64(600), *tok.Projected.Sources[0].ServiceAccountToken.ExpirationSeconds)
 }
 
+// TestTerminatingGatewayCredentialPodProcessorContract asserts the processor
+// container only receives values camp-auth-processor accepts: its log levels
+// (debug/info/warn/error) and a drain-wait duration in (0, 300s].
+func TestTerminatingGatewayCredentialPodProcessorContract(t *testing.T) {
+	build := func(logLevel string, drain *int64) corev1.PodSpec {
+		ci := &consulv1alpha1.TerminatingGatewayCredentialInjection{
+			Enabled:            true,
+			Source:             consulv1alpha1.CredentialSourceKubernetesSecret,
+			SecretName:         "camp-egress-credentials",
+			ProcessorImage:     "camp-auth-processor:test",
+			ProcessorConfigMap: "camp-proc",
+			DrainSeconds:       drain,
+		}
+		podSpec := corev1.PodSpec{
+			InitContainers: []corev1.Container{{Name: "terminating-gateway-init"}},
+			Containers:     []corev1.Container{{Name: "terminating-gateway"}},
+		}
+		applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, logLevel, false, false)
+		return podSpec
+	}
+
+	for in, want := range map[string]string{"trace": "debug", "TRACE": "debug", "debug": "debug", "info": "info", "warn": "warn", "error": "error"} {
+		proc := containerByName(t, build(in, nil).Containers, "camp-auth-processor")
+		require.Containsf(t, proc.Args, "-log-level="+want, "gateway log level %q", in)
+	}
+
+	// Default and upper-bound drain keep the preStop wait.
+	for drain, want := range map[int64]string{30: "-duration=30s", 300: "-duration=300s"} {
+		podSpec := build("info", ptr.To(drain))
+		proc := containerByName(t, podSpec.Containers, "camp-auth-processor")
+		require.NotNil(t, proc.Lifecycle)
+		require.Contains(t, proc.Lifecycle.PreStop.Exec.Command, want)
+		require.Equal(t, drain+campShutdownAllowanceSecs, *podSpec.TerminationGracePeriodSeconds)
+	}
+
+	// Zero disables draining: no preStop hook (drain-wait rejects 0s), and only
+	// the shutdown allowance remains in the grace period.
+	podSpec := build("info", ptr.To(int64(0)))
+	proc := containerByName(t, podSpec.Containers, "camp-auth-processor")
+	require.Nil(t, proc.Lifecycle)
+	require.Equal(t, campShutdownAllowanceSecs, *podSpec.TerminationGracePeriodSeconds)
+}
+
 func TestTerminatingGatewayCredentialPodDisabled(t *testing.T) {
 	podSpec := corev1.PodSpec{
 		InitContainers: []corev1.Container{{Name: "terminating-gateway-init"}},

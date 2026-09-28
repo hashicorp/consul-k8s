@@ -1003,8 +1003,10 @@ spec:
                         drainSeconds:
                           description: |-
                             DrainSeconds bounds how long the sidecars wait to finish in-flight credential
-                            refresh work before terminating during a rolling update.
+                            refresh work before terminating during a rolling update. Must be between 0
+                            and 300; 0 disables the drain wait. Defaults to 30.
                           format: int64
+                          maximum: 300
                           minimum: 0
                           type: integer
                         enabled:

@@ -1653,6 +1653,41 @@ key2: value2' \
   [[ "$output" == *"drainSeconds must not be negative"* ]]
 }
 
+@test "terminatingGateways/Deployment: credentialInjection rejects drainSeconds above the processor's 300s limit" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
+      --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.defaults.credentialInjection.secretName=creds' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
+      --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
+      --set 'terminatingGateways.defaults.credentialInjection.drainSeconds=301' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"drainSeconds must not exceed 300"* ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection accepts IPv6 and rejects malformed vaultAddress hosts" {
+  cd `chart_dir`
+  local ci="terminatingGateways.defaults.credentialInjection"
+  local args="-s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set ${ci}.enabled=true --set ${ci}.processorImage=p:1 --set ${ci}.processorConfigMap=camp-proc \
+      --set ${ci}.vaultAgentImage=v:1 --set ${ci}.vaultAgentConfigMap=camp-agent --set ${ci}.tokenAudience=vault"
+  for addr in 'https://vault:8200' 'https://[fd00::1]:8200' 'https://[fd00::1]' 'https://[fe80::1%25eth0]:8200/v1' 'https://10.0.0.5:8200'; do
+    run helm template ${args} --set-string "${ci}.vaultAddress=${addr}" .
+    [ "$status" -eq 0 ] || { echo "expected ${addr} to be accepted: $output" >&2; false; }
+  done
+  for addr in 'https://' 'https://[zz::1]:8200' 'https://fd00::1:8200' 'https://[fd00::1' 'http://[fd00::1]:8200'; do
+    run helm template ${args} --set-string "${ci}.vaultAddress=${addr}" .
+    [ "$status" -eq 1 ] || { echo "expected ${addr} to be rejected" >&2; false; }
+    [[ "$output" == *"vaultAddress must be a valid absolute https:// URL"* ]]
+  done
+}
+
 @test "terminatingGateways/Deployment: credentialInjection rejects identical processor and vault-agent ConfigMaps" {
   cd `chart_dir`
   run helm template \
@@ -2082,7 +2117,7 @@ key2: value2' \
   [ "$g" = "10" ]
 }
 
-@test "terminatingGateways/Deployment: credentialInjection drainSeconds=0 yields a 15s grace period" {
+@test "terminatingGateways/Deployment: credentialInjection drainSeconds=0 yields a 15s grace period and no drain hook" {
   cd `chart_dir`
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
@@ -2097,8 +2132,43 @@ key2: value2' \
       . | tee /dev/stderr)
   # 0 (drain) + 15 (shutdown allowance); the nil-aware default must not treat 0 as unset.
   [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds')" = "15" ]
+  # drain-wait rejects -duration=0s, so zero omits the preStop hook entirely.
   local proc=$(echo "$out" | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")')
-  [ "$(echo "$proc" | yq -r '.lifecycle.preStop.exec.command | contains(["-duration=0s"])')" = "true" ]
+  [ "$(echo "$proc" | yq -r '.lifecycle')" = "null" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection drainSeconds=300 keeps the drain hook at the processor limit" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.source=kubernetesSecret \
+      --set terminatingGateways.defaults.credentialInjection.secretName=creds \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.drainSeconds=300 \
+      . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.terminationGracePeriodSeconds')" = "315" ]
+  local proc=$(echo "$out" | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")')
+  [ "$(echo "$proc" | yq -r '.lifecycle.preStop.exec.command | contains(["-duration=300s"])')" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection maps trace log level to debug for the processor only" {
+  cd `chart_dir`
+  local ci="terminatingGateways.defaults.credentialInjection"
+  local args="-s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set ${ci}.enabled=true --set ${ci}.source=kubernetesSecret --set ${ci}.secretName=creds \
+      --set ${ci}.processorImage=camp-auth-processor:test --set ${ci}.processorConfigMap=camp-proc"
+  # Inherited from global.logLevel and set directly on terminatingGateways.logLevel.
+  for level in "--set global.logLevel=trace" "--set terminatingGateways.logLevel=trace"; do
+    local spec=$(helm template ${args} ${level} . | tee /dev/stderr | yq -s '.[0].spec.template.spec')
+    [ "$(echo "$spec" | yq -r '.containers[] | select(.name=="camp-auth-processor") | .args | contains(["-log-level=debug"])')" = "true" ]
+    [ "$(echo "$spec" | yq -r '.containers[] | select(.name=="terminating-gateway") | .args | contains(["-log-level=trace"])')" = "true" ]
+  done
+  # Other levels pass through unchanged.
+  local proc=$(helm template ${args} --set terminatingGateways.logLevel=warn . | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-auth-processor")')
+  [ "$(echo "$proc" | yq -r '.args | contains(["-log-level=warn"])')" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: credentialInjection per-gateway partial override merges with defaults field-by-field" {

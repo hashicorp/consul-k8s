@@ -3812,7 +3812,7 @@ terminatingGateways:
 
       # DrainSeconds bounds how long the sidecars wait to finish in-flight
       # credential refresh work before terminating during a rolling update.
-      # Null uses the processor's own default.
+      # Must be between 0 and 300; 0 disables the drain wait. Null uses 30.
       # @type: integer
       drainSeconds: null
 

@@ -849,10 +849,12 @@ Input dict: ci (effective merged config), name (gateway name for messages).
 {{- if empty $ci.processorImage }}{{ fail (printf "%s: processorImage is required when enabled" $prefix) }}{{ end -}}
 {{- if empty $ci.processorConfigMap }}{{ fail (printf "%s: processorConfigMap is required when enabled" $prefix) }}{{ end -}}
 {{- if contains "*" (default "" $ci.processorConfigMap) }}{{ fail (printf "%s: processorConfigMap must not contain the wildcard character \"*\"" $prefix) }}{{ end -}}
-{{- /* Non-negative drain is source-independent: a negative value renders an
-       invalid negative drain-wait / terminationGracePeriodSeconds for both
-       sources. The upper bound vs. tokenExpirationSeconds stays Vault-specific. */ -}}
+{{- /* Drain bounds are source-independent: a negative value renders an invalid
+       drain-wait / terminationGracePeriodSeconds, and camp-auth-processor's
+       drain-wait rejects durations over 300s (the preStop hook would exit
+       immediately instead of waiting). Zero disables the drain hook. */ -}}
 {{- if and (not (kindIs "invalid" $ci.drainSeconds)) (lt (int $ci.drainSeconds) 0) }}{{ fail (printf "%s: drainSeconds must not be negative" $prefix) }}{{ end -}}
+{{- if and (not (kindIs "invalid" $ci.drainSeconds)) (gt (int $ci.drainSeconds) 300) }}{{ fail (printf "%s: drainSeconds must not exceed 300" $prefix) }}{{ end -}}
 {{- $source := default "vault" $ci.source -}}
 {{- if and (ne $source "vault") (ne $source "kubernetesSecret") }}{{ fail (printf "%s: source must be \"vault\" or \"kubernetesSecret\"" $prefix) }}{{ end -}}
 {{- if eq $source "kubernetesSecret" -}}
@@ -862,7 +864,9 @@ Input dict: ci (effective merged config), name (gateway name for messages).
   {{- if empty $ci.vaultAgentImage }}{{ fail (printf "%s: vaultAgentImage is required when enabled" $prefix) }}{{ end -}}
   {{- if empty $ci.vaultAgentConfigMap }}{{ fail (printf "%s: vaultAgentConfigMap is required when enabled" $prefix) }}{{ end -}}
   {{- if empty $ci.vaultAddress }}{{ fail (printf "%s: vaultAddress is required when enabled" $prefix) }}{{ end -}}
-  {{- if not (regexMatch "^https://[a-zA-Z0-9._-]+(:[0-9]+)?(/.*)?$" (default "" $ci.vaultAddress)) }}{{ fail (printf "%s: vaultAddress must be a valid absolute https:// URL with a host" $prefix) }}{{ end -}}
+  {{- /* Parsed like the Go API check (url.Parse): an https:// URL with a DNS
+         name, IPv4 address, or bracketed IPv6 literal host. */ -}}
+  {{- if not (regexMatch "^https://([a-zA-Z0-9._-]+|\\[[0-9a-fA-F:.]+(%[a-zA-Z0-9._~-]+)?\\])(:[0-9]+)?(/.*)?$" (default "" $ci.vaultAddress)) }}{{ fail (printf "%s: vaultAddress must be a valid absolute https:// URL with a host" $prefix) }}{{ end -}}
   {{- if empty $ci.tokenAudience }}{{ fail (printf "%s: tokenAudience is required when enabled" $prefix) }}{{ end -}}
   {{- if not (kindIs "invalid" $ci.tokenExpirationSeconds) -}}
     {{- $exp := int $ci.tokenExpirationSeconds -}}
@@ -961,7 +965,9 @@ drainSeconds, root.
   args:
   - "-config-file=/consul/processor-config/config.json"
   - "-uds-path=/consul/auth-socket/auth.sock"
-  - "-log-level={{ .logLevel }}"
+  {{- /* camp-auth-processor accepts debug/info/warn/error; Consul's trace
+         level maps to its most verbose level. */}}
+  - "-log-level={{ if eq (lower .logLevel) "trace" }}debug{{ else }}{{ .logLevel }}{{ end }}"
   securityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
@@ -1005,6 +1011,7 @@ drainSeconds, root.
     periodSeconds: 10
     failureThreshold: 6
     timeoutSeconds: 5
+  {{- if gt (int .drainSeconds) 0 }}
   lifecycle:
     preStop:
       exec:
@@ -1012,6 +1019,7 @@ drainSeconds, root.
         - "camp-auth-processor"
         - "drain-wait"
         - "-duration={{ .drainSeconds }}s"
+  {{- end }}
   resources:
     requests:
       memory: "50Mi"

@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -314,7 +315,7 @@ func campAuthProcessorContainer(
 		}
 	}
 
-	return corev1.Container{
+	container := corev1.Container{
 		Name:            "camp-auth-processor",
 		Image:           ci.ProcessorImage,
 		ImagePullPolicy: imagePullPolicy,
@@ -322,7 +323,7 @@ func campAuthProcessorContainer(
 		Args: []string{
 			fmt.Sprintf("-config-file=%s", campProcessorConfigFile),
 			fmt.Sprintf("-uds-path=%s", campAuthSocketFile),
-			fmt.Sprintf("-log-level=%s", logLevel),
+			fmt.Sprintf("-log-level=%s", campProcessorLogLevel(logLevel)),
 		},
 		SecurityContext: campCredentialSecurityContext(),
 		VolumeMounts: []corev1.VolumeMount{
@@ -334,11 +335,25 @@ func campAuthProcessorContainer(
 		// process is alive and stays tolerant of recoverable Vault/file errors.
 		ReadinessProbe: probe("-ready", 5, 3),
 		LivenessProbe:  probe("-live", 15, 6),
-		Lifecycle: &corev1.Lifecycle{PreStop: &corev1.LifecycleHandler{Exec: &corev1.ExecAction{Command: []string{
-			"camp-auth-processor", "drain-wait", fmt.Sprintf("-duration=%ds", drainSeconds),
-		}}}},
-		Resources: campBoundedResources("50Mi", "50m"),
+		Resources:      campBoundedResources("50Mi", "50m"),
 	}
+	// drain-wait rejects a zero duration, so zero disables the hook entirely.
+	if drainSeconds > 0 {
+		container.Lifecycle = &corev1.Lifecycle{PreStop: &corev1.LifecycleHandler{Exec: &corev1.ExecAction{Command: []string{
+			"camp-auth-processor", "drain-wait", fmt.Sprintf("-duration=%ds", drainSeconds),
+		}}}}
+	}
+	return container
+}
+
+// campProcessorLogLevel maps the gateway log level to one camp-auth-processor
+// accepts (debug, info, warn, error). Consul's trace level maps to its most
+// verbose level instead of making the processor fail to start.
+func campProcessorLogLevel(logLevel string) string {
+	if strings.EqualFold(logLevel, "trace") {
+		return "debug"
+	}
+	return logLevel
 }
 
 // campSocketInitContainer removed: the shared ext_proc socket directory is now

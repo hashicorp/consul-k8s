@@ -247,9 +247,11 @@ type TerminatingGatewayCredentialInjection struct {
 	TokenExpirationSeconds *int64 `json:"tokenExpirationSeconds,omitempty"`
 
 	// DrainSeconds bounds how long the sidecars wait to finish in-flight credential
-	// refresh work before terminating during a rolling update.
+	// refresh work before terminating during a rolling update. Must be between 0
+	// and 300; 0 disables the drain wait. Defaults to 30.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=300
 	DrainSeconds *int64 `json:"drainSeconds,omitempty"`
 }
 
@@ -630,6 +632,9 @@ const (
 	// maxTokenExpirationSeconds is a conservative ceiling (12 hours) to keep
 	// the projected token lifetime bounded.
 	maxTokenExpirationSeconds int64 = 43200
+	// maxDrainSeconds matches the maximum duration camp-auth-processor's
+	// drain-wait accepts (5 minutes).
+	maxDrainSeconds int64 = 300
 )
 
 func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool, path *field.Path) field.ErrorList {
@@ -650,12 +655,15 @@ func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool
 		errs = append(errs, field.Required(path.Child("processorConfigMap"), "processorConfigMap is required when credentialInjection is enabled"))
 	}
 
-	// drainSeconds must be non-negative regardless of source: a negative value
-	// produces an invalid negative drain-wait and grace period for both the
-	// Vault and Kubernetes Secret sources. (The upper bound vs. tokenExpiration
-	// stays Vault-specific in validateProjectedToken.)
+	// Drain bounds are source-independent: a negative value produces an invalid
+	// drain-wait and grace period, and camp-auth-processor's drain-wait rejects
+	// durations over maxDrainSeconds, so its preStop hook would exit immediately
+	// instead of waiting.
 	if in.DrainSeconds != nil && *in.DrainSeconds < 0 {
 		errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not be negative"))
+	}
+	if in.DrainSeconds != nil && *in.DrainSeconds > maxDrainSeconds {
+		errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, fmt.Sprintf("drainSeconds must not exceed %d", maxDrainSeconds)))
 	}
 
 	switch in.EffectiveSource() {
