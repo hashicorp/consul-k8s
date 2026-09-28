@@ -390,7 +390,7 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
         yq 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
@@ -405,8 +405,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.apiVersion' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.apiVersion' | tee /dev/stderr)
     [ "$actual" = "consul.hashicorp.com/v1alpha1" ]
 }
 
@@ -416,8 +416,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.kind' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.kind' | tee /dev/stderr)
     [ "$actual" = "InferenceGateway" ]
 }
 
@@ -427,8 +427,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.metadata.name' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.metadata.name' | tee /dev/stderr)
     [ "$actual" = "travel-pool" ]
 }
 
@@ -438,8 +438,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.metadata.labels.component' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.metadata.labels.component' | tee /dev/stderr)
     [ "$actual" = "inference-gateway" ]
 }
 
@@ -453,8 +453,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.poolRef.name' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.poolRef.name' | tee /dev/stderr)
     [ "$actual" = "travel-pool" ]
 }
 
@@ -465,8 +465,8 @@ gw_flags=(
         "${gw_flags[@]}" \
         --set 'ai.inferenceGateway.gateways[0].poolRef.name=my-pool' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.poolRef.name' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.poolRef.name' | tee /dev/stderr)
     [ "$actual" = "my-pool" ]
 }
 
@@ -480,8 +480,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.image' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.image' | tee /dev/stderr)
     [ "$actual" = "hashicorp/consul-inference-gateway:2.1.0-rc1" ]
 }
 
@@ -492,8 +492,8 @@ gw_flags=(
         "${gw_flags[@]}" \
         --set 'ai.inferenceGateway.gateways[0].image=myregistry/gw:v2' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.image' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.image' | tee /dev/stderr)
     [ "$actual" = "myregistry/gw:v2" ]
 }
 
@@ -507,8 +507,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.replicas' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.replicas' | tee /dev/stderr)
     [ "$actual" = "2" ]
 }
 
@@ -519,8 +519,8 @@ gw_flags=(
         "${gw_flags[@]}" \
         --set 'ai.inferenceGateway.gateways[0].replicas=5' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.replicas' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.replicas' | tee /dev/stderr)
     [ "$actual" = "5" ]
 }
 
@@ -534,8 +534,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.service.type' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.service.type' | tee /dev/stderr)
     [ "$actual" = "ClusterIP" ]
 }
 
@@ -545,8 +545,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.service.ports[0].port' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.service.ports[0].port' | tee /dev/stderr)
     [ "$actual" = "8443" ]
 }
 
@@ -558,8 +558,8 @@ gw_flags=(
         --set 'ai.inferenceGateway.gateways[0].service.type=LoadBalancer' \
         --set 'ai.inferenceGateway.gateways[0].service.ports[0].port=9000' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.service.type' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.service.type' | tee /dev/stderr)
     [ "$actual" = "LoadBalancer" ]
 }
 
@@ -570,8 +570,8 @@ gw_flags=(
         "${gw_flags[@]}" \
         --set 'ai.inferenceGateway.gateways[0].service.ports[0].port=9443' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.service.ports[0].port' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.service.ports[0].port' | tee /dev/stderr)
     [ "$actual" = "9443" ]
 }
 
@@ -583,7 +583,7 @@ gw_flags=(
         --set 'ai.inferenceGateway.gateways[0].service.ports[0].port=9000' \
         --set 'ai.inferenceGateway.gateways[0].service.ports[1].port=9001' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
         yq '.spec.service.ports | length' | tee /dev/stderr)
     [ "$actual" = "2" ]
 }
@@ -598,8 +598,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.resources.requests.memory' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.resources.requests.memory' | tee /dev/stderr)
     [ "$actual" = "128Mi" ]
 }
 
@@ -609,8 +609,8 @@ gw_flags=(
         -s $target \
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.resources.limits.cpu' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.resources.limits.cpu' | tee /dev/stderr)
     [ "$actual" = "500m" ]
 }
 
@@ -622,8 +622,8 @@ gw_flags=(
         --set 'ai.inferenceGateway.gateways[0].resources.requests.memory=512Mi' \
         --set 'ai.inferenceGateway.gateways[0].resources.limits.memory=1Gi' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.resources.requests.memory' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.spec.resources.requests.memory' | tee /dev/stderr)
     [ "$actual" = "512Mi" ]
 }
 
@@ -639,7 +639,7 @@ gw_flags=(
         --set 'ai.inferenceGateway.gateways[0].name=pool-a' \
         --set 'ai.inferenceGateway.gateways[1].name=pool-b' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
         yq '. | length' | tee /dev/stderr | grep -c '^[0-9]')
     # yq emits one integer per document; two documents means two lines
     [ "$actual" = "2" ]
@@ -653,8 +653,8 @@ gw_flags=(
         --set 'ai.inferenceGateway.gateways[0].name=pool-a' \
         --set 'ai.inferenceGateway.gateways[1].name=pool-b' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq 'select(.metadata.name == "pool-b") | .spec.replicas' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r 'select(.metadata.name == "pool-b") | .spec.replicas' | tee /dev/stderr)
     [ "$actual" = "2" ]
 }
 
@@ -668,7 +668,7 @@ gw_flags=(
         --set 'ai.inferenceGateway.gateways[1].name=pool-b' \
         --set 'ai.inferenceGateway.gateways[1].replicas=3' \
         . | tee /dev/stderr |
-        yq '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq 'select(.metadata.name == "pool-b") | .spec.replicas' | tee /dev/stderr)
+        yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
+        yq -r 'select(.metadata.name == "pool-b") | .spec.replicas' | tee /dev/stderr)
     [ "$actual" = "3" ]
 }
