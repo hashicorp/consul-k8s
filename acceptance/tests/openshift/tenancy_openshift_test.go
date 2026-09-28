@@ -12,6 +12,9 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"math/big"
+	"os/exec"
+
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -19,34 +22,33 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
-	"math/big"
-	"os/exec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/hashicorp/consul/api"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
 var (
-	gatewayGroup               = gwv1beta1.Group(gwv1beta1.GroupVersion.Group)
-	consulGroup                = gwv1beta1.Group(v1alpha1.GroupVersion.Group)
-	gatewayKind                = gwv1beta1.Kind("Gateway")
-	serviceKind                = gwv1beta1.Kind("Service")
-	secretKind                 = gwv1beta1.Kind("Secret")
-	meshServiceKind            = gwv1beta1.Kind("MeshService")
-	httpRouteKind              = gwv1beta1.Kind("HTTPRoute")
-	tcpRouteKind               = gwv1beta1.Kind("TCPRoute")
+	gatewayGroup               = gwv1.Group(gwv1.GroupVersion.Group)
+	consulGroup                = gwv1.Group(v1alpha1.GroupVersion.Group)
+	gatewayKind                = gwv1.Kind("Gateway")
+	serviceKind                = gwv1.Kind("Service")
+	secretKind                 = gwv1.Kind("Secret")
+	meshServiceKind            = gwv1.Kind("MeshService")
+	httpRouteKind              = gwv1.Kind("HTTPRoute")
+	tcpRouteKind               = gwv1.Kind("TCPRoute")
 	gatewayClassControllerName = "consul.hashicorp.com/gateway-controller"
 )
 
@@ -126,7 +128,7 @@ func TestOpenshift_APIGateway_Tenancy(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			retryCheck(t, 120, func(r *retry.R) {
-				var gateway gwv1beta1.Gateway
+				var gateway gwv1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
@@ -148,7 +150,7 @@ func TestOpenshift_APIGateway_Tenancy(t *testing.T) {
 
 			// route failure
 			retryCheck(t, 60, func(r *retry.R) {
-				var httproute gwv1beta1.HTTPRoute
+				var httproute gwv1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
@@ -170,7 +172,7 @@ func TestOpenshift_APIGateway_Tenancy(t *testing.T) {
 
 			// gateway updated with references allowed
 			retryCheck(t, 60, func(r *retry.R) {
-				var gateway gwv1beta1.Gateway
+				var gateway gwv1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
@@ -202,7 +204,7 @@ func TestOpenshift_APIGateway_Tenancy(t *testing.T) {
 
 			// route updated with gateway and services allowed
 			retryCheck(t, 30, func(r *retry.R) {
-				var httproute gwv1beta1.HTTPRoute
+				var httproute gwv1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
@@ -260,26 +262,26 @@ func createReferenceGrant(t *testing.T, cfg *config.TestConfig, client client.Cl
 
 	// we just create a reference grant for all combinations in the given namespaces
 
-	require.NoError(t, client.Create(context.Background(), &gwv1beta1.ReferenceGrant{
+	require.NoError(t, client.Create(context.Background(), &gwv1.ReferenceGrant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: to,
 		},
-		Spec: gwv1beta1.ReferenceGrantSpec{
-			From: []gwv1beta1.ReferenceGrantFrom{{
+		Spec: gwv1.ReferenceGrantSpec{
+			From: []gwv1.ReferenceGrantFrom{{
 				Group:     gatewayGroup,
 				Kind:      gatewayKind,
-				Namespace: gwv1beta1.Namespace(from),
+				Namespace: gwv1.Namespace(from),
 			}, {
 				Group:     gatewayGroup,
 				Kind:      httpRouteKind,
-				Namespace: gwv1beta1.Namespace(from),
+				Namespace: gwv1.Namespace(from),
 			}, {
 				Group:     gatewayGroup,
 				Kind:      tcpRouteKind,
-				Namespace: gwv1beta1.Namespace(from),
+				Namespace: gwv1.Namespace(from),
 			}},
-			To: []gwv1beta1.ReferenceGrantTo{{
+			To: []gwv1.ReferenceGrantTo{{
 				Group: gatewayGroup,
 				Kind:  gatewayKind,
 			}, {

@@ -304,3 +304,41 @@ func TestGetHelmValues(t *testing.T) {
 		})
 	}
 }
+
+func TestLocalComponentAuthMethodName(t *testing.T) {
+	cases := []struct {
+		name     string
+		hv       *HelmValues
+		expected string
+	}{
+		{
+			name: "defaults to the consul full name",
+			hv: &HelmValues{
+				Release: ReleaseConfig{Name: "release-name"},
+			},
+			expected: "release-name-consul-k8s-component-auth-method",
+		},
+		{
+			name: "uses the configured auth method name when set",
+			hv: &HelmValues{
+				Release: ReleaseConfig{Name: "release-name"},
+				Global:  GlobalConfig{ACLs: ACLsConfig{AuthMethod: AuthMethodConfig{Name: "cluster-b"}}},
+			},
+			expected: "cluster-b-k8s-component-auth-method",
+		},
+		{
+			name: "configured auth method name takes precedence over fullnameOverride",
+			hv: &HelmValues{
+				FullNameOverride: "my-custom-consul",
+				Global:           GlobalConfig{ACLs: ACLsConfig{AuthMethod: AuthMethodConfig{Name: "cluster-b"}}},
+			},
+			expected: "cluster-b-k8s-component-auth-method",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			require.Equal(t, c.expected, LocalComponentAuthMethodName(c.hv))
+		})
+	}
+}

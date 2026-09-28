@@ -19,8 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const (
@@ -185,8 +183,6 @@ func (k kubernetesContext) ControllerRuntimeClient(t testutil.TestingTB) client.
 
 	s := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(s))
-	require.NoError(t, gwv1alpha2.Install(s))
-	require.NoError(t, gwv1beta1.Install(s))
 	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 

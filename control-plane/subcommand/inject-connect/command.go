@@ -84,6 +84,9 @@ type Command struct {
 	flagReleaseName      string
 	flagReleaseNamespace string
 
+	// Flags for the admission webhook.
+	flagDisableMultiportRegistration bool
+
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
 	flagDefaultSidecarProxyCPURequest    string
@@ -182,6 +185,7 @@ type Command struct {
 	flagAIAgentImage              string // Docker image for the AI agent sidecar
 	flagConsulOBOInboundImage     string // Docker image for consul-obo-inbound (ai-agent pods)
 	flagConsulOBOOutboundImage    string // Docker image for consul-obo-outbound (ai-agent pods)
+	flagEnableOBO                 bool   // inject OBO sidecars into ai-role=ai-agent pods
 	// InferenceGateway defaults sourced from ai.inferenceGateway.defaults in values.yaml
 	flagAIInferenceGatewayDefaultServiceType  string // default Service type (ClusterIP/NodePort/LoadBalancer)
 	flagAIInferenceGatewayDefaultServicePort  int    // default Service port
@@ -244,6 +248,8 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
 	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
+	c.flagSet.BoolVar(&c.flagDisableMultiportRegistration, "disable-multiport-registration", false,
+		"Reject new multi-port Consul service registrations unless exactly one application port is selected.")
 	c.flagSet.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
 		"[Enterprise Only] Enables Admin Partitions.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
@@ -320,6 +326,10 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagConsulOBOOutboundImage, "consul-obo-outbound-image", "",
 		"Docker image for consul-obo-outbound. OUTBOUND OBO sidecar for ai-agent pods. "+
 			"Mirrors ai.obo.outbound.image from values.yaml.")
+	c.flagSet.BoolVar(&c.flagEnableOBO, "enable-obo", false,
+		"Inject OBO identity-plane sidecars (consul-obo-inbound/outbound) into "+
+			"ai-role=ai-agent pods. Set to false for environments without an IBM Verify tenant. "+
+			"Mirrors ai.obo.enabled from values.yaml.")
 
 	// custom controller flags
 	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")

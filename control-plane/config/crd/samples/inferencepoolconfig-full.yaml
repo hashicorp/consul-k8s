@@ -285,3 +285,115 @@ spec:
       enabled: false
       destination: backend-shadow
       percentage: 5
+
+  # ---------------------------------------------------------------------------
+  # processor — ext_proc binding between Envoy and the co-located
+  # consul-inference-gateway process. The socket path is host-local, per-
+  # instance state derived by consul-dataplane; it is not stored here.
+  # ---------------------------------------------------------------------------
+  processor:
+    # failureMode: what Envoy does when the ext_proc server is unreachable.
+    #   closed — reject the request with HTTP 500 (default; safe for production).
+    #   open   — pass the request through without ext_proc processing.
+    failureMode: closed
+
+    # bodyModelRouting: route on the request body's "model" field instead of
+    # a caller-supplied capability header. Consul renders a per-model route.
+    bodyModelRouting: false
+
+  # ---------------------------------------------------------------------------
+  # policy — cross-cutting request/response enforcement (PII detection).
+  # Consul carries this block verbatim to the co-located policy processor.
+  # ---------------------------------------------------------------------------
+  policy:
+    pii:
+      # scope: which conversation parts are scanned.
+      #   request  — scan the user prompt only.
+      #   response — scan the model completion only.
+      #   both     — scan prompt and completion (default).
+      scope: both
+
+      # defaultAction: fallback when a detector fires with no per-rule action.
+      #   block       — reject with HTTP 422.
+      #   mask        — replace detected span using the mask pattern.
+      #   placeholder — replace detected span with a labelled token (e.g. <CREDIT_CARD>).
+      #   off         — pass through unchanged (audit only).
+      # Note: "redact" and "log" are accepted by the CRD admission webhook
+      # but are not valid values understood by the processor; use "placeholder"
+      # or "off" instead.
+      defaultAction: mask
+
+      # streamHoldbackBytes: trailing bytes buffered from a streaming response
+      # before PII scanning begins. Higher = better accuracy, more latency.
+      streamHoldbackBytes: 128
+
+      mask:
+        char: "*"       # replacement character for each masked rune
+        keepLast: 4     # leave last N chars visible (e.g. credit-card last 4)
+
+      detectors:
+        # Built-in detectors — use the underscore form: credit_card, api_key, ssn, email.
+        # Hyphenated aliases (e.g. "credit-card") are accepted by the controller
+        # and normalised to underscore form before the Consul API write.
+        # Regex is optional for built-ins; omitting it uses the processor's built-in
+        # pattern (credit_card also runs a Luhn digit check when no regex is set).
+        - name: credit_card
+          action: mask               # overrides defaultAction for this rule
+        - name: ssn
+          action: block
+        - name: email
+          action: mask
+        - name: api_key
+          action: mask
+        # Custom detector: name is a free-form label; regex is REQUIRED.
+        # Without a regex the Consul API rejects the entry with HTTP 500.
+        - name: internal_secret
+          regex: '(?i)(secret[_\-]?key\s*[=:]\s*)[A-Za-z0-9\-_]{20,}'
+          action: mask
+
+  # ---------------------------------------------------------------------------
+  # observability — processor telemetry: metrics and tracing.
+  # Each pillar is independent: a degraded sink never affects request outcomes.
+  # ---------------------------------------------------------------------------
+  observability:
+    # ── Metrics ────────────────────────────────────────────────────────────
+    # OTel metrics export. Enabled by default; set enabled: false to disable.
+    metrics:
+      enabled: true
+
+      # Prometheus pull-based scrape endpoint.
+      prometheus:
+        port: 9090
+        path: /metrics
+
+      # OTLP push-based exporter (mutually usable with Prometheus).
+      # The controller automatically strips any http:// or https:// scheme before
+      # writing to the Consul API — Consul requires bare host:port only.
+      # Both forms are accepted here:
+      #   endpoint: http://otel-collector.observability.svc:4318   ← scheme stripped by controller
+      #   endpoint: otel-collector.observability.svc:4318          ← used verbatim
+      otlp:
+        endpoint: otel-collector.observability.svc:4318
+        insecure: false          # set true only in dev/test environments
+
+      # Pins the OTel semantic-convention schema version added to every exported
+      # metric resource. Omit to use the processor default.
+      semconvSchema: "1.37.0"
+
+      # Extra label key names promoted onto every exported metric.
+      # Each entry must be a bare identifier (^[a-zA-Z_][a-zA-Z0-9_]*$).
+      # Maximum 8 entries. Do NOT use key=value pairs here.
+      customLabels:
+        - "env"
+        - "team"
+        - "cluster"
+
+    # ── Tracing ────────────────────────────────────────────────────────────
+    # OTel distributed tracing. Off by default.
+    tracing:
+      enabled: true
+      sampleRatio: 0.01          # trace 1 % of requests (tail-based sampling)
+      otlp:
+        # Same scheme-stripping applies: controller converts http(s)://host:port → host:port.
+        endpoint: otel-collector.observability.svc:4317
+        insecure: false

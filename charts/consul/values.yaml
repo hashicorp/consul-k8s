@@ -67,7 +67,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.io/library/consul:ai1
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:2.1.0-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -87,7 +87,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: localhost/consul-k8s-control-plane:localMCP33
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:2.1.0-dev
 
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -423,6 +423,41 @@ global:
     # This requires Consul >= 1.4.
     manageSystemACLs: false
 
+    # Configures the Kubernetes auth methods that Consul components and service mesh
+    # workloads use to authenticate with Consul.
+    authMethod:
+      # The base name used to derive the Kubernetes auth methods managed by this chart.
+      # If empty, it defaults to the Helm release fullname, which preserves the
+      # auth method names used by existing installations.
+      #
+      # Two auth methods are derived from this value:
+      # `<name>-k8s-component-auth-method` for Consul components and
+      # `<name>-k8s-auth-method` for service mesh workloads. When federation is
+      # enabled, secondary datacenters additionally derive
+      # `<name>-k8s-component-auth-method-<global.datacenter>` for global tokens.
+      #
+      # Set this to a value that is unique per Kubernetes cluster when multiple
+      # Kubernetes clusters share a single Consul control plane within the same
+      # admin partition. Otherwise each cluster overwrites the other's auth methods,
+      # because auth method names are not namespaced by cluster.
+      #
+      # Note that ACL policies and roles are still derived from `global.name`, so
+      # clusters that share a control plane should also use a unique `global.name`.
+      # @type: string
+      name: ""
+
+      # If true, the `server-acl-init` job creates and manages the Kubernetes auth
+      # methods described by `name`. Set this to false if you provision the auth
+      # methods yourself, for example because the Consul servers are managed
+      # separately from this Helm release.
+      #
+      # When false, the auth methods must already exist before this chart is
+      # installed, and they must use the names derived from `name`. The
+      # `server-acl-init` job still creates the ACL policies, roles and binding
+      # rules that Consul components require on those auth methods.
+      # @type: boolean
+      create: true
+
     # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
     logLevel: ""
@@ -558,6 +593,31 @@ global:
     secretKey: null
     # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
     enableLicenseAutoload: true
+
+  # Configures the global registry integration. When enabled, the Consul server will
+  # communicate with an external registry service. The token used by the registry
+  # is read from a Kubernetes secret.
+  globalRegistry:
+    # If true, enables the global_registry stanza in the Consul server configuration.
+    # @type: boolean
+    enabled: false
+
+    # The address of the global registry service.
+    # @type: string
+    address: null
+
+    # The cluster ID to use when communicating with the global registry.
+    # @type: string
+    clusterId: null
+
+    # The name of the Kubernetes secret that holds the global registry token.
+    # A Kubernetes secret must be in the same namespace that Consul is installed into.
+    # @type: string
+    tokenSecretName: null
+
+    # The key within the Kubernetes secret that holds the global registry token.
+    # @type: string
+    tokenSecretKey: null
 
   # Configure federation.
   federation:
@@ -794,7 +854,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: hashicorp/consul-dataplane:2.0.2
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev
   # Disable this once the manifests are generated and subsequent helm upgrades
   
   generateManifests: false
@@ -804,6 +864,12 @@ global:
 
   # Storage requirement for generateManifests pvc
   generateManifestsStorage: "1Gi"
+
+  # Image used by the post-upgrade apply-manifests Job to run kubectl (non-OpenShift) or oc (OpenShift).
+  # Override this to supply an air-gapped or security-approved image.
+  # When global.openshift.enabled=true, the image must contain oc; otherwise it must contain kubectl.
+  # If not set, defaults to bitnami/kubectl:latest (non-OpenShift) or registry.redhat.io/openshift4/ose-cli (OpenShift).
+  imageApplyManifests: ""
 
   # During the install:
   # custom crds and gateway TCP crd enabling
@@ -2428,6 +2494,20 @@ connectInject:
   # to explicitly opt-out of injection.
   default: false
 
+  # Controls whether one Consul service registration may contain multiple
+  # named ports. When disabled, a multi-port workload must select exactly one
+  # port with consul.hashicorp.com/connect-service-port.
+  multiportServiceRegistration:
+    # @type: boolean
+    enabled: false
+    # Controls how existing mesh-injected Deployments, StatefulSets, and
+    # DaemonSets are handled during a Helm upgrade while multi-port
+    # registration is disabled. NONE leaves existing workload specifications
+    # untouched. TRANSLATE selects one service port. DECOMMISSION removes
+    # eligible workloads from the mesh.
+    # @type: string
+    conversionStrategy: "NONE"
+
   # Configures Transparent Proxy for Consul Service mesh services.
   # Using this feature requires Consul 1.10.0-beta1+.
   transparentProxy:
@@ -2700,6 +2780,24 @@ connectInject:
       runAsGroup: 0
       runAsUser: 0
 
+    # Toleration settings for the CNI installer DaemonSet pods.
+    # This should be a multi-line string matching the Tolerations
+    # array in a Pod spec. If not set, defaults to tolerating
+    # CriticalAddonsOnly and NoExecute taints.
+    # 
+    # Example:
+    #
+    # ```yaml
+    # tolerations: |
+    #   - key: dd
+    #     operator: Exists
+    #   - effect: bb
+    #     operator: Exists
+    # ```
+    # 
+    # @type: string
+    tolerations: null
+
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.
     #
@@ -2954,6 +3052,12 @@ connectInject:
 
   # If you are not using global.acls.manageSystemACLs and instead manually setting up an
   # auth method for Connect inject, set this to the name of your auth method.
+  #
+  # Note that binding rules for this auth method are not managed by Consul, so you must
+  # create them yourself. When `global.acls.manageSystemACLs` is true, prefer
+  # `global.acls.authMethod.name` instead: the service mesh auth method is derived from it
+  # and its binding rules are managed for you. Setting both at the same time while
+  # `global.acls.manageSystemACLs` is true is rejected.
   overrideAuthMethodName: ""
 
   # Refers to a Kubernetes secret that you have created that contains
@@ -3790,7 +3894,7 @@ ai:
   #     are not created.
   #   - The connect-inject controller does NOT start the InferenceModelConfig watcher.
   # @type: boolean
-  enabled: true
+  enabled: false
 
   inferenceModel:
     defaults:
@@ -3825,7 +3929,8 @@ ai:
     #
     # @default: ""
     # @type: string
-    image: hashicorp/consul-dataplane:2.0.2
+    # TODO: this is yet to be implemented
+    image: "hashicorp/consul-mcp-gateway:2.1.0-rc1"
 
     defaults:
       # The port the MCP server container listens on inside the pod.
@@ -3876,7 +3981,7 @@ ai:
     # ```
     # @default: hashicorp/consul-inference-gateway:<latest version>
     # @type: string
-    image: "hashicorp/consul-inference-gateway:0.1.0-dev"
+    image: "hashicorp/consul-inference-gateway:2.1.0-rc1"
 
     # Default values applied to every gateway in the gateways list below unless
     # overridden on the individual gateway entry.
@@ -3950,7 +4055,7 @@ ai:
     # ```
     # @default: ""
     # @type: string
-    image: ""
+    image: "hashicorp/consul-mcp-gateway:2.1.0-rc1"
 
     defaults:
       # The port the agent interceptor listens on inside the pod.
@@ -3987,13 +4092,18 @@ ai:
   # Split-knowledge: envelope ciphertext on Envoy UDS + DEK via dataplane broker.
   # Required when injecting ai-role=ai-agent; webhook errors if unset.
   obo:
+    # enabled controls whether OBO identity-plane sidecars are injected into
+    # ai-role=ai-agent pods. Set to false for local dev / playground environments
+    # that do not have an IBM Verify tenant. Default: false.
+    # @type: boolean
+    enabled: false
     inbound:
       # Docker image for consul-obo-inbound (loopback :21102).
       # Binary source: consul-ai-apps/gateways/obo-inbound
       # @type: string
-      image: ""
+      image: "hashicorp/consul-obo-inbound:2.1.0-rc1"
     outbound:
       # Docker image for consul-obo-outbound (loopback :21103).
       # Binary source: consul-ai-apps/gateways/obo-outbound
       # @type: string
-      image: ""
+      image: "hashicorp/consul-obo-outbound:2.1.0-rc1"

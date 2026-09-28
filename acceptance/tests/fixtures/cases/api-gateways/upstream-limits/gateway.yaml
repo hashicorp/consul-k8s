@@ -1,0 +1,22 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Gateway used by the upstream-limits acceptance test.
+# It exposes a plain HTTP listener so the static-client can make requests
+# without TLS, keeping the fixture self-contained.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: limits-gateway
+  namespace: default
+  labels:
+    component: api-gateway
+spec:
+  gatewayClassName: limits-gateway-class
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 8080
+      allowedRoutes:
+        namespaces:
+          from: All

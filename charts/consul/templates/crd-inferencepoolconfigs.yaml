@@ -581,14 +581,17 @@ spec:
                             properties:
                               name:
                                 description: >-
-                                  Name is the identifier of a built-in detector
-                                  (e.g. "credit-card", "ssn", "email", "phone").
-                                  Mutually exclusive with regex.
+                                  Name identifies the detector. Built-ins (underscore form):
+                                  credit_card, api_key, ssn, email. For a custom detector,
+                                  set a non-empty regex — name then acts as a label for logs.
                                 type: string
                               regex:
                                 description: >-
-                                  Regex is a custom regular expression pattern. When set,
-                                  name is ignored.
+                                  Regex is a RE2 pattern. Required when name is not one of
+                                  the four built-ins (credit_card, api_key, ssn, email);
+                                  the Consul API rejects a custom detector without a regex.
+                                  Optional for built-ins; when set it replaces the built-in
+                                  pattern (the credit_card Luhn check is then skipped).
                                 type: string
                               action:
                                 description: >-
@@ -597,6 +600,123 @@ spec:
                                   Allowed values: block, mask, redact, log.
                                 type: string
                                 enum: [block, mask, redact, log]
+                processor:
+                  description: >-
+                    Processor configures the ext_proc binding between Envoy and the
+                    co-located consul-inference-gateway process. The socket path is
+                    host-local, per-instance state and is not part of the cluster-wide
+                    config entry; consul-dataplane derives it per proxy instance.
+                  type: object
+                  properties:
+                    failureMode:
+                      description: >-
+                        FailureMode controls Envoy's behaviour when the ext_proc server
+                        is unreachable. closed — reject the request (HTTP 500), safe for
+                        production. open — pass the request through without ext_proc
+                        processing.
+                      type: string
+                      enum: [closed, open]
+                    bodyModelRouting:
+                      description: >-
+                        BodyModelRouting routes on the request body's model field instead
+                        of a caller-supplied capability header. Consul renders the matching
+                        per-model route when true.
+                      type: boolean
+                observability:
+                  description: >-
+                    Observability configures the processor's telemetry pillars (metrics
+                    and tracing). Each pillar is independent; a degraded sink degrades
+                    only that pillar and never changes a request's outcome.
+                  type: object
+                  properties:
+                    metrics:
+                      description: >-
+                        Metrics configures OTel metrics export. Metrics are enabled by
+                        default; set enabled=false to disable.
+                      type: object
+                      properties:
+                        enabled:
+                          description: >-
+                            Enabled controls whether the processor exports metrics at all.
+                            Default: true.
+                          type: boolean
+                        semconvSchema:
+                          description: >-
+                            SemconvSchema pins the OTel semantic-convention schema version
+                            on every exported metric resource. The processor implements
+                            exactly "1.37.0"; any other value is rejected by Consul.
+                            Omit to use the processor default.
+                          type: string
+                        customLabels:
+                          description: >-
+                            CustomLabels is a list of bare label key names (identifiers)
+                            promoted onto every exported metric. Each entry must match
+                            ^[a-zA-Z_][a-zA-Z0-9_]*$ (e.g. ["env", "team"]).
+                            Maximum 8 entries. Do not use key=value pairs.
+                          type: array
+                          items:
+                            type: string
+                        prometheus:
+                          description: >-
+                            Prometheus configures the Prometheus pull-based scrape endpoint.
+                          type: object
+                          properties:
+                            port:
+                              description: >-
+                                Port is the TCP port the scrape endpoint listens on.
+                                Default: 9090.
+                              type: integer
+                            path:
+                              description: >-
+                                Path is the HTTP path that serves metrics. Default: "/metrics".
+                              type: string
+                        otlp:
+                          description: >-
+                            OTLP configures a push-based OTLP metrics exporter.
+                          type: object
+                          properties:
+                            endpoint:
+                              description: >-
+                                Endpoint is the OTLP collector URL
+                                (e.g. "http://otel-collector:4318").
+                              type: string
+                            insecure:
+                              description: >-
+                                Insecure disables TLS verification when true. Use only in
+                                non-production environments.
+                              type: boolean
+                    tracing:
+                      description: >-
+                        Tracing configures OTel distributed tracing. Off by default.
+                      type: object
+                      properties:
+                        enabled:
+                          description: >-
+                            Enabled controls whether the processor emits spans.
+                            Default: false.
+                          type: boolean
+                        sampleRatio:
+                          description: >-
+                            SampleRatio is the fraction of requests to trace (0.0–1.0).
+                            0.0 = never, 1.0 = always. Default: 0.01 (1%).
+                          type: number
+                          minimum: 0
+                          maximum: 1
+                        otlp:
+                          description: >-
+                            OTLP configures the OTLP trace exporter endpoint.
+                          type: object
+                          properties:
+                            endpoint:
+                              description: >-
+                                Endpoint is the OTLP collector URL
+                                (e.g. "http://otel-collector:4318").
+                              type: string
+                            insecure:
+                              description: >-
+                                Insecure disables TLS verification when true. Use only in
+                                non-production environments.
+                              type: boolean
             status:
               description: InferencePoolConfigStatus records the observed state set by the controller.
               type: object

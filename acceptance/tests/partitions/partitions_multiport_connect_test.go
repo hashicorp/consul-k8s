@@ -80,6 +80,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 					"global.acls.manageSystemACLs": strconv.FormatBool(c.aclsEnabled),
 
 					"connectInject.enabled":                                     "true",
+					"connectInject.multiportServiceRegistration.enabled":        "true",
 					"connectInject.transparentProxy.defaultEnabled":             strconv.FormatBool(cfg.EnableTransparentProxy),
 					"connectInject.consulNamespaces.consulDestinationNamespace": "default",
 					"connectInject.consulNamespaces.mirroringK8S":               "false",
@@ -152,6 +153,10 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
 				clientConsulCluster.Create(t)
 
+				// Ensure mesh gateways are available in both partition clusters before proceeding with config entries and workloads.
+				k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s-consul-mesh-gateway", releaseName))
+				k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s-consul-mesh-gateway", releaseName))
+
 				consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.aclsEnabled)
 
 				// Apply config entries (ProxyDefaults, ServiceDefaults, ServiceResolver) as CRDs
@@ -201,7 +206,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				// cross-partition per-port configuration. Without this ordering, the
 				// proxy may receive an incomplete initial snapshot (missing some port
 				// VIPs/clusters) that never self-corrects — particularly in
-				// ACLs-disabled (default-allow) mode or with CNI where iptables are
+				// ACLs-disabled (default-allow) mode or with CNI where nftables rules are
 				// configured before consul-dataplane starts.
 				consulDefaultQueryOpts := &api.QueryOptions{Partition: defaultPartition, Namespace: "default"}
 				retry.Run(t, func(r *retry.R) {
@@ -255,7 +260,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 
 				// Deploy the client.
 				// CNI + tproxy requires explicit upstream annotations because with
-				// CNI, iptables are set up by the DaemonSet at pod-creation time,
+				// CNI, nftables rules are set up by the DaemonSet at pod-creation time,
 				// before consul-dataplane starts. The initial xDS snapshot therefore
 				// may not include the cross-partition per-port VIP filter chains,
 				// leaving the outbound listener unable to route traffic to 240.0.0.x

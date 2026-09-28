@@ -152,6 +152,18 @@ const (
 	AnnotationServiceMetricsPort   = "consul.hashicorp.com/service-metrics-port"
 	AnnotationServiceMetricsPath   = "consul.hashicorp.com/service-metrics-path"
 
+	// AnnotationServiceMetricsEndpoints allows a single container to expose
+	// metrics on more than one port. It is a comma-separated list of
+	// "port:path" pairs, where port may be a port number or the name of a
+	// container port, and the ":path" suffix is optional and defaults to
+	// /metrics. For example:
+	//
+	//	consul.hashicorp.com/service-metrics-endpoints: "8080:/metrics,admin:/admin/metrics,9090"
+	//
+	// When set, this annotation takes precedence over service-metrics-port and
+	// service-metrics-path.
+	AnnotationServiceMetricsEndpoints = "consul.hashicorp.com/service-metrics-endpoints"
+
 	// annotations for configuring TLS for Prometheus.
 	AnnotationPrometheusCAFile   = "consul.hashicorp.com/prometheus-ca-file"
 	AnnotationPrometheusCAPath   = "consul.hashicorp.com/prometheus-ca-path"
@@ -196,8 +208,8 @@ const (
 	// to point to the Envoy proxy when running in Transparent Proxy mode.
 	AnnotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
-	// AnnotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
-	// iptables rules.
+	// AnnotationRedirectTraffic stores nftables.Config information so that the CNI plugin can use it to apply
+	// nft traffic redirection rules.
 	AnnotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
 	// AnnotationDualStack stores if pod need to run in dualstack mode.
@@ -275,30 +287,30 @@ const (
 	// --socket is not used. Defaults to :21101 per the binary's built-in default.
 	// Only useful in local development or environments where a shared UDS volume is unavailable.
 	// Maps to the --addr flag on consul-mcp-gateway.
-	// e.g. consul.hashicorp.com/ai-agent-addr: ":21200"
+	// e.g. consul.hashicorp.com/ai-agent-addr: ":21200".
 	AnnotationAIAgentAddr = "consul.hashicorp.com/ai-agent-addr"
 
 	// AnnotationAIAgentChildBinary sets the path to a child binary supervised by consul-mcp-gateway.
 	// When set, the mcp-gateway container launches this binary alongside the ext_proc server
 	// with a shared lifecycle. Maps to the --child flag on consul-mcp-gateway.
-	// e.g. consul.hashicorp.com/ai-agent-child-binary: "/app/consul-ai-agent"
+	// e.g. consul.hashicorp.com/ai-agent-child-binary: "/app/consul-ai-agent".
 	AnnotationAIAgentChildBinary = "consul.hashicorp.com/ai-agent-child-binary"
 
 	// AnnotationAIAgentChildArgs passes space-separated arguments to the child binary.
 	// Only used when AnnotationAIAgentChildBinary is also set.
 	// Maps to the --child-args flag on consul-mcp-gateway.
-	// e.g. consul.hashicorp.com/ai-agent-child-args: "--port=8080 --log-level=debug"
+	// e.g. consul.hashicorp.com/ai-agent-child-args: "--port=8080 --log-level=debug".
 	AnnotationAIAgentChildArgs = "consul.hashicorp.com/ai-agent-child-args"
 
 	// AnnotationAIInferenceModelProtocol sets the wire protocol for an inference-model
 	// service registration. Valid values: openai | anthropic | passthrough.
 	// Stamped on the Consul service's AI.InferenceModel.Protocol field.
-	// e.g. consul.hashicorp.com/ai-inference-model-protocol: "openai"
+	// e.g. consul.hashicorp.com/ai-inference-model-protocol: "openai".
 	AnnotationAIInferenceModelProtocol = "consul.hashicorp.com/ai-inference-model-protocol"
 
 	// AnnotationAIInferenceModelPath sets the base URL path for an inference-model
 	// service registration (e.g. "/v1"). Stamped on AI.InferenceModel.Path.
-	// e.g. consul.hashicorp.com/ai-inference-model-path: "/v1"
+	// e.g. consul.hashicorp.com/ai-inference-model-path: "/v1".
 	AnnotationAIInferenceModelPath = "consul.hashicorp.com/ai-inference-model-path"
 
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.

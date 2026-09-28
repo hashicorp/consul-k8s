@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: Add support for zero-touch downstream TLS termination via the `consul.hashicorp.com/tls-enabled: "true"` annotation. When set on a `Gateway` resource, Consul automatically uses the gateway's Connect leaf certificate to terminate HTTPS — no `certificateRefs` or operator-managed `Secret` required. The leaf certificate carries `*.api-gateway.<domain>` wildcard DNS SANs. Combined with Consul DNS auto-registration (`<service>.api-gateway.consul`), clients inside the cluster can reach mesh-registered services over CA-verified HTTPS without any manual certificate management.
+```

@@ -57,7 +57,12 @@ type CACert struct {
 }
 
 type ACLsConfig struct {
-	ManageSystemACLs bool `json:"manageSystemACLs"`
+	ManageSystemACLs bool             `json:"manageSystemACLs"`
+	AuthMethod       AuthMethodConfig `json:"authMethod"`
+}
+
+type AuthMethodConfig struct {
+	Name string `json:"name"`
 }
 
 type MetricsConfig struct {

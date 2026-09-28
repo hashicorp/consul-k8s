@@ -17,6 +17,9 @@ on:
       - 'assets/**'
       - '.changelog/**'
 
+permissions:
+  security-events: write
+
 # cancel existing runs of the same workflow on the same ref
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}

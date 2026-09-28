@@ -9,15 +9,16 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/hashicorp/consul/sdk/iptables"
+	capi "github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/nftables"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
-// addRedirectTrafficConfigAnnotation creates an iptables.Config in JSON format based on proxy configuration.
-// iptables.Config:
+// addRedirectTrafficConfigAnnotation creates a nftables.Config in JSON format based on proxy configuration.
+// nftables.Config:
 //
 //	ConsulDNSIP: an environment variable named RESOURCE_PREFIX_DNS_SERVICE_HOST where RESOURCE_PREFIX is the consul.fullname in helm.
 //	ProxyUserID: a constant set in Annotations or read from namespace when using OpenShift
@@ -27,8 +28,8 @@ import (
 //	ExcludeOutboundPorts: pod annotations
 //	ExcludeOutboundCIDRs: pod annotations
 //	ExcludeUIDs: pod annotations
-func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns corev1.Namespace) (string, error) {
-	cfg := iptables.Config{}
+func (w *MeshWebhook) nftablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (string, error) {
+	cfg := nftables.Config{}
 
 	if !w.EnableOpenShift {
 		cfg.ProxyUserID = strconv.Itoa(sidecarUserAndGroupID)
@@ -55,7 +56,7 @@ func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns
 	cfg.ProxyInboundPort = constants.ProxyDefaultInboundPort
 
 	// Set the proxy's outbound port.
-	cfg.ProxyOutboundPort = iptables.DefaultTProxyOutboundPort
+	cfg.ProxyOutboundPort = nftables.DefaultTProxyOutboundPort
 
 	// If metrics are enabled, get the prometheusScrapePort and exclude it from the inbound ports
 	enableMetrics, err := w.MetricsConfig.EnableMetrics(pod)
@@ -110,11 +111,19 @@ func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns
 	//   ExcludeInbound:  MCP port, HITL port, interceptor port, OBO inbound/outbound
 	//   ExcludeOutbound: MCP port, OBO inbound/outbound
 	if common.IsAIAgent(pod) {
-		aiCfg, err := common.AIConfigFromAgentCRD(ctx, w.Client, pod)
-		if err != nil {
+		var (
+			aiCfg *capi.AgentServiceAI
+			err   error
+		)
+		if w.Client != nil {
+			aiCfg, err = common.AIConfigFromAgentCRD(context.Background(), w.Client, pod)
+		}
+		if w.Client == nil || err != nil {
 			// Non-fatal: fall back to built-in constants so iptables rules are
 			// still applied with sensible defaults rather than blocking injection.
-			w.Log.Error(err, "failed to resolve AgentConfig for iptables exclusion; using built-in defaults")
+			if err != nil {
+				w.Log.Error(err, "failed to resolve AgentConfig for iptables exclusion; using built-in defaults")
+			}
 			aiCfg = common.DefaultAIConfig()
 		}
 		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,
@@ -160,22 +169,22 @@ func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns
 		cfg.ConsulDNSPort = consulDataplaneDNSBindPort
 	}
 
-	iptablesConfigJson, err := json.Marshal(&cfg)
+	nftCfgJSON, err := json.Marshal(&cfg)
 	if err != nil {
-		return "", fmt.Errorf("could not marshal iptables config: %w", err)
+		return "", fmt.Errorf("could not marshal traffic redirection config: %w", err)
 	}
 
-	return string(iptablesConfigJson), nil
+	return string(nftCfgJSON), nil
 }
 
-// addRedirectTrafficConfigAnnotation add the created iptables JSON config as an annotation on the provided pod.
-func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(ctx context.Context, pod *corev1.Pod, ns corev1.Namespace) error {
-	iptablesConfig, err := w.iptablesConfigJSON(ctx, *pod, ns)
+// addRedirectTrafficConfigAnnotation add the created traffic redirection JSON config as an annotation on the provided pod.
+func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
+	nftCfg, err := w.nftablesConfigJSON(*pod, ns)
 	if err != nil {
 		return err
 	}
 
-	pod.Annotations[constants.AnnotationRedirectTraffic] = iptablesConfig
+	pod.Annotations[constants.AnnotationRedirectTraffic] = nftCfg
 
 	return nil
 }

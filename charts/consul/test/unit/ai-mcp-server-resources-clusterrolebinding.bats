@@ -31,7 +31,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -41,7 +41,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.roleRef.kind' | tee /dev/stderr)
+        yq -r '.roleRef.kind' | tee /dev/stderr)
     [ "$actual" = "ClusterRole" ]
 }
 
@@ -51,6 +51,6 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.subjects[0].kind' | tee /dev/stderr)
+        yq -r '.subjects[0].kind' | tee /dev/stderr)
     [ "$actual" = "ServiceAccount" ]
 }

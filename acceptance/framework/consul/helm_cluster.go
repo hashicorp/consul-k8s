@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -52,6 +52,7 @@ type HelmCluster struct {
 	ChartPath string
 
 	ctx                environment.TestContext
+	cfg                *config.TestConfig
 	helmOptions        *helm.Options
 	releaseName        string
 	runtimeClient      client.Client
@@ -114,6 +115,7 @@ func NewHelmCluster(
 	}
 	return &HelmCluster{
 		ctx:                ctx,
+		cfg:                cfg,
 		helmOptions:        opts,
 		releaseName:        releaseName,
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
@@ -123,6 +125,81 @@ func NewHelmCluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 	}
+}
+
+// NewHelmClusterFromReleasedChart returns a cluster that installs a published
+// consul-k8s chart from the HashiCorp Helm repository instead of the chart in
+// this working tree.
+//
+// It exists for upgrade tests, which must start on a real prior release and
+// then move to the local chart via UpgradeToLocalChart. The image overrides the
+// test flags normally inject are dropped so that the released chart's own
+// pinned image versions are used: an install that ran the locally built
+// control-plane image against an old chart would not be the prior release, and
+// would hide exactly the migration problems an upgrade test is meant to find.
+//
+// The enterprise Consul image is the one override that is kept, because the
+// released chart defaults to the CE image and an enterprise run would otherwise
+// silently install CE and leave its license secret unused.
+func NewHelmClusterFromReleasedChart(
+	t *testing.T,
+	helmValues map[string]string,
+	ctx environment.TestContext,
+	cfg *config.TestConfig,
+	releaseName string,
+	chartVersion string,
+) *HelmCluster {
+	cluster := NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	for _, key := range []string{"global.image", "global.imageK8S", "global.imageEnvoy", "global.imageConsulDataplane"} {
+		delete(cluster.helmOptions.SetValues, key)
+	}
+	if cfg.EnableEnterprise {
+		entImage, err := cfg.HelmValuesFromConfig()
+		require.NoError(t, err)
+		if image, ok := entImage["global.image"]; ok {
+			cluster.helmOptions.SetValues["global.image"] = image
+		}
+	}
+	cluster.helmOptions.Version = chartVersion
+	cluster.helmOptions.ExtraArgs["upgrade"] = append(
+		cluster.helmOptions.ExtraArgs["upgrade"], "--version", chartVersion,
+	)
+	return cluster
+}
+
+// UpgradeToLocalChart upgrades a release installed from a published chart to
+// the chart in this working tree, restoring the image overrides from the test
+// flags.
+//
+// Restoring global.imageK8S is what makes the upgrade meaningful: hooks and
+// controllers added by the local chart run subcommands that only exist in the
+// locally built control-plane image.
+func (h *HelmCluster) UpgradeToLocalChart(t *testing.T, helmValues map[string]string) {
+	t.Helper()
+
+	valuesFromConfig, err := h.cfg.HelmValuesFromConfig()
+	require.NoError(t, err)
+	for _, key := range []string{"global.image", "global.imageK8S", "global.imageEnvoy", "global.imageConsulDataplane"} {
+		if value, ok := valuesFromConfig[key]; ok {
+			h.helmOptions.SetValues[key] = value
+		}
+	}
+	h.helmOptions.Version = config.HelmChartPath
+	h.removeReleasedChartVersion()
+	h.Upgrade(t, helmValues)
+}
+
+func (h *HelmCluster) removeReleasedChartVersion() {
+	args := h.helmOptions.ExtraArgs["upgrade"]
+	filtered := args[:0]
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--version" && i+1 < len(args) {
+			i++
+			continue
+		}
+		filtered = append(filtered, args[i])
+	}
+	h.helmOptions.ExtraArgs["upgrade"] = filtered
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
@@ -152,7 +229,26 @@ func (h *HelmCluster) Create(t *testing.T) {
 		if err != nil {
 			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
 		}
+		// terratest's helm.UpgradeE ignores Options.Version, so `helm upgrade
+		// --install` would pull the latest published chart instead of the pinned
+		// one. Pass --version explicitly for this install and restore the args so
+		// a later UpgradeToLocalChart still targets the local chart path.
+		if h.helmOptions.Version != "" {
+			upgradeArgs := h.helmOptions.ExtraArgs["upgrade"]
+			h.helmOptions.ExtraArgs["upgrade"] = append(append([]string{}, upgradeArgs...), "--version", h.helmOptions.Version)
+			defer func() { h.helmOptions.ExtraArgs["upgrade"] = upgradeArgs }()
+		}
 	}
+	// terratest's helm.UpgradeE ignores Options.Version, so `helm upgrade
+    // --install` would pull the latest published chart instead of the pinned
+    // one. Pass --version explicitly for this install and restore the args so
+    // a later UpgradeToLocalChart still targets the local chart path. An empty
+    // version is left unpinned so it keeps resolving to the latest release.
+    if h.helmOptions.Version != "" {
+		upgradeArgs := h.helmOptions.ExtraArgs["upgrade"]
+		h.helmOptions.ExtraArgs["upgrade"] = append(append([]string{}, upgradeArgs...), "--version", h.helmOptions.Version)
+		defer func() { h.helmOptions.ExtraArgs["upgrade"] = upgradeArgs }()
+}
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
@@ -179,9 +275,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Forcibly delete all gateway classes and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
 
-	var gatewayClassList gwv1beta1.GatewayClassList
+	var gatewayClassList gwv1.GatewayClassList
 	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
 	}) == nil {
@@ -468,6 +564,23 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	}
 	helm.Upgrade(t, h.helmOptions, chartName, h.releaseName)
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
+}
+
+// UpgradeE runs a Helm upgrade and returns its error instead of failing the
+// test. It is intended for tests that assert an upgrade is rejected, for
+// example when a post-upgrade hook Job is expected to fail.
+//
+// Unlike Upgrade it does not wait for Pods to become ready, because a rejected
+// upgrade may leave the release partially rolled out.
+func (h *HelmCluster) UpgradeE(t *testing.T, helmValues map[string]string) error {
+	t.Helper()
+
+	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
+	chartName := "hashicorp/consul"
+	if h.helmOptions.Version == config.HelmChartPath {
+		chartName = config.HelmChartPath
+	}
+	return helm.UpgradeE(t, h.helmOptions, chartName, h.releaseName)
 }
 
 // CreatePortForwardTunnel returns the local address:port of a tunnel to the consul server pod in the given release.

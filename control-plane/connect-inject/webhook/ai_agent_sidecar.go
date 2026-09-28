@@ -141,11 +141,19 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 //     natively so we stat the socket file instead.
 func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *corev1.Probe {
 	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
-		// Parse the port from the addr string e.g. ":21101" → 21101.
+		// Parse the port from the addr string e.g. "127.0.0.1:21101" or ":21101" → 21101.
 		// Fall back to hitlPort if the addr is malformed.
 		port := hitlPort
-		if len(addr) > 1 {
-			if p, err := strconv.ParseInt(addr[1:], 10, 32); err == nil {
+		host, portStr, err := net.SplitHostPort(addr)
+		if err != nil {
+			// addr might be just ":port" or malformed, try splitting with dummy host if needed
+			if h, p, err2 := net.SplitHostPort("127.0.0.1" + addr); err2 == nil {
+				host, portStr, err = h, p, nil
+			}
+		}
+		_ = host
+		if err == nil {
+			if p, parseErr := strconv.ParseInt(portStr, 10, 32); parseErr == nil {
 				port = int32(p)
 			}
 		}
@@ -174,8 +182,6 @@ func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *
 }
 
 // oboInboundSidecar builds consul-obo-inbound for ai-agent pods.
-// Listens on loopback :21102; envelope + broker UDS for split-knowledge credentials.
-// Verify-only — no private key material in this process beyond envelope decrypt.
 func (w *MeshWebhook) oboInboundSidecar(runAsUser, runAsGroup int64) (corev1.Container, error) {
 	if w.ImageConsulOBOInbound == "" {
 		return corev1.Container{}, fmt.Errorf(
@@ -186,8 +192,6 @@ func (w *MeshWebhook) oboInboundSidecar(runAsUser, runAsGroup int64) (corev1.Con
 }
 
 // oboOutboundSidecar builds consul-obo-outbound for ai-agent pods.
-// Listens on loopback :21103; RFC 8693 exchange after envelope decrypt via broker.
-// Not an SDS/xDS client — envelope UDS + Local Credential Broker only.
 func (w *MeshWebhook) oboOutboundSidecar(runAsUser, runAsGroup int64) (corev1.Container, error) {
 	if w.ImageConsulOBOOutbound == "" {
 		return corev1.Container{}, fmt.Errorf(
@@ -198,44 +202,28 @@ func (w *MeshWebhook) oboOutboundSidecar(runAsUser, runAsGroup int64) (corev1.Co
 }
 
 func (w *MeshWebhook) oboSidecar(runAsUser, runAsGroup int64, name, image, binary string, port int) (corev1.Container, error) {
-	// Listen address stays 127.0.0.1. xDS OBO clusters dial that address.
-	// Only the Envoy admin readiness URL follows the dual-stack bind.
 	readyHost := constants.Getv4orv6Str("127.0.0.1", "::1")
 	readyURL := "http://" + net.JoinHostPort(readyHost, strconv.Itoa(constants.DefaultEnvoyAdminPort)) + "/ready"
-
 	return corev1.Container{
 		Name:            name,
 		Image:           image,
 		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Resources:       w.DefaultConsulSidecarResources,
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
-				ReadOnly:  true,
-			},
-		},
-		Command: []string{binary},
+		VolumeMounts:    []corev1.VolumeMount{{Name: volumeName, MountPath: "/consul/connect-inject", ReadOnly: true}},
+		Command:         []string{binary},
 		Args: []string{
-			"--addr",
-			net.JoinHostPort("127.0.0.1", strconv.Itoa(port)),
+			"--addr", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)),
 			"--log-level=info",
 			"--envelope-uds=/consul/connect-inject/oauth-envelope.sock",
 			"--broker-uds=/consul/connect-inject/credential-broker.sock",
 			"--dataplane-ready-url=" + readyURL,
 		},
 		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:                ptr.To(runAsUser),
-			RunAsGroup:               ptr.To(runAsGroup),
-			RunAsNonRoot:             ptr.To(true),
-			AllowPrivilegeEscalation: ptr.To(false),
-			ReadOnlyRootFilesystem:   ptr.To(true),
-			SeccompProfile: &corev1.SeccompProfile{
-				Type: corev1.SeccompProfileTypeRuntimeDefault,
-			},
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
+			RunAsUser: ptr.To(runAsUser), RunAsGroup: ptr.To(runAsGroup),
+			RunAsNonRoot: ptr.To(true), AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem: ptr.To(true),
+			SeccompProfile:         &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+			Capabilities:           &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 		},
 	}, nil
 }

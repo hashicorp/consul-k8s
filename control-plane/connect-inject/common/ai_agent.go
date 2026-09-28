@@ -130,11 +130,10 @@ func AIConfigFromAgentCRD(
 
 	var agentCfg v1alpha1.AgentConfig
 	if err := k8sClient.Get(ctx, types.NamespacedName{
-		Name:      configName,
-		Namespace: pod.Namespace,
+		Name: configName,
 	}, &agentCfg); err != nil {
-		return nil, fmt.Errorf("failed to get AgentConfig %s/%s: %w",
-			pod.Namespace, configName, err)
+		return nil, fmt.Errorf("failed to get AgentConfig %s: %w",
+			configName, err)
 	}
 
 	return AIConfigFromAgentDefaults(agentCfg.Spec.Defaults), nil

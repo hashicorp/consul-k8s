@@ -423,6 +423,18 @@ type InferencePoolConfigSpec struct {
 	// is applied.
 	// +optional
 	Policy *InferencePoolPolicy `json:"policy,omitempty"`
+
+	// Observability configures the processor's telemetry pillars (Prometheus/
+	// OTLP metrics and OTLP tracing). Each pillar is independent and
+	// best-effort: a degraded sink never affects request outcomes. When omitted,
+	// the processor uses its compiled-in defaults (metrics on, tracing off).
+	// +optional
+	Observability *InferencePoolObservability `json:"observability,omitempty"`
+
+	// Processor configures the ext_proc binding between Envoy and the
+	// co-located consul-inference-gateway process.
+	// +optional
+	Processor *InferencePoolProcessor `json:"processor,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -896,21 +908,13 @@ type InferencePoolWeightedTarget struct {
 // +k8s:deepcopy-gen=true
 
 // InferencePoolPolicy holds cross-cutting request/response policy (PII
-// detection, redaction, and audit) that the co-located policy processor
-// enforces. Consul carries it verbatim to the processor. When omitted, no
-// policy processing is applied.
+// detection and redaction) that the co-located policy processor enforces.
+// Consul carries it verbatim to the processor. When omitted, no policy
+// processing is applied.
 type InferencePoolPolicy struct {
 	// PII configures per-detector PII detection and redaction.
 	// +optional
 	PII *InferencePoolPII `json:"pii,omitempty"`
-
-	// AuditLevel sets the verbosity of the audit log emitted by the processor.
-	//   none    — no audit log entries.
-	//   request — log request metadata only.
-	//   full    — log request and response metadata.
-	// +kubebuilder:validation:Enum=none;request;full
-	// +optional
-	AuditLevel string `json:"auditLevel,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -972,13 +976,19 @@ type InferencePoolPIIMask struct {
 
 // InferencePoolPIIDetector is one PII detection rule.
 type InferencePoolPIIDetector struct {
-	// Name is the identifier of a built-in detector
-	// (e.g. "credit-card", "ssn", "email", "phone").
-	// Mutually exclusive with Regex.
+	// Name identifies the detector. For built-ins use the underscore form:
+	// "credit_card", "api_key", "ssn", "email". Hyphenated aliases
+	// (e.g. "credit-card") are accepted and normalised automatically.
+	// For a custom detector set a non-empty Regex — Name then acts as a
+	// label for logs/placeholder text and may be any non-empty string.
 	// +optional
 	Name string `json:"name,omitempty"`
 
-	// Regex is a custom regular expression pattern. When set, Name is ignored.
+	// Regex is a RE2 regular expression pattern.
+	// - Required when Name is not one of the four built-ins; without it
+	//   the Consul API rejects the entry ("a custom detector needs a Regex").
+	// - Optional for built-ins; when set it replaces the built-in pattern
+	//   (note: the built-in credit_card Luhn check is then skipped).
 	// +optional
 	Regex string `json:"regex,omitempty"`
 
@@ -986,6 +996,134 @@ type InferencePoolPIIDetector struct {
 	// +kubebuilder:validation:Enum=block;mask;redact;log
 	// +optional
 	Action string `json:"action,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
+// InferencePoolObservability
+// ---------------------------------------------------------------------------
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolObservability configures the processor's telemetry pillars
+// (metrics and tracing). Each pillar is independent: a degraded sink
+// degrades only that pillar and never changes a request's outcome.
+type InferencePoolObservability struct {
+	// Metrics configures OTel metrics export. Metrics are enabled by default;
+	// set Enabled=false to disable.
+	// +optional
+	Metrics *InferencePoolObservabilityMetrics `json:"metrics,omitempty"`
+
+	// Tracing configures OTel distributed tracing. Off by default.
+	// +optional
+	Tracing *InferencePoolObservabilityTracing `json:"tracing,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolObservabilityMetrics configures OTel metrics export for the
+// processor. Metrics are on by default; set Enabled=false to disable.
+type InferencePoolObservabilityMetrics struct {
+	// Enabled controls whether the processor exports metrics at all.
+	// Pointer so an unset field stays distinguishable from an explicit false.
+	// Default: true.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Prometheus configures the Prometheus pull-based scrape endpoint.
+	// +optional
+	Prometheus *InferencePoolObservabilityMetricsPrometheus `json:"prometheus,omitempty"`
+
+	// OTLP configures a push-based OTLP metrics exporter.
+	// +optional
+	OTLP *InferencePoolOTLPExport `json:"otlp,omitempty"`
+
+	// SemconvSchema pins the OpenTelemetry semantic-convention schema version
+	// added to every exported metric resource. The Consul inference-gateway
+	// processor implements exactly "1.37.0"; any other value is rejected.
+	// Omit this field to accept the processor default.
+	// +optional
+	SemconvSchema string `json:"semconvSchema,omitempty"`
+
+	// CustomLabels is a list of label key names (identifiers) promoted onto every
+	// exported metric. Each entry must be a valid identifier matching
+	// ^[a-zA-Z_][a-zA-Z0-9_]*$ (e.g. ["env", "team"]).
+	// +optional
+	CustomLabels []string `json:"customLabels,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolObservabilityMetricsPrometheus configures the processor's
+// Prometheus scrape endpoint.
+type InferencePoolObservabilityMetricsPrometheus struct {
+	// Port is the TCP port the scrape endpoint listens on. Default: 9090.
+	// +optional
+	Port int `json:"port,omitempty"`
+
+	// Path is the HTTP path that serves /metrics. Default: "/metrics".
+	// +optional
+	Path string `json:"path,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolObservabilityTracing configures OTel distributed tracing for
+// the processor. Off by default.
+type InferencePoolObservabilityTracing struct {
+	// Enabled controls whether the processor emits spans. Default: false.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// OTLP configures the OTLP trace exporter endpoint.
+	// +optional
+	OTLP *InferencePoolOTLPExport `json:"otlp,omitempty"`
+
+	// SampleRatio is the fraction of requests to trace (0.0–1.0).
+	// 0.0 = never, 1.0 = always. Default: 0.01 (1 %).
+	// +optional
+	SampleRatio float64 `json:"sampleRatio,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolOTLPExport is a shared OTLP exporter target used by both
+// metrics and tracing pillars.
+type InferencePoolOTLPExport struct {
+	// Endpoint is the OTLP collector URL
+	// (e.g. "http://otel-collector:4318").
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
+
+	// Insecure disables TLS verification when true. Use only in non-production
+	// environments.
+	// +optional
+	Insecure bool `json:"insecure,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
+// InferencePoolProcessor
+// ---------------------------------------------------------------------------
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolProcessor configures the ext_proc binding between Envoy and the
+// co-located consul-inference-gateway process. The socket path is host-local,
+// per-instance state — it is not part of the cluster-wide config entry;
+// consul-dataplane derives it per proxy instance.
+type InferencePoolProcessor struct {
+	// FailureMode controls Envoy's behaviour when the ext_proc server is
+	// unreachable.
+	//   closed — reject the request (HTTP 500). Default: safe for production.
+	//   open   — pass the request through without ext_proc processing.
+	// +kubebuilder:validation:Enum=closed;open
+	// +optional
+	FailureMode string `json:"failureMode,omitempty"`
+
+	// BodyModelRouting routes on the request body's model field instead of a
+	// caller-supplied capability header. Consul renders the matching
+	// per-model route when true.
+	// +optional
+	BodyModelRouting bool `json:"bodyModelRouting,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
