@@ -61,6 +61,31 @@ spec:
             spec:
               description: TerminatingGatewaySpec defines the desired state of TerminatingGateway.
               properties:
+                credentialInjection:
+                  description: |-
+                    CredentialInjection enables credential-injection routing in the Consul
+                    terminating-gateway config entry, connecting Envoy to the local credential
+                    processor over a Unix domain socket. Each linked service must then set
+                    credential.mode. Routing is also enabled automatically when
+                    spec.deployment.credentialInjection.enabled is true. Set this block
+                    explicitly when the gateway workload is deployed by Helm rather than by this
+                    resource. It carries only non-secret routing settings; images, Vault settings
+                    and other Kubernetes deployment details stay in
+                    spec.deployment.credentialInjection. Requires Consul Enterprise.
+                  properties:
+                    messageTimeout:
+                      description: |-
+                        MessageTimeout bounds each Envoy-to-processor exchange, as a duration string
+                        (for example "250ms"). Consul defaults it to 250ms when unset.
+                      type: string
+                    udsPath:
+                      description: |-
+                        UDSPath is the absolute path of the credential processor's Unix domain
+                        socket that Envoy connects to. Defaults to "/consul/auth-socket/auth.sock",
+                        the path where Kubernetes credential-injection pods mount the socket; it
+                        must equal that path when spec.deployment.credentialInjection is enabled.
+                      type: string
+                  type: object
                 deployment:
                   description: Deployment contains all deployment-related configuration
                   properties:
@@ -971,8 +996,9 @@ spec:
                       description: |-
                         CredentialInjection configures optional non-secret credential-processor and
                         Vault Agent sidecars that inject external-model credentials for linked
-                        services. This is a Kubernetes deployment concern only: it does not change
-                        the Consul terminating-gateway config entry produced by ToConsul.
+                        services. When enabled it also enables credential-injection routing in the
+                        Consul config entry (see spec.credentialInjection), so each linked service
+                        must set credential.mode.
                       properties:
                         drainSeconds:
                           description: |-
@@ -1416,6 +1442,28 @@ spec:
                           CertFile is the optional path to a client certificate to use for TLS connections
                           from the gateway to the linked service.
                         type: string
+                      credential:
+                        description: |-
+                          Credential configures credential injection for this service. Required for
+                          every linked service when credential-injection routing is enabled, and not
+                          allowed otherwise. Requires Consul Enterprise.
+                        properties:
+                          bindingID:
+                            description: |-
+                              BindingID selects the credential binding in the processor configuration.
+                              Required when mode is "inject", must be empty when mode is "none", and must
+                              be unique across the gateway's linked services.
+                            type: string
+                          mode:
+                            description: |-
+                              Mode is "inject" to have the credential processor inject the credential for
+                              BindingID into requests to this service, or "none" to forward requests
+                              without a credential.
+                            enum:
+                            - inject
+                            - none
+                            type: string
+                        type: object
                       disableAutoHostRewrite:
                         description: DisableAutoHostRewrite disables terminating gateways
                           auto host rewrite feature when set to true.

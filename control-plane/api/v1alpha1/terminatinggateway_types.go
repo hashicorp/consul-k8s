@@ -67,9 +67,42 @@ type TerminatingGatewaySpec struct {
 	// Services is a list of service names represented by the terminating gateway.
 	Services []LinkedService `json:"services,omitempty"`
 
+	// CredentialInjection enables credential-injection routing in the Consul
+	// terminating-gateway config entry, connecting Envoy to the local credential
+	// processor over a Unix domain socket. Each linked service must then set
+	// credential.mode. Routing is also enabled automatically when
+	// spec.deployment.credentialInjection.enabled is true. Set this block
+	// explicitly when the gateway workload is deployed by Helm rather than by this
+	// resource. It carries only non-secret routing settings; images, Vault settings
+	// and other Kubernetes deployment details stay in
+	// spec.deployment.credentialInjection. Requires Consul Enterprise.
+	// +kubebuilder:validation:Optional
+	CredentialInjection *TerminatingGatewayCredentialRouting `json:"credentialInjection,omitempty"`
+
 	// Deployment contains all deployment-related configuration
 	// +kubebuilder:validation:Optional
 	Deployment TerminatingGatewayDeploymentSpec `json:"deployment,omitempty"`
+}
+
+// DefaultCredentialInjectionUDSPath is the credential processor's ext_proc
+// socket inside a credential-injection terminating-gateway pod. Both the Helm
+// chart and the controller mount the processor socket at this path.
+const DefaultCredentialInjectionUDSPath = "/consul/auth-socket/auth.sock"
+
+// TerminatingGatewayCredentialRouting configures the non-secret credential
+// processor routing in the Consul terminating-gateway config entry.
+type TerminatingGatewayCredentialRouting struct {
+	// UDSPath is the absolute path of the credential processor's Unix domain
+	// socket that Envoy connects to. Defaults to "/consul/auth-socket/auth.sock",
+	// the path where Kubernetes credential-injection pods mount the socket; it
+	// must equal that path when spec.deployment.credentialInjection is enabled.
+	// +kubebuilder:validation:Optional
+	UDSPath string `json:"udsPath,omitempty"`
+
+	// MessageTimeout bounds each Envoy-to-processor exchange, as a duration string
+	// (for example "250ms"). Consul defaults it to 250ms when unset.
+	// +kubebuilder:validation:Optional
+	MessageTimeout string `json:"messageTimeout,omitempty"`
 }
 
 // TerminatingGatewayDeploymentSpec contains all deployment-related configuration for the terminating gateway.
@@ -135,8 +168,9 @@ type TerminatingGatewayDeploymentSpec struct {
 
 	// CredentialInjection configures optional non-secret credential-processor and
 	// Vault Agent sidecars that inject external-model credentials for linked
-	// services. This is a Kubernetes deployment concern only: it does not change
-	// the Consul terminating-gateway config entry produced by ToConsul.
+	// services. When enabled it also enables credential-injection routing in the
+	// Consul config entry (see spec.credentialInjection), so each linked service
+	// must set credential.mode.
 	// +kubebuilder:validation:Optional
 	CredentialInjection *TerminatingGatewayCredentialInjection `json:"credentialInjection,omitempty"`
 }
@@ -292,6 +326,28 @@ type LinkedService struct {
 	// SecretRef references a Kubernetes secret containing TLS certificates.
 	// +optional
 	SecretRef *SecretReference `json:"secretRef,omitempty"`
+
+	// Credential configures credential injection for this service. Required for
+	// every linked service when credential-injection routing is enabled, and not
+	// allowed otherwise. Requires Consul Enterprise.
+	// +kubebuilder:validation:Optional
+	Credential *LinkedServiceCredential `json:"credential,omitempty"`
+}
+
+// LinkedServiceCredential configures the non-secret credential policy for one
+// linked service. It never carries credential material.
+type LinkedServiceCredential struct {
+	// Mode is "inject" to have the credential processor inject the credential for
+	// BindingID into requests to this service, or "none" to forward requests
+	// without a credential.
+	// +kubebuilder:validation:Enum=inject;none
+	Mode string `json:"mode,omitempty"`
+
+	// BindingID selects the credential binding in the processor configuration.
+	// Required when mode is "inject", must be empty when mode is "none", and must
+	// be unique across the gateway's linked services.
+	// +kubebuilder:validation:Optional
+	BindingID string `json:"bindingID,omitempty"`
 }
 
 // SecretReference defines the name of the Kubernetes secret.
@@ -429,11 +485,39 @@ func (in *TerminatingGateway) ToConsul(datacenter string) capi.ConfigEntry {
 		svcs = append(svcs, s.toConsul())
 	}
 	return &capi.TerminatingGatewayConfigEntry{
-		Kind:     in.ConsulKind(),
-		Name:     in.ConsulName(),
-		Services: svcs,
-		Meta:     meta(datacenter),
+		Kind:                in.ConsulKind(),
+		Name:                in.ConsulName(),
+		Services:            svcs,
+		CredentialInjection: in.consulCredentialInjection(),
+		Meta:                meta(datacenter),
 	}
+}
+
+// CredentialRoutingEnabled reports whether the Consul config entry enables
+// credential-injection routing: either spec.credentialInjection is set, or the
+// controller deploys credential-injection sidecars for this gateway. Enabling
+// the sidecars always enables routing so the processor is never deployed
+// without Envoy being connected to it.
+func (in *TerminatingGateway) CredentialRoutingEnabled() bool {
+	if in.Spec.CredentialInjection != nil {
+		return true
+	}
+	ci := in.Spec.Deployment.CredentialInjection
+	return ci != nil && ci.Enabled
+}
+
+func (in *TerminatingGateway) consulCredentialInjection() *capi.GatewayCredentialInjection {
+	if !in.CredentialRoutingEnabled() {
+		return nil
+	}
+	out := &capi.GatewayCredentialInjection{UDSPath: DefaultCredentialInjectionUDSPath}
+	if r := in.Spec.CredentialInjection; r != nil {
+		if r.UDSPath != "" {
+			out.UDSPath = r.UDSPath
+		}
+		out.MessageTimeout = r.MessageTimeout
+	}
+	return out
 }
 
 func (in *TerminatingGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
@@ -466,9 +550,22 @@ func normalizeTerminatingGatewayForCompare(in *capi.TerminatingGatewayConfigEntr
 		clearLinkedServiceStringField(&normalized.Services[i], "Namespace")
 		clearLinkedServiceStringField(&normalized.Services[i], "Partition")
 	}
+	// Consul defaults an empty MessageTimeout on write, so compare against the
+	// server default to avoid rewriting the entry on every reconcile.
+	if in.CredentialInjection != nil {
+		ci := *in.CredentialInjection
+		if ci.MessageTimeout == "" {
+			ci.MessageTimeout = consulDefaultCredentialMessageTimeout
+		}
+		normalized.CredentialInjection = &ci
+	}
 
 	return &normalized
 }
+
+// consulDefaultCredentialMessageTimeout mirrors the MessageTimeout Consul
+// applies to a terminating-gateway CredentialInjection block when it is unset.
+const consulDefaultCredentialMessageTimeout = "250ms"
 
 func clearLinkedServiceStringField(in *capi.LinkedService, field string) {
 	v := reflect.ValueOf(in)
@@ -491,6 +588,7 @@ func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {
 
 	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
 	errs = append(errs, in.Spec.Deployment.validateCredentialInjection(path.Child("deployment"))...)
+	errs = append(errs, in.validateCredentialRouting(path)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -689,7 +787,7 @@ func (in *TerminatingGateway) DefaultNamespaceFields(consulMeta common.ConsulMet
 }
 
 func (in LinkedService) toConsul() capi.LinkedService {
-	return capi.LinkedService{
+	out := capi.LinkedService{
 		Namespace:              in.Namespace,
 		Name:                   in.Name,
 		CAFile:                 in.CAFile,
@@ -698,6 +796,13 @@ func (in LinkedService) toConsul() capi.LinkedService {
 		SNI:                    in.SNI,
 		DisableAutoHostRewrite: in.DisableAutoHostRewrite,
 	}
+	if in.Credential != nil {
+		out.Credential = &capi.GatewayServiceCredential{
+			Mode:      in.Credential.Mode,
+			BindingID: in.Credential.BindingID,
+		}
+	}
+	return out
 }
 
 func (in LinkedService) validate(path *field.Path) field.ErrorList {

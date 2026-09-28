@@ -1074,6 +1074,13 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 	if err := validateCredentialInjectionWorkload(termGW.Spec.Deployment.CredentialInjection, termGW.Spec.Services, termGW.Spec.Deployment.EnableDeployment); err != nil {
 		return nil, err
 	}
+	// The sidecars are only useful if Consul routes Envoy to the processor, so
+	// also refuse a workload whose credential routing Consul would reject.
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled {
+		if err := termGW.ValidateCredentialRouting(); err != nil {
+			return nil, fmt.Errorf("credentialInjection routing is invalid: %w", err)
+		}
+	}
 
 	// Add the Vault-only credential-injection sidecars/volumes when enabled.
 	// Match the Helm chart: the global Vault Agent Injector is only active when

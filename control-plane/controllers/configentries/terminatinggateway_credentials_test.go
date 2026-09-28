@@ -259,10 +259,16 @@ func TestConstructDeploymentFromCRDCredentialInjectionOpenShift(t *testing.T) {
 		}
 	}
 	termGW := func(ci *consulv1alpha1.TerminatingGatewayCredentialInjection) *consulv1alpha1.TerminatingGateway {
+		svc := consulv1alpha1.LinkedService{Name: "external-api"}
+		if ci != nil && ci.Enabled {
+			svc.CAFile = "/etc/ssl/certs/ca-certificates.crt"
+			svc.SNI = "api.example.com"
+			svc.Credential = &consulv1alpha1.LinkedServiceCredential{Mode: consulv1alpha1.CredentialModeInject, BindingID: "external-api"}
+		}
 		return &consulv1alpha1.TerminatingGateway{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-gateway", Namespace: "consul"},
 			Spec: consulv1alpha1.TerminatingGatewaySpec{
-				Services: []consulv1alpha1.LinkedService{{Name: "external-api"}},
+				Services: []consulv1alpha1.LinkedService{svc},
 				Deployment: consulv1alpha1.TerminatingGatewayDeploymentSpec{
 					GatewayName:         "terminating-gateway",
 					LogLevel:            "info",
@@ -293,6 +299,16 @@ func TestConstructDeploymentFromCRDCredentialInjectionOpenShift(t *testing.T) {
 	deployment, err = r.constructDeploymentFromCRD(termGW(enabledCI), helmValues(false))
 	require.NoError(t, err)
 	require.True(t, hasContainer(deployment.Spec.Template.Spec.Containers, "camp-auth-processor"))
+
+	// Sidecars without complete routing are refused: Envoy would never reach the
+	// processor, so the gateway would look healthy without injecting credentials.
+	noRouting := termGW(enabledCI)
+	noRouting.Spec.Services[0].Credential = nil
+	deployment, err = r.constructDeploymentFromCRD(noRouting, helmValues(false))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "credentialInjection routing is invalid")
+	require.Contains(t, err.Error(), "spec.services[0].credential")
+	require.Nil(t, deployment)
 
 	// Disabled or unset on OpenShift: the gateway builds with no credential
 	// injection projection.

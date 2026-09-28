@@ -2619,7 +2619,12 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 				gw.Spec.Deployment.Annotations = map[string]string{
 					"vault.hashicorp.com/agent-service-account-token-volume-name": "attacker-volume",
 				}
-				gw.Spec.Services = []v1alpha1.LinkedService{{Name: "external-api"}}
+				gw.Spec.Services = []v1alpha1.LinkedService{{
+					Name:       "external-api",
+					CAFile:     "/etc/ssl/certs/ca-certificates.crt",
+					SNI:        "api.example.com",
+					Credential: &v1alpha1.LinkedServiceCredential{Mode: v1alpha1.CredentialModeInject, BindingID: "external-api"},
+				}}
 				gw.Spec.Deployment.CredentialInjection = &v1alpha1.TerminatingGatewayCredentialInjection{
 					Enabled:             true,
 					ProcessorImage:      "camp-auth-processor:test",

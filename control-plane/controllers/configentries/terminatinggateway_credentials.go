@@ -34,7 +34,7 @@ const (
 
 	campVaultRenderedPath   = "/consul/vault-rendered"
 	campAuthSocketDir       = "/consul/auth-socket"
-	campAuthSocketFile      = "/consul/auth-socket/auth.sock"
+	campAuthSocketFile      = consulv1alpha1.DefaultCredentialInjectionUDSPath
 	campVaultTokenPath      = "/consul/vault-token"
 	campVaultAgentPrivate   = "/consul/vault-agent-private"
 	campVaultAgentConfig    = "/consul/vault-agent-config"
