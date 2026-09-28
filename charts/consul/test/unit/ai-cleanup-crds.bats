@@ -13,7 +13,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-job.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -24,7 +24,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         "${base_flags[@]}" \
         --set 'ai=null' \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -46,7 +46,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-job.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.annotations["helm.sh/hook"]' | tee /dev/stderr)
+        yq -r '.metadata.annotations["helm.sh/hook"]' | tee /dev/stderr)
     [ "$actual" = "pre-delete,pre-upgrade" ]
 }
 
@@ -56,7 +56,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-job.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.annotations["helm.sh/hook-weight"]' | tee /dev/stderr)
+        yq -r '.metadata.annotations["helm.sh/hook-weight"]' | tee /dev/stderr)
     [ "$actual" = "-5" ]
 }
 
@@ -66,7 +66,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-job.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.annotations["helm.sh/hook-delete-policy"]' | tee /dev/stderr)
+        yq -r '.metadata.annotations["helm.sh/hook-delete-policy"]' | tee /dev/stderr)
     [ "$actual" = "hook-succeeded,before-hook-creation" ]
 }
 
@@ -79,9 +79,9 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-job.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-    local actual=$(echo "$args" | yq 'contains(["ai-cleanup"])')
+    local actual=$(echo "$args" | yq -r 'contains(["ai-cleanup"])')
     [ "$actual" = "true" ]
 }
 
@@ -94,7 +94,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-clusterrole.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -113,7 +113,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-clusterrole.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.annotations["helm.sh/hook-weight"]' | tee /dev/stderr)
+        yq -r '.metadata.annotations["helm.sh/hook-weight"]' | tee /dev/stderr)
     [ "$actual" = "-10" ]
 }
 
@@ -123,15 +123,15 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-clusterrole.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.rules[0].resources' | tee /dev/stderr)
+        yq -r '.rules[0].resources' | tee /dev/stderr)
 
-    local actual=$(echo "$rules" | yq 'contains(["inferencemodelconfigs"])' | tee /dev/stderr)
+    local actual=$(echo "$rules" | yq -r 'contains(["inferencemodelconfigs"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$rules" | yq 'contains(["mcpserverconfigs"])' | tee /dev/stderr)
+    local actual=$(echo "$rules" | yq -r 'contains(["mcpserverconfigs"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$rules" | yq 'contains(["agentconfigs"])' | tee /dev/stderr)
+    local actual=$(echo "$rules" | yq -r 'contains(["agentconfigs"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -141,7 +141,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-clusterrole.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.rules[0].verbs | contains(["delete"])' | tee /dev/stderr)
+        yq -r '.rules[0].verbs | contains(["delete"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -154,7 +154,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-clusterrolebinding.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -176,7 +176,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         -s templates/ai-cleanup-crds-serviceaccount.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -196,6 +196,6 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         "${base_flags[@]}" \
         --set 'global.imagePullSecrets[0].name=pull-secret' \
         . | tee /dev/stderr |
-        yq '.imagePullSecrets[0].name' | tee /dev/stderr)
+        yq -r '.imagePullSecrets[0].name' | tee /dev/stderr)
     [ "$actual" = "pull-secret" ]
 }

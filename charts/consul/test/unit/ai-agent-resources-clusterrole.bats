@@ -32,7 +32,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         "${base_flags[@]}" \
         . | tee /dev/stderr |
         yq 'length > 0' | tee /dev/stderr)
-    [ "$actual" = "true" ]
+    [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

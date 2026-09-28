@@ -43,7 +43,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -56,7 +56,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.annotations["helm.sh/hook"]' | tee /dev/stderr)
+        yq -r '.metadata.annotations["helm.sh/hook"]' | tee /dev/stderr)
     [ "$actual" = "post-install,post-upgrade" ]
 }
 
@@ -70,7 +70,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         "${base_flags[@]}" \
         --set 'global.imageK8S=my-image:1.0' \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].image' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
     [ "$actual" = "my-image:1.0" ]
 }
 
@@ -83,18 +83,18 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-    local actual=$(echo "$args" | yq 'contains(["mcp-server-resources"])')
+    local actual=$(echo "$args" | yq -r 'contains(["mcp-server-resources"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-transport=streamable-http"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-transport=streamable-http"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-path=/mcp"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-path=/mcp"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-interceptor-port=21102"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-interceptor-port=21102"])')
     [ "$actual" = "true" ]
 }
 
@@ -107,15 +107,15 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         --set 'ai.mcpServer.defaults.path=/custom' \
         --set 'ai.mcpServer.defaults.protocolVersion=2024-11-05' \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-    local actual=$(echo "$args" | yq 'contains(["-transport=sse"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-transport=sse"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-path=/custom"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-path=/custom"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-protocol-version=2024-11-05"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-protocol-version=2024-11-05"])')
     [ "$actual" = "true" ]
 }
 
@@ -128,6 +128,6 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.template.metadata.annotations["consul.hashicorp.com/connect-inject"]' | tee /dev/stderr)
+        yq -r '.spec.template.metadata.annotations["consul.hashicorp.com/connect-inject"]' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }

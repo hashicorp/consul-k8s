@@ -30,7 +30,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencemodelconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -40,7 +40,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencemodelconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.name' | tee /dev/stderr)
+        yq -r '.metadata.name' | tee /dev/stderr)
     [ "$actual" = "inferencemodelconfigs.consul.hashicorp.com" ]
 }
 
@@ -50,7 +50,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencemodelconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
     [ "$actual" = "Synced" ]
 }
 
@@ -60,7 +60,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencemodelconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.scope' | tee /dev/stderr)
+        yq -r '.spec.scope' | tee /dev/stderr)
     [ "$actual" = "Cluster" ]
 }
 
@@ -90,7 +90,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-mcpserverconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -100,7 +100,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-mcpserverconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.name' | tee /dev/stderr)
+        yq -r '.metadata.name' | tee /dev/stderr)
     [ "$actual" = "mcpserverconfigs.consul.hashicorp.com" ]
 }
 
@@ -110,7 +110,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-mcpserverconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
     [ "$actual" = "Synced" ]
 }
 
@@ -140,7 +140,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-agentconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -150,7 +150,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-agentconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.name' | tee /dev/stderr)
+        yq -r '.metadata.name' | tee /dev/stderr)
     [ "$actual" = "agentconfigs.consul.hashicorp.com" ]
 }
 
@@ -160,7 +160,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-agentconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
     [ "$actual" = "Synced" ]
 }
 
@@ -170,7 +170,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-agentconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.scope' | tee /dev/stderr)
+        yq -r '.spec.scope' | tee /dev/stderr)
     [ "$actual" = "Cluster" ]
 }
 
@@ -211,7 +211,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -221,7 +221,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.name' | tee /dev/stderr)
+        yq -r '.metadata.name' | tee /dev/stderr)
     [ "$actual" = "inferencepoolconfigs.consul.hashicorp.com" ]
 }
 
@@ -231,7 +231,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.scope' | tee /dev/stderr)
+        yq -r '.spec.scope' | tee /dev/stderr)
     [ "$actual" = "Namespaced" ]
 }
 
@@ -241,7 +241,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.group' | tee /dev/stderr)
+        yq -r '.spec.group' | tee /dev/stderr)
     [ "$actual" = "consul.hashicorp.com" ]
 }
 
@@ -251,7 +251,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.names.kind' | tee /dev/stderr)
+        yq -r '.spec.names.kind' | tee /dev/stderr)
     [ "$actual" = "InferencePoolConfig" ]
 }
 
@@ -261,7 +261,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.names.plural' | tee /dev/stderr)
+        yq -r '.spec.names.plural' | tee /dev/stderr)
     [ "$actual" = "inferencepoolconfigs" ]
 }
 
@@ -271,7 +271,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.names.shortNames[0]' | tee /dev/stderr)
+        yq -r '.spec.names.shortNames[0]' | tee /dev/stderr)
     [ "$actual" = "ipc" ]
 }
 
@@ -281,7 +281,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].name' | tee /dev/stderr)
     [ "$actual" = "v1alpha1" ]
 }
 
@@ -291,7 +291,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].served' | tee /dev/stderr)
+        yq -r '.spec.versions[0].served' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -301,7 +301,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].storage' | tee /dev/stderr)
+        yq -r '.spec.versions[0].storage' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -311,7 +311,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].subresources | has("status")' | tee /dev/stderr)
+        yq -r '.spec.versions[0].subresources | has("status")' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -321,7 +321,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
     [ "$actual" = "Synced" ]
 }
 
@@ -331,7 +331,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Age") | .name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Age") | .name' | tee /dev/stderr)
     [ "$actual" = "Age" ]
 }
 
@@ -341,7 +341,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .jsonPath' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .jsonPath' | tee /dev/stderr)
     [ "$actual" = '.status.conditions[?(@.type=="Ready")].status' ]
 }
 
@@ -351,7 +351,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["enabled"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["enabled"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -361,7 +361,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["parentRefs"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["parentRefs"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -371,7 +371,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.enabled.default' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.enabled.default' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }
 
@@ -381,7 +381,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.parentRefs.minItems' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.parentRefs.minItems' | tee /dev/stderr)
     [ "$actual" = "1" ]
 }
 
@@ -391,7 +391,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.parentRefs.items.required | contains(["kind","name"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.parentRefs.items.required | contains(["kind","name"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -401,7 +401,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.parentRefs.items.required | contains(["namespace"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.parentRefs.items.required | contains(["namespace"])' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }
 
@@ -411,7 +411,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["rateLimit"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["rateLimit"])' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }
 
@@ -421,7 +421,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["routing"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["routing"])' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }
 
@@ -431,7 +431,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.routing.properties.budget."x-kubernetes-preserve-unknown-fields"' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.routing.properties.budget."x-kubernetes-preserve-unknown-fields"' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -441,7 +441,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.routing.properties.cache."x-kubernetes-preserve-unknown-fields"' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.routing.properties.cache."x-kubernetes-preserve-unknown-fields"' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -451,7 +451,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.routing.properties.mirror."x-kubernetes-preserve-unknown-fields"' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.routing.properties.mirror."x-kubernetes-preserve-unknown-fields"' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -461,7 +461,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.status.properties.conditions."x-kubernetes-list-type"' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.status.properties.conditions."x-kubernetes-list-type"' | tee /dev/stderr)
     [ "$actual" = "map" ]
 }
 
@@ -471,7 +471,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.labels.component' | tee /dev/stderr)
+        yq -r '.metadata.labels.component' | tee /dev/stderr)
     [ "$actual" = "crd" ]
 }
 
@@ -481,7 +481,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.labels | has("app")' | tee /dev/stderr)
+        yq -r '.metadata.labels | has("app")' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -491,6 +491,6 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s templates/crd-inferencepoolconfigs.yaml \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.labels | has("release")' | tee /dev/stderr)
+        yq -r '.metadata.labels | has("release")' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }

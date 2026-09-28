@@ -43,7 +43,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -56,15 +56,15 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.rules[] | select(.resources[] == "inferencemodelconfigs")' | tee /dev/stderr)
+        yq -r '.rules[] | select(.resources[] == "inferencemodelconfigs")' | tee /dev/stderr)
 
-    local actual=$(echo "$rules" | yq '.verbs | contains(["get"])' | tee /dev/stderr)
+    local actual=$(echo "$rules" | yq -r '.verbs | contains(["get"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$rules" | yq '.verbs | contains(["create"])' | tee /dev/stderr)
+    local actual=$(echo "$rules" | yq -r '.verbs | contains(["create"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$rules" | yq '.verbs | contains(["update"])' | tee /dev/stderr)
+    local actual=$(echo "$rules" | yq -r '.verbs | contains(["update"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -74,6 +74,6 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.rules[0].apiGroups[0]' | tee /dev/stderr)
+        yq -r '.rules[0].apiGroups[0]' | tee /dev/stderr)
     [ "$actual" = "consul.hashicorp.com" ]
 }

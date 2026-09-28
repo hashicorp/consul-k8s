@@ -43,7 +43,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -56,7 +56,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.annotations["helm.sh/hook"]' | tee /dev/stderr)
+        yq -r '.metadata.annotations["helm.sh/hook"]' | tee /dev/stderr)
     [ "$actual" = "post-install,post-upgrade" ]
 }
 
@@ -70,7 +70,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         "${base_flags[@]}" \
         --set 'global.imageK8S=agent-image:2.0' \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].image' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
     [ "$actual" = "agent-image:2.0" ]
 }
 
@@ -83,21 +83,21 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-    local actual=$(echo "$args" | yq 'contains(["agent-resources"])')
+    local actual=$(echo "$args" | yq -r 'contains(["agent-resources"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-interceptor-port=21101"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-interceptor-port=21101"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-mcp-port=15101"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-mcp-port=15101"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-hitl-port=16101"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-hitl-port=16101"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-approval-timeout=60s"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-approval-timeout=60s"])')
     [ "$actual" = "true" ]
 }
 
@@ -111,18 +111,18 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         --set 'ai.agent.defaults.hitl.port=16201' \
         --set 'ai.agent.defaults.hitl.approvalTimeout=120s' \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-    local actual=$(echo "$args" | yq 'contains(["-interceptor-port=22101"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-interceptor-port=22101"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-mcp-port=15201"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-mcp-port=15201"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-hitl-port=16201"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-hitl-port=16201"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-approval-timeout=120s"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-approval-timeout=120s"])')
     [ "$actual" = "true" ]
 }
 
@@ -135,6 +135,6 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.template.metadata.annotations["consul.hashicorp.com/connect-inject"]' | tee /dev/stderr)
+        yq -r '.spec.template.metadata.annotations["consul.hashicorp.com/connect-inject"]' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }

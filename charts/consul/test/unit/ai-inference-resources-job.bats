@@ -43,7 +43,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -56,7 +56,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.annotations["helm.sh/hook"]' | tee /dev/stderr)
+        yq -r '.metadata.annotations["helm.sh/hook"]' | tee /dev/stderr)
     [ "$actual" = "post-install,post-upgrade" ]
 }
 
@@ -66,7 +66,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.annotations["helm.sh/hook-delete-policy"]' | tee /dev/stderr)
+        yq -r '.metadata.annotations["helm.sh/hook-delete-policy"]' | tee /dev/stderr)
     [ "$actual" = "hook-succeeded,before-hook-creation" ]
 }
 
@@ -80,7 +80,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         "${base_flags[@]}" \
         --set 'global.imageK8S=my-image:1.2.3' \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].image' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
     [ "$actual" = "my-image:1.2.3" ]
 }
 
@@ -93,21 +93,21 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-    local actual=$(echo "$args" | yq 'contains(["ai-inference-resources"])')
+    local actual=$(echo "$args" | yq -r 'contains(["ai-inference-resources"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-enabled=true"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-enabled=true"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-interceptor-port=21101"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-interceptor-port=21101"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-inference-path=/v1"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-inference-path=/v1"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-inference-protocol=openai"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-inference-protocol=openai"])')
     [ "$actual" = "true" ]
 }
 
@@ -120,15 +120,15 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         --set 'ai.inferenceModel.defaults.inferenceProtocol=anthropic' \
         --set 'ai.inferenceModel.defaults.inferencePath=/v2' \
         . | tee /dev/stderr |
-        yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+        yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-    local actual=$(echo "$args" | yq 'contains(["-interceptor-port=22000"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-interceptor-port=22000"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-inference-protocol=anthropic"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-inference-protocol=anthropic"])')
     [ "$actual" = "true" ]
 
-    local actual=$(echo "$args" | yq 'contains(["-inference-path=/v2"])')
+    local actual=$(echo "$args" | yq -r 'contains(["-inference-path=/v2"])')
     [ "$actual" = "true" ]
 }
 
@@ -141,6 +141,6 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.template.metadata.annotations["consul.hashicorp.com/connect-inject"]' | tee /dev/stderr)
+        yq -r '.spec.template.metadata.annotations["consul.hashicorp.com/connect-inject"]' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }

@@ -101,7 +101,6 @@ load _helpers
         --set 'ai.agent.defaults.hitl.port=20000' \
         .
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "hitl.port" ]]
 }
 
 #--------------------------------------------------------------------

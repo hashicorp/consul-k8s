@@ -31,7 +31,7 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         -s $target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -42,6 +42,6 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
         "${base_flags[@]}" \
         --set 'global.imagePullSecrets[0].name=my-secret' \
         . | tee /dev/stderr |
-        yq '.imagePullSecrets[0].name' | tee /dev/stderr)
+        yq -r '.imagePullSecrets[0].name' | tee /dev/stderr)
     [ "$actual" = "my-secret" ]
 }

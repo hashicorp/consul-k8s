@@ -69,7 +69,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -83,7 +83,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.name' | tee /dev/stderr)
+        yq -r '.metadata.name' | tee /dev/stderr)
     [ "$actual" = "inferencegateways.consul.hashicorp.com" ]
 }
 
@@ -93,7 +93,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.group' | tee /dev/stderr)
+        yq -r '.spec.group' | tee /dev/stderr)
     [ "$actual" = "consul.hashicorp.com" ]
 }
 
@@ -103,7 +103,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.scope' | tee /dev/stderr)
+        yq -r '.spec.scope' | tee /dev/stderr)
     [ "$actual" = "Namespaced" ]
 }
 
@@ -113,7 +113,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.names.kind' | tee /dev/stderr)
+        yq -r '.spec.names.kind' | tee /dev/stderr)
     [ "$actual" = "InferenceGateway" ]
 }
 
@@ -123,7 +123,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.names.plural' | tee /dev/stderr)
+        yq -r '.spec.names.plural' | tee /dev/stderr)
     [ "$actual" = "inferencegateways" ]
 }
 
@@ -133,7 +133,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.names.shortNames[0]' | tee /dev/stderr)
+        yq -r '.spec.names.shortNames[0]' | tee /dev/stderr)
     [ "$actual" = "igw" ]
 }
 
@@ -143,7 +143,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.labels.component' | tee /dev/stderr)
+        yq -r '.metadata.labels.component' | tee /dev/stderr)
     [ "$actual" = "crd" ]
 }
 
@@ -153,7 +153,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.labels | has("app")' | tee /dev/stderr)
+        yq -r '.metadata.labels | has("app")' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -163,7 +163,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.metadata.labels | has("release")' | tee /dev/stderr)
+        yq -r '.metadata.labels | has("release")' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -177,7 +177,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].name' | tee /dev/stderr)
     [ "$actual" = "v1alpha1" ]
 }
 
@@ -187,7 +187,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].served' | tee /dev/stderr)
+        yq -r '.spec.versions[0].served' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -197,7 +197,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].storage' | tee /dev/stderr)
+        yq -r '.spec.versions[0].storage' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -211,7 +211,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].subresources | has("status")' | tee /dev/stderr)
+        yq -r '.spec.versions[0].subresources | has("status")' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -221,14 +221,14 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].subresources.scale.specReplicasPath' | tee /dev/stderr)
+        yq -r '.spec.versions[0].subresources.scale.specReplicasPath' | tee /dev/stderr)
     [ "$spec" = ".spec.replicas" ]
 
     local status=$(helm template \
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].subresources.scale.statusReplicasPath' | tee /dev/stderr)
+        yq -r '.spec.versions[0].subresources.scale.statusReplicasPath' | tee /dev/stderr)
     [ "$status" = ".status.readyReplicas" ]
 }
 
@@ -242,7 +242,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Ready") | .name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Ready") | .name' | tee /dev/stderr)
     [ "$actual" = "Ready" ]
 }
 
@@ -252,7 +252,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Synced") | .name' | tee /dev/stderr)
     [ "$actual" = "Synced" ]
 }
 
@@ -262,7 +262,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Pool") | .jsonPath' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Pool") | .jsonPath' | tee /dev/stderr)
     [ "$actual" = ".spec.poolRef.name" ]
 }
 
@@ -272,7 +272,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Age") | .name' | tee /dev/stderr)
+        yq -r '.spec.versions[0].additionalPrinterColumns[] | select(.name == "Age") | .name' | tee /dev/stderr)
     [ "$actual" = "Age" ]
 }
 
@@ -286,7 +286,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["poolRef"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["poolRef"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -296,7 +296,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["replicas"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["replicas"])' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }
 
@@ -306,7 +306,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["resources"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["resources"])' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }
 
@@ -316,7 +316,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["service"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.required | contains(["service"])' | tee /dev/stderr)
     [ "$actual" = "false" ]
 }
 
@@ -326,7 +326,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.service.properties.type.enum | contains(["ClusterIP","NodePort","LoadBalancer"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.service.properties.type.enum | contains(["ClusterIP","NodePort","LoadBalancer"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -336,7 +336,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.service.properties.ports.items.required | contains(["port"])' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.service.properties.ports.items.required | contains(["port"])' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -346,7 +346,7 @@ gw_flags=(
         -s $crd_target \
         "${base_flags[@]}" \
         . | tee /dev/stderr |
-        yq '.spec.versions[0].schema.openAPIV3Schema.properties.status.properties.conditions."x-kubernetes-list-type"' | tee /dev/stderr)
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.status.properties.conditions."x-kubernetes-list-type"' | tee /dev/stderr)
     [ "$actual" = "map" ]
 }
 
@@ -391,7 +391,7 @@ gw_flags=(
         "${gw_flags[@]}" \
         . | tee /dev/stderr |
         yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq 'length > 0' | tee /dev/stderr)
+        yq -r 'length > 0' | tee /dev/stderr)
     [ "$actual" = "true" ]
 }
 
@@ -584,7 +584,7 @@ gw_flags=(
         --set 'ai.inferenceGateway.gateways[0].service.ports[1].port=9001' \
         . | tee /dev/stderr |
         yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '.spec.service.ports | length' | tee /dev/stderr)
+        yq -r '.spec.service.ports | length' | tee /dev/stderr)
     [ "$actual" = "2" ]
 }
 
@@ -640,7 +640,7 @@ gw_flags=(
         --set 'ai.inferenceGateway.gateways[1].name=pool-b' \
         . | tee /dev/stderr |
         yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
-        yq '. | length' | tee /dev/stderr | grep -c '^[0-9]')
+        yq -r '. | length' | tee /dev/stderr | grep -c '^[0-9]')
     # yq emits one integer per document; two documents means two lines
     [ "$actual" = "2" ]
 }
