@@ -3,10 +3,10 @@
 
 // Package cache provides a Consul config-entry cache for the AI gateway
 // controllers. It mirrors the design of api-gateway/cache but is scoped to
-// the ai-gateway config entry kind only.
+// the inference-gateway config entry kind only.
 //
 // The Cache runs a background blocking-query long-poll against Consul.
-// Whenever an ai-gateway entry is created, modified, or deleted out-of-band,
+// Whenever an inference-gateway entry is created, modified, or deleted out-of-band,
 // any registered Subscription receives a controller-runtime GenericEvent so
 // the InferenceGatewayController re-queues a Reconcile — exactly the mechanism
 // used by api-gateway/cache for APIGatewayConfigEntry at
@@ -33,7 +33,7 @@ const (
 	// query blocks for at most this duration before re-connecting.
 	apiTimeout = 5 * time.Minute
 
-	// datacenterMetaKey is the metadata key stamped on every ai-gateway config
+	// datacenterMetaKey is the metadata key stamped on every inference-gateway config
 	// entry by toConsulConfigEntry. Matches api/common.DatacenterKey.
 	datacenterMetaKey = "consul.hashicorp.com/source-datacenter"
 )
@@ -48,7 +48,7 @@ type Config struct {
 	Logger     logr.Logger
 }
 
-// Cache subscribes to and mirrors Consul ai-gateway config entries.
+// Cache subscribes to and mirrors Consul inference-gateway config entries.
 // It exposes a Subscribe method so controllers can receive GenericEvents
 // whenever the Consul-side state diverges from the last known state.
 type Cache struct {
@@ -92,7 +92,7 @@ func (c *Cache) WaitSynced(ctx context.Context) {
 }
 
 // Subscribe registers a Subscription. The returned Subscription's Events()
-// channel receives a GenericEvent each time an ai-gateway config entry
+// channel receives a GenericEvent each time an inference-gateway config entry
 // changes in Consul and the translator maps it to a non-empty NamespacedName.
 //
 // translator is called with each diffed entry and returns the K8s
@@ -143,7 +143,12 @@ func (c *Cache) subscribeToConsul(ctx context.Context) {
 		entries, meta, err := consulClient.ConfigEntries().List(capi.InferenceGateway, opts.WithContext(ctx))
 		if err != nil {
 			if !isLongPollErr(err) {
-				c.logger.Error(err, "error listing ai-gateway config entries")
+				c.logger.Error(err, "error listing inference-gateway config entries")
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(2 * time.Second):
+				}
 			}
 			continue
 		}
@@ -193,7 +198,7 @@ func (c *Cache) updateAndNotify(ctx context.Context, entries []capi.ConfigEntry)
 
 	// Signal initial sync complete (once).
 	c.once.Do(func() {
-		c.logger.Info("consul ai-gateway cache: initial sync complete")
+		c.logger.Info("consul inference-gateway cache: initial sync complete")
 		c.synced <- struct{}{}
 	})
 
@@ -239,7 +244,7 @@ func (c *Cache) notifySubscribers(ctx context.Context, entries []capi.ConfigEntr
 	c.subscribers = live
 }
 
-// Write upserts an ai-gateway config entry in Consul. It skips the Consul
+// Write upserts an inference-gateway config entry in Consul. It skips the Consul
 // call when the locally cached entry already has the same ModifyIndex,
 // mirroring the dedup guard in api-gateway/cache/consul.go:Write.
 func (c *Cache) Write(ctx context.Context, entry capi.ConfigEntry) error {
@@ -267,7 +272,7 @@ func (c *Cache) Write(ctx context.Context, entry capi.ConfigEntry) error {
 	return err
 }
 
-// Delete removes an ai-gateway config entry from Consul. It is a no-op when
+// Delete removes an inference-gateway config entry from Consul. It is a no-op when
 // the entry is absent from the local cache, mirroring the guard in
 // api-gateway/cache/consul.go:Delete to prevent spurious deletes on cold start.
 func (c *Cache) Delete(ctx context.Context, name, namespace, partition string) error {
@@ -276,7 +281,7 @@ func (c *Cache) Delete(ctx context.Context, name, namespace, partition string) e
 	c.mu.RUnlock()
 
 	if !ok {
-		c.logger.Info("ai-gateway cache: entry not found locally, skipping Consul delete", "name", name)
+		c.logger.Info("inference-gateway cache: entry not found locally, skipping Consul delete", "name", name)
 		return nil
 	}
 
@@ -290,14 +295,14 @@ func (c *Cache) Delete(ctx context.Context, name, namespace, partition string) e
 	return err
 }
 
-// Get returns the locally cached ai-gateway config entry for name, or nil.
+// Get returns the locally cached inference-gateway config entry for name, or nil.
 func (c *Cache) Get(name string) capi.ConfigEntry {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.entries[name]
 }
 
-// List returns all locally cached ai-gateway config entries.
+// List returns all locally cached inference-gateway config entries.
 func (c *Cache) List() []capi.ConfigEntry {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

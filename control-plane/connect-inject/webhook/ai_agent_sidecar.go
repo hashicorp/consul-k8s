@@ -141,11 +141,19 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 //     natively so we stat the socket file instead.
 func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *corev1.Probe {
 	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
-		// Parse the port from the addr string e.g. ":21101" → 21101.
+		// Parse the port from the addr string e.g. "127.0.0.1:21101" or ":21101" → 21101.
 		// Fall back to hitlPort if the addr is malformed.
 		port := hitlPort
-		if len(addr) > 1 {
-			if p, err := strconv.ParseInt(addr[1:], 10, 32); err == nil {
+		host, portStr, err := net.SplitHostPort(addr)
+		if err != nil {
+			// addr might be just ":port" or malformed, try splitting with dummy host if needed
+			if h, p, err2 := net.SplitHostPort("127.0.0.1" + addr); err2 == nil {
+				host, portStr, err = h, p, nil
+			}
+		}
+		_ = host
+		if err == nil {
+			if p, parseErr := strconv.ParseInt(portStr, 10, 32); parseErr == nil {
 				port = int32(p)
 			}
 		}

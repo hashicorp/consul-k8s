@@ -619,7 +619,7 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 		// registration; OBO sidecars are not injected for this role.
 		mcpDefaults := v1alpha1.McpServerDefaults{}
 		var mcpCfg v1alpha1.McpServerConfig
-		if err := r.Client.Get(ctx, types.NamespacedName{Name: "consul-mcp-server", Namespace: pod.Namespace}, &mcpCfg); err == nil {
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: "consul-mcp-server"}, &mcpCfg); err == nil {
 			mcpDefaults = mcpCfg.Spec.Defaults
 		} else {
 			r.Log.Info("McpServerConfig not found, using built-in defaults for mcp-server registration",

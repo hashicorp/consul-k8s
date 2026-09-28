@@ -113,6 +113,7 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 			Clientset:              clientset,
 			ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			ImageConsulDataplane:   "dataplane:test",
+			EnableOBO:              true,
 			ImageConsulOBOInbound:  "obo-inbound:test",
 			ImageConsulOBOOutbound: "obo-outbound:test",
 		}
@@ -228,4 +229,78 @@ func injectedContainers(t *testing.T, w MeshWebhook, pod *corev1.Pod) map[string
 		found[c.Name] = c
 	}
 	return found
+}
+
+func TestMCPGatewayReadinessProbe(t *testing.T) {
+	w := &MeshWebhook{}
+
+	tests := []struct {
+		name         string
+		annotations  map[string]string
+		hitlPort     int32
+		expectedPort int32
+		isTCP        bool
+	}{
+		{
+			name:        "uds default",
+			annotations: map[string]string{},
+			hitlPort:    16101,
+			isTCP:       false,
+		},
+		{
+			name: "tcp colon-port",
+			annotations: map[string]string{
+				constants.AnnotationAIAgentAddr: ":21101",
+			},
+			hitlPort:     16101,
+			expectedPort: 21101,
+			isTCP:        true,
+		},
+		{
+			name: "tcp host-port",
+			annotations: map[string]string{
+				constants.AnnotationAIAgentAddr: "127.0.0.1:21101",
+			},
+			hitlPort:     16101,
+			expectedPort: 21101,
+			isTCP:        true,
+		},
+		{
+			name: "tcp ipv6 host-port",
+			annotations: map[string]string{
+				constants.AnnotationAIAgentAddr: "[::1]:21101",
+			},
+			hitlPort:     16101,
+			expectedPort: 21101,
+			isTCP:        true,
+		},
+		{
+			name: "malformed addr falls back to hitlPort",
+			annotations: map[string]string{
+				constants.AnnotationAIAgentAddr: "invalid-addr",
+			},
+			hitlPort:     16101,
+			expectedPort: 16101,
+			isTCP:        true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: tc.annotations,
+				},
+			}
+			probe := w.mcpGatewayReadinessProbe(pod, tc.hitlPort)
+			require.NotNil(t, probe)
+			if tc.isTCP {
+				require.NotNil(t, probe.TCPSocket)
+				require.Equal(t, int(tc.expectedPort), probe.TCPSocket.Port.IntValue())
+			} else {
+				require.NotNil(t, probe.Exec)
+				require.Equal(t, []string{"test", "-S", mcpGatewayUDSPath}, probe.Exec.Command)
+			}
+		})
+	}
 }

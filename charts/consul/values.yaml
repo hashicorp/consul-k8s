@@ -3894,7 +3894,7 @@ ai:
   #     are not created.
   #   - The connect-inject controller does NOT start the InferenceModelConfig watcher.
   # @type: boolean
-  enabled: true
+  enabled: false
 
   inferenceModel:
     defaults:

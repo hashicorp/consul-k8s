@@ -257,6 +257,11 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			setupLog.Error(err, "unable to create controller", "controller", "InferencePoolConfig")
 			return err
 		}
+		defaultResources, err := c.inferenceGatewayDefaultResources()
+		if err != nil {
+			setupLog.Error(err, "invalid AI inference gateway default resource flag")
+			return err
+		}
 		if err := (&aicontrollers.InferenceGatewayController{
 			Client:                 mgr.GetClient(),
 			Log:                    ctrl.Log.WithName("controller").WithName("inference-gateway"),
@@ -265,7 +270,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			DataplaneImage:         c.flagConsulDataplaneImage,
 			ConsulK8SImage:         c.flagConsulK8sImage,
 			DefaultService:         c.inferenceGatewayDefaultService(),
-			DefaultResources:       c.inferenceGatewayDefaultResources(),
+			DefaultResources:       defaultResources,
 			ConsulClientConfig:     consulConfig,
 			ConsulServerConnMgr:    watcher,
 			ConsulAddress:          c.consul.Addresses,
@@ -779,21 +784,38 @@ func (c *Command) inferenceGatewayDefaultService() v1alpha1.InferenceGatewayServ
 // InferenceGatewayController from the CLI flags that mirror
 // ai.inferenceGateway.defaults.resources in values.yaml.
 // Any flag left empty is omitted from the resource list.
-func (c *Command) inferenceGatewayDefaultResources() v1.ResourceRequirements {
+// Returns an error if any flag value is not a valid Kubernetes resource quantity.
+func (c *Command) inferenceGatewayDefaultResources() (v1.ResourceRequirements, error) {
 	req := v1.ResourceList{}
 	lim := v1.ResourceList{}
 
 	if c.flagAIInferenceGatewayDefaultCPURequest != "" {
-		req[v1.ResourceCPU] = resource.MustParse(c.flagAIInferenceGatewayDefaultCPURequest)
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultCPURequest)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-cpu-request %q: %w", c.flagAIInferenceGatewayDefaultCPURequest, err)
+		}
+		req[v1.ResourceCPU] = q
 	}
 	if c.flagAIInferenceGatewayDefaultMemRequest != "" {
-		req[v1.ResourceMemory] = resource.MustParse(c.flagAIInferenceGatewayDefaultMemRequest)
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultMemRequest)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-mem-request %q: %w", c.flagAIInferenceGatewayDefaultMemRequest, err)
+		}
+		req[v1.ResourceMemory] = q
 	}
 	if c.flagAIInferenceGatewayDefaultCPULimit != "" {
-		lim[v1.ResourceCPU] = resource.MustParse(c.flagAIInferenceGatewayDefaultCPULimit)
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultCPULimit)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-cpu-limit %q: %w", c.flagAIInferenceGatewayDefaultCPULimit, err)
+		}
+		lim[v1.ResourceCPU] = q
 	}
 	if c.flagAIInferenceGatewayDefaultMemLimit != "" {
-		lim[v1.ResourceMemory] = resource.MustParse(c.flagAIInferenceGatewayDefaultMemLimit)
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultMemLimit)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-mem-limit %q: %w", c.flagAIInferenceGatewayDefaultMemLimit, err)
+		}
+		lim[v1.ResourceMemory] = q
 	}
 
 	res := v1.ResourceRequirements{}
@@ -803,5 +825,5 @@ func (c *Command) inferenceGatewayDefaultResources() v1.ResourceRequirements {
 	if len(lim) > 0 {
 		res.Limits = lim
 	}
-	return res
+	return res, nil
 }

@@ -537,8 +537,8 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		if w.ImageAIAgent != "" {
 			// Port and resource defaults are resolved with a 3-level precedence:
 			//   1. consul.hashicorp.com/ai-agent-config annotation — names a custom
-			//      AgentConfig object in the pod's namespace; use when a team needs
-			//      settings that differ from the cluster default.
+			//      AgentConfig object; use when a team needs settings that differ
+			//      from the cluster default.
 			//   2. "consul-ai-agent" AgentConfig object — the cluster-wide default
 			//      installed by Helm; always present when ai.enabled=true.
 			//   3. Per-pod annotations (e.g. consul.hashicorp.com/ai-agent-hitl-port)
@@ -554,11 +554,11 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 				}
 
 				var agentCfg v1alpha1.AgentConfig
-				if err := w.Client.Get(ctx, client.ObjectKey{Name: configName, Namespace: req.Namespace}, &agentCfg); err == nil {
+				if err := w.Client.Get(ctx, client.ObjectKey{Name: configName}, &agentCfg); err == nil {
 					agentDefaults = agentCfg.Spec.Defaults
 				} else {
 					w.Log.Info("AgentConfig not found, continuing with zero defaults; per-pod annotations or built-in constants will apply",
-						"name", configName, "namespace", req.Namespace)
+						"name", configName)
 				}
 			}
 			agentContainer := w.aiAgentSidecar(pod, agentDefaults)
