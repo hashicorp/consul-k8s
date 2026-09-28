@@ -623,9 +623,7 @@ func TestConnectInject_MultiportConversionFromPriorRelease(t *testing.T) {
 	require.NotEqual(t, cfg.ConsulK8SImage, injectorImage,
 		"the starting cluster must run the released image, not the locally built one")
 	require.NotContains(t, injectorArgs, "-disable-multiport-registration",
-		"the starting chart must predate the gate, but the injector installed from chart %s has it; "+
-			"the running image is %s, which names the chart that was actually installed",
-		multiportPriorReleaseChartVersion, injectorImage)
+		"the starting chart must predate the gate")
 
 	appNamespace := multiportGateTestAppNamespace(t, cfg, ctx)
 	appOpts := ctx.KubectlOptionsForNamespace(appNamespace)
