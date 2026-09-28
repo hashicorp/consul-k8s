@@ -3748,6 +3748,8 @@ terminatingGateways:
     credentialInjection:
       # Enabled controls whether the credential processor and Vault Agent
       # sidecars are added to the terminating gateway deployment.
+      # Credential injection is not supported on OpenShift: rendering fails if
+      # this is true while `global.openshift.enabled` is true.
       enabled: false
 
       # Source selects the credential delivery mechanism: "vault" (default) runs

@@ -1063,6 +1063,12 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		Containers:                    []corev1.Container{mainContainer},
 	}
 
+	// Credential injection is not supported on OpenShift; reject it before
+	// creating the workload rather than rendering an unsupported pod.
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled && helmConfigValues.Global.OpenShiftEnabled {
+		return nil, fmt.Errorf("credentialInjection is not supported on OpenShift (global.openshift.enabled=true)")
+	}
+
 	// Reject an incomplete credential-injection config before creating the
 	// workload; never infer a default credential.
 	if err := validateCredentialInjectionWorkload(termGW.Spec.Deployment.CredentialInjection, termGW.Spec.Services, termGW.Spec.Deployment.EnableDeployment); err != nil {
@@ -1081,7 +1087,6 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		termGW.Spec.Deployment.CredentialInjection,
 		imagePullPolicy,
 		logLevel,
-		helmConfigValues.Global.OpenShiftEnabled,
 		helmConfigValues.Global.ACLs.ManageSystemACLs,
 		vaultInjectorEnabled,
 	)

@@ -4,13 +4,18 @@
 package configentries
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
 )
 
 // TestTerminatingGatewayCredentialPod asserts the controller's credential
@@ -36,7 +41,7 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", false, true, false)
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", true, false)
 
 	// Envoy (main container) gets only the socket mount and the Consul-login
 	// token, never credentials/token-sink/Vault token.
@@ -59,20 +64,24 @@ func TestTerminatingGatewayCredentialPod(t *testing.T) {
 	// via the pod fsGroup instead.
 	require.False(t, hasContainer(podSpec.InitContainers, "camp-auth-socket-init"))
 
-	// Vault Agent init: hardened non-root (no pinned UID/GID so an OpenShift
-	// assigned UID works), exits after auth, read-only token mount.
+	// Vault Agent init: hardened non-root, pinned to the image's non-root vault
+	// UID, exits after auth, read-only token mount, and loads the
+	// Vault CA as a single file (VAULT_CACERT), not a directory (VAULT_CAPATH).
 	ai := containerByName(t, podSpec.InitContainers, "camp-vault-agent-init")
 	require.Contains(t, ai.Args, "-exit-after-auth")
 	require.Equal(t, ptr.To(true), ai.SecurityContext.RunAsNonRoot)
-	require.Nil(t, ai.SecurityContext.RunAsUser)
+	require.Equal(t, ptr.To(campVaultAgentUID), ai.SecurityContext.RunAsUser)
 	require.Nil(t, ai.SecurityContext.RunAsGroup)
 	require.True(t, mountReadOnly(ai, campVaultTokenVolume))
+	require.Contains(t, ai.Env, corev1.EnvVar{Name: "VAULT_CACERT", Value: "/consul/vault-ca/ca.crt"})
+	require.NotContains(t, envNames(ai), "VAULT_CAPATH")
 
 	// Vault Agent sidecar runs continuously (no exit-after-auth).
 	as := containerByName(t, podSpec.Containers, "camp-vault-agent")
 	require.NotContains(t, as.Args, "-exit-after-auth")
 	require.Equal(t, ptr.To(true), as.SecurityContext.RunAsNonRoot)
-	require.Nil(t, as.SecurityContext.RunAsUser)
+	require.Equal(t, ptr.To(campVaultAgentUID), as.SecurityContext.RunAsUser)
+	require.Contains(t, as.Env, corev1.EnvVar{Name: "VAULT_CACERT", Value: "/consul/vault-ca/ca.crt"})
 	require.False(t, hasMount(as, campConsulAuthTokenVolume), "vault agent must not mount the Consul-login token")
 
 	// Processor: non-root, read-only creds, writable socket, no token/token-sink,
@@ -120,8 +129,8 @@ func TestTerminatingGatewayCredentialPodDisabled(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 	// nil and disabled are both no-ops.
-	applyTerminatingGatewayCredentialInjection(&podSpec, nil, corev1.PullIfNotPresent, "info", false, true, false)
-	applyTerminatingGatewayCredentialInjection(&podSpec, &consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, corev1.PullIfNotPresent, "info", false, true, false)
+	applyTerminatingGatewayCredentialInjection(&podSpec, nil, corev1.PullIfNotPresent, "info", true, false)
+	applyTerminatingGatewayCredentialInjection(&podSpec, &consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, corev1.PullIfNotPresent, "info", true, false)
 	require.Len(t, podSpec.Containers, 1)
 	require.Len(t, podSpec.InitContainers, 1)
 	require.Empty(t, podSpec.Volumes)
@@ -147,9 +156,9 @@ func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
 		Containers:     []corev1.Container{{Name: "terminating-gateway"}},
 	}
 
-	// OpenShift + ACLs disabled: fsGroup is omitted (SCC-assigned) and no
-	// Consul-login token volume is projected, but automount is still disabled.
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", true, false, false)
+	// ACLs disabled: no Consul-login token volume is projected, but automount is
+	// still disabled.
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", false, false)
 
 	// No Vault Agent containers in either init or main containers.
 	for _, n := range []string{"camp-vault-agent", "camp-vault-agent-init"} {
@@ -178,8 +187,9 @@ func TestTerminatingGatewayCredentialPodKubernetesSecret(t *testing.T) {
 	require.True(t, hasMount(envoy, campAuthSocketVolume))
 	require.False(t, hasMount(envoy, campVaultRenderedVolume))
 
-	// On OpenShift the fsGroup is omitted so the SCC can assign the shared group.
-	require.Nil(t, podSpec.SecurityContext)
+	// Shared fsGroup is set for every credential source.
+	require.NotNil(t, podSpec.SecurityContext)
+	require.Equal(t, ptr.To(campCredentialFSGroup), podSpec.SecurityContext.FSGroup)
 	require.NotNil(t, podSpec.TerminationGracePeriodSeconds)
 
 	// Automount is disabled, but with ACLs disabled no Consul-login token is
@@ -211,7 +221,7 @@ func TestTerminatingGatewayCredentialPodVaultInjectorToken(t *testing.T) {
 	}
 
 	// aclsEnabled=false, vaultAgentInjectorEnabled=true.
-	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", false, false, true)
+	applyTerminatingGatewayCredentialInjection(&podSpec, ci, corev1.PullIfNotPresent, "info", false, true)
 
 	require.NotNil(t, podSpec.AutomountServiceAccountToken)
 	require.False(t, *podSpec.AutomountServiceAccountToken)
@@ -224,6 +234,90 @@ func TestTerminatingGatewayCredentialPodVaultInjectorToken(t *testing.T) {
 	baseInit := containerByName(t, podSpec.InitContainers, "terminating-gateway-init")
 	require.False(t, hasMount(envoy, campConsulAuthTokenVolume))
 	require.False(t, hasMount(baseInit, campConsulAuthTokenVolume))
+}
+
+// TestConstructDeploymentFromCRDCredentialInjectionOpenShift asserts credential
+// injection is rejected on OpenShift (unsupported) while a gateway without it
+// still builds unchanged there.
+func TestConstructDeploymentFromCRDCredentialInjectionOpenShift(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, consulv1alpha1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	r := &TerminatingGatewayController{Scheme: scheme}
+
+	helmValues := func(openShift bool) *helmvalues.HelmValues {
+		return &helmvalues.HelmValues{
+			Global: helmvalues.GlobalConfig{
+				Name:                 "consul",
+				Datacenter:           "dc1",
+				ImageK8S:             "hashicorp/consul-k8s-control-plane:1.0.0",
+				ImageConsulDataplane: "hashicorp/consul-dataplane:1.0.0",
+				ImagePullPolicy:      "IfNotPresent",
+				OpenShiftEnabled:     openShift,
+			},
+			Release: helmvalues.ReleaseConfig{Name: "consul", Namespace: "consul", Service: "Helm"},
+		}
+	}
+	termGW := func(ci *consulv1alpha1.TerminatingGatewayCredentialInjection) *consulv1alpha1.TerminatingGateway {
+		return &consulv1alpha1.TerminatingGateway{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-gateway", Namespace: "consul"},
+			Spec: consulv1alpha1.TerminatingGatewaySpec{
+				Services: []consulv1alpha1.LinkedService{{Name: "external-api"}},
+				Deployment: consulv1alpha1.TerminatingGatewayDeploymentSpec{
+					GatewayName:         "terminating-gateway",
+					LogLevel:            "info",
+					LogJSON:             ptr.To(false),
+					EnableDeployment:    ptr.To(true),
+					CredentialInjection: ci,
+				},
+			},
+		}
+	}
+	enabledCI := &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:             true,
+		ProcessorImage:      "camp-auth-processor:test",
+		VaultAgentImage:     "hashicorp/vault:test",
+		ProcessorConfigMap:  "camp-proc",
+		VaultAgentConfigMap: "camp-agent",
+		VaultAddress:        "https://vault:8200",
+		TokenAudience:       "vault",
+	}
+
+	// Enabled on OpenShift: rejected, no workload built.
+	deployment, err := r.constructDeploymentFromCRD(termGW(enabledCI), helmValues(true))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not supported on OpenShift")
+	require.Nil(t, deployment)
+
+	// The same config off OpenShift is accepted.
+	deployment, err = r.constructDeploymentFromCRD(termGW(enabledCI), helmValues(false))
+	require.NoError(t, err)
+	require.True(t, hasContainer(deployment.Spec.Template.Spec.Containers, "camp-auth-processor"))
+
+	// Disabled or unset on OpenShift: the gateway builds with no credential
+	// injection projection.
+	for _, ci := range []*consulv1alpha1.TerminatingGatewayCredentialInjection{nil, {Enabled: false}} {
+		deployment, err = r.constructDeploymentFromCRD(termGW(ci), helmValues(true))
+		require.NoError(t, err)
+		spec := deployment.Spec.Template.Spec
+		require.Len(t, spec.Containers, 1)
+		require.Len(t, spec.InitContainers, 1)
+		require.Nil(t, spec.AutomountServiceAccountToken)
+		for _, v := range spec.Volumes {
+			require.Falsef(t, strings.HasPrefix(v.Name, "camp-"), "unexpected credential volume %q", v.Name)
+		}
+		if spec.SecurityContext != nil {
+			require.Nil(t, spec.SecurityContext.FSGroup)
+		}
+	}
+}
+
+func envNames(c corev1.Container) []string {
+	names := make([]string, 0, len(c.Env))
+	for _, e := range c.Env {
+		names = append(names, e.Name)
+	}
+	return names
 }
 
 func containerByName(t *testing.T, containers []corev1.Container, name string) corev1.Container {

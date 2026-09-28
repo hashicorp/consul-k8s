@@ -50,6 +50,7 @@
 {{- /* Fail fast on an incomplete/invalid enabled config (Helm renders without
        CRD/controller validation), mirroring the controller-side checks. */ -}}
 {{- if and $ci $ci.enabled }}
+{{- if $root.Values.global.openshift.enabled }}{{ fail (printf "terminatingGateways[%s].credentialInjection is not supported on OpenShift (global.openshift.enabled=true)" .name) }}{{ end }}
 {{- include "consul.validateTerminatingGatewayCredentialInjection" (dict "ci" $ci "name" .name) }}
 {{- end }}
 apiVersion: apps/v1
@@ -169,15 +170,11 @@ spec:
       topologySpreadConstraints:
         {{ tpl (default $defaults.topologySpreadConstraints .topologySpreadConstraints) $root | nindent 8 | trim }}
       {{- end }}
-      {{- if and $ci $ci.enabled (not $root.Values.global.openshift.enabled) }}
+      {{- if and $ci $ci.enabled }}
       # Shared fsGroup so the kubelet group-owns the ext_proc socket and rendered
       # credential volumes (with the setgid bit); no privileged root init
       # container is required. Every container joins this group, so Envoy (a
       # group member) can reach the processor's socket.
-      #
-      # On OpenShift the fsGroup is intentionally omitted: the restricted-v2 SCC
-      # uses a MustRunAs range allocated per namespace, so a fixed group would be
-      # rejected. The SCC injects an allowed shared group instead.
       securityContext:
         fsGroup: 10001
       {{- end }}

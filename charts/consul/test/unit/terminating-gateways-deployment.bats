@@ -1716,12 +1716,13 @@ key2: value2' \
   [ "$(echo "$c" | yq -r '.image')" = "hashicorp/vault:1.15" ]
   [ "$(echo "$c" | yq -r '.args | contains(["-exit-after-auth"])')" = "true" ]
   [ "$(echo "$c" | yq -r '.securityContext.runAsNonRoot')" = "true" ]
-  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "null" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "100" ]
   [ "$(echo "$c" | yq -r '.securityContext.runAsGroup')" = "null" ]
   [ "$(echo "$c" | yq -r '.securityContext.readOnlyRootFilesystem')" = "true" ]
   [ "$(echo "$c" | yq -r '.securityContext.allowPrivilegeEscalation')" = "false" ]
   [ "$(echo "$c" | yq -r '.env | map(.name) | contains(["VAULT_ADDR"])')" = "true" ]
-  [ "$(echo "$c" | yq -r '.env | map(.name) | contains(["VAULT_CAPATH"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.env[] | select(.name=="VAULT_CACERT").value')" = "/consul/vault-ca/ca.crt" ]
+  [ "$(echo "$c" | yq -r '.env | map(.name) | contains(["VAULT_CAPATH"])')" = "false" ]
   [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-vault-token").readOnly')" = "true" ]
   [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-rendered"])')" = "true" ]
   [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-agent-private"])')" = "true" ]
@@ -1742,7 +1743,86 @@ key2: value2' \
   [ "$(echo "$c" | yq -r '.image')" = "hashicorp/vault:1.15" ]
   [ "$(echo "$c" | yq -r '.args | contains(["-exit-after-auth"])')" = "false" ]
   [ "$(echo "$c" | yq -r '.securityContext.runAsNonRoot')" = "true" ]
-  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "null" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "100" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection fails on OpenShift" {
+  cd `chart_dir`
+  run helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.openshift.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "terminatingGateways[terminating-gateway].credentialInjection is not supported on OpenShift" ]]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection enabled on a single gateway fails on OpenShift" {
+  cd `chart_dir`
+  run helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.openshift.enabled=true \
+      --set 'terminatingGateways.gateways[0].name=plain' \
+      --set 'terminatingGateways.gateways[1].name=ci' \
+      --set 'terminatingGateways.gateways[1].credentialInjection.enabled=true' \
+      --set 'terminatingGateways.gateways[1].credentialInjection.source=kubernetesSecret' \
+      --set 'terminatingGateways.gateways[1].credentialInjection.secretName=camp-creds' \
+      --set 'terminatingGateways.gateways[1].credentialInjection.processorImage=camp-auth-processor:test' \
+      --set 'terminatingGateways.gateways[1].credentialInjection.processorConfigMap=camp-proc' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "terminatingGateways[ci].credentialInjection is not supported on OpenShift" ]]
+}
+
+@test "terminatingGateways/Deployment: OpenShift without credentialInjection renders no credential-injection projection" {
+  cd `chart_dir`
+  local spec=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.openshift.enabled=true \
+      --set global.acls.manageSystemACLs=true \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec' | tee /dev/stderr)
+  [ "$(echo "$spec" | yq -r '[.initContainers[], .containers[]] | map(select(.name | startswith("camp-"))) | length')" = "0" ]
+  [ "$(echo "$spec" | yq -r '.volumes | map(select((.name | startswith("camp-")) or .name == "consul-auth-method-sa-token")) | length')" = "0" ]
+  [ "$(echo "$spec" | yq -r '.securityContext')" = "null" ]
+  [ "$(echo "$spec" | yq -r '.automountServiceAccountToken')" = "null" ]
+  [ "$(echo "$spec" | yq -r '.terminationGracePeriodSeconds')" = "10" ]
+}
+
+# The controller renders the same pod via applyTerminatingGatewayCredentialInjection;
+# both sides compare against one golden file so Helm/controller drift fails CI.
+# Inputs and the jq normalization must match
+# TestTerminatingGatewayCredentialPodHelmParity in
+# control-plane/controllers/configentries/terminatinggateway_credentials_parity_test.go.
+@test "terminatingGateways/Deployment: credentialInjection controller and Helm render the same pod" {
+  cd `chart_dir`
+  local golden="../../control-plane/controllers/configentries/testdata/terminating-gateway-credential-injection-parity.golden.json"
+  local norm='{containers: [((.initContainers // []) + (.containers // []))[] | select(.name | startswith("camp-")) | .env = ((.env // []) | sort_by(.name)) | .volumeMounts = ((.volumeMounts // []) | sort_by(.name)) | .resources = (.resources // {})], volumes: ([(.volumes // [])[] | select((.name | startswith("camp-")) or .name == "consul-auth-method-sa-token")] | sort_by(.name)), securityContext, terminationGracePeriodSeconds, automountServiceAccountToken} | with_entries(select(.value != null))'
+  local ci="terminatingGateways.defaults.credentialInjection"
+  local args="-s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set global.acls.manageSystemACLs=true \
+      --set global.imagePullPolicy=IfNotPresent \
+      --set ${ci}.enabled=true \
+      --set ${ci}.processorImage=camp-auth-processor:parity \
+      --set ${ci}.vaultAgentImage=hashicorp/vault:parity \
+      --set ${ci}.processorConfigMap=camp-proc \
+      --set ${ci}.vaultAgentConfigMap=camp-agent \
+      --set ${ci}.vaultAddress=https://vault:8200 \
+      --set ${ci}.vaultCAConfigMap=camp-ca \
+      --set ${ci}.vaultNamespace=camp \
+      --set ${ci}.tokenAudience=vault \
+      --set ${ci}.tokenExpirationSeconds=600 \
+      --set ${ci}.drainSeconds=45"
+
+  local def=$(helm template ${args} . | yq -s ".[0].spec.template.spec | ${norm}")
+
+  diff <(jq -S . "${golden}") <(echo "${def}" | jq -S .) >&2
 }
 
 @test "terminatingGateways/Deployment: credentialInjection adds private token-sink and config volumes" {
@@ -1870,23 +1950,6 @@ key2: value2' \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
       . | tee /dev/stderr | yq -s '.[0].spec.template.spec.securityContext' | tee /dev/stderr)
   [ "$(echo "$sc" | yq -r '.fsGroup')" = "10001" ]
-}
-
-@test "terminatingGateways/Deployment: credentialInjection omits fixed fsGroup on OpenShift" {
-  cd `chart_dir`
-  local sc=$(helm template -s templates/terminating-gateways-deployment.yaml \
-      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set global.openshift.enabled=true \
-      --set terminatingGateways.defaults.credentialInjection.enabled=true \
-      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
-      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
-      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
-      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
-      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
-      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
-      . | tee /dev/stderr | yq -s -r '.[0].spec.template.spec.securityContext' | tee /dev/stderr)
-  # On OpenShift the SCC assigns the shared group; the pod must not pin fsGroup.
-  [ "$sc" = "null" ]
 }
 
 @test "terminatingGateways/Deployment: credentialInjection disables SA-token automount and isolates it from Envoy/processor" {
