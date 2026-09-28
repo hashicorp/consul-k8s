@@ -153,6 +153,14 @@ type InferenceGatewayController struct {
 	// config entry so ownership can be asserted at delete time.
 	Datacenter string
 
+	// AuthMethod is the Consul ACL auth method used for Kubernetes service
+	// account login (e.g. "consul-k8s-auth-method"). When non-empty, the
+	// controller creates a ServiceAccount named after the gateway, injects
+	// CONSUL_LOGIN_* into connect-init, and passes -credential-type=login to
+	// consul-dataplane — matching the mesh webhook for injected workloads.
+	// Empty when ACLs are disabled.
+	AuthMethod string
+
 	// cache is the Consul ai-gateway long-poll cache. Initialised by
 	// SetupWithManager; used to detect out-of-band Consul mutations.
 	cache *igwcache.Cache
@@ -164,6 +172,7 @@ type InferenceGatewayController struct {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=inferencepoolconfigs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 
 func (r *InferenceGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("inferenceGateway", req.NamespacedName)
@@ -278,7 +287,16 @@ func (r *InferenceGatewayController) Reconcile(ctx context.Context, req ctrl.Req
 		"poolEnabled", pool.Spec.Enabled,
 	)
 
-	// ── 4. Reconcile the Deployment ───────────────────────────────────────────
+	// ── 4. Reconcile ServiceAccount (ACL login) then Deployment ───────────────
+	// When ACLs are enabled the gateway pod must login with a Kubernetes SA
+	// whose name matches the Consul service identity (binding rule BindName).
+	if err := r.reconcileServiceAccount(ctx, igw); err != nil {
+		log.Error(err, "failed to reconcile ServiceAccount")
+		r.Recorder.Eventf(igw, corev1.EventTypeWarning, eventReasonSyncFailed,
+			"failed to reconcile ServiceAccount: %v", err)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
+	}
+
 	if err := r.reconcileDeployment(ctx, igw, pool); err != nil {
 		log.Error(err, "failed to reconcile Deployment")
 		r.Recorder.Eventf(igw, corev1.EventTypeWarning, eventReasonSyncFailed,
@@ -702,6 +720,8 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		tlsEnabled:    r.ConsulTLSEnabled,
 		caCert:        r.ConsulCACert,
 		tlsServerName: r.ConsulTLSServerName,
+		authMethod:    r.AuthMethod,
+		partition:     r.ConsulPartition,
 	})
 	if err := controllerutil.SetControllerReference(igw, desired, r.Client.Scheme()); err != nil {
 		return fmt.Errorf("setting owner reference on Deployment: %w", err)
@@ -721,9 +741,10 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		return fmt.Errorf("getting Deployment %q: %w", desired.Name, err)
 	}
 
-	// Patch mutable fields: init containers, containers, volumes, replicas, and labels.
+	// Patch mutable fields: init containers, containers, volumes, replicas, SA, and labels.
 	patch := client.MergeFrom(existing.DeepCopy())
 	existing.Spec.Replicas = desired.Spec.Replicas
+	existing.Spec.Template.Spec.ServiceAccountName = desired.Spec.Template.Spec.ServiceAccountName
 	existing.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 	existing.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 	existing.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
@@ -732,6 +753,46 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		return fmt.Errorf("patching Deployment %q: %w", existing.Name, err)
 	}
 	log.Info("Deployment reconciled", "deployment", existing.Name)
+	return nil
+}
+
+// reconcileServiceAccount ensures a ServiceAccount named after the gateway exists
+// when ACLs are enabled (AuthMethod non-empty). The workload auth-method binding
+// rule uses BindName=${serviceaccount.name}, so the SA name must match the Consul
+// service identity (igw.Name). When ACLs are disabled this is a no-op.
+func (r *InferenceGatewayController) reconcileServiceAccount(
+	ctx context.Context,
+	igw *v1alpha1.InferenceGateway,
+) error {
+	if r.AuthMethod == "" {
+		return nil
+	}
+
+	log := r.Log.WithValues("inferenceGateway", igw.Name, "namespace", igw.Namespace)
+	desired := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      igw.Name,
+			Namespace: igw.Namespace,
+			Labels:    gatewayLabels(igw),
+		},
+	}
+	if err := controllerutil.SetControllerReference(igw, desired, r.Client.Scheme()); err != nil {
+		return fmt.Errorf("setting owner reference on ServiceAccount: %w", err)
+	}
+
+	existing := &corev1.ServiceAccount{}
+	key := types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}
+	err := r.Client.Get(ctx, key, existing)
+	if k8serrors.IsNotFound(err) {
+		log.Info("creating ServiceAccount", "serviceAccount", desired.Name)
+		if err := r.Client.Create(ctx, desired); err != nil {
+			return fmt.Errorf("creating ServiceAccount %q: %w", desired.Name, err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("getting ServiceAccount %q: %w", desired.Name, err)
+	}
 	return nil
 }
 
@@ -797,7 +858,11 @@ type deploymentConsulConfig struct {
 	tlsEnabled    bool
 	caCert        string // PEM CA cert (when TLS enabled)
 	tlsServerName string // SNI name (when TLS enabled)
+	authMethod    string // Consul ACL auth method; empty when ACLs disabled
+	partition     string // Consul admin partition (Enterprise); empty for OSS
 }
+
+const bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 // initContainerFor builds the connect-init init container for an InferenceGateway
 // pod. It mirrors what the mesh webhook does for regular workloads in container_init.go:
@@ -843,6 +908,19 @@ func initContainerFor(igw *v1alpha1.InferenceGateway, image string, cc deploymen
 			corev1.EnvVar{Name: constants.TLSServerNameEnvVar, Value: cc.tlsServerName},
 		)
 	}
+	if cc.authMethod != "" {
+		env = append(env,
+			corev1.EnvVar{Name: "CONSUL_LOGIN_AUTH_METHOD", Value: cc.authMethod},
+			corev1.EnvVar{Name: "CONSUL_LOGIN_BEARER_TOKEN_FILE", Value: bearerTokenFile},
+			corev1.EnvVar{Name: "CONSUL_LOGIN_META", Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)"},
+		)
+		if cc.partition != "" {
+			env = append(env, corev1.EnvVar{Name: "CONSUL_LOGIN_PARTITION", Value: cc.partition})
+		}
+	}
+	if cc.partition != "" {
+		env = append(env, corev1.EnvVar{Name: "CONSUL_PARTITION", Value: cc.partition})
+	}
 	return corev1.Container{
 		Name:  "connect-init",
 		Image: image,
@@ -882,6 +960,16 @@ func dataplaneArgsFor(cc deploymentConsulConfig) []string {
 		"-xds-bind-addr=127.0.0.1",
 		"-graceful-addr=127.0.0.1",
 		"-graceful-port=20600",
+	}
+	if cc.authMethod != "" {
+		args = append(args,
+			"-credential-type=login",
+			"-login-auth-method="+cc.authMethod,
+			"-login-bearer-token-path="+bearerTokenFile,
+		)
+		if cc.partition != "" {
+			args = append(args, "-login-partition="+cc.partition)
+		}
 	}
 	if cc.tlsEnabled {
 		if cc.tlsServerName != "" {
@@ -938,6 +1026,131 @@ func deploymentFor(
 		replicas = *igw.Spec.Replicas
 	}
 
+	podSpec := corev1.PodSpec{
+		// connect-init writes the proxy-id to /consul/service/proxy-id
+		// so that consul-dataplane can bootstrap Envoy from Consul xDS.
+		InitContainers: []corev1.Container{initContainerFor(igw, consulK8SImage, cc)},
+		Containers: []corev1.Container{
+			{
+				// consul-dataplane boots Envoy from the proxy-id written by connect-init.
+				// This is the primary process and runs as the inference-gateway proxy type.
+				Name:    "consul-dataplane",
+				Image:   dataplaneImage,
+				Command: []string{"consul-dataplane"},
+				Args:    dataplaneArgsFor(cc),
+				Env: []corev1.EnvVar{
+					{
+						Name: "NODE_NAME",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+						},
+					},
+					{
+						Name:  "DP_SERVICE_NODE_NAME",
+						Value: "$(NODE_NAME)-virtual",
+					},
+					{
+						Name: "POD_NAME",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+						},
+					},
+					{
+						Name: "POD_NAMESPACE",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+						},
+					},
+					{
+						Name: "HOST_IP",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+						},
+					},
+					{
+						// consul-dataplane has readOnlyRootFilesystem:true so it needs
+						// TMPDIR to point at a writable volume. run-consul is already
+						// mounted read-write on this container.
+						Name:  "TMPDIR",
+						Value: "/run/consul",
+					},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						// Read-only: consul-dataplane only reads the proxy-id written
+						// by connect-init; it never writes to this volume.
+						Name:      "consul-service",
+						MountPath: "/consul/service",
+						ReadOnly:  true,
+					},
+					{
+						// Envoy needs the UDS directory to reach the ext_proc sidecar.
+						Name:      "run-consul",
+						MountPath: "/run/consul",
+					},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					AllowPrivilegeEscalation: boolPtr(false),
+					ReadOnlyRootFilesystem:   boolPtr(true),
+					RunAsNonRoot:             boolPtr(true),
+					Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+				},
+			},
+			{
+				// inference-gateway is the ext_proc sidecar that Envoy calls over UDS.
+				// It only handles LLM request/response processing — it does not run Envoy.
+							Name:  "inference-gateway",
+				Image: gatewayImage,
+				// Flags must match consul-inference-gateway CLI (ai-apps): -config-entry
+				// and -consul-http-addr were removed — Consul/xDS owns config; this
+				// process only serves ext_proc on the shared UDS.
+				Args: []string{
+					"-uds-path=/run/consul/ext_proc.sock",
+					"-log-level=$(CONSUL_IGW_LOG_LEVEL)",
+				},
+				Ports: []corev1.ContainerPort{
+					{Name: "metrics", ContainerPort: inferenceGatewayMetricsPort, Protocol: corev1.ProtocolTCP},
+				},
+				Env: []corev1.EnvVar{
+					{Name: "POOL_NAME", Value: pool.Name},
+					{Name: "POOL_NAMESPACE", Value: pool.Namespace},
+					// Log level for the inference-gateway process.
+					// Set via spec.logLevel on the InferenceGateway CR.
+					// Valid values: debug, info, warn, error (default: info).
+					{Name: "CONSUL_IGW_LOG_LEVEL", Value: logLevel},
+				},
+				Resources: resources,
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "run-consul",
+					MountPath: "/run/consul",
+				}},
+			},
+		},
+		Volumes: []corev1.Volume{
+			{
+				// proxy-id file shared between connect-init and consul-dataplane.
+				Name: "consul-service",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
+				},
+			},
+			{
+				// UDS socket directory shared between consul-dataplane (Envoy) and
+				// the inference-gateway ext_proc sidecar.
+				Name: "run-consul",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		},
+	}
+	// When ACLs are enabled the pod must use a dedicated SA (not "default") so the
+	// consul-k8s-auth-method binding rule (serviceaccount.name!=default) applies and
+	// BindName=${serviceaccount.name} yields the Consul service identity.
+	if cc.authMethod != "" {
+		podSpec.ServiceAccountName = igw.Name
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      igw.Name,
@@ -960,123 +1173,7 @@ func deploymentFor(
 						constants.AnnotationInferenceGatewayPort: fmt.Sprintf("%d", servicePort),
 					},
 				},
-				Spec: corev1.PodSpec{
-					// connect-init writes the proxy-id to /consul/service/proxy-id
-					// so that consul-dataplane can bootstrap Envoy from Consul xDS.
-					InitContainers: []corev1.Container{initContainerFor(igw, consulK8SImage, cc)},
-					Containers: []corev1.Container{
-						{
-							// consul-dataplane boots Envoy from the proxy-id written by connect-init.
-							// This is the primary process and runs as the inference-gateway proxy type.
-							Name:    "consul-dataplane",
-							Image:   dataplaneImage,
-							Command: []string{"consul-dataplane"},
-							Args:    dataplaneArgsFor(cc),
-							Env: []corev1.EnvVar{
-								{
-									Name: "NODE_NAME",
-									ValueFrom: &corev1.EnvVarSource{
-										FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
-									},
-								},
-								{
-									Name:  "DP_SERVICE_NODE_NAME",
-									Value: "$(NODE_NAME)-virtual",
-								},
-								{
-									Name: "POD_NAME",
-									ValueFrom: &corev1.EnvVarSource{
-										FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
-									},
-								},
-								{
-									Name: "POD_NAMESPACE",
-									ValueFrom: &corev1.EnvVarSource{
-										FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
-									},
-								},
-								{
-									Name: "HOST_IP",
-									ValueFrom: &corev1.EnvVarSource{
-										FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-									},
-								},
-								{
-									// consul-dataplane has readOnlyRootFilesystem:true so it needs
-									// TMPDIR to point at a writable volume. run-consul is already
-									// mounted read-write on this container.
-									Name:  "TMPDIR",
-									Value: "/run/consul",
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									// Read-only: consul-dataplane only reads the proxy-id written
-									// by connect-init; it never writes to this volume.
-									Name:      "consul-service",
-									MountPath: "/consul/service",
-									ReadOnly:  true,
-								},
-								{
-									// Envoy needs the UDS directory to reach the ext_proc sidecar.
-									Name:      "run-consul",
-									MountPath: "/run/consul",
-								},
-							},
-							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: boolPtr(false),
-								ReadOnlyRootFilesystem:   boolPtr(true),
-								RunAsNonRoot:             boolPtr(true),
-								Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-							},
-						},
-						{
-							// inference-gateway is the ext_proc sidecar that Envoy calls over UDS.
-							// It only handles LLM request/response processing — it does not run Envoy.
-							Name:  "inference-gateway",
-							Image: gatewayImage,
-							Args: []string{
-								"-uds-path=/run/consul/ext_proc.sock",
-								"-config-entry=" + igw.Name,
-								"-consul-http-addr=http://" + fmt.Sprintf("%s:%d", cc.address, cc.httpPort),
-								"-log-level=$(CONSUL_IGW_LOG_LEVEL)",
-							},
-							Ports: []corev1.ContainerPort{
-								{Name: "metrics", ContainerPort: inferenceGatewayMetricsPort, Protocol: corev1.ProtocolTCP},
-							},
-							Env: []corev1.EnvVar{
-								{Name: "POOL_NAME", Value: pool.Name},
-								{Name: "POOL_NAMESPACE", Value: pool.Namespace},
-								// Log level for the inference-gateway process.
-								// Set via spec.logLevel on the InferenceGateway CR.
-								// Valid values: debug, info, warn, error (default: info).
-								{Name: "CONSUL_IGW_LOG_LEVEL", Value: logLevel},
-							},
-							Resources: resources,
-							VolumeMounts: []corev1.VolumeMount{{
-								Name:      "run-consul",
-								MountPath: "/run/consul",
-							}},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							// proxy-id file shared between connect-init and consul-dataplane.
-							Name: "consul-service",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
-							},
-						},
-						{
-							// UDS socket directory shared between consul-dataplane (Envoy) and
-							// the inference-gateway ext_proc sidecar.
-							Name: "run-consul",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
-				},
+				Spec: podSpec,
 			},
 		},
 	}
@@ -1288,6 +1385,7 @@ func (r *InferenceGatewayController) SetupWithManager(ctx context.Context, mgr c
 		// Owned K8s resources re-trigger reconciliation when mutated externally.
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
+		Owns(&corev1.ServiceAccount{}).
 		// Re-reconcile any InferenceGateway whose spec.poolRef points to a
 		// pool that just changed — e.g. enabled toggled, rate-limit updated.
 		Watches(

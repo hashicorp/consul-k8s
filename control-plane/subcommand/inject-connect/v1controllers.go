@@ -276,6 +276,10 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			ConsulNamespace:        c.flagConsulDestinationNamespace,
 			EnableConsulNamespaces: c.flagEnableNamespaces,
 			Datacenter:             c.consul.Datacenter,
+			// Workload auth method (same as mesh webhook), not the component
+			// auth method used by API/mesh gateways. Binding rule:
+			// BindName=${serviceaccount.name}, Selector=serviceaccount.name!=default.
+			AuthMethod: c.flagACLAuthMethod,
 		}).SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InferenceGateway")
 			return err
