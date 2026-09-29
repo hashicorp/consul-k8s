@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-		
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
@@ -214,6 +214,10 @@ func TestFilterIsExternalFilter(t *testing.T) {
 		},
 		"tls sds external filter": {
 			filter:   extensionRefFilter(consulGroup, v1alpha1.RouteTLSSDSFilterKind),
+			expected: true,
+		},
+		"header match invert external filter": {
+			filter:   extensionRefFilter(consulGroup, v1alpha1.RouteHeaderMatchInvertFilterKind),
 			expected: true,
 		},
 		"ext_proc with wrong group": {

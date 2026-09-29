@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func TestPeering_Gateway(t *testing.T) {
@@ -268,7 +268,7 @@ func TestPeering_Gateway(t *testing.T) {
 	var gatewayAddress string
 	counter := &retry.Counter{Count: 10, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: staticClientNamespace}, &gateway)
 		require.NoError(r, err)
 

@@ -486,6 +486,68 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: -acl-auth-method is derived from global.acls.authMethod.name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.authMethod.name=cluster-b' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method=\"cluster-b-k8s-auth-method\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: CONSUL_LOGIN_AUTH_METHOD is derived from global.acls.authMethod.name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.authMethod.name=cluster-b' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LOGIN_AUTH_METHOD") | .value' | tee /dev/stderr)
+  [ "${actual}" = "\"cluster-b-k8s-component-auth-method\"" ]
+}
+
+@test "connectInject/Deployment: connectInject.overrideAuthMethodName takes precedence over global.acls.authMethod.name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=false' \
+      --set 'global.acls.authMethod.name=cluster-b' \
+      --set 'connectInject.overrideAuthMethodName=override' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method=\"override\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: fails if connectInject.overrideAuthMethodName and global.acls.authMethod.name are both set when ACLs are managed" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.authMethod.name=cluster-b' \
+      --set 'connectInject.overrideAuthMethodName=override' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "connectInject.overrideAuthMethodName cannot be set at the same time as global.acls.authMethod.name" ]]
+}
+
+@test "connectInject/Deployment: does not fail if only connectInject.overrideAuthMethodName is set when ACLs are managed" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.overrideAuthMethodName=override' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-acl-auth-method=\"override\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # DNS
 

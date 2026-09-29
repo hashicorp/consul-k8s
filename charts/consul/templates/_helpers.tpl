@@ -16,6 +16,40 @@ as well as the global.name setting.
 {{- end -}}
 
 {{/*
+Base name that all Kubernetes auth methods managed by this chart are derived from.
+Defaults to the release fullname so that existing installations keep their auth
+method names. Set global.acls.authMethod.name to a value that is unique per
+Kubernetes cluster when several clusters share a single Consul control plane,
+otherwise the clusters overwrite each other's auth methods.
+*/}}
+{{- define "consul.authMethodPrefix" -}}
+{{- default (include "consul.fullname" .) .Values.global.acls.authMethod.name -}}
+{{- end -}}
+
+{{/*
+Auth method that Consul components use to issue a `consul login` for local tokens.
+*/}}
+{{- define "consul.localComponentAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-component-auth-method
+{{- end -}}
+
+{{/*
+Auth method that Consul components use to issue a `consul login` for global tokens.
+Only created in secondary datacenters when federation is enabled, which is why it
+is suffixed with the datacenter name to keep it distinct from the local one.
+*/}}
+{{- define "consul.globalComponentAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+{{- end -}}
+
+{{/*
+Auth method that service mesh workloads use to issue a `consul login`.
+*/}}
+{{- define "consul.connectInjectAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-auth-method
+{{- end -}}
+
+{{/*
 Resolve the Consul namespace that a terminating gateway service should be
 registered into. Resolution order:
   1. Per-gateway consulNamespace.
