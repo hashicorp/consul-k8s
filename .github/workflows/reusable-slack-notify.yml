@@ -12,6 +12,10 @@
 # Because GitHub-hosted runners can't use Vault, the webhook is provided as a
 # GitHub Actions secret named SLACK_FEED_CONSUL_K8S_CI_WEBHOOK containing a Slack
 # incoming-webhook URL for the #feed-consul-k8s-ci channel (repo- or org-level).
+#
+# The payload keys (Message/Repository/Branch/Commit/Run) mirror the contract used
+# by consul-k8s-workflows' reusable-slack-error.yml so both notifiers feed the same
+# Slack Workflow Builder variables for #feed-consul-k8s-ci.
 name: reusable-slack-notify
 
 on:
@@ -38,14 +42,9 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": ":x: Workflow *${{ inputs.workflow-name }}* failed on `${{ github.ref_name }}` in `${{ github.repository }}`",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": ":x: *${{ inputs.workflow-name }}* failed in `${{ github.repository }}`\n*Branch:* `${{ github.ref_name }}`\n*Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.run_id }}>"
-                  }
-                }
-              ]
+              "Message": ":x: ${{ inputs.workflow-name }} failed",
+              "Repository": "${{ github.repository }}",
+              "Branch": "${{ github.ref_name }}",
+              "Commit": "${{ github.sha }}",
+              "Run": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
