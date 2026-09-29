@@ -4017,7 +4017,15 @@ ai:
     # unique `name` and may override any field from `defaults` above.
     # The Helm chart renders one InferenceGateway CRD object per entry.
     # The controller then reconciles each into a Deployment, Service, and
-    # Consul ai-gateway config entry.
+    # Consul ai-gateway config entry. The gateway name is used directly for
+    # the Consul service/config entry and ServiceAccount identity.
+    # The service and config entry both use the destination Consul namespace,
+    # or the mirrored Kubernetes namespace (including mirroringK8SPrefix).
+    # With namespace mirroring, same-named gateways in different Kubernetes
+    # namespaces are independent; use the gateway name and mirrored Consul
+    # namespace in service intentions. In OSS or a shared destination namespace,
+    # gateway names must be unique: a conflicting gateway is rejected before
+    # its Deployment is created and cannot overwrite or delete the owner's entry.
     #
     # Example:
     #

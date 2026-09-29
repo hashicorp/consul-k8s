@@ -5,6 +5,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,10 +31,12 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	igwcache "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/ai/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 const (
 	inferenceGatewayFinalizer = "inference-gateway-exists-finalizer.consul.hashicorp.com"
+	inferenceGatewayUIDKey    = "consul.hashicorp.com/inference-gateway-uid"
 
 	// conditionTypePoolResolved is set to True when the referenced
 	// InferencePoolConfig exists, False when it is missing.
@@ -61,13 +64,11 @@ const (
 // For each InferenceGateway it:
 //  1. Ensures a finalizer is present.
 //  2. Resolves the referenced InferencePoolConfig.
-//  3. Creates or updates a Deployment and a ClusterIP Service (owned via
+//  3. Claims the Consul config entry using an ownership-checked CAS write.
+//  4. Creates or updates a Deployment and a ClusterIP Service (owned via
 //     ownerReference so K8s GC removes them on deletion).
-//  4. Upserts an AIGateway config entry in Consul so that the Consul
-//     service-mesh control-plane can configure the ext_proc filter and
-//     routing rules — following the same pattern as ConfigEntryController.
 //  5. Writes PoolResolved, Available, and Ready status conditions.
-//  6. On deletion: deletes the Consul config entry (with datacenter-ownership
+//  6. On deletion: deletes the Consul config entry (with Kubernetes UID ownership
 //     guard), then drops the finalizer (owned K8s resources are GC'd).
 //
 // Out-of-band Consul mutations (direct consul config delete) are detected by a
@@ -133,7 +134,8 @@ type InferenceGatewayController struct {
 	// ConsulPartition is the Consul admin partition (Enterprise only; empty for OSS).
 	ConsulPartition string
 
-	// ConsulNamespace is the destination Consul namespace for the config entry.
+	// ConsulNamespace is the destination Consul namespace for the gateway service
+	// and config entry when Kubernetes namespace mirroring is disabled.
 	// Only used when EnableConsulNamespaces is true (Consul Enterprise).
 	// On OSS this must remain empty so no ?ns= query param is ever sent.
 	ConsulNamespace string
@@ -161,6 +163,9 @@ type InferenceGatewayController struct {
 	// the login namespace is "default" (the auth method lives there).
 	// Mirrors the same field on MeshWebhook.
 	EnableK8SNSMirroring bool
+
+	NSMirroringPrefix string
+	CrossNSACLPolicy  string
 
 	// cache is the Consul ai-gateway long-poll cache. Initialised by
 	// SetupWithManager; used to detect out-of-band Consul mutations.
@@ -288,7 +293,16 @@ func (r *InferenceGatewayController) Reconcile(ctx context.Context, req ctrl.Req
 		"poolEnabled", pool.Spec.Enabled,
 	)
 
-	// ── 4. Reconcile the ServiceAccount (must exist before the Deployment so
+	// Claim the Consul identity before starting pods. Otherwise a conflicting
+	// gateway in a shared Consul namespace could register under another's policy.
+	if err := r.upsertConfigEntry(ctx, consulClient, igw, pool, log); err != nil {
+		log.Error(err, "failed to upsert Consul config entry")
+		r.Recorder.Eventf(igw, corev1.EventTypeWarning, eventReasonSyncFailed,
+			"failed to upsert Consul config entry: %v", err)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
+	}
+
+	// ── 5. Reconcile the ServiceAccount (must exist before the Deployment so
 	// the pod can authenticate via the Consul ACL auth method binding rule).
 	if err := r.reconcileServiceAccount(ctx, igw); err != nil {
 		log.Error(err, "failed to reconcile ServiceAccount")
@@ -297,7 +311,7 @@ func (r *InferenceGatewayController) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
-	// ── 5. Reconcile the Deployment ───────────────────────────────────────────
+	// ── 6. Reconcile the Deployment ───────────────────────────────────────────
 	if err := r.reconcileDeployment(ctx, igw, pool); err != nil {
 		log.Error(err, "failed to reconcile Deployment")
 		r.Recorder.Eventf(igw, corev1.EventTypeWarning, eventReasonSyncFailed,
@@ -305,21 +319,11 @@ func (r *InferenceGatewayController) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
-	// ── 6. Reconcile the Service ──────────────────────────────────────────────
+	// ── 7. Reconcile the Service ──────────────────────────────────────────────
 	if err := r.reconcileService(ctx, igw); err != nil {
 		log.Error(err, "failed to reconcile Service")
 		r.Recorder.Eventf(igw, corev1.EventTypeWarning, eventReasonSyncFailed,
 			"failed to reconcile Service: %v", err)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
-	}
-
-	// ── 6. Upsert the Consul AIGateway config entry ───────────────────────────
-	// Uses ConfigEntries().Set() following the same pattern as
-	// ConfigEntryController.ReconcileEntry — not the catalog API.
-	if err := r.upsertConfigEntry(ctx, consulClient, igw, pool, log); err != nil {
-		log.Error(err, "failed to upsert Consul config entry")
-		r.Recorder.Eventf(igw, corev1.EventTypeWarning, eventReasonSyncFailed,
-			"failed to upsert Consul config entry: %v", err)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
@@ -354,8 +358,27 @@ func (r *InferenceGatewayController) Reconcile(ctx context.Context, req ctrl.Req
 
 // ── Consul config-entry management ───────────────────────────────────────────
 
-// upsertConfigEntry writes an AIGateway config entry to Consul using
-// ConfigEntries().Set(), mirroring the write path in ConfigEntryController.
+// inferenceGatewayName is also the ServiceAccount name so the standard
+// Kubernetes auth binding grants access to exactly this Consul service.
+func inferenceGatewayName(igw *v1alpha1.InferenceGateway) string {
+	return igw.Name
+}
+
+func (r *InferenceGatewayController) consulNamespace(kubeNamespace string) string {
+	return namespaces.ConsulNamespace(kubeNamespace, r.EnableConsulNamespaces, r.ConsulNamespace, r.EnableK8SNSMirroring, r.NSMirroringPrefix)
+}
+
+func (r *InferenceGatewayController) ownsConfigEntry(entry capi.ConfigEntry, igw *v1alpha1.InferenceGateway) bool {
+	meta := entry.GetMeta()
+	return igw.UID != "" &&
+		meta[common.DatacenterKey] == r.Datacenter &&
+		meta[constants.MetaKeyKubeNS] == igw.Namespace &&
+		meta[constants.MetaKeyKubeName] == igw.Name &&
+		meta[inferenceGatewayUIDKey] == string(igw.UID)
+}
+
+// upsertConfigEntry uses CAS so an entry cannot change owners between the
+// ownership check and the write.
 func (r *InferenceGatewayController) upsertConfigEntry(
 	ctx context.Context,
 	consulClient *capi.Client,
@@ -366,40 +389,48 @@ func (r *InferenceGatewayController) upsertConfigEntry(
 	entry := r.toConsulConfigEntry(igw, pool)
 	writeOpts := &capi.WriteOptions{
 		Partition: r.ConsulPartition,
+		Namespace: entry.GetNamespace(),
 	}
-	// Only set Namespace on Consul Enterprise — OSS rejects the ?ns= param (HTTP 400).
-	if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
-		writeOpts.Namespace = r.ConsulNamespace
+	if r.EnableConsulNamespaces && entry.GetNamespace() != "" {
+		if _, err := namespaces.EnsureExists(consulClient, entry.GetNamespace(), r.CrossNSACLPolicy); err != nil {
+			return fmt.Errorf("ensuring Consul namespace %q: %w", entry.GetNamespace(), err)
+		}
 	}
 
-	if _, _, err := consulClient.ConfigEntries().Set(entry, writeOpts); err != nil {
-		// If the Consul server does not yet recognise ai-gateway entries (e.g. a
-		// pre-release binary in CI), log a warning and continue rather than
-		// blocking reconciliation. The entry will be written once the server is
-		// upgraded to a build that includes the ai-gateway config entry kind.
-		if isConsulUnknownKindErr(err) {
-			log.Info("Consul server does not yet support ai-gateway config entries; skipping upsert",
-				"name", igw.Name,
-				"error", err.Error(),
-			)
-			return nil
+	current, _, err := consulClient.ConfigEntries().Get(entry.GetKind(), entry.GetName(), (&capi.QueryOptions{
+		Partition: r.ConsulPartition,
+		Namespace: entry.GetNamespace(),
+	}).WithContext(ctx))
+	var index uint64
+	if err == nil {
+		if !r.ownsConfigEntry(current, igw) {
+			return fmt.Errorf("refusing to overwrite Consul config entry %q: not owned by InferenceGateway %s/%s (%s)",
+				entry.GetName(), igw.Namespace, igw.Name, igw.UID)
 		}
-		return fmt.Errorf("ConfigEntries().Set for %q: %w", igw.Name, err)
+		index = current.GetModifyIndex()
+	} else if !isConsulNotFoundErr(err) {
+		return fmt.Errorf("ConfigEntries().Get for %q: %w", entry.GetName(), err)
+	}
+
+	written, _, err := consulClient.ConfigEntries().CAS(entry, index, writeOpts.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("ConfigEntries().CAS for %q: %w", entry.GetName(), err)
+	}
+	if !written {
+		return fmt.Errorf("Consul config entry %q changed during upsert; retrying reconciliation", entry.GetName())
 	}
 
 	log.Info("upserted AIGateway config entry in Consul",
-		"name", igw.Name,
-		"namespace", r.ConsulNamespace,
+		"name", entry.GetName(),
+		"namespace", entry.GetNamespace(),
 		"partition", r.ConsulPartition,
 	)
 	return nil
 }
 
 // deleteConfigEntry removes the AIGateway config entry from Consul.
-// Mirrors the delete path in ConfigEntryController.ReconcileEntry:
-//  1. Get the entry; if 404, treat as desired state (nothing to do).
-//  2. Check datacenter ownership via Meta[DatacenterKey].
-//  3. Delete only if this datacenter owns the entry.
+// Foreign entries are left untouched. CAS protects against ownership changes
+// after the read; a failed CAS is retried before removing the finalizer.
 func (r *InferenceGatewayController) deleteConfigEntry(
 	ctx context.Context,
 	consulClient *capi.Client,
@@ -408,28 +439,25 @@ func (r *InferenceGatewayController) deleteConfigEntry(
 ) error {
 	queryOpts := &capi.QueryOptions{
 		Partition: r.ConsulPartition,
-	}
-	// Only set Namespace on Consul Enterprise — OSS rejects the ?ns= param (HTTP 400).
-	if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
-		queryOpts.Namespace = r.ConsulNamespace
+		Namespace: r.consulNamespace(igw.Namespace),
 	}
 
-	entry, _, err := consulClient.ConfigEntries().Get(capi.InferenceGateway, igw.Name, queryOpts)
+	name := inferenceGatewayName(igw)
+	entry, _, err := consulClient.ConfigEntries().Get(capi.InferenceGateway, name, queryOpts.WithContext(ctx))
 	if err != nil {
 		if isConsulNotFoundErr(err) {
 			// Already gone — desired state, not an error.
 			log.Info("Consul config entry not found during deletion (already removed)",
-				"name", igw.Name,
+				"name", name,
 			)
 			return nil
 		}
-		return fmt.Errorf("ConfigEntries().Get for %q: %w", igw.Name, err)
+		return fmt.Errorf("ConfigEntries().Get for %q: %w", name, err)
 	}
 
-	// Only delete if this datacenter originally wrote the entry.
-	if entry.GetMeta()[common.DatacenterKey] != r.Datacenter {
-		log.Info("skipping config entry deletion: owned by a different datacenter",
-			"name", igw.Name,
+	if !r.ownsConfigEntry(entry, igw) {
+		log.Info("skipping config entry deletion: not owned by this InferenceGateway",
+			"name", name,
 			"entryDatacenter", entry.GetMeta()[common.DatacenterKey],
 			"localDatacenter", r.Datacenter,
 		)
@@ -438,16 +466,17 @@ func (r *InferenceGatewayController) deleteConfigEntry(
 
 	writeOpts := &capi.WriteOptions{
 		Partition: r.ConsulPartition,
+		Namespace: queryOpts.Namespace,
 	}
-	// Only set Namespace on Consul Enterprise — OSS rejects the ?ns= param (HTTP 400).
-	if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
-		writeOpts.Namespace = r.ConsulNamespace
+	deleted, _, err := consulClient.ConfigEntries().DeleteCAS(capi.InferenceGateway, name, entry.GetModifyIndex(), writeOpts.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("ConfigEntries().DeleteCAS for %q: %w", name, err)
 	}
-	if _, err := consulClient.ConfigEntries().Delete(capi.InferenceGateway, igw.Name, writeOpts); err != nil {
-		return fmt.Errorf("ConfigEntries().Delete for %q: %w", igw.Name, err)
+	if !deleted {
+		return fmt.Errorf("Consul config entry %q changed during deletion; retrying reconciliation", name)
 	}
 
-	log.Info("deleted InferenceGateway config entry from Consul", "name", igw.Name)
+	log.Info("deleted InferenceGateway config entry from Consul", "name", name)
 	return nil
 }
 
@@ -468,12 +497,14 @@ func (r *InferenceGatewayController) toConsulConfigEntry(
 ) capi.ConfigEntry {
 	entry := &capi.InferenceGatewayConfigEntry{
 		Kind:      capi.InferenceGateway,
-		Name:      igw.Name,
+		Name:      inferenceGatewayName(igw),
 		Partition: r.ConsulPartition,
+		Namespace: r.consulNamespace(igw.Namespace),
 		Meta: map[string]string{
 			common.DatacenterKey:      r.Datacenter,
 			constants.MetaKeyKubeNS:   igw.Namespace,
 			constants.MetaKeyKubeName: igw.Name,
+			inferenceGatewayUIDKey:    string(igw.UID),
 		},
 		// Default to "closed": reject if ext_proc is unreachable (safe for production).
 		// Overridden below from pool.Spec.Processor when the operator sets failureMode.
@@ -488,12 +519,6 @@ func (r *InferenceGatewayController) toConsulConfigEntry(
 			entry.Processor.FailureMode = p.FailureMode
 		}
 		entry.Processor.BodyModelRouting = p.BodyModelRouting
-	}
-
-	// Only set Namespace on Consul Enterprise — OSS Consul rejects the ?ns=
-	// query parameter (HTTP 400 "Namespaces are a Consul Enterprise feature").
-	if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
-		entry.Namespace = r.ConsulNamespace
 	}
 
 	// TODO: Uncomment when capi.InferenceGatewayConfigEntry re-adds StateStore and RateLimit.
@@ -728,26 +753,10 @@ func otlpHostPort(endpoint string) string {
 	return strings.TrimPrefix(endpoint, "http://")
 }
 
-// isConsulNotFoundErr returns true when the Consul API returned a 404 for a
-// config entry lookup, or when the server returns an error indicating the kind
-// is not registered (e.g. pre-release Consul binary used in tests).
-// Mirrors the private isNotFoundErr in
-// controllers/configentries/configentry_controller.go.
+// isConsulNotFoundErr returns true only when the config entry is absent.
 func isConsulNotFoundErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "404") ||
-		strings.Contains(msg, "invalid config entry kind")
-}
-
-// isConsulUnknownKindErr returns true when the Consul server rejected a write
-// because it does not know the config entry kind (HTTP 400 with "invalid config
-// entry kind" in the body). This happens when the operator is deployed against a
-// Consul release that predates the ai-gateway entry type.
-func isConsulUnknownKindErr(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "invalid config entry kind")
+	var statusErr capi.StatusError
+	return errors.As(err, &statusErr) && statusErr.Code == 404
 }
 
 // ── Kubernetes child-resource reconciliation ──────────────────────────────────
@@ -794,6 +803,8 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		enableNamespaces:     r.EnableConsulNamespaces,
 		enableNSMirroring:    r.EnableK8SNSMirroring,
 		consulLoginNamespace: r.ConsulNamespace,
+		consulNamespace:      r.consulNamespace(igw.Namespace),
+		consulPartition:      r.ConsulPartition,
 	})
 	if err := controllerutil.SetControllerReference(igw, desired, r.Client.Scheme()); err != nil {
 		return fmt.Errorf("setting owner reference on Deployment: %w", err)
@@ -813,24 +824,6 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		return fmt.Errorf("getting Deployment %q: %w", desired.Name, err)
 	}
 
-	// ServiceAccountName is immutable in a pod template — if it has drifted
-	// (e.g. Deployment was created before reconcileServiceAccount ran), we must
-	// delete and recreate the Deployment so the new pods inherit the correct SA.
-	if existing.Spec.Template.Spec.ServiceAccountName != desired.Spec.Template.Spec.ServiceAccountName {
-		log.Info("ServiceAccountName changed, recreating Deployment",
-			"deployment", existing.Name,
-			"old", existing.Spec.Template.Spec.ServiceAccountName,
-			"new", desired.Spec.Template.Spec.ServiceAccountName,
-		)
-		if err := r.Client.Delete(ctx, existing); err != nil && !k8serrors.IsNotFound(err) {
-			return fmt.Errorf("deleting Deployment %q for ServiceAccountName update: %w", existing.Name, err)
-		}
-		if err := r.Client.Create(ctx, desired); err != nil {
-			return fmt.Errorf("recreating Deployment %q: %w", desired.Name, err)
-		}
-		return nil
-	}
-
 	// Patch mutable fields: init containers, containers, volumes, replicas, labels,
 	// and ServiceAccountName (kept in sync for new deployments).
 	patch := client.MergeFrom(existing.DeepCopy())
@@ -839,6 +832,12 @@ func (r *InferenceGatewayController) reconcileDeployment(
 	existing.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 	existing.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
 	existing.Spec.Template.Spec.ServiceAccountName = desired.Spec.Template.Spec.ServiceAccountName
+	if existing.Spec.Template.Annotations == nil {
+		existing.Spec.Template.Annotations = make(map[string]string)
+	}
+	for key, value := range desired.Spec.Template.Annotations {
+		existing.Spec.Template.Annotations[key] = value
+	}
 	existing.Labels = desired.Labels
 	if err := r.Client.Patch(ctx, existing, patch); err != nil {
 		return fmt.Errorf("patching Deployment %q: %w", existing.Name, err)
@@ -847,17 +846,15 @@ func (r *InferenceGatewayController) reconcileDeployment(
 	return nil
 }
 
-// reconcileServiceAccount ensures a dedicated ServiceAccount named igw.Name
-// exists in igw.Namespace. The pod template references it by name so the
-// Consul ACL auth method binding rule (selector: serviceaccount.name==igw.Name)
-// matches and the pod receives a token with the inference-gateway policy.
+// reconcileServiceAccount matches the ServiceAccount name to the Consul service
+// identity used by the standard Kubernetes auth method binding rule.
 func (r *InferenceGatewayController) reconcileServiceAccount(
 	ctx context.Context,
 	igw *v1alpha1.InferenceGateway,
 ) error {
 	desired := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      igw.Name,
+			Name:      inferenceGatewayName(igw),
 			Namespace: igw.Namespace,
 			Labels:    gatewayLabels(igw),
 		},
@@ -874,7 +871,13 @@ func (r *InferenceGatewayController) reconcileServiceAccount(
 		}
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if !metav1.IsControlledBy(existing, igw) {
+		return fmt.Errorf("ServiceAccount %s/%s is not owned by InferenceGateway %s", existing.Namespace, existing.Name, igw.Name)
+	}
+	return nil
 }
 
 // reconcileService creates or patches the ClusterIP Service owned by igw.
@@ -943,6 +946,8 @@ type deploymentConsulConfig struct {
 	enableNamespaces     bool   // Consul Enterprise namespaces enabled
 	enableNSMirroring    bool   // K8s → Consul namespace mirroring enabled
 	consulLoginNamespace string // explicit Consul namespace for ACL login
+	consulNamespace      string
+	consulPartition      string
 }
 
 // initContainerFor builds the connect-init init container for an InferenceGateway
@@ -989,6 +994,12 @@ func initContainerFor(igw *v1alpha1.InferenceGateway, image string, cc deploymen
 			corev1.EnvVar{Name: constants.TLSServerNameEnvVar, Value: cc.tlsServerName},
 		)
 	}
+	if cc.enableNamespaces {
+		env = append(env, corev1.EnvVar{Name: "CONSUL_NAMESPACE", Value: cc.consulNamespace})
+	}
+	if cc.consulPartition != "" {
+		env = append(env, corev1.EnvVar{Name: "CONSUL_PARTITION", Value: cc.consulPartition})
+	}
 	// When ACLs are enabled connect-init must exchange the pod's ServiceAccount
 	// JWT for a Consul ACL token before registering the proxy service.
 	// Mirrors container_init.go's CONSUL_LOGIN_* block exactly:
@@ -1001,6 +1012,9 @@ func initContainerFor(igw *v1alpha1.InferenceGateway, image string, cc deploymen
 			corev1.EnvVar{Name: "CONSUL_LOGIN_BEARER_TOKEN_FILE", Value: "/var/run/secrets/kubernetes.io/serviceaccount/token"},
 			corev1.EnvVar{Name: "CONSUL_LOGIN_META", Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)"},
 		)
+		if cc.consulPartition != "" {
+			env = append(env, corev1.EnvVar{Name: "CONSUL_LOGIN_PARTITION", Value: cc.consulPartition})
+		}
 		if cc.enableNamespaces {
 			if cc.enableNSMirroring {
 				env = append(env, corev1.EnvVar{Name: "CONSUL_LOGIN_NAMESPACE", Value: "default"})
@@ -1042,7 +1056,7 @@ func initContainerFor(igw *v1alpha1.InferenceGateway, image string, cc deploymen
 				" -pod-namespace=${POD_NAMESPACE}" +
 				" -gateway-kind=inference-gateway" +
 				" -proxy-id-file=/consul/service/proxy-id" +
-				" -service-name=" + igw.Name,
+				" -service-name=" + inferenceGatewayName(igw),
 		},
 		VolumeMounts: volMounts,
 		SecurityContext: &corev1.SecurityContext{
@@ -1087,6 +1101,22 @@ func dataplaneArgsFor(cc deploymentConsulConfig) []string {
 			"-login-auth-method="+cc.authMethod,
 			"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token",
 		)
+		if cc.enableNamespaces {
+			loginNamespace := cc.consulLoginNamespace
+			if cc.enableNSMirroring {
+				loginNamespace = namespaces.DefaultNamespace
+			}
+			args = append(args, "-login-namespace="+loginNamespace)
+		}
+		if cc.consulPartition != "" {
+			args = append(args, "-login-partition="+cc.consulPartition)
+		}
+	}
+	if cc.enableNamespaces {
+		args = append(args, "-service-namespace="+cc.consulNamespace)
+	}
+	if cc.consulPartition != "" {
+		args = append(args, "-service-partition="+cc.consulPartition)
 	}
 	return args
 }
@@ -1150,16 +1180,14 @@ func deploymentFor(
 						constants.AnnotationInject: "false",
 						// Mark as a gateway so the endpoints controller uses registerGateway().
 						constants.AnnotationGatewayKind:              "inference-gateway",
-						constants.AnnotationGatewayConsulServiceName: igw.Name,
+						constants.AnnotationGatewayConsulServiceName: inferenceGatewayName(igw),
+						constants.AnnotationGatewayNamespace:         cc.consulNamespace,
 						// Consul catalog service port read by createGatewayRegistrations.
 						constants.AnnotationInferenceGatewayPort: fmt.Sprintf("%d", servicePort),
 					},
 				},
 				Spec: corev1.PodSpec{
-					// ServiceAccountName must match igw.Name so the Consul ACL
-					// auth method binding rule (selector: serviceaccount.name==igw.Name)
-					// resolves the correct role and policy for this gateway.
-					ServiceAccountName: igw.Name,
+					ServiceAccountName: inferenceGatewayName(igw),
 					// connect-init writes the proxy-id to /consul/service/proxy-id
 					// so that consul-dataplane can bootstrap Envoy from Consul xDS.
 					InitContainers: []corev1.Container{initContainerFor(igw, consulK8SImage, cc)},
@@ -1252,7 +1280,7 @@ func deploymentFor(
 							Image: gatewayImage,
 							Args: []string{
 								"-uds-path=/run/consul/ext_proc.sock",
-								"-config-entry=" + igw.Name,
+								"-config-entry=" + inferenceGatewayName(igw),
 								"-consul-http-addr=http://" + fmt.Sprintf("%s:%d", cc.address, cc.httpPort),
 								"-log-level=$(CONSUL_IGW_LOG_LEVEL)",
 							},
@@ -1262,6 +1290,8 @@ func deploymentFor(
 							Env: []corev1.EnvVar{
 								{Name: "POOL_NAME", Value: pool.Name},
 								{Name: "POOL_NAMESPACE", Value: pool.Namespace},
+								{Name: "CONSUL_NAMESPACE", Value: cc.consulNamespace},
+								{Name: "CONSUL_PARTITION", Value: cc.consulPartition},
 								// Log level for the inference-gateway process.
 								// Set via spec.logLevel on the InferenceGateway CR.
 								// Valid values: debug, info, warn, error (default: info).
@@ -1513,6 +1543,10 @@ func (r *InferenceGatewayController) gatewaysForPool(ctx context.Context, obj cl
 func (r *InferenceGatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	r.Log.Info("registering InferenceGatewayController with manager")
 
+	cacheNamespace := r.consulNamespace("")
+	if r.EnableConsulNamespaces && r.EnableK8SNSMirroring {
+		cacheNamespace = namespaces.WildcardNamespace
+	}
 	// Build the Consul ai-gateway cache and start the background poll.
 	// The goroutine exits when ctx is cancelled (manager shutdown).
 	r.cache = igwcache.New(igwcache.Config{
@@ -1520,6 +1554,8 @@ func (r *InferenceGatewayController) SetupWithManager(ctx context.Context, mgr c
 		ConsulServerConnMgr: r.ConsulServerConnMgr,
 		Datacenter:          r.Datacenter,
 		Logger:              r.Log.WithName("cache"),
+		Namespace:           cacheNamespace,
+		Partition:           r.ConsulPartition,
 	})
 	go r.cache.Run(ctx)
 

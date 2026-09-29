@@ -46,6 +46,8 @@ type Config struct {
 	// matching the convention in api-gateway/cache/consul.go:updateAndNotify.
 	Datacenter string
 	Logger     logr.Logger
+	Namespace  string
+	Partition  string
 }
 
 // Cache subscribes to and mirrors Consul inference-gateway config entries.
@@ -56,10 +58,12 @@ type Cache struct {
 	serverMgr  consul.ServerConnectionManager
 	logger     logr.Logger
 	datacenter string
+	namespace  string
+	partition  string
 
 	// mu protects entries.
 	mu      sync.RWMutex
-	entries map[string]capi.ConfigEntry // keyed by entry name
+	entries map[entryKey]capi.ConfigEntry
 
 	subMu       sync.Mutex
 	subscribers []*Subscription
@@ -77,7 +81,9 @@ func New(cfg Config) *Cache {
 		serverMgr:  cfg.ConsulServerConnMgr,
 		logger:     cfg.Logger,
 		datacenter: cfg.Datacenter,
-		entries:    make(map[string]capi.ConfigEntry),
+		namespace:  cfg.Namespace,
+		partition:  cfg.Partition,
+		entries:    make(map[entryKey]capi.ConfigEntry),
 		synced:     make(chan struct{}, 1),
 	}
 }
@@ -120,7 +126,7 @@ func (c *Cache) Run(ctx context.Context) {
 }
 
 func (c *Cache) subscribeToConsul(ctx context.Context) {
-	opts := &capi.QueryOptions{}
+	opts := &capi.QueryOptions{Namespace: c.namespace, Partition: c.partition}
 
 	for {
 		select {
@@ -165,7 +171,7 @@ func (c *Cache) updateAndNotify(ctx context.Context, entries []capi.ConfigEntry)
 
 	// Build a fresh snapshot, honouring the datacenter ownership check that
 	// api-gateway/cache/consul.go:updateAndNotify uses to ignore foreign entries.
-	newEntries := make(map[string]capi.ConfigEntry, len(entries))
+	newEntries := make(map[entryKey]capi.ConfigEntry, len(entries))
 	for _, e := range entries {
 		m := e.GetMeta()
 		if m[constants.MetaKeyKubeName] == "" {
@@ -176,7 +182,7 @@ func (c *Cache) updateAndNotify(ctx context.Context, entries []capi.ConfigEntry)
 			// Belongs to a different datacenter.
 			continue
 		}
-		newEntries[e.GetName()] = e
+		newEntries[configEntryKey(e.GetName(), e.GetNamespace(), e.GetPartition())] = e
 	}
 
 	// Diff: new or modified entries.
@@ -249,7 +255,7 @@ func (c *Cache) notifySubscribers(ctx context.Context, entries []capi.ConfigEntr
 // mirroring the dedup guard in api-gateway/cache/consul.go:Write.
 func (c *Cache) Write(ctx context.Context, entry capi.ConfigEntry) error {
 	c.mu.RLock()
-	old, ok := c.entries[entry.GetName()]
+	old, ok := c.entries[configEntryKey(entry.GetName(), entry.GetNamespace(), entry.GetPartition())]
 	c.mu.RUnlock()
 
 	if ok && entriesEqual(old, entry) {
@@ -277,7 +283,7 @@ func (c *Cache) Write(ctx context.Context, entry capi.ConfigEntry) error {
 // api-gateway/cache/consul.go:Delete to prevent spurious deletes on cold start.
 func (c *Cache) Delete(ctx context.Context, name, namespace, partition string) error {
 	c.mu.RLock()
-	_, ok := c.entries[name]
+	_, ok := c.entries[configEntryKey(name, namespace, partition)]
 	c.mu.RUnlock()
 
 	if !ok {
@@ -296,10 +302,10 @@ func (c *Cache) Delete(ctx context.Context, name, namespace, partition string) e
 }
 
 // Get returns the locally cached inference-gateway config entry for name, or nil.
-func (c *Cache) Get(name string) capi.ConfigEntry {
+func (c *Cache) Get(name, namespace, partition string) capi.ConfigEntry {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.entries[name]
+	return c.entries[configEntryKey(name, namespace, partition)]
 }
 
 // List returns all locally cached inference-gateway config entries.
@@ -314,6 +320,20 @@ func (c *Cache) List() []capi.ConfigEntry {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+type entryKey struct {
+	name, namespace, partition string
+}
+
+func configEntryKey(name, namespace, partition string) entryKey {
+	if namespace == "" {
+		namespace = "default"
+	}
+	if partition == "" {
+		partition = "default"
+	}
+	return entryKey{name: name, namespace: namespace, partition: partition}
+}
 
 // entryObject is a minimal client.Object used to carry a name/namespace into
 // a GenericEvent without importing a full K8s resource type — mirroring

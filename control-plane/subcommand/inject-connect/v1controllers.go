@@ -281,6 +281,8 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			ConsulNamespace:        c.flagConsulDestinationNamespace,
 			EnableConsulNamespaces: c.flagEnableNamespaces,
 			EnableK8SNSMirroring:   c.flagEnableK8SNSMirroring,
+			NSMirroringPrefix:      c.flagK8SNSMirroringPrefix,
+			CrossNSACLPolicy:       c.flagCrossNamespaceACLPolicy,
 			Datacenter:             c.consul.Datacenter,
 			AuthMethod:             c.flagACLAuthMethod,
 		}).SetupWithManager(ctx, mgr); err != nil {

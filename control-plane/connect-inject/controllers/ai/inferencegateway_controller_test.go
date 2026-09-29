@@ -15,8 +15,8 @@ import (
 	"time"
 
 	logrtest "github.com/go-logr/logr/testr"
-	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 // ── mock Consul httptest helpers ──────────────────────────────────────────────
@@ -51,14 +51,14 @@ import (
 func consulMockServer(t *testing.T) (*consul.Config, consul.ServerConnectionManager) {
 	t.Helper()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return consulMockServerWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Handle any Consul API call generically.
 		switch r.Method {
 		case http.MethodPut:
 			// ConfigEntries().Set() — return a minimal success payload.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"Index": 1})
+			_ = json.NewEncoder(w).Encode(true)
 		case http.MethodDelete:
 			// ConfigEntries().Delete()
 			w.WriteHeader(http.StatusOK)
@@ -71,6 +71,11 @@ func consulMockServer(t *testing.T) (*consul.Config, consul.ServerConnectionMana
 			w.WriteHeader(http.StatusOK)
 		}
 	}))
+}
+
+func consulMockServerWithHandler(t *testing.T, handler http.Handler) (*consul.Config, consul.ServerConnectionManager) {
+	t.Helper()
+	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
 	host, portStr, err := net.SplitHostPort(srv.Listener.Addr().String())
@@ -388,7 +393,7 @@ func TestInferenceGatewayReconcile_ChildResources(t *testing.T) {
 		// Pod annotations: webhook opted out, gateway-kind set for endpoints controller.
 		require.Equal(t, "false", dep.Spec.Template.Annotations[constants.AnnotationInject])
 		require.Equal(t, "inference-gateway", dep.Spec.Template.Annotations[constants.AnnotationGatewayKind])
-		require.Equal(t, "gw", dep.Spec.Template.Annotations[constants.AnnotationGatewayConsulServiceName])
+		require.Equal(t, inferenceGatewayName(igw), dep.Spec.Template.Annotations[constants.AnnotationGatewayConsulServiceName])
 		// No spec.service set → falls back to inferenceGatewayServicePort (8443).
 		require.Equal(t, "8443", dep.Spec.Template.Annotations[constants.AnnotationInferenceGatewayPort])
 
@@ -532,7 +537,7 @@ func TestInferenceGatewayReconcile_StatusConditions(t *testing.T) {
 			},
 		},
 		{
-			name: "disabled pool → PoolResolved=False, Available=False, Ready=False",
+			name:     "disabled pool → PoolResolved=False, Available=False, Ready=False",
 			buildIGW: func() *v1alpha1.InferenceGateway { return minimalIGW("gw", "default", "pool") },
 			buildPool: func() *v1alpha1.InferencePoolConfig {
 				p := enabledPool("pool", "default")
@@ -676,7 +681,7 @@ func TestInferenceGatewayReconcile_EnableConsulNamespaces(t *testing.T) {
 			switch r.Method {
 			case http.MethodPut:
 				w.WriteHeader(http.StatusOK)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{"Index": 1})
+				_ = json.NewEncoder(w).Encode(true)
 			case http.MethodGet:
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write([]byte("404 Not Found"))
@@ -814,6 +819,7 @@ func minimalIGW(name, namespace, poolName string) *v1alpha1.InferenceGateway {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			UID:       types.UID(namespace + "-" + name),
 		},
 		Spec: v1alpha1.InferenceGatewaySpec{
 			PoolRef: v1alpha1.InferencePoolRef{Name: poolName},
@@ -881,7 +887,7 @@ func TestToConsulConfigEntry(t *testing.T) {
 		entry := r.toConsulConfigEntry(igw, pool)
 
 		require.Equal(t, capi.InferenceGateway, entry.GetKind())
-		require.Equal(t, "my-gw", entry.GetName())
+		require.Equal(t, inferenceGatewayName(igw), entry.GetName())
 		require.Equal(t, "dc1", entry.GetMeta()["consul.hashicorp.com/source-datacenter"])
 
 		aige, ok := entry.(*capi.InferenceGatewayConfigEntry)

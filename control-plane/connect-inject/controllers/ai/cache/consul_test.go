@@ -169,9 +169,57 @@ func TestCache_Get(t *testing.T) {
 	go c.Run(ctx)
 	c.WaitSynced(ctx)
 
-	got := c.Get("my-gw")
+	got := c.Get("my-gw", "", "")
 	require.NotNil(t, got)
 	require.Equal(t, "my-gw", got.GetName())
+}
+
+func TestCache_NamespaceIsolation(t *testing.T) {
+	c := New(Config{ConsulClientConfig: &consul.Config{}, Datacenter: "dc1", Logger: logrtest.NewTestLogger(t)})
+	first := aiGatewayEntry("foo", "ns-a", "dc1", 1)
+	first.Namespace = "ns-a"
+	second := aiGatewayEntry("foo", "ns-b", "dc1", 2)
+	second.Namespace = "ns-b"
+	third := aiGatewayEntry("foo", "ns-a", "dc1", 3)
+	third.Namespace = "ns-a"
+	third.Partition = "other"
+	c.updateAndNotify(context.Background(), []capi.ConfigEntry{first, second, third})
+	require.Len(t, c.List(), 3)
+	require.Equal(t, first, c.Get("foo", "ns-a", ""))
+	require.Equal(t, second, c.Get("foo", "ns-b", ""))
+	require.Equal(t, third, c.Get("foo", "ns-a", "other"))
+	c.updateAndNotify(context.Background(), []capi.ConfigEntry{second, third})
+	require.Nil(t, c.Get("foo", "ns-a", ""))
+	require.Equal(t, second, c.Get("foo", "ns-b", ""))
+	require.Equal(t, third, c.Get("foo", "ns-a", "other"))
+}
+
+func TestCache_PollNamespace(t *testing.T) {
+	for _, ns := range []string{"", "shared", "*"} {
+		t.Run("namespace="+ns, func(t *testing.T) {
+			var count atomic.Int32
+			server, cfg, watcher := consulTestServer(t, nil, &count)
+			handler := server.Config.Handler
+			server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				require.Equal(t, ns, req.URL.Query().Get("ns"))
+				require.Equal(t, "part-a", req.URL.Query().Get("partition"))
+				handler.ServeHTTP(w, req)
+			})
+			c := New(Config{ConsulClientConfig: cfg, ConsulServerConnMgr: watcher,
+				Datacenter: "dc1", Logger: logrtest.NewTestLogger(t), Namespace: ns, Partition: "part-a"})
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				c.Run(ctx)
+			}()
+			c.WaitSynced(ctx)
+			require.Positive(t, count.Load())
+			cancel()
+			<-done
+		})
+	}
 }
 
 func TestCache_List(t *testing.T) {
@@ -222,7 +270,7 @@ func TestCache_ForeignDatacenter_Filtered(t *testing.T) {
 	go c.Run(ctx)
 	c.WaitSynced(ctx)
 
-	require.Nil(t, c.Get("foreign-gw"), "foreign-datacenter entry must be filtered out")
+	require.Nil(t, c.Get("foreign-gw", "", ""), "foreign-datacenter entry must be filtered out")
 	require.Empty(t, c.List())
 }
 
@@ -252,7 +300,7 @@ func TestCache_NoKubeName_Filtered(t *testing.T) {
 	go c.Run(ctx)
 	c.WaitSynced(ctx)
 
-	require.Nil(t, c.Get("user-created"), "entry without k8s-name must be filtered out")
+	require.Nil(t, c.Get("user-created", "", ""), "entry without k8s-name must be filtered out")
 }
 
 func TestCache_Subscribe_NotifiesOnChange(t *testing.T) {

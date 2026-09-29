@@ -1010,9 +1010,13 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 		// consistent with other gateway types but don't return an error below.
 	case inferenceGateway:
 		service.Kind = api.ServiceKindInferenceGateway
+		service.ID = pod.Namespace + "/" + pod.Name
 		if r.EnableConsulNamespaces {
-			service.Namespace = defaultNS
-			consulNS = defaultNS
+			consulNS = r.consulNamespace(pod.Namespace)
+			if ns := pod.Annotations[constants.AnnotationGatewayNamespace]; ns != "" {
+				consulNS = ns
+			}
+			service.Namespace = consulNS
 		}
 		// Use the port stamped on the pod by the controller (from spec.service.ports[0]).
 		// Fall back to 8443 if the annotation is absent or unparseable.
@@ -1049,11 +1053,11 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 		},
 		Service: service,
 		Check: &api.AgentCheck{
-			CheckID:   consulHealthCheckID(pod.Namespace, pod.Name),
+			CheckID:   consulHealthCheckID(pod.Namespace, service.ID),
 			Name:      constants.ConsulKubernetesCheckName,
 			Type:      constants.ConsulKubernetesCheckType,
 			Status:    healthStatus,
-			ServiceID: pod.Name,
+			ServiceID: service.ID,
 			Namespace: consulNS,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
 		},

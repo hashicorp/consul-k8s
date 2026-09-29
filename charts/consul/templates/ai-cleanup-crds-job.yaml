@@ -1,14 +1,11 @@
-{{- if not (and .Values.ai .Values.ai.enabled) }}
+{{- $aiEnabled := and .Values.ai .Values.ai.enabled -}}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 #
-# Rendered only when ai.enabled is false or absent (i.e. the AI operator is
-# being disabled or was never enabled). When ai.enabled=true the running
-# controller owns CR lifecycle and must NOT be bypassed.
-#
-# Hook triggers (pre-delete,pre-upgrade):
-#   • helm upgrade  --set ai.enabled=false  →  pre-upgrade fires: cleans CRs
-#   • helm uninstall                         →  pre-delete fires:  cleans CRs
+# Always rendered, but never executed on initial install:
+#   • helm upgrade with AI disabled or absent → pre-upgrade cleans CRs when disabling AI
+#   • helm upgrade with AI enabled → no cleanup
+#   • helm uninstall with any AI setting → pre-delete cleans CRs before controller pods are removed
 #
 # The subcommand is safe when no CRDs are installed: each resource type is
 # skipped (isCRDAbsent) and the command exits 0. Idempotent.
@@ -31,10 +28,11 @@ metadata:
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
   annotations:
-    "helm.sh/hook": pre-delete,pre-upgrade
+    "helm.sh/hook": pre-delete{{ if not $aiEnabled }},pre-upgrade{{ end }}
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation,hook-failed
 spec:
+  activeDeadlineSeconds: 120
   template:
     metadata:
       name: {{ template "consul.fullname" . }}-ai-cleanup
@@ -71,5 +69,4 @@ spec:
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
-      {{- end }}
 {{- end }}
