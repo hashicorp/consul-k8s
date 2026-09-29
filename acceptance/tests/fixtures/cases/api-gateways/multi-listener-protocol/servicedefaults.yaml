@@ -1,0 +1,30 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# ServiceDefaults for all three backends used by the multi-listener protocol
+# acceptance test.  Each service's declared protocol must match the Consul
+# api-gateway listener protocol that routes to it.
+---
+# http-server: plain HTTP/1.1 — matches the "http" listener.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: http-server
+spec:
+  protocol: http
+---
+# grpc-server: gRPC — matches the "grpc" listener added on day 2.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: grpc-server
+spec:
+  protocol: grpc
+---
+# h2-server: HTTP/2 — matches the "http2" listener added on day 3.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: h2-server
+spec:
+  protocol: http2

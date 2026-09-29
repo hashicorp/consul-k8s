@@ -146,6 +146,18 @@ const (
 	AnnotationServiceMetricsPort   = "consul.hashicorp.com/service-metrics-port"
 	AnnotationServiceMetricsPath   = "consul.hashicorp.com/service-metrics-path"
 
+	// AnnotationServiceMetricsEndpoints allows a single container to expose
+	// metrics on more than one port. It is a comma-separated list of
+	// "port:path" pairs, where port may be a port number or the name of a
+	// container port, and the ":path" suffix is optional and defaults to
+	// /metrics. For example:
+	//
+	//	consul.hashicorp.com/service-metrics-endpoints: "8080:/metrics,admin:/admin/metrics,9090"
+	//
+	// When set, this annotation takes precedence over service-metrics-port and
+	// service-metrics-path.
+	AnnotationServiceMetricsEndpoints = "consul.hashicorp.com/service-metrics-endpoints"
+
 	// annotations for configuring TLS for Prometheus.
 	AnnotationPrometheusCAFile   = "consul.hashicorp.com/prometheus-ca-file"
 	AnnotationPrometheusCAPath   = "consul.hashicorp.com/prometheus-ca-path"
@@ -190,8 +202,8 @@ const (
 	// to point to the Envoy proxy when running in Transparent Proxy mode.
 	AnnotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
-	// AnnotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
-	// iptables rules.
+	// AnnotationRedirectTraffic stores nftables.Config information so that the CNI plugin can use it to apply
+	// nft traffic redirection rules.
 	AnnotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
 	// AnnotationDualStack stores if pod need to run in dualstack mode.

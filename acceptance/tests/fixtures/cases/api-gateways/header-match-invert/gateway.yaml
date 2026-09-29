@@ -1,0 +1,18 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: header-invert-gw
+  labels:
+    component: api-gateway
+spec:
+  gatewayClassName: header-invert-class
+  listeners:
+  - name: listener
+    protocol: HTTP
+    port: 8080
+    allowedRoutes:
+      namespaces:
+        from: All

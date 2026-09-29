@@ -1,0 +1,79 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# grpc-server — backend behind the gRPC listener.
+#
+# For the purposes of this test we care that:
+#   a) a mesh-enrolled service named "grpc-server" is registered in Consul, and
+#   b) ServiceDefaults.protocol == "grpc" so Consul treats it as a gRPC upstream.
+#
+# The actual wire protocol spoken by the container does not matter for gateway
+# config-entry validation; we reuse the lightweight hashicorp/http-echo image
+# (which speaks HTTP/1.1) with protocol: grpc in ServiceDefaults.  If you want
+# real gRPC echo, swap the image for docker.mirror.hashicorp.services/moul/grpcbin
+# and change the containerPort to 9000.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grpc-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grpc-server
+  template:
+    metadata:
+      name: grpc-server
+      labels:
+        app: grpc-server
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+    spec:
+      serviceAccountName: grpc-server
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: grpc-server
+          # hashicorp/http-echo speaks HTTP/1.1; ServiceDefaults below tells
+          # Consul to treat this service as grpc for routing purposes.
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          args:
+            - -text="grpc-server hello"
+            - -listen=:9000
+          ports:
+            - containerPort: 9000
+              name: grpc
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              add:
+                - NET_BIND_SERVICE
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              port: 9000
+            initialDelaySeconds: 1
+            periodSeconds: 1
+            failureThreshold: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-server
+spec:
+  selector:
+    app: grpc-server
+  ports:
+    - name: grpc
+      port: 9000
+      targetPort: 9000

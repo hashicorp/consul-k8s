@@ -1385,6 +1385,69 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 			},
 		},
 		{
+			name: "merged metrics with multiple service metrics endpoints",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:                 "web",
+						constants.AnnotationEnableMetrics:           "true",
+						constants.AnnotationEnableMetricsMerging:    "true",
+						constants.AnnotationMergedMetricsPort:       "20100",
+						constants.AnnotationServiceMetricsEndpoints: "1234:/metrics,8080:/admin/metrics,9090",
+						constants.AnnotationPrometheusScrapePath:    "/scrape-path",
+					},
+				},
+			},
+			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics -telemetry-prom-service-metrics-url=http://127.0.0.1:8080/admin/metrics -telemetry-prom-service-metrics-url=http://127.0.0.1:9090/metrics",
+			expPorts: []corev1.ContainerPort{
+				{
+					Name:          "prometheus",
+					ContainerPort: 20200,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			name: "service metrics endpoints takes precedence over service-metrics-port",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:                 "web",
+						constants.AnnotationEnableMetrics:           "true",
+						constants.AnnotationEnableMetricsMerging:    "true",
+						constants.AnnotationMergedMetricsPort:       "20100",
+						constants.AnnotationPort:                    "1234",
+						constants.AnnotationServiceMetricsPort:      "9000",
+						constants.AnnotationServiceMetricsPath:      "/ignored",
+						constants.AnnotationServiceMetricsEndpoints: "8080,9090:/admin",
+						constants.AnnotationPrometheusScrapePath:    "/scrape-path",
+					},
+				},
+			},
+			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:8080/metrics -telemetry-prom-service-metrics-url=http://127.0.0.1:9090/admin",
+			expPorts: []corev1.ContainerPort{
+				{
+					Name:          "prometheus",
+					ContainerPort: 20200,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			name: "invalid service metrics endpoints returns an error",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:                 "web",
+						constants.AnnotationEnableMetrics:           "true",
+						constants.AnnotationEnableMetricsMerging:    "true",
+						constants.AnnotationServiceMetricsEndpoints: "8080:metrics",
+					},
+				},
+			},
+			expErr: "must begin with '/'",
+		},
+		{
 			name: "metrics with prometheus port override",
 			pod: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
