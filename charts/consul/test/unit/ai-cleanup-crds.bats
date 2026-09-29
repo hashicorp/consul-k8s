@@ -67,7 +67,7 @@ base_flags=(--set 'connectInject.enabled=false' --set 'global.enabled=false')
         "${base_flags[@]}" \
         . | tee /dev/stderr |
         yq -r '.metadata.annotations["helm.sh/hook-delete-policy"]' | tee /dev/stderr)
-    [ "$actual" = "hook-succeeded,before-hook-creation" ]
+    [ "$actual" = "hook-succeeded,before-hook-creation,hook-failed" ]
 }
 
 #--------------------------------------------------------------------
