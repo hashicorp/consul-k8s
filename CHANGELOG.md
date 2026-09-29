@@ -1,3 +1,34 @@
+## 2.1.0-rc1 (September 29, 2026)
+
+> NOTE: Consul K8s 2.1.x is compatible with Consul 2.1.x and Consul Dataplane 2.1.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+SECURITY:
+
+* build: Revert s390x architecture build support, update `api` submodule, and upgrade `google.golang.org/grpc` to v1.83.2, `golang.org/x/crypto` to v0.57.0, and `go-discover` to v1.5.0 to address CVEs reported in binary and container scans. [[GH-5690](https://github.com/hashicorp/consul-k8s/issues/5690)]
+* security: upgrade Python dependencies in the custom gateway-api 0.7.1 module to fix four advisories: tornado 6.5.5 -> 6.5.7 for GHSA-mgf9-4vpg-hj56 (CVE-2026-49855, AsyncHTTPClient gzip bomb), GHSA-3x9g-8vmp-wqvf (SimpleAsyncHTTPClient cross-origin Authorization/Cookie leak) and GHSA-pw6j-qg29-8w7f (CurlAsyncHTTPClient per-request credential leak on pooled handle reuse); and Markdown 3.3.7 -> 3.8.1 (with mkdocs 1.4.3 -> 1.6.1 to permit it) for GHSA-5wmx-573v-2qwq (CVE-2025-69534) where Python-Markdown raises an uncaught AssertionError on malformed HTML-like input, enabling a remote denial of service [[GH-5473](https://github.com/hashicorp/consul-k8s/issues/5473)]
+* security: upgrade Python dependencies in the custom gateway-api 0.7.1 module: tornado 6.5.7 -> 6.5.8 to fix GHSA-mpf4-983q-p7j4 (CVE-2026-82397) urlencoded POST body DoS and GHSA-8423-8fgw-73vq multipart form-data memory amplification DoS; mkdocs-material 9.1.12 -> 9.7.7 to fix GHSA-xvg9-69gf-fjrf (CVE-2026-73295) DOM-based XSS in search.suggest; also bumps mkdocs-material-extensions 1.1.1 -> 1.3.1 and Pygments 2.15.1 -> 2.21.0 [[GH-5661](https://github.com/hashicorp/consul-k8s/issues/5661)]
+
+FEATURES:
+
+* api-gateway: Add `RouteUpstreamLimitsFilter` CRD and gateway-wide annotation defaults to configure per-service upstream circuit-breaker limits (`maxConnections`, `maxPendingRequests`, `maxConcurrentRequests`) and passive health checks (Envoy outlier detection) on API Gateway backends. [[GH-5596](https://github.com/hashicorp/consul-k8s/issues/5596)]
+* api-gateway: Add support for `http2` and `grpc` listener protocols via a per-section annotation on the Kubernetes `Gateway` object (`api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol`). Each listener can now independently select its Consul protocol, enabling Envoy `http2_protocol_options` and gRPC-specific filters (`grpc_stats`, `grpc_http1_bridge`) to be generated for the appropriate listeners. [[GH-5594](https://github.com/hashicorp/consul-k8s/issues/5594)]
+* api-gateway: Add support for zero-touch downstream TLS termination via the `consul.hashicorp.com/tls-enabled: "true"` annotation. When set on a `Gateway` resource, Consul automatically uses the gateway's Connect leaf certificate to terminate HTTPS — no `certificateRefs` or operator-managed `Secret` required. The leaf certificate carries `*.api-gateway.<domain>` wildcard DNS SANs. Combined with Consul DNS auto-registration (`<service>.api-gateway.consul`), clients inside the cluster can reach mesh-registered services over CA-verified HTTPS without any manual certificate management. [[GH-5597](https://github.com/hashicorp/consul-k8s/issues/5597)]
+* api-gateway: add `RouteHeaderMatchInvertFilter` CRD to support negated HTTP header match conditions (Invert=true) on API Gateway `HTTPRoute` rules, enabling "route when header is absent" and "route when header value does NOT match" patterns via an `ExtensionRef` filter. [[GH-5593](https://github.com/hashicorp/consul-k8s/issues/5593)]
+* api-gateway: upgrade the api-gateway operator to support tcproute under v1 under package version 1.6.0 of gateway-api [[GH-5532](https://github.com/hashicorp/consul-k8s/issues/5532)]
+* crd: Add `ECDHCurves` field and OpenAPI validation to `MeshDirectionalTLSConfig` in `Mesh` CRD for post-quantum hybrid key exchange (`X25519MLKEM768`). [[GH-5639](https://github.com/hashicorp/consul-k8s/issues/5639)]
+* helm: Add `global.globalRegistry` Helm values to configure Consul server integration with an external global registry service, including support for authenticating via a Kubernetes secret token. [[GH-5633](https://github.com/hashicorp/consul-k8s/issues/5633)]
+* helm: add `global.acls.authMethod.create` to allow using Kubernetes auth methods that were configured outside of the Helm release. When set to `false`, the `server-acl-init` job requires the auth methods to already exist and only manages the ACL policies, roles and binding rules. [[GH-5611](https://github.com/hashicorp/consul-k8s/issues/5611)]
+* helm: add `global.acls.authMethod.name` to configure the base name of the Kubernetes auth methods created by the `server-acl-init` job. Set this to a unique value per Kubernetes cluster when multiple clusters share a single Consul control plane, so that the clusters do not overwrite each other's auth methods. [[GH-5611](https://github.com/hashicorp/consul-k8s/issues/5611)]
+* metrics: add a new `consul.hashicorp.com/service-metrics-endpoints` annotation that accepts a comma-separated list of `port:path` pairs, allowing a single container to expose metrics on multiple ports for metrics merging. Takes precedence over `consul.hashicorp.com/service-metrics-port` and `consul.hashicorp.com/service-metrics-path`, which continue to work unchanged. [[GH-5664](https://github.com/hashicorp/consul-k8s/issues/5664)]
+
+IMPROVEMENTS:
+
+* helm: add `global.imageApplyManifests` value to allow overriding the container image used by the post-upgrade apply-manifests Job, enabling use of air-gapped or security-approved images in place of the default `bitnami/kubectl:latest` (non-OpenShift) or `registry.redhat.io/openshift4/ose-cli` (OpenShift). [[GH-5673](https://github.com/hashicorp/consul-k8s/issues/5673)]
+* ci: Increased the stale PR automation windows to 90 days before marking a pull request stale and 60 days before closing it. [[GH-5506](https://github.com/hashicorp/consul-k8s/issues/5506)]
+* control-plane: Migrate traffic redirection from `iptables`/`ip6tables` to `nftables`. This requires the `nft` binary and Linux kernel support for stateful NAT in `nftables` `inet` chains (Linux 5.2+ or distro backports); hosts without this support will fail to set up transparent-proxy traffic redirection. [[GH-5554](https://github.com/hashicorp/consul-k8s/issues/5554)]
+* test: Fix flaky test by refactoring repeated ingress setup and manually triggering ingress upsert for fake clients, since fake Kubernetes informers don’t emit nested watch events like production. [[GH-5306](https://github.com/hashicorp/consul-k8s/issues/5306)]
+
 ## 2.0.3 (August 11, 2026)
 
 SECURITY:
