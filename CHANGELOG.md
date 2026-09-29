@@ -5,8 +5,7 @@
 
 SECURITY:
 
-* build: Revert s390x architecture build support, update `api` submodule, and upgrade `google.golang.org/grpc` to v1.83.2, `golang.org/x/crypto` to v0.57.0, and `go-discover` to v1.5.0 to address CVEs reported in binary and container scans. [[GH-5690](https://github.com/hashicorp/consul-k8s/issues/5690)]
-* security: upgrade Python dependencies in the custom gateway-api 0.7.1 module to fix four advisories: tornado 6.5.5 -> 6.5.7 for GHSA-mgf9-4vpg-hj56 (CVE-2026-49855, AsyncHTTPClient gzip bomb), GHSA-3x9g-8vmp-wqvf (SimpleAsyncHTTPClient cross-origin Authorization/Cookie leak) and GHSA-pw6j-qg29-8w7f (CurlAsyncHTTPClient per-request credential leak on pooled handle reuse); and Markdown 3.3.7 -> 3.8.1 (with mkdocs 1.4.3 -> 1.6.1 to permit it) for GHSA-5wmx-573v-2qwq (CVE-2025-69534) where Python-Markdown raises an uncaught AssertionError on malformed HTML-like input, enabling a remote denial of service [[GH-5473](https://github.com/hashicorp/consul-k8s/issues/5473)]
+* security: update `api` submodule, and upgrade `google.golang.org/grpc` to v1.83.2, `golang.org/x/crypto` to v0.57.0, and `go-discover` to v1.5.0 to address CVEs reported in binary and container scans. [[GH-5690](https://github.com/hashicorp/consul-k8s/issues/5690)]
 * security: upgrade Python dependencies in the custom gateway-api 0.7.1 module: tornado 6.5.7 -> 6.5.8 to fix GHSA-mpf4-983q-p7j4 (CVE-2026-82397) urlencoded POST body DoS and GHSA-8423-8fgw-73vq multipart form-data memory amplification DoS; mkdocs-material 9.1.12 -> 9.7.7 to fix GHSA-xvg9-69gf-fjrf (CVE-2026-73295) DOM-based XSS in search.suggest; also bumps mkdocs-material-extensions 1.1.1 -> 1.3.1 and Pygments 2.15.1 -> 2.21.0 [[GH-5661](https://github.com/hashicorp/consul-k8s/issues/5661)]
 
 FEATURES:
@@ -25,9 +24,7 @@ FEATURES:
 IMPROVEMENTS:
 
 * helm: add `global.imageApplyManifests` value to allow overriding the container image used by the post-upgrade apply-manifests Job, enabling use of air-gapped or security-approved images in place of the default `bitnami/kubectl:latest` (non-OpenShift) or `registry.redhat.io/openshift4/ose-cli` (OpenShift). [[GH-5673](https://github.com/hashicorp/consul-k8s/issues/5673)]
-* ci: Increased the stale PR automation windows to 90 days before marking a pull request stale and 60 days before closing it. [[GH-5506](https://github.com/hashicorp/consul-k8s/issues/5506)]
 * control-plane: Migrate traffic redirection from `iptables`/`ip6tables` to `nftables`. This requires the `nft` binary and Linux kernel support for stateful NAT in `nftables` `inet` chains (Linux 5.2+ or distro backports); hosts without this support will fail to set up transparent-proxy traffic redirection. [[GH-5554](https://github.com/hashicorp/consul-k8s/issues/5554)]
-* test: Fix flaky test by refactoring repeated ingress setup and manually triggering ingress upsert for fake clients, since fake Kubernetes informers don’t emit nested watch events like production. [[GH-5306](https://github.com/hashicorp/consul-k8s/issues/5306)]
 
 ## 2.0.3 (August 11, 2026)
 
