@@ -1,21 +1,15 @@
-# Reusable workflow that posts a failure notification to the
-# #feed-consul-k8s-ci Slack channel. Callers invoke this with `if: failure()`
-# so the channel is alerted when a scheduled workflow in THIS repo fails.
+# Reusable workflow that posts a failure notification to the #feed-consul-k8s-ci
+# Slack channel. Callers invoke this with `if: failure()` so the channel is
+# alerted when a scheduled workflow in this repo fails.
 #
-# Scope: this covers the consul-k8s-side scheduled workflows (the thin jobs that
-# dispatch to consul-k8s-workflows, plus the stale-pr/stale-branch maintenance
-# jobs). These run on GitHub-hosted runners, which cannot reach the internal CI
-# Vault (that requires self-hosted runners + the vault-auth helper). The deeper
-# acceptance-test failures are notified separately from consul-k8s-workflows via
-# its Vault-backed reusable-slack-error.yml.
+# This mirrors consul-k8s-workflows' reusable-slack-error.yml: it runs on a
+# self-hosted runner, authenticates to the CI Vault via OIDC (the `vault-auth`
+# helper), reads the Slack webhook from Vault, and posts the same Workflow
+# Builder payload (Message/Repository/Branch/Commit/Run).
 #
-# Because GitHub-hosted runners can't use Vault, the webhook is provided as a
-# GitHub Actions secret named SLACK_FEED_CONSUL_K8S_CI_WEBHOOK containing a Slack
-# incoming-webhook URL for the #feed-consul-k8s-ci channel (repo- or org-level).
-#
-# The payload keys (Message/Repository/Branch/Commit/Run) mirror the contract used
-# by consul-k8s-workflows' reusable-slack-error.yml so both notifiers feed the same
-# Slack Workflow Builder variables for #feed-consul-k8s-ci.
+# Prerequisites (provisioned in the CI Vault for this repo):
+#   * A JWT auth role bound to hashicorp/consul-k8s (auth/github-jwt).
+#   * A KV secret at kv/data/github/hashicorp/consul-k8s/slack with key `webhook`.
 name: reusable-slack-notify
 
 on:
@@ -25,21 +19,38 @@ on:
         description: "Human readable name of the workflow that failed."
         required: true
         type: string
-    secrets:
-      SLACK_FEED_CONSUL_K8S_CI_WEBHOOK:
-        required: true
 
 jobs:
   slack-notify:
     name: slack-notify
-    runs-on: ubuntu-latest
-    permissions: {}
+    runs-on: ['self-hosted', 'linux', 'small']
+    permissions:
+      id-token: write # Note: this permission is explicitly required for Vault auth
+      contents: read
     steps:
-      - name: Send failure notification to Slack
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+      - name: Checkout code
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - name: Authenticate to Vault
+        id: vault-auth
+        run: vault-auth
+
+      - name: Retrieve Vault-hosted Secrets
+        id: secrets
+        uses: hashicorp/vault-action@4c06c5ccf5c0761b6029f56cfb1dcf5565918a3b # v3.4.0
         with:
-          webhook: ${{ secrets.SLACK_FEED_CONSUL_K8S_CI_WEBHOOK }}
-          webhook-type: incoming-webhook
+          url: ${{ steps.vault-auth.outputs.addr }}
+          caCertificate: ${{ steps.vault-auth.outputs.ca_certificate }}
+          token: ${{ steps.vault-auth.outputs.token }}
+          secrets: |
+            kv/data/github/${{ github.repository }}/slack webhook | SLACK_WEBHOOK_URL ;
+
+      - name: Slack
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+        with:
           payload: |
             {
               "Message": ":x: ${{ inputs.workflow-name }} failed",

@@ -30,7 +30,9 @@ jobs:
     name: slack-notify
     needs: api-gateway-conformance
     if: failure()
+    permissions:
+      id-token: write
+      contents: read
     uses: ./.github/workflows/reusable-slack-notify.yml
     with:
       workflow-name: nightly-api-gateway-conformance
-    secrets: inherit

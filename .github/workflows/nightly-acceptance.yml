@@ -29,7 +29,9 @@ jobs:
     name: slack-notify
     needs: cloud
     if: failure()
+    permissions:
+      id-token: write
+      contents: read
     uses: ./.github/workflows/reusable-slack-notify.yml
     with:
       workflow-name: nightly-acceptance
-    secrets: inherit
