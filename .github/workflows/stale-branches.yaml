@@ -24,3 +24,12 @@ jobs:
           ignore-issue-interaction: true
           pr-check: true
           max-issues: 500
+
+  slack-notify:
+    name: slack-notify
+    needs: stale_branches
+    if: failure()
+    uses: ./.github/workflows/reusable-slack-notify.yml
+    with:
+      workflow-name: Stale Branches
+    secrets: inherit

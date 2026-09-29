@@ -1,0 +1,51 @@
+# Reusable workflow that posts a failure notification to the
+# #feed-consul-k8s-ci Slack channel. Callers invoke this with `if: failure()`
+# so the channel is alerted when a scheduled workflow in THIS repo fails.
+#
+# Scope: this covers the consul-k8s-side scheduled workflows (the thin jobs that
+# dispatch to consul-k8s-workflows, plus the stale-pr/stale-branch maintenance
+# jobs). These run on GitHub-hosted runners, which cannot reach the internal CI
+# Vault (that requires self-hosted runners + the vault-auth helper). The deeper
+# acceptance-test failures are notified separately from consul-k8s-workflows via
+# its Vault-backed reusable-slack-error.yml.
+#
+# Because GitHub-hosted runners can't use Vault, the webhook is provided as a
+# GitHub Actions secret named SLACK_FEED_CONSUL_K8S_CI_WEBHOOK containing a Slack
+# incoming-webhook URL for the #feed-consul-k8s-ci channel (repo- or org-level).
+name: reusable-slack-notify
+
+on:
+  workflow_call:
+    inputs:
+      workflow-name:
+        description: "Human readable name of the workflow that failed."
+        required: true
+        type: string
+    secrets:
+      SLACK_FEED_CONSUL_K8S_CI_WEBHOOK:
+        required: true
+
+jobs:
+  slack-notify:
+    name: slack-notify
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Send failure notification to Slack
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_FEED_CONSUL_K8S_CI_WEBHOOK }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":x: Workflow *${{ inputs.workflow-name }}* failed on `${{ github.ref_name }}` in `${{ github.repository }}`",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":x: *${{ inputs.workflow-name }}* failed in `${{ github.repository }}`\n*Branch:* `${{ github.ref_name }}`\n*Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.run_id }}>"
+                  }
+                }
+              ]
+            }

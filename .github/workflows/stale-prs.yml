@@ -29,3 +29,12 @@ jobs:
             leave a comment and it will be re-surfaced for the maintainers to review.
           stale-pr-label: meta/stale
           exempt-pr-labels: meta/staleproof
+
+  slack-notify:
+    name: slack-notify
+    needs: stale
+    if: failure()
+    uses: ./.github/workflows/reusable-slack-notify.yml
+    with:
+      workflow-name: stale prs
+    secrets: inherit
