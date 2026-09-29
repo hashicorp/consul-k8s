@@ -5,16 +5,22 @@ package aicleanup
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -44,6 +50,104 @@ func TestRun_noCRDs(t *testing.T) {
 		ctx:       context.Background(),
 	}
 	require.Equal(t, 0, cmd.Run([]string{}))
+}
+
+func TestIsCRDAbsent(t *testing.T) {
+	t.Parallel()
+
+	gv := v1alpha1.GroupVersion
+	noMatch := &meta.NoResourceMatchError{PartialResource: gv.WithResource("")}
+	notFound := k8serrors.NewNotFound(gv.WithResource("inferencegateways").GroupResource(), "")
+	forbidden := k8serrors.NewForbidden(gv.WithResource("inferencegateways").GroupResource(), "", errors.New("access denied"))
+	discoveryMissing := &apiutil.ErrResourceDiscoveryFailed{gv: noMatch}
+	unregistered := runtime.NewNotRegisteredErrForKind("test", gv.WithKind("InferenceGateway"))
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil"},
+		{name: "not found", err: notFound, want: true},
+		{name: "no matching resource", err: noMatch, want: true},
+		{name: "no matching kind", err: &meta.NoKindMatchError{GroupKind: gv.WithKind("InferenceGateway").GroupKind()}, want: true},
+		{name: "unregistered kind", err: unregistered, want: true},
+		{name: "wrapped unregistered kind", err: fmt.Errorf("list: %w", unregistered), want: true},
+		{name: "missing API group", err: discoveryMissing, want: true},
+		{name: "wrapped discovery", err: fmt.Errorf("list: %w", discoveryMissing), want: true},
+		{name: "discovery not found", err: &apiutil.ErrResourceDiscoveryFailed{gv: notFound}, want: true},
+		{name: "empty discovery error", err: &apiutil.ErrResourceDiscoveryFailed{}},
+		{name: "forbidden", err: forbidden},
+		{name: "unauthorized", err: k8serrors.NewUnauthorized("authentication required")},
+		{name: "discovery forbidden", err: &apiutil.ErrResourceDiscoveryFailed{gv: forbidden}},
+		{name: "discovery unavailable", err: &apiutil.ErrResourceDiscoveryFailed{gv: k8serrors.NewServiceUnavailable("API unavailable")}},
+		{name: "discovery timeout", err: &apiutil.ErrResourceDiscoveryFailed{gv: context.DeadlineExceeded}},
+		{name: "mixed discovery failures", err: &apiutil.ErrResourceDiscoveryFailed{
+			gv: noMatch,
+			{Group: "other.example.com", Version: "v1"}: forbidden,
+		}},
+		{name: "joined failures", err: errors.Join(noMatch, context.DeadlineExceeded)},
+		{name: "error text is not sufficient", err: errors.New("no matches for kind InferenceGateway: access denied")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isCRDAbsent(tt.err))
+		})
+	}
+}
+
+func TestRun_discoveryErrors(t *testing.T) {
+	t.Parallel()
+
+	gv := v1alpha1.GroupVersion
+	for _, tt := range []struct {
+		name     string
+		err      error
+		wantCode int
+	}{
+		{
+			name: "missing API group",
+			err: &apiutil.ErrResourceDiscoveryFailed{
+				gv: &meta.NoResourceMatchError{PartialResource: gv.WithResource("")},
+			},
+		},
+		{
+			name: "mixed discovery failure",
+			err: &apiutil.ErrResourceDiscoveryFailed{
+				gv: &meta.NoResourceMatchError{PartialResource: gv.WithResource("")},
+				{Group: "other.example.com", Version: "v1"}: k8serrors.NewServiceUnavailable("API unavailable"),
+			},
+			wantCode: 1,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var listed []string
+			fc := fake.NewClientBuilder().WithScheme(testScheme(t)).WithInterceptorFuncs(interceptor.Funcs{
+				List: func(_ context.Context, _ client.WithWatch, list client.ObjectList, _ ...client.ListOption) error {
+					listed = append(listed, fmt.Sprintf("%T", list))
+					return tt.err
+				},
+			}).Build()
+			ui := cli.NewMockUi()
+			cmd := &Command{UI: ui, k8sClient: fc, ctx: context.Background()}
+
+			require.Equal(t, tt.wantCode, cmd.Run(nil))
+			if tt.wantCode == 0 {
+				require.Equal(t, []string{
+					"*v1alpha1.InferenceGatewayList",
+					"*v1alpha1.InferenceModelConfigList",
+					"*v1alpha1.McpServerConfigList",
+					"*v1alpha1.AgentConfigList",
+					"*v1alpha1.InferencePoolConfigList",
+				}, listed)
+				require.Empty(t, ui.ErrorWriter.String())
+				require.Contains(t, ui.OutputWriter.String(), "AI CRD cleanup complete.")
+			} else {
+				require.Len(t, listed, 1)
+				require.Contains(t, ui.ErrorWriter.String(), tt.err.Error())
+				require.NotContains(t, ui.OutputWriter.String(), "AI CRD cleanup complete.")
+			}
+		})
+	}
 }
 
 // TestRun_noResources verifies the command exits 0 when CRDs are present but

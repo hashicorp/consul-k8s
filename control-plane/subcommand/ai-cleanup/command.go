@@ -17,13 +17,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff"
 	"github.com/mitchellh/cli"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -280,21 +280,23 @@ func (c *Command) deleteAndWait(obj client.Object, removeFinalizers bool) error 
 // in the cluster — either the API group is unknown or the resource kind has no
 // match. This happens when the CRD was never installed or was already deleted.
 func isCRDAbsent(err error) bool {
-	return k8serrors.IsNotFound(err) ||
-		isNoMatchError(err)
-}
-
-// isNoMatchError detects runtime.IsNotRegisteredError and
-// meta.IsNoMatchError by checking the error message, since both are
-// non-exported types in controller-runtime's dependency tree.
-func isNoMatchError(err error) bool {
-	if err == nil {
-		return false
+	// Discovery errors can contain multiple causes. Do not hide a real API
+	// failure just because another cause indicates a missing resource.
+	if aggregate, ok := err.(interface{ Unwrap() []error }); ok {
+		causes := aggregate.Unwrap()
+		for _, cause := range causes {
+			if !isCRDAbsent(cause) {
+				return false
+			}
+		}
+		return len(causes) > 0
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "no matches for kind") ||
-		strings.Contains(msg, "no kind is registered") ||
-		strings.Contains(msg, "is not registered")
+	if cause := errors.Unwrap(err); cause != nil {
+		return isCRDAbsent(cause)
+	}
+	return k8serrors.IsNotFound(err) ||
+		meta.IsNoMatchError(err) ||
+		runtime.IsNotRegisteredError(err)
 }
 
 func exponentialBackoff() *backoff.ExponentialBackOff {
