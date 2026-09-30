@@ -29,9 +29,8 @@ jobs:
     name: slack-notify
     needs: cleanup
     if: failure()
-    permissions:
-      id-token: write
-      contents: read
     uses: ./.github/workflows/reusable-slack-notify.yml
     with:
       workflow-name: nightly-cleanup
+    secrets:
+      CONSUL_K8S_CI_SLACK_WEBHOOK: ${{ secrets.CONSUL_K8S_CI_SLACK_WEBHOOK }}
