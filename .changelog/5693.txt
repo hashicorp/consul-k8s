@@ -1,7 +1,0 @@
-```release-note:improvement
-connect-inject: Inject consul-obo-inbound and consul-obo-outbound into pods annotated consul.hashicorp.com/ai-role=ai-agent. The annotation is the only gate; images come from ai.obo.inbound.image and ai.obo.outbound.image, and admission fails if either is empty.
-```
-
-```release-note:bug
-connect-inject: Run the InferenceGateway dataplane and inference-gateway containers as the same uid (5995, or the OpenShift namespace range when OpenShift is enabled), and stop passing removed -config-entry and -consul-http-addr flags so the ext_proc sidecar starts and Envoy can dial its socket.
-```
