@@ -4,8 +4,9 @@
 #
 # This mirrors consul-k8s-workflows' reusable-slack-error.yml: it runs on a
 # self-hosted runner, authenticates to the CI Vault via OIDC (the `vault-auth`
-# helper), reads the Slack webhook from Vault, and posts the same Workflow
-# Builder payload (Message/Repository/Branch/Commit/Run).
+# helper), and reads the Slack webhook from Vault. The webhook is a Slack App
+# Incoming Webhook (hooks.slack.com/services/...), so the payload is a Slack
+# Block Kit message (text + blocks).
 #
 # Prerequisites (provisioned in the CI Vault for this repo):
 #   * A JWT auth role bound to hashicorp/consul-k8s (auth/github-jwt).
@@ -53,9 +54,14 @@ jobs:
         with:
           payload: |
             {
-              "Message": ":x: ${{ inputs.workflow-name }} failed",
-              "Repository": "${{ github.repository }}",
-              "Branch": "${{ github.ref_name }}",
-              "Commit": "${{ github.sha }}",
-              "Run": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": ":x: ${{ inputs.workflow-name }} failed in ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":x: *${{ inputs.workflow-name }}* failed\n*Repository:* `${{ github.repository }}`\n*Branch:* `${{ github.ref_name }}`\n*Commit:* `${{ github.sha }}`\n*Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+                  }
+                }
+              ]
             }
