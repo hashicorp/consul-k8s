@@ -69,10 +69,9 @@ type Command struct {
 
 	flagSnapshotAgent bool
 
-	flagMeshGateway             bool
-	flagIngressGatewayNames     []string
-	flagTerminatingGatewayNames []string
-
+	flagMeshGateway              bool
+	flagIngressGatewayNames      []string
+	flagTerminatingGatewayNames  []string
 	// Flags to configure Consul connection.
 	flagServerPort uint
 

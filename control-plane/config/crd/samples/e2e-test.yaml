@@ -1,0 +1,79 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# E2E test manifests for the InferenceGateway operator.
+# Apply with: kubectl apply -f control-plane/config/crd/samples/e2e-test.yaml
+# Watch:      kubectl get igw,ipc -n default -w
+# Conditions: kubectl get igw my-gateway -n default -o jsonpath='{.status.conditions}' | jq .
+---
+# 1. InferencePoolConfig — defines routing, rate-limits and which gateway owns it.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: InferencePoolConfig
+metadata:
+  name: my-pool
+  namespace: default
+spec:
+  enabled: true
+  parentRefs:
+    - kind: InferenceGateway
+      name: my-gateway
+  routing:
+    matchRules:
+      - when:
+          path: /v1/chat/completions
+        candidates:
+          - gpt-4o
+          - gpt-4
+      - when:
+          path: /v1/completions
+        candidates:
+          - gpt-3.5-turbo
+    fallback:
+      retryOn:
+        - 5xx
+        - reset
+      maxTiers: 3
+      perTryTimeout: 30s
+    retry:
+      maxAttempts: 2
+      retryOn:
+        - 5xx
+    timeout:
+      connect: 5s
+      request: 120s
+  rateLimit:
+    enabled: true
+    enforcement: deny
+    mode: soft
+    countMode: total
+    dimensions:
+      - tier
+      - global
+    degradeMode: fail_closed
+    default:
+      requests:
+        count: 100
+        window: minute
+      tokens:
+        count: 50000
+        window: minute
+    tierLimits:
+      - tier: premium
+        maxCompletionTokensCap: 4096
+        requests:
+          count: 500
+          window: minute
+    tierBindings:
+      - tier: premium
+        spiffeIDs:
+          - spiffe://dc1/ns/default/dc/dc1/svc/my-app
+---
+# 2. InferenceGateway — references the pool above.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: InferenceGateway
+metadata:
+  name: my-gateway
+  namespace: default
+spec:
+  poolRef:
+    name: my-pool

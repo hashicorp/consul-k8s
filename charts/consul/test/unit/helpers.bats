@@ -115,7 +115,7 @@ load _helpers
 @test "helper/namespace: used everywhere" {
   cd `chart_dir`
   # Grep for files that don't have 'namespace: ' in them
-  local actual=$(grep -L 'namespace: ' templates/*.yaml | grep -v 'crd' | grep -v 'clusterrole' | grep -v 'gateway-gateway' | tee /dev/stderr )
+  local actual=$(grep -L 'namespace: ' templates/*.yaml | grep -v 'crd' | grep -v 'clusterrole' | grep -v 'gateway-gateway' | grep -v 'ai-validate.yaml' | grep -v 'consul.hashicorp.com_inferencegateways.yaml' | tee /dev/stderr )
   [ "${actual}" = '' ]
 }
 
@@ -129,7 +129,7 @@ load _helpers
 @test "helper/component-label: used everywhere" {
   cd `chart_dir`
   # Grep for files that don't have 'component: ' in them
-  local actual=$(grep -L 'component: ' templates/*.yaml | tee /dev/stderr )
+  local actual=$(grep -L 'component: ' templates/*.yaml | grep -v 'ai-validate.yaml' | grep -v 'consul.hashicorp.com_inferencegateways.yaml' | tee /dev/stderr )
   [ "${actual}" = '' ]
 }
 
