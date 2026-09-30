@@ -113,7 +113,6 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 			Clientset:              clientset,
 			ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			ImageConsulDataplane:   "dataplane:test",
-			EnableOBO:              true,
 			ImageConsulOBOInbound:  "obo-inbound:test",
 			ImageConsulOBOOutbound: "obo-outbound:test",
 		}

@@ -4101,13 +4101,9 @@ ai:
 
   # OBO (on-behalf-of) identity-plane sidecars for ai-agent pods.
   # Split-knowledge: envelope ciphertext on Envoy UDS + DEK via dataplane broker.
-  # Required when injecting ai-role=ai-agent; webhook errors if unset.
+  # Injected whenever a pod has consul.hashicorp.com/ai-role=ai-agent; webhook
+  # errors if images are unset. No separate enable flag — the ai-role is the gate.
   obo:
-    # enabled controls whether OBO identity-plane sidecars are injected into
-    # ai-role=ai-agent pods. Set to false for local dev / playground environments
-    # that do not have an IBM Verify tenant. Default: false.
-    # @type: boolean
-    enabled: false
     inbound:
       # Docker image for consul-obo-inbound (loopback :21102).
       # Binary source: consul-ai-apps/gateways/obo-inbound
