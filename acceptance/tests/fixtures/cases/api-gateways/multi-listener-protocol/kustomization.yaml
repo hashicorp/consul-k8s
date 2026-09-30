@@ -1,0 +1,26 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# This kustomization deploys shared infrastructure for the multi-listener
+# protocol acceptance test (TestAPIGateway_MultiListenerProtocol).
+#
+# What is included here:
+#   - GatewayClassConfig + GatewayClass  (cluster-scoped, shared)
+#   - Three backend servers (http-server, grpc-server, h2-server), each with
+#     a Deployment, Service, ServiceAccount, and ServiceDefaults CRD that
+#     declares the protocol Consul uses when the gateway routes to them.
+#
+# What is NOT included here:
+#   - The Gateway itself and all HTTPRoutes — they are created/patched
+#     programmatically by the test so each day-N step has precise control
+#     over the listener list and annotations.
+resources:
+  - gatewayclassconfig.yaml
+  - gatewayclass.yaml
+  - http-server.yaml
+  - grpc-server.yaml
+  - h2-server.yaml
+  - servicedefaults.yaml

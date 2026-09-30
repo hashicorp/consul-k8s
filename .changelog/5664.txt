@@ -1,0 +1,3 @@
+```release-note:feature
+metrics: add a new `consul.hashicorp.com/service-metrics-endpoints` annotation that accepts a comma-separated list of `port:path` pairs, allowing a single container to expose metrics on multiple ports for metrics merging. Takes precedence over `consul.hashicorp.com/service-metrics-port` and `consul.hashicorp.com/service-metrics-path`, which continue to work unchanged.
+```

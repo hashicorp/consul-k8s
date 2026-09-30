@@ -20,8 +20,10 @@ import (
 // https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
 const defaultKubernetesHost = "https://kubernetes.default.svc"
 
-// configureConnectInject sets up auth methods so that connect injection will
-// work.
+// configureConnectInjectAuthMethod creates the auth method that service mesh
+// workloads use to log in to Consul. The binding rule is managed separately by
+// createConnectInjectBindingRule so that it is also applied when the auth method
+// is pre-configured outside of this command.
 func (c *Command) configureConnectInjectAuthMethod(client *consul.DynamicClient, authMethodName string) error {
 
 	// Create the auth method template. This requires calls to the
@@ -61,7 +63,7 @@ func (c *Command) configureConnectInjectAuthMethod(client *consul.DynamicClient,
 		}
 	}
 
-	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
+	return c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
 		func() error {
 			var err error
 			err = client.RefreshClient()
@@ -74,10 +76,11 @@ func (c *Command) configureConnectInjectAuthMethod(client *consul.DynamicClient,
 			_, _, err = client.ConsulClient.ACL().AuthMethodCreate(&authMethodTmpl, &writeOptions)
 			return err
 		})
-	if err != nil {
-		return err
-	}
+}
 
+// createConnectInjectBindingRule creates the binding rule that maps a workload's
+// Kubernetes service account to a Consul service identity.
+func (c *Command) createConnectInjectBindingRule(client *consul.DynamicClient, authMethodName string) error {
 	abr := api.ACLBindingRule{
 		Description: "Kubernetes binding rule",
 		AuthMethod:  authMethodName,

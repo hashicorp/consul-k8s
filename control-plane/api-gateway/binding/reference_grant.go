@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 type referenceValidator struct {
@@ -59,7 +58,7 @@ func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRo
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(backendRef.Name))
 }
 
-func (rv *referenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1.BackendRef) bool {
+func (rv *referenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1.TCPRoute, backendRef gwv1.BackendRef) bool {
 	fromNS := tcpRoute.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: tcpRoute.GroupVersionKind().Group,
