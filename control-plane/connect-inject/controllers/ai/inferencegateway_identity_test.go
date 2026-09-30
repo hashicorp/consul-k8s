@@ -187,9 +187,10 @@ func TestInferenceGatewayNamespaceWiring(t *testing.T) {
 			require.Equal(t, tc.wantNamespace, dep.Spec.Template.Annotations[constants.AnnotationGatewayNamespace])
 			require.Equal(t, entry.GetName(), dep.Spec.Template.Annotations[constants.AnnotationGatewayConsulServiceName])
 			require.Equal(t, entry.GetName(), dep.Spec.Template.Spec.ServiceAccountName)
-			require.Contains(t, dep.Spec.Template.Spec.Containers[1].Args, "-uds-path=/run/consul/ext_proc.sock")
-			require.NotContains(t, dep.Spec.Template.Spec.Containers[1].Args, "-config-entry="+entry.GetName())
-			require.NotContains(t, dep.Spec.Template.Spec.Containers[1].Args, "-consul-http-addr=")
+			gwArgs := strings.Join(dep.Spec.Template.Spec.Containers[1].Args, " ")
+			require.Contains(t, gwArgs, "-uds-path=/run/consul/ext_proc.sock")
+			require.NotContains(t, gwArgs, "-config-entry=")
+			require.NotContains(t, gwArgs, "-consul-http-addr=")
 			require.Equal(t, sidecarUserAndGroupID, *dep.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
 			require.Equal(t, sidecarUserAndGroupID, *dep.Spec.Template.Spec.Containers[1].SecurityContext.RunAsUser)
 			require.Contains(t, dep.Spec.Template.Spec.InitContainers[0].Command[2], "-service-name="+entry.GetName())
@@ -249,7 +250,7 @@ func TestInferenceGatewayDeploymentNamespaceMigration(t *testing.T) {
 	ctx := context.Background()
 	igw := minimalIGW("foo", "ns-a", "pool")
 	pool := enabledPool("pool", "ns-a")
-	dep := deploymentFor(igw, pool, "dp", "k8s", "igw", 8443, corev1.ResourceRequirements{}, deploymentConsulConfig{})
+	dep := deploymentFor(igw, pool, "dp", "k8s", "igw", 8443, corev1.ResourceRequirements{}, sidecarUserAndGroupID, sidecarUserAndGroupID, deploymentConsulConfig{})
 	dep.UID = "existing-deployment"
 	dep.Spec.Template.Spec.ServiceAccountName = igw.Name
 	dep.Spec.Template.Annotations[constants.AnnotationGatewayConsulServiceName] = igw.Name
@@ -425,4 +426,77 @@ func TestInferenceGatewayConfigIsolation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInferenceGatewayOpenShiftSharesNamespaceUID(t *testing.T) {
+	igw := minimalIGW("foo", "ns-a", "pool")
+	pool := enabledPool("pool", "ns-a")
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ns-a",
+			Annotations: map[string]string{
+				constants.AnnotationOpenShiftUIDRange: "1000700000/5",
+				constants.AnnotationOpenShiftGroups:   "1000700000/5",
+			},
+		},
+	}
+	k8sClient := fake.NewClientBuilder().WithScheme(igwScheme(t)).WithObjects(ns).Build()
+	cfg, watcher := consulMockServer(t)
+	controller := igwController(t, k8sClient, cfg, watcher)
+	controller.EnableOpenShift = true
+
+	require.NoError(t, controller.reconcileDeployment(context.Background(), igw, pool))
+	dep := &appsv1.Deployment{}
+	require.NoError(t, k8sClient.Get(context.Background(), types.NamespacedName{Namespace: igw.Namespace, Name: igw.Name}, dep))
+	// 1000700000/5 is 1000700000..1000700004; mesh sidecar identity is the second-to-last id.
+	const want int64 = 1000700003
+	for _, c := range dep.Spec.Template.Spec.Containers {
+		require.Equal(t, want, *c.SecurityContext.RunAsUser)
+		require.Equal(t, want, *c.SecurityContext.RunAsGroup)
+	}
+	require.NotEqual(t, sidecarUserAndGroupID, want)
+}
+
+func TestInferenceGatewayOpenShiftRequiresNamespaceRange(t *testing.T) {
+	igw := minimalIGW("foo", "ns-a", "pool")
+	pool := enabledPool("pool", "ns-a")
+	cfg, watcher := consulMockServer(t)
+
+	t.Run("missing namespace", func(t *testing.T) {
+		k8sClient := fake.NewClientBuilder().WithScheme(igwScheme(t)).Build()
+		controller := igwController(t, k8sClient, cfg, watcher)
+		controller.EnableOpenShift = true
+		err := controller.reconcileDeployment(context.Background(), igw, pool)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "reading namespace")
+	})
+
+	t.Run("invalid range", func(t *testing.T) {
+		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name:        "ns-a",
+			Annotations: map[string]string{constants.AnnotationOpenShiftUIDRange: "not-a-range"},
+		}}
+		k8sClient := fake.NewClientBuilder().WithScheme(igwScheme(t)).WithObjects(ns).Build()
+		controller := igwController(t, k8sClient, cfg, watcher)
+		controller.EnableOpenShift = true
+		err := controller.reconcileDeployment(context.Background(), igw, pool)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "openshift sidecar uid")
+	})
+
+	t.Run("invalid group range", func(t *testing.T) {
+		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: "ns-a",
+			Annotations: map[string]string{
+				constants.AnnotationOpenShiftUIDRange: "1000700000/5",
+				constants.AnnotationOpenShiftGroups:   "not-a-range",
+			},
+		}}
+		k8sClient := fake.NewClientBuilder().WithScheme(igwScheme(t)).WithObjects(ns).Build()
+		controller := igwController(t, k8sClient, cfg, watcher)
+		controller.EnableOpenShift = true
+		err := controller.reconcileDeployment(context.Background(), igw, pool)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "openshift sidecar gid")
+	})
 }

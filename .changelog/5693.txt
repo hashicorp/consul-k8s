@@ -1,7 +1,7 @@
 ```release-note:improvement
-connect-inject: Inject consul-obo-inbound and consul-obo-outbound for pods labeled consul.hashicorp.com/ai-role=ai-agent. Remove the ai.obo.enabled Helm value and the -enable-obo flag; missing OBO images fail admission.
+connect-inject: Inject consul-obo-inbound and consul-obo-outbound for pods labeled consul.hashicorp.com/ai-role=ai-agent. Remove the ai.obo.enabled Helm value and the -enable-obo flag; missing OBO images fail admission. Pass the OBO image flags even when ai.enabled is false so the annotation is the only gate.
 ```
 
 ```release-note:bug
-connect-inject: Run the InferenceGateway dataplane and inference-gateway containers as the same uid, and stop passing removed -config-entry and -consul-http-addr flags so the ext_proc sidecar starts and Envoy can dial its socket.
+connect-inject: Run the InferenceGateway dataplane and inference-gateway containers as the same uid (5995, or the OpenShift namespace range when OpenShift is enabled), and stop passing removed -config-entry and -consul-http-addr flags so the ext_proc sidecar starts and Envoy can dial its socket.
 ```

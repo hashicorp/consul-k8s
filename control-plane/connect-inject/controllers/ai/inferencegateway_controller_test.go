@@ -765,7 +765,7 @@ func TestInferenceGatewayReconcile_ReadyReplicas(t *testing.T) {
 		// Pre-create a Deployment with ReadyReplicas=1 in the fake store.
 		// The controller reads Deployment.Status.ReadyReplicas after reconcileDeployment,
 		// so seeding it here simulates a running pod.
-		existingDep := deploymentFor(igw, pool, "consul-dataplane:latest", "consul-k8s:latest", "test-gateway-image:latest", inferenceGatewayServicePort, corev1.ResourceRequirements{}, deploymentConsulConfig{address: "consul-server.default.svc"})
+		existingDep := deploymentFor(igw, pool, "consul-dataplane:latest", "consul-k8s:latest", "test-gateway-image:latest", inferenceGatewayServicePort, corev1.ResourceRequirements{}, sidecarUserAndGroupID, sidecarUserAndGroupID, deploymentConsulConfig{address: "consul-server.default.svc"})
 		existingDep.Status.ReadyReplicas = 1
 
 		fakeClient := fake.NewClientBuilder().
