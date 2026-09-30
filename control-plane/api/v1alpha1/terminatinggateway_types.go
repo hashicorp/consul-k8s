@@ -5,7 +5,10 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"reflect"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -64,9 +67,42 @@ type TerminatingGatewaySpec struct {
 	// Services is a list of service names represented by the terminating gateway.
 	Services []LinkedService `json:"services,omitempty"`
 
+	// CredentialInjection enables credential-injection routing in the Consul
+	// terminating-gateway config entry, connecting Envoy to the local credential
+	// processor over a Unix domain socket. Each linked service must then set
+	// credential.mode. Routing is also enabled automatically when
+	// spec.deployment.credentialInjection.enabled is true. Set this block
+	// explicitly when the gateway workload is deployed by Helm rather than by this
+	// resource. It carries only non-secret routing settings; images, Vault settings
+	// and other Kubernetes deployment details stay in
+	// spec.deployment.credentialInjection. Requires Consul Enterprise.
+	// +kubebuilder:validation:Optional
+	CredentialInjection *TerminatingGatewayCredentialRouting `json:"credentialInjection,omitempty"`
+
 	// Deployment contains all deployment-related configuration
 	// +kubebuilder:validation:Optional
 	Deployment TerminatingGatewayDeploymentSpec `json:"deployment,omitempty"`
+}
+
+// DefaultCredentialInjectionUDSPath is the credential processor's ext_proc
+// socket inside a credential-injection terminating-gateway pod. Both the Helm
+// chart and the controller mount the processor socket at this path.
+const DefaultCredentialInjectionUDSPath = "/consul/auth-socket/auth.sock"
+
+// TerminatingGatewayCredentialRouting configures the non-secret credential
+// processor routing in the Consul terminating-gateway config entry.
+type TerminatingGatewayCredentialRouting struct {
+	// UDSPath is the absolute path of the credential processor's Unix domain
+	// socket that Envoy connects to. Defaults to "/consul/auth-socket/auth.sock",
+	// the path where Kubernetes credential-injection pods mount the socket; it
+	// must equal that path when spec.deployment.credentialInjection is enabled.
+	// +kubebuilder:validation:Optional
+	UDSPath string `json:"udsPath,omitempty"`
+
+	// MessageTimeout bounds each Envoy-to-processor exchange, as a duration string
+	// (for example "250ms"). Consul defaults it to 250ms when unset.
+	// +kubebuilder:validation:Optional
+	MessageTimeout string `json:"messageTimeout,omitempty"`
 }
 
 // TerminatingGatewayDeploymentSpec contains all deployment-related configuration for the terminating gateway.
@@ -129,6 +165,110 @@ type TerminatingGatewayDeploymentSpec struct {
 
 	// LogJSON enables JSON formatted logging
 	LogJSON *bool `json:"logJSON,omitempty"`
+
+	// CredentialInjection configures optional non-secret credential-processor and
+	// Vault Agent sidecars that inject external-model credentials for linked
+	// services. When enabled it also enables credential-injection routing in the
+	// Consul config entry (see spec.credentialInjection), so each linked service
+	// must set credential.mode.
+	// +kubebuilder:validation:Optional
+	CredentialInjection *TerminatingGatewayCredentialInjection `json:"credentialInjection,omitempty"`
+}
+
+// TerminatingGatewayCredentialInjection configures the optional credential-processor
+// and Vault Agent sidecars added to a terminating gateway's deployment. All fields
+// here are non-secret: ConfigMaps referenced by name must carry only non-secret
+// binding/template/auth configuration, never token values or arbitrary environment
+// credential sources. Image fields are shapes only; production deployments must
+// pin an immutable image digest.
+type TerminatingGatewayCredentialInjection struct {
+	// Enabled controls whether the credential processor and Vault Agent sidecars
+	// are added to the gateway deployment.
+	// +kubebuilder:validation:Optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Source selects the credential delivery mechanism. "vault" (the default when
+	// empty) runs the Vault Agent sidecars; "kubernetesSecret" mounts a Kubernetes
+	// Secret read-only into the credential processor instead.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=vault;kubernetesSecret
+	Source string `json:"source,omitempty"`
+
+	// SecretName names the Kubernetes Secret, in the gateway's namespace, whose data
+	// keys are per-binding credential envelope files. Required when source is
+	// "kubernetesSecret"; ignored otherwise.
+	// +kubebuilder:validation:Optional
+	SecretName string `json:"secretName,omitempty"`
+
+	// ProcessorImage is the container image reference for the credential processor sidecar.
+	// +kubebuilder:validation:Optional
+	ProcessorImage string `json:"processorImage,omitempty"`
+
+	// VaultAgentImage is the container image reference for the Vault Agent sidecar.
+	// +kubebuilder:validation:Optional
+	VaultAgentImage string `json:"vaultAgentImage,omitempty"`
+
+	// ProcessorConfigMap names the ConfigMap, in the gateway's namespace, carrying
+	// non-secret credential processor binding/template configuration.
+	// +kubebuilder:validation:Optional
+	ProcessorConfigMap string `json:"processorConfigMap,omitempty"`
+
+	// VaultAgentConfigMap names the ConfigMap, in the gateway's namespace, carrying
+	// non-secret Vault Agent configuration. This ConfigMap exclusively owns the
+	// Vault auth configuration (auto-auth method, role, and mount); there are no
+	// separate auth role/mount fields on this API.
+	// +kubebuilder:validation:Optional
+	VaultAgentConfigMap string `json:"vaultAgentConfigMap,omitempty"`
+
+	// VaultAddress is the address of the Vault server the sidecar authenticates against.
+	// It must be an absolute https:// URL.
+	// +kubebuilder:validation:Optional
+	VaultAddress string `json:"vaultAddress,omitempty"`
+
+	// VaultNamespace is the optional Vault Enterprise namespace.
+	// +kubebuilder:validation:Optional
+	VaultNamespace string `json:"vaultNamespace,omitempty"`
+
+	// VaultCAConfigMap optionally names a ConfigMap, in the gateway's namespace, carrying
+	// the CA bundle used to validate the Vault server's TLS certificate.
+	// +kubebuilder:validation:Optional
+	VaultCAConfigMap string `json:"vaultCAConfigMap,omitempty"`
+
+	// TokenAudience is the audience requested for the projected Kubernetes service
+	// account token presented to Vault.
+	// +kubebuilder:validation:Optional
+	TokenAudience string `json:"tokenAudience,omitempty"`
+
+	// TokenExpirationSeconds is the requested expiration, in seconds, of the
+	// projected service account token.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=600
+	// +kubebuilder:validation:Maximum=43200
+	TokenExpirationSeconds *int64 `json:"tokenExpirationSeconds,omitempty"`
+
+	// DrainSeconds bounds how long the sidecars wait to finish in-flight credential
+	// refresh work before terminating during a rolling update. Must be between 0
+	// and 300; 0 disables the drain wait. Defaults to 30.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=300
+	DrainSeconds *int64 `json:"drainSeconds,omitempty"`
+}
+
+// Credential-injection delivery sources for
+// spec.deployment.credentialInjection.source.
+const (
+	CredentialSourceVault            = "vault"
+	CredentialSourceKubernetesSecret = "kubernetesSecret"
+)
+
+// EffectiveSource returns the configured credential source, defaulting to
+// CredentialSourceVault when unset.
+func (in *TerminatingGatewayCredentialInjection) EffectiveSource() string {
+	if in.Source == "" {
+		return CredentialSourceVault
+	}
+	return in.Source
 }
 
 // ExtraVolume defines a volume to be mounted in the pod.
@@ -188,6 +328,28 @@ type LinkedService struct {
 	// SecretRef references a Kubernetes secret containing TLS certificates.
 	// +optional
 	SecretRef *SecretReference `json:"secretRef,omitempty"`
+
+	// Credential configures credential injection for this service. Required for
+	// every linked service when credential-injection routing is enabled, and not
+	// allowed otherwise. Requires Consul Enterprise.
+	// +kubebuilder:validation:Optional
+	Credential *LinkedServiceCredential `json:"credential,omitempty"`
+}
+
+// LinkedServiceCredential configures the non-secret credential policy for one
+// linked service. It never carries credential material.
+type LinkedServiceCredential struct {
+	// Mode is "inject" to have the credential processor inject the credential for
+	// BindingID into requests to this service, or "none" to forward requests
+	// without a credential.
+	// +kubebuilder:validation:Enum=inject;none
+	Mode string `json:"mode,omitempty"`
+
+	// BindingID selects the credential binding in the processor configuration.
+	// Required when mode is "inject", must be empty when mode is "none", and must
+	// be unique across the gateway's linked services.
+	// +kubebuilder:validation:Optional
+	BindingID string `json:"bindingID,omitempty"`
 }
 
 // SecretReference defines the name of the Kubernetes secret.
@@ -325,11 +487,39 @@ func (in *TerminatingGateway) ToConsul(datacenter string) capi.ConfigEntry {
 		svcs = append(svcs, s.toConsul())
 	}
 	return &capi.TerminatingGatewayConfigEntry{
-		Kind:     in.ConsulKind(),
-		Name:     in.ConsulName(),
-		Services: svcs,
-		Meta:     meta(datacenter),
+		Kind:                in.ConsulKind(),
+		Name:                in.ConsulName(),
+		Services:            svcs,
+		CredentialInjection: in.consulCredentialInjection(),
+		Meta:                meta(datacenter),
 	}
+}
+
+// CredentialRoutingEnabled reports whether the Consul config entry enables
+// credential-injection routing: either spec.credentialInjection is set, or the
+// controller deploys credential-injection sidecars for this gateway. Enabling
+// the sidecars always enables routing so the processor is never deployed
+// without Envoy being connected to it.
+func (in *TerminatingGateway) CredentialRoutingEnabled() bool {
+	if in.Spec.CredentialInjection != nil {
+		return true
+	}
+	ci := in.Spec.Deployment.CredentialInjection
+	return ci != nil && ci.Enabled
+}
+
+func (in *TerminatingGateway) consulCredentialInjection() *capi.GatewayCredentialInjection {
+	if !in.CredentialRoutingEnabled() {
+		return nil
+	}
+	out := &capi.GatewayCredentialInjection{UDSPath: DefaultCredentialInjectionUDSPath}
+	if r := in.Spec.CredentialInjection; r != nil {
+		if r.UDSPath != "" {
+			out.UDSPath = r.UDSPath
+		}
+		out.MessageTimeout = r.MessageTimeout
+	}
+	return out
 }
 
 func (in *TerminatingGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
@@ -362,9 +552,22 @@ func normalizeTerminatingGatewayForCompare(in *capi.TerminatingGatewayConfigEntr
 		clearLinkedServiceStringField(&normalized.Services[i], "Namespace")
 		clearLinkedServiceStringField(&normalized.Services[i], "Partition")
 	}
+	// Consul defaults an empty MessageTimeout on write, so compare against the
+	// server default to avoid rewriting the entry on every reconcile.
+	if in.CredentialInjection != nil {
+		ci := *in.CredentialInjection
+		if ci.MessageTimeout == "" {
+			ci.MessageTimeout = consulDefaultCredentialMessageTimeout
+		}
+		normalized.CredentialInjection = &ci
+	}
 
 	return &normalized
 }
+
+// consulDefaultCredentialMessageTimeout mirrors the MessageTimeout Consul
+// applies to a terminating-gateway CredentialInjection block when it is unset.
+const consulDefaultCredentialMessageTimeout = "250ms"
 
 func clearLinkedServiceStringField(in *capi.LinkedService, field string) {
 	v := reflect.ValueOf(in)
@@ -386,6 +589,8 @@ func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+	errs = append(errs, in.Spec.Deployment.validateCredentialInjection(path.Child("deployment"))...)
+	errs = append(errs, in.validateCredentialRouting(path)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -393,6 +598,183 @@ func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+// validateCredentialInjection validates spec.deployment.credentialInjection. Validation
+// is skipped entirely when the block is nil or not enabled, preserving legacy behavior
+// for resources that don't use this feature.
+func (in TerminatingGatewayDeploymentSpec) validateCredentialInjection(path *field.Path) field.ErrorList {
+	ci := in.CredentialInjection
+	if ci == nil || !ci.Enabled {
+		return nil
+	}
+	return ci.validate(in.EnableDeployment, path.Child("credentialInjection"))
+}
+
+// ValidateForWorkload runs the same structural validation as the admission
+// webhook for an enabled credential-injection block and returns a single
+// aggregated error. It lets the controller's reconcile-path guard reuse the full
+// Vault-specific constraints (HTTPS Vault address, required tokenAudience,
+// supported source, etc.) instead of re-implementing a weaker subset, so a
+// resource admitted without the webhook cannot construct an invalid workload.
+func (in *TerminatingGatewayCredentialInjection) ValidateForWorkload(enableDeployment *bool) error {
+	errs := in.validate(enableDeployment, field.NewPath("spec", "deployment", "credentialInjection"))
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs.ToAggregate()
+}
+
+const (
+	// minTokenExpirationSeconds mirrors Kubernetes' documented floor for
+	// projected service account tokens (10 minutes).
+	minTokenExpirationSeconds int64 = 600
+	// maxTokenExpirationSeconds is a conservative ceiling (12 hours) to keep
+	// the projected token lifetime bounded.
+	maxTokenExpirationSeconds int64 = 43200
+	// maxDrainSeconds matches the maximum duration camp-auth-processor's
+	// drain-wait accepts (5 minutes).
+	maxDrainSeconds int64 = 300
+)
+
+func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool, path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	// Feature/deployment mismatch: sidecars can only be injected into a Deployment
+	// that will actually be created, so enabledDeployment must be explicitly true.
+	if enableDeployment == nil || !*enableDeployment {
+		errs = append(errs, field.Invalid(path.Child("enabled"), in.Enabled,
+			"credentialInjection.enabled requires spec.deployment.enabledDeployment to be true"))
+	}
+
+	// The credential processor runs in every source.
+	if in.ProcessorImage == "" {
+		errs = append(errs, field.Required(path.Child("processorImage"), "processorImage is required when credentialInjection is enabled"))
+	}
+	if in.ProcessorConfigMap == "" {
+		errs = append(errs, field.Required(path.Child("processorConfigMap"), "processorConfigMap is required when credentialInjection is enabled"))
+	}
+
+	// Drain bounds are source-independent: a negative value produces an invalid
+	// drain-wait and grace period, and camp-auth-processor's drain-wait rejects
+	// durations over maxDrainSeconds, so its preStop hook would exit immediately
+	// instead of waiting.
+	if in.DrainSeconds != nil && *in.DrainSeconds < 0 {
+		errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not be negative"))
+	}
+	if in.DrainSeconds != nil && *in.DrainSeconds > maxDrainSeconds {
+		errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, fmt.Sprintf("drainSeconds must not exceed %d", maxDrainSeconds)))
+	}
+
+	switch in.EffectiveSource() {
+	case CredentialSourceKubernetesSecret:
+		if in.SecretName == "" {
+			errs = append(errs, field.Required(path.Child("secretName"),
+				`secretName is required when credentialInjection.source is "kubernetesSecret"`))
+		}
+		if strings.Contains(in.SecretName, WildcardSpecifier) {
+			errs = append(errs, field.Invalid(path.Child("secretName"), in.SecretName, `must not contain the wildcard character "*"`))
+		}
+		// The processor ConfigMap is used by every source, so guard its
+		// identifier here too (the Vault branch covers it via
+		// validateWildcardAndModeCombinations).
+		if strings.Contains(in.ProcessorConfigMap, WildcardSpecifier) {
+			errs = append(errs, field.Invalid(path.Child("processorConfigMap"), in.ProcessorConfigMap, `must not contain the wildcard character "*"`))
+		}
+	case CredentialSourceVault:
+		if in.VaultAgentImage == "" {
+			errs = append(errs, field.Required(path.Child("vaultAgentImage"), "vaultAgentImage is required when credentialInjection is enabled"))
+		}
+		if in.VaultAgentConfigMap == "" {
+			errs = append(errs, field.Required(path.Child("vaultAgentConfigMap"), "vaultAgentConfigMap is required when credentialInjection is enabled"))
+		}
+		errs = append(errs, in.validateVaultAddress(path.Child("vaultAddress"))...)
+		errs = append(errs, in.validateProjectedToken(path)...)
+		errs = append(errs, in.validateWildcardAndModeCombinations(path)...)
+	default:
+		// Reject unsupported source values rather than silently treating them as
+		// Vault: the injection logic only starts a Vault Agent for the exact
+		// "vault" value. (The CRD enum guards normal admission; this is
+		// defense-in-depth for the API validation path.)
+		errs = append(errs, field.NotSupported(path.Child("source"), in.Source,
+			[]string{CredentialSourceVault, CredentialSourceKubernetesSecret}))
+	}
+
+	return errs
+}
+
+// validateVaultAddress enforces "invalid Vault URL/TLS": the address must be an
+// absolute URL with a host, and must use the https scheme (plaintext Vault
+// connections are forbidden for this feature).
+func (in *TerminatingGatewayCredentialInjection) validateVaultAddress(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in.VaultAddress == "" {
+		return append(errs, field.Required(path, "vaultAddress is required when credentialInjection is enabled"))
+	}
+	u, err := url.Parse(in.VaultAddress)
+	if err != nil || u.Host == "" || u.Scheme == "" {
+		return append(errs, field.Invalid(path, in.VaultAddress, "vaultAddress must be a valid absolute URL"))
+	}
+	if u.Scheme != "https" {
+		errs = append(errs, field.Invalid(path, in.VaultAddress,
+			`vaultAddress must use the "https" scheme; plaintext Vault connections are not permitted`))
+	}
+	return errs
+}
+
+// validateProjectedToken enforces "invalid projected-token fields": tokenAudience
+// is required and tokenExpirationSeconds must fall within the supported range.
+// The source-independent non-negative drainSeconds check lives in validate; the
+// only Vault-specific drain rule here is that it must not exceed
+// tokenExpirationSeconds.
+func (in *TerminatingGatewayCredentialInjection) validateProjectedToken(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in.TokenAudience == "" {
+		errs = append(errs, field.Required(path.Child("tokenAudience"), "tokenAudience is required when credentialInjection is enabled"))
+	}
+	if in.TokenExpirationSeconds != nil {
+		v := *in.TokenExpirationSeconds
+		if v < minTokenExpirationSeconds || v > maxTokenExpirationSeconds {
+			errs = append(errs, field.Invalid(path.Child("tokenExpirationSeconds"), v,
+				fmt.Sprintf("tokenExpirationSeconds must be between %d and %d seconds", minTokenExpirationSeconds, maxTokenExpirationSeconds)))
+		}
+	}
+	if in.DrainSeconds != nil && in.TokenExpirationSeconds != nil && *in.DrainSeconds > *in.TokenExpirationSeconds {
+		errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not exceed tokenExpirationSeconds"))
+	}
+	return errs
+}
+
+// validateWildcardAndModeCombinations enforces "forbidden wildcard/mode
+// combinations": Vault/ConfigMap identifiers must not contain the wildcard
+// specifier, and the processor/Vault Agent ConfigMaps (which carry different,
+// non-interchangeable configuration shapes) must not reference the same
+// ConfigMap.
+func (in *TerminatingGatewayCredentialInjection) validateWildcardAndModeCombinations(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	wildcardFields := []struct {
+		name  string
+		value string
+	}{
+		{"vaultNamespace", in.VaultNamespace},
+		{"vaultCAConfigMap", in.VaultCAConfigMap},
+		{"processorConfigMap", in.ProcessorConfigMap},
+		{"vaultAgentConfigMap", in.VaultAgentConfigMap},
+		{"tokenAudience", in.TokenAudience},
+	}
+	for _, f := range wildcardFields {
+		if strings.Contains(f.value, WildcardSpecifier) {
+			errs = append(errs, field.Invalid(path.Child(f.name), f.value, `must not contain the wildcard character "*"`))
+		}
+	}
+
+	if in.ProcessorConfigMap != "" && in.ProcessorConfigMap == in.VaultAgentConfigMap {
+		errs = append(errs, field.Invalid(path.Child("vaultAgentConfigMap"), in.VaultAgentConfigMap,
+			"vaultAgentConfigMap must reference a different ConfigMap than processorConfigMap"))
+	}
+
+	return errs
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.services to their default values if namespaces are enabled.
@@ -413,7 +795,7 @@ func (in *TerminatingGateway) DefaultNamespaceFields(consulMeta common.ConsulMet
 }
 
 func (in LinkedService) toConsul() capi.LinkedService {
-	return capi.LinkedService{
+	out := capi.LinkedService{
 		Namespace:              in.Namespace,
 		Name:                   in.Name,
 		CAFile:                 in.CAFile,
@@ -422,6 +804,13 @@ func (in LinkedService) toConsul() capi.LinkedService {
 		SNI:                    in.SNI,
 		DisableAutoHostRewrite: in.DisableAutoHostRewrite,
 	}
+	if in.Credential != nil {
+		out.Credential = &capi.GatewayServiceCredential{
+			Mode:      in.Credential.Mode,
+			BindingID: in.Credential.BindingID,
+		}
+	}
+	return out
 }
 
 func (in LinkedService) validate(path *field.Path) field.ErrorList {
