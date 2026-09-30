@@ -18,10 +18,24 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
+
+func TestAgentConfigStatusWrites(t *testing.T) {
+	testConfigStatusWrites(t, func() configStatusFixture {
+		ac := enabledAgentConfig("agent")
+		return configStatusFixture{
+			object: ac, conditions: &ac.Status.Conditions, timestamp: &ac.Status.LastSyncedTime, enabled: &ac.Spec.Enabled,
+			sync: func(ctx context.Context, c client.Client) error {
+				controller := &AgentConfigController{Client: c, Log: logrtest.New(t)}
+				return controller.syncAgentStatus(ctx, ac)
+			},
+		}
+	})
+}
 
 func TestAgentConfigReconcile(t *testing.T) {
 	t.Parallel()

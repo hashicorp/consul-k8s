@@ -3964,7 +3964,8 @@ ai:
 
   inferenceGateway:
     # Enable the InferenceGateway feature. When false, the CRD is not installed
-    # and no InferenceGateway objects are rendered regardless of the gateways list.
+    # and its controller and Consul cache are not started. No InferenceGateway
+    # objects are rendered regardless of the gateways list.
     # Requires ai.enabled=true and connectInject.enabled=true.
     # @type: boolean
     enabled: false
@@ -3988,8 +3989,9 @@ ai:
     # overridden on the individual gateway entry.
     defaults:
       # Number of replicas for each InferenceGateway Deployment.
+      # An explicit per-gateway replicas value, including zero, overrides this default.
       # @type: integer
-      replicas: 2
+      replicas: 1
 
       # Service configuration for the ClusterIP Service fronting each gateway.
       service:

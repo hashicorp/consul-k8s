@@ -23,6 +23,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -821,7 +822,7 @@ func TestInferencePoolConfigReconcile_ConditionStability(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestInferencePoolConfigReconcile_LastSyncedTime — written on every reconcile
+// TestInferencePoolConfigReconcile_LastSyncedTime — initialized on first status sync
 // ---------------------------------------------------------------------------
 
 func TestInferencePoolConfigReconcile_LastSyncedTime(t *testing.T) {
@@ -860,6 +861,168 @@ func TestInferencePoolConfigReconcile_LastSyncedTime(t *testing.T) {
 		"LastSyncedTime must be set after a successful reconcile")
 	require.False(t, got.Status.LastSyncedTime.IsZero(),
 		"LastSyncedTime must not be the zero time")
+}
+
+func TestInferencePoolConfigReconcile_OnlyPatchesChanges(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	oldTime := metav1.NewTime(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
+	for _, tc := range []struct {
+		name         string
+		parentBefore bool
+		parentAfter  bool
+		mutate       func(*v1alpha1.InferencePoolConfig)
+		wantPatch    bool
+		wantReady    bool
+	}{
+		{name: "unchanged resolved", parentBefore: true, parentAfter: true, wantReady: true},
+		{name: "unchanged unresolved"},
+		{name: "parent disappeared", parentBefore: true, wantPatch: true},
+		{name: "parent recovered", parentAfter: true, wantPatch: true, wantReady: true},
+		{name: "disabled", parentBefore: true, parentAfter: true, wantPatch: true,
+			mutate: func(ipc *v1alpha1.InferencePoolConfig) { ipc.Spec.Enabled = false }},
+		{name: "generation changed", parentBefore: true, parentAfter: true, wantPatch: true, wantReady: true,
+			mutate: func(ipc *v1alpha1.InferencePoolConfig) { ipc.Generation++ }},
+		{name: "message drifted", parentBefore: true, parentAfter: true, wantPatch: true, wantReady: true,
+			mutate: func(ipc *v1alpha1.InferencePoolConfig) { ipc.Status.Conditions[0].Message = "stale" }},
+		{name: "reason drifted", parentBefore: true, parentAfter: true, wantPatch: true, wantReady: true,
+			mutate: func(ipc *v1alpha1.InferencePoolConfig) { ipc.Status.Conditions[0].Reason = "Stale" }},
+		{name: "missing timestamp", parentBefore: true, parentAfter: true, wantPatch: true, wantReady: true,
+			mutate: func(ipc *v1alpha1.InferencePoolConfig) { ipc.Status.LastSyncedTime = nil }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			require.NoError(t, v1alpha1.AddToScheme(s))
+			ipc := enabledIPC("pool", "default", "parent")
+			ipc.Generation = 1
+			ipc.Finalizers = []string{inferencePoolConfigFinalizer}
+			parent := makeUnstructuredParent("parent", "default",
+				"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
+			patches := 0
+			c := fake.NewClientBuilder().WithScheme(s).WithObjects(ipc).
+				WithStatusSubresource(ipc).WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					require.Equal(t, "status", subresource)
+					patches++
+					return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
+				},
+			}).Build()
+			if tc.parentBefore {
+				require.NoError(t, c.Create(ctx, parent))
+			}
+			controller := &InferencePoolConfigController{Client: c, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(ipc)}
+			_, err := controller.Reconcile(ctx, req)
+			require.NoError(t, err)
+			require.Equal(t, 1, patches, "initial status must be written")
+			require.NoError(t, c.Get(ctx, req.NamespacedName, ipc))
+			for i := range ipc.Status.Conditions {
+				ipc.Status.Conditions[i].LastTransitionTime = oldTime
+			}
+			ipc.Status.Conditions = append(ipc.Status.Conditions, metav1.Condition{
+				Type: "External", Status: metav1.ConditionTrue, Reason: "External",
+				Message: "preserve", LastTransitionTime: oldTime,
+			})
+			ipc.Status.LastSyncedTime = &oldTime
+			if tc.mutate != nil {
+				tc.mutate(ipc)
+			}
+			status := ipc.DeepCopy().Status
+			require.NoError(t, c.Update(ctx, ipc))
+			ipc.Status = status
+			require.NoError(t, c.Status().Update(ctx, ipc))
+			if tc.parentBefore && !tc.parentAfter {
+				require.NoError(t, c.Delete(ctx, parent))
+			} else if !tc.parentBefore && tc.parentAfter {
+				require.NoError(t, c.Create(ctx, parent))
+			}
+			require.NoError(t, c.Get(ctx, req.NamespacedName, ipc))
+			before := ipc.DeepCopy()
+			patches = 0
+
+			result, err := controller.Reconcile(ctx, req)
+			require.NoError(t, err)
+			require.NoError(t, c.Get(ctx, req.NamespacedName, ipc))
+			if tc.wantPatch {
+				require.Equal(t, 1, patches)
+				require.NotNil(t, ipc.Status.LastSyncedTime)
+				require.True(t, ipc.Status.LastSyncedTime.After(oldTime.Time))
+			} else {
+				require.Zero(t, patches)
+				require.Equal(t, before.ResourceVersion, ipc.ResourceVersion)
+				require.Equal(t, before.Status, ipc.Status)
+			}
+			wantResult := ctrl.Result{}
+			if !tc.parentAfter {
+				wantResult.RequeueAfter = 10 * time.Second
+			}
+			require.Equal(t, wantResult, result)
+			require.Equal(t, findCondition(before.Status.Conditions, "External"), findCondition(ipc.Status.Conditions, "External"))
+			for _, condition := range ipc.Status.Conditions[:3] {
+				require.Equal(t, ipc.Generation, condition.ObservedGeneration)
+				previous := findCondition(before.Status.Conditions, condition.Type)
+				require.NotNil(t, previous)
+				if previous.Status == condition.Status {
+					require.True(t, oldTime.Equal(&condition.LastTransitionTime))
+				} else {
+					require.True(t, condition.LastTransitionTime.After(oldTime.Time))
+				}
+			}
+			ready := findCondition(ipc.Status.Conditions, conditionTypeReady)
+			require.NotNil(t, ready)
+			require.Equal(t, tc.wantReady, ready.Status == metav1.ConditionTrue)
+			parentCondition := findCondition(ipc.Status.Conditions, conditionTypeParentResolved)
+			require.NotNil(t, parentCondition)
+			require.Equal(t, tc.parentAfter, parentCondition.Status == metav1.ConditionTrue)
+
+			before = ipc.DeepCopy()
+			patches = 0
+			result, err = controller.Reconcile(ctx, req)
+			require.NoError(t, err)
+			require.Equal(t, wantResult, result)
+			require.Zero(t, patches, "status-update event must not trigger another status write")
+			require.NoError(t, c.Get(ctx, req.NamespacedName, ipc))
+			require.Equal(t, before.ResourceVersion, ipc.ResourceVersion)
+			require.Equal(t, before.Status, ipc.Status)
+		})
+	}
+}
+
+func TestInferencePoolConfigReconcile_StatusPatchFailure(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	s := runtime.NewScheme()
+	require.NoError(t, v1alpha1.AddToScheme(s))
+	ipc := enabledIPC("pool", "default", "parent")
+	ipc.Finalizers = []string{inferencePoolConfigFinalizer}
+	patchErr := fmt.Errorf("status patch failed")
+	failPatch := true
+	c := fake.NewClientBuilder().WithScheme(s).WithObjects(ipc).
+		WithStatusSubresource(ipc).WithInterceptorFuncs(interceptor.Funcs{
+		SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+			if failPatch {
+				return patchErr
+			}
+			return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
+		},
+	}).Build()
+	controller := &InferencePoolConfigController{Client: c, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(ipc)}
+	_, err := controller.Reconcile(ctx, req)
+	require.ErrorIs(t, err, patchErr)
+	require.NoError(t, c.Get(ctx, req.NamespacedName, ipc))
+	require.Nil(t, ipc.Status.LastSyncedTime)
+	require.Empty(t, ipc.Status.Conditions)
+
+	failPatch = false
+	result, err := controller.Reconcile(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, 10*time.Second, result.RequeueAfter)
+	require.NoError(t, c.Get(ctx, req.NamespacedName, ipc))
+	require.NotNil(t, ipc.Status.LastSyncedTime)
+	require.Len(t, ipc.Status.Conditions, 3)
 }
 
 // ---------------------------------------------------------------------------
@@ -901,7 +1064,7 @@ func TestIsParentCRDAbsent(t *testing.T) {
 		},
 		{
 			name: "wrapped no matches error",
-			err:  fmt.Errorf("looking up parentRef %q: %w", "gw",
+			err: fmt.Errorf("looking up parentRef %q: %w", "gw",
 				fmt.Errorf("no matches for kind \"InferenceGateway\" in version \"consul.hashicorp.com/v1alpha1\"")),
 			want: true,
 		},

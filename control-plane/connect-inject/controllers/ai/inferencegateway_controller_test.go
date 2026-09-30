@@ -30,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -510,6 +511,135 @@ func TestInferenceGatewayReconcile_ChildResources(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TestInferenceGatewayReconcile_StatusConditions — exact condition values
 // ---------------------------------------------------------------------------
+
+func TestSyncGatewayStatus_OnlyPatchesChanges(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	oldTime := metav1.NewTime(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
+	for _, tc := range []struct {
+		name      string
+		mutate    func(*v1alpha1.InferenceGateway)
+		poolReady bool
+		message   string
+		replicas  int32
+		wantPatch bool
+	}{
+		{name: "unchanged", poolReady: true, message: "pool resolved", replicas: 1},
+		{name: "replicas changed", poolReady: true, message: "pool resolved", replicas: 2, wantPatch: true},
+		{name: "pool became unavailable", message: "pool unavailable", wantPatch: true},
+		{name: "message changed", poolReady: true, message: "pool updated", replicas: 1, wantPatch: true},
+		{name: "generation changed", poolReady: true, message: "pool resolved", replicas: 1, wantPatch: true,
+			mutate: func(igw *v1alpha1.InferenceGateway) { igw.Generation++ }},
+		{name: "reason drifted", poolReady: true, message: "pool resolved", replicas: 1, wantPatch: true,
+			mutate: func(igw *v1alpha1.InferenceGateway) { igw.Status.Conditions[0].Reason = "Stale" }},
+		{name: "missing timestamp", poolReady: true, message: "pool resolved", replicas: 1, wantPatch: true,
+			mutate: func(igw *v1alpha1.InferenceGateway) { igw.Status.LastSyncedTime = nil }},
+		{name: "initial status", poolReady: true, message: "pool resolved", replicas: 1, wantPatch: true,
+			mutate: func(igw *v1alpha1.InferenceGateway) { igw.Status = v1alpha1.InferenceGatewayStatus{} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			igw := minimalIGW("gw", "default", "pool")
+			igw.Generation = 1
+			patches := 0
+			k8sClient := fake.NewClientBuilder().WithScheme(igwScheme(t)).
+				WithObjects(igw).WithStatusSubresource(igw).
+				WithInterceptorFuncs(interceptor.Funcs{
+					SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+						require.Equal(t, "status", subresource)
+						patches++
+						return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
+					},
+				}).Build()
+			controller := &InferenceGatewayController{Client: k8sClient, Log: logrtest.New(t)}
+			require.NoError(t, controller.syncGatewayStatus(ctx, igw, true, "pool resolved", 1))
+			require.Equal(t, 1, patches)
+
+			key := client.ObjectKeyFromObject(igw)
+			require.NoError(t, k8sClient.Get(ctx, key, igw))
+			for i := range igw.Status.Conditions {
+				igw.Status.Conditions[i].LastTransitionTime = oldTime
+			}
+			igw.Status.Conditions = append(igw.Status.Conditions, metav1.Condition{
+				Type: "External", Status: metav1.ConditionTrue, Reason: "External",
+				Message: "preserve", LastTransitionTime: oldTime,
+			})
+			igw.Status.LastSyncedTime = &oldTime
+			if tc.mutate != nil {
+				tc.mutate(igw)
+			}
+			status := igw.DeepCopy().Status
+			require.NoError(t, k8sClient.Update(ctx, igw))
+			igw.Status = status
+			require.NoError(t, k8sClient.Status().Update(ctx, igw))
+			require.NoError(t, k8sClient.Get(ctx, key, igw))
+			before := igw.DeepCopy()
+			patches = 0
+
+			require.NoError(t, controller.syncGatewayStatus(ctx, igw, tc.poolReady, tc.message, tc.replicas))
+			require.NoError(t, k8sClient.Get(ctx, key, igw))
+			if tc.wantPatch {
+				require.Equal(t, 1, patches)
+				require.NotNil(t, igw.Status.LastSyncedTime)
+				require.True(t, igw.Status.LastSyncedTime.After(oldTime.Time))
+			} else {
+				require.Zero(t, patches)
+				require.Equal(t, before.ResourceVersion, igw.ResourceVersion)
+				require.Equal(t, before.Status, igw.Status)
+			}
+			require.Equal(t, tc.replicas, igw.Status.ReadyReplicas)
+			condition := findCondition(igw.Status.Conditions, conditionTypePoolResolved)
+			require.NotNil(t, condition)
+			require.Equal(t, igw.Generation, condition.ObservedGeneration)
+			require.Equal(t, tc.message, condition.Message)
+			if tc.poolReady && tc.name != "initial status" {
+				require.True(t, oldTime.Equal(&condition.LastTransitionTime))
+			}
+			if tc.name != "initial status" {
+				require.Equal(t, findCondition(before.Status.Conditions, "External"), findCondition(igw.Status.Conditions, "External"))
+			}
+
+			// A status-update event must settle without another API write.
+			patches = 0
+			before = igw.DeepCopy()
+			require.NoError(t, controller.syncGatewayStatus(ctx, igw, tc.poolReady, tc.message, tc.replicas))
+			require.Zero(t, patches)
+			require.NoError(t, k8sClient.Get(ctx, key, igw))
+			require.Equal(t, before.ResourceVersion, igw.ResourceVersion)
+			require.Equal(t, before.Status, igw.Status)
+		})
+	}
+}
+
+func TestSyncGatewayStatus_PatchFailure(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	igw := minimalIGW("gw", "default", "pool")
+	patchErr := fmt.Errorf("status patch failed")
+	failPatch := true
+	k8sClient := fake.NewClientBuilder().WithScheme(igwScheme(t)).
+		WithObjects(igw).WithStatusSubresource(igw).
+		WithInterceptorFuncs(interceptor.Funcs{
+			SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+				if failPatch {
+					return patchErr
+				}
+				return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
+			},
+		}).Build()
+	controller := &InferenceGatewayController{Client: k8sClient, Log: logrtest.New(t)}
+	require.ErrorIs(t, controller.syncGatewayStatus(ctx, igw, true, "pool resolved", 1), patchErr)
+	require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(igw), igw))
+	require.Nil(t, igw.Status.LastSyncedTime)
+	require.Empty(t, igw.Status.Conditions)
+
+	failPatch = false
+	require.NoError(t, controller.syncGatewayStatus(ctx, igw, true, "pool resolved", 1))
+	require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(igw), igw))
+	require.NotNil(t, igw.Status.LastSyncedTime)
+	require.Len(t, igw.Status.Conditions, 3)
+}
 
 func TestInferenceGatewayReconcile_StatusConditions(t *testing.T) {
 	t.Parallel()

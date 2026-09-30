@@ -178,21 +178,22 @@ type Command struct {
 	flagEnableCustomGatewayCRDController bool
 	//enable tcp routes
 	flagEnableTCPRoute bool
-	// enable AI inference model feature
-	flagEnableAI                  bool
-	flagAIInferenceGatewayImage   string // Docker image for the InferenceGateway Deployment
-	flagAIMCPServerImage          string // Docker image for the MCP server sidecar
-	flagAIAgentImage              string // Docker image for the AI agent sidecar
-	flagConsulOBOInboundImage     string // Docker image for consul-obo-inbound (ai-agent pods)
-	flagConsulOBOOutboundImage    string // Docker image for consul-obo-outbound (ai-agent pods)
-	flagEnableOBO                 bool   // inject OBO sidecars into ai-role=ai-agent pods
+	// AI feature flags
+	flagEnableAI                 bool
+	flagEnableAIInferenceGateway bool
+	flagAIInferenceGatewayImage  string // Docker image for the InferenceGateway Deployment
+	flagAIMCPServerImage         string // Docker image for the MCP server sidecar
+	flagAIAgentImage             string // Docker image for the AI agent sidecar
+	flagConsulOBOInboundImage    string // Docker image for consul-obo-inbound (ai-agent pods)
+	flagConsulOBOOutboundImage   string // Docker image for consul-obo-outbound (ai-agent pods)
+	flagEnableOBO                bool   // inject OBO sidecars into ai-role=ai-agent pods
 	// InferenceGateway defaults sourced from ai.inferenceGateway.defaults in values.yaml
-	flagAIInferenceGatewayDefaultServiceType  string // default Service type (ClusterIP/NodePort/LoadBalancer)
-	flagAIInferenceGatewayDefaultServicePort  int    // default Service port
-	flagAIInferenceGatewayDefaultCPURequest   string // default container CPU request
-	flagAIInferenceGatewayDefaultCPULimit     string // default container CPU limit
-	flagAIInferenceGatewayDefaultMemRequest   string // default container memory request
-	flagAIInferenceGatewayDefaultMemLimit     string // default container memory limit
+	flagAIInferenceGatewayDefaultServiceType string // default Service type (ClusterIP/NodePort/LoadBalancer)
+	flagAIInferenceGatewayDefaultServicePort int    // default Service port
+	flagAIInferenceGatewayDefaultCPURequest  string // default container CPU request
+	flagAIInferenceGatewayDefaultCPULimit    string // default container CPU limit
+	flagAIInferenceGatewayDefaultMemRequest  string // default container memory request
+	flagAIInferenceGatewayDefaultMemLimit    string // default container memory limit
 }
 
 var (
@@ -291,8 +292,10 @@ func (c *Command) init() {
 	// enable TCP watch
 	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enabe-tcp-route", false, "Enables TCP Watch under gateway.networkings.k8s.io API Group")
 
-	// AI inference model feature flag — mirrors ai.enabled from values.yaml
-	c.flagSet.BoolVar(&c.flagEnableAI, "enable-ai", false, "Enables the AI InferenceModelConfig controller and CRD watcher.")
+	// AI feature flags mirror ai.enabled and ai.inferenceGateway.enabled from values.yaml.
+	c.flagSet.BoolVar(&c.flagEnableAI, "enable-ai", false, "Enables AI controllers and CRD watchers. InferenceGateway additionally requires -enable-ai-inference-gateway.")
+	c.flagSet.BoolVar(&c.flagEnableAIInferenceGateway, "enable-ai-inference-gateway", false,
+		"Enables the InferenceGateway controller and its Consul cache. Requires -enable-ai.")
 	c.flagSet.StringVar(&c.flagAIInferenceGatewayImage, "ai-inference-gateway-image", "",
 		"Docker image for the InferenceGateway Deployment created by the AI controller. "+
 			"Mirrors ai.inferenceGateway.image from values.yaml.")

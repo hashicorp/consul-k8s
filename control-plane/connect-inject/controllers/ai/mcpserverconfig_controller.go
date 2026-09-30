@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -162,11 +163,14 @@ func (r *McpServerConfigController) syncMcpStatus(ctx context.Context, mcp *v1al
 		},
 	}
 
-	patch := client.MergeFrom(mcp.DeepCopy())
+	before := mcp.DeepCopy()
 	mcp.Status.Conditions = mergeConditions(mcp.Status.Conditions, conditions)
+	if mcp.Status.LastSyncedTime != nil && equality.Semantic.DeepEqual(before.Status, mcp.Status) {
+		return nil
+	}
 	mcp.Status.LastSyncedTime = &now
 
-	if err := r.Client.Status().Patch(ctx, mcp, patch); err != nil {
+	if err := r.Client.Status().Patch(ctx, mcp, client.MergeFrom(before)); err != nil {
 		log.Error(err, "failed to patch status")
 		return err
 	}

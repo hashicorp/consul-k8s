@@ -257,6 +257,10 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			setupLog.Error(err, "unable to create controller", "controller", "InferencePoolConfig")
 			return err
 		}
+	}
+
+	// Match the chart's InferenceGateway CRD gate before starting its watches or cache.
+	if c.flagEnableAI && c.flagEnableAIInferenceGateway {
 		defaultResources, err := c.inferenceGatewayDefaultResources()
 		if err != nil {
 			setupLog.Error(err, "invalid AI inference gateway default resource flag")

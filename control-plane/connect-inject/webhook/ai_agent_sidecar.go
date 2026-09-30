@@ -36,17 +36,12 @@ const (
 // server on a Unix domain socket shared with consul-dataplane. It intercepts
 // MCP JSON-RPC requests and stamps x-mcp-* routing/HITL decision headers.
 //
-// Per-pod annotations take precedence over the AgentDefaults from the CRD.
+// Port overrides are resolved into defaults by the caller.
 func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefaults) corev1.Container {
 	// Resolve HITL port: used only as a named container port for observability.
 	hitlPort := defaults.HITL.Port
 	if hitlPort == 0 {
 		hitlPort = 16101
-	}
-	if v, ok := pod.Annotations[constants.AnnotationAIAgentHITLPort]; ok {
-		if p, err := strconv.ParseInt(v, 10, 32); err == nil {
-			hitlPort = int32(p)
-		}
 	}
 
 	// consul-mcp-gateway flags:

@@ -11,7 +11,9 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -152,6 +154,7 @@ func (r *InferencePoolConfigController) Reconcile(ctx context.Context, req ctrl.
 
 // syncPoolStatus resolves every parentRef and writes Accepted, ParentResolved,
 // and Ready conditions onto the InferencePoolConfig status sub-resource.
+// Unchanged status is not written, avoiding updates triggered by our own watch.
 // It returns (allParentsResolved, error):
 //   - allParentsResolved=true  → every parentRef was found; caller can stop requeueing.
 //   - allParentsResolved=false → at least one parentRef is missing; caller must requeue.
@@ -249,11 +252,16 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 		},
 	}
 
-	patch := client.MergeFrom(ipc.DeepCopy())
-	ipc.Status.Conditions = mergeConditions(ipc.Status.Conditions, conditions)
+	before := ipc.DeepCopy()
+	for _, condition := range conditions {
+		meta.SetStatusCondition(&ipc.Status.Conditions, condition)
+	}
+	if ipc.Status.LastSyncedTime != nil && equality.Semantic.DeepEqual(before.Status, ipc.Status) {
+		return parentResolved == metav1.ConditionTrue, nil
+	}
 	ipc.Status.LastSyncedTime = &now
 
-	if err := r.Client.Status().Patch(ctx, ipc, patch); err != nil {
+	if err := r.Client.Status().Patch(ctx, ipc, client.MergeFrom(before)); err != nil {
 		log.Error(err, "failed to patch status")
 		return false, err
 	}

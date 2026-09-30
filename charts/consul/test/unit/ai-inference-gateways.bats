@@ -20,6 +20,52 @@ gw_flags=(
     --set 'ai.inferenceGateway.gateways[0].name=travel-pool'
 )
 
+@test "ai/InferenceGateway/controller: disabled by default" {
+    cd `chart_dir`
+    local command=$(helm template -s templates/connect-inject-deployment.yaml . |
+        yq -r '.spec.template.spec.containers[0].command | join(" ")')
+    [[ "$command" == *"inject-connect"* ]]
+    [[ "$command" != *"-enable-ai=true"* ]]
+    [[ "$command" != *"-enable-ai-inference-gateway=true"* ]]
+}
+
+@test "ai/InferenceGateway/controller: AI alone does not enable gateway" {
+    cd `chart_dir`
+    local command=$(helm template -s templates/connect-inject-deployment.yaml \
+        --set 'ai.enabled=true' . |
+        yq -r '.spec.template.spec.containers[0].command | join(" ")')
+    [[ "$command" == *"-enable-ai=true"* ]]
+    [[ "$command" != *"-enable-ai-inference-gateway=true"* ]]
+}
+
+@test "ai/InferenceGateway/controller: gateway explicitly disabled leaves other AI controllers enabled" {
+    cd `chart_dir`
+    local command=$(helm template -s templates/connect-inject-deployment.yaml \
+        --set 'ai.enabled=true' --set 'ai.inferenceGateway.enabled=false' . |
+        yq -r '.spec.template.spec.containers[0].command | join(" ")')
+    [[ "$command" == *"-enable-ai=true"* ]]
+    [[ "$command" != *"-enable-ai-inference-gateway=true"* ]]
+}
+
+@test "ai/InferenceGateway/controller: gateway cannot override AI master switch" {
+    cd `chart_dir`
+    local command=$(helm template -s templates/connect-inject-deployment.yaml \
+        --set 'ai.enabled=false' --set 'ai.inferenceGateway.enabled=true' . |
+        yq -r '.spec.template.spec.containers[0].command | join(" ")')
+    [[ "$command" == *"inject-connect"* ]]
+    [[ "$command" != *"-enable-ai=true"* ]]
+    [[ "$command" != *"-enable-ai-inference-gateway=true"* ]]
+}
+
+@test "ai/InferenceGateway/controller: enabled with its CRD" {
+    cd `chart_dir`
+    local command=$(helm template -s templates/connect-inject-deployment.yaml \
+        "${base_flags[@]}" . |
+        yq -r '.spec.template.spec.containers[0].command | join(" ")')
+    [[ "$command" == *"-enable-ai=true"* ]]
+    [[ "$command" == *"-enable-ai-inference-gateway=true"* ]]
+}
+
 # ──────────────────────────────────────────────────────────────────────────────
 # crd-inferencegateways.yaml — rendering gate
 # ──────────────────────────────────────────────────────────────────────────────
@@ -509,7 +555,7 @@ gw_flags=(
         . | tee /dev/stderr |
         yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
         yq -r '.spec.replicas' | tee /dev/stderr)
-    [ "$actual" = "2" ]
+    [ "$actual" = "1" ]
 }
 
 @test "ai/InferenceGateway/object: per-gateway replicas overrides default" {
@@ -522,6 +568,31 @@ gw_flags=(
         yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
         yq -r '.spec.replicas' | tee /dev/stderr)
     [ "$actual" = "5" ]
+}
+
+@test "ai/InferenceGateway/object: explicit zero replicas overrides a nonzero default" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s $target \
+        "${gw_flags[@]}" \
+        --set 'ai.inferenceGateway.defaults.replicas=3' \
+        --set 'ai.inferenceGateway.gateways[0].replicas=0' \
+        . | tee /dev/stderr |
+        yq -r '.data["manifests.yaml"]' |
+        yq -r '.spec.replicas == 0' | tee /dev/stderr)
+    [ "$actual" = "true" ]
+}
+
+@test "ai/InferenceGateway/object: omitted replicas inherits a zero default" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s $target \
+        "${gw_flags[@]}" \
+        --set 'ai.inferenceGateway.defaults.replicas=0' \
+        . | tee /dev/stderr |
+        yq -r '.data["manifests.yaml"]' |
+        yq -r '.spec.replicas == 0' | tee /dev/stderr)
+    [ "$actual" = "true" ]
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -655,7 +726,7 @@ gw_flags=(
         . | tee /dev/stderr |
         yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
         yq -r 'select(.metadata.name == "pool-b") | .spec.replicas' | tee /dev/stderr)
-    [ "$actual" = "2" ]
+    [ "$actual" = "1" ]
 }
 
 @test "ai/InferenceGateway/object: gateways can independently override replicas" {

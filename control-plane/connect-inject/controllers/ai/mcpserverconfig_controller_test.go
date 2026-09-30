@@ -18,10 +18,24 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
+
+func TestMcpServerConfigStatusWrites(t *testing.T) {
+	testConfigStatusWrites(t, func() configStatusFixture {
+		mcp := enabledMcp("mcp")
+		return configStatusFixture{
+			object: mcp, conditions: &mcp.Status.Conditions, timestamp: &mcp.Status.LastSyncedTime, enabled: &mcp.Spec.Enabled,
+			sync: func(ctx context.Context, c client.Client) error {
+				controller := &McpServerConfigController{Client: c, Log: logrtest.New(t)}
+				return controller.syncMcpStatus(ctx, mcp)
+			},
+		}
+	})
+}
 
 func TestMcpServerConfigReconcile(t *testing.T) {
 	t.Parallel()

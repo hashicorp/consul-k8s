@@ -543,6 +543,11 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 						"name", configName)
 				}
 			}
+			agentDefaults, err = common.ResolveAIAgentDefaults(pod, agentDefaults)
+			if err != nil {
+				w.Log.Error(err, "invalid AI agent annotation", "request name", req.Name)
+				return admission.Errored(http.StatusBadRequest, err)
+			}
 			agentContainer := w.aiAgentSidecar(pod, agentDefaults)
 			pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
 		}

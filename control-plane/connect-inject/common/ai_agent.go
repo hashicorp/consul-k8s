@@ -6,6 +6,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -109,15 +110,12 @@ func AIAgentConfigName(pod corev1.Pod) string {
 	return pod.Annotations[constants.AnnotationAIAgentConfig]
 }
 
-// AIConfigFromAgentCRD resolves the AgentConfig CRD for the pod using the
-// same 3-level precedence as the mesh webhook:
+// AIConfigFromAgentCRD selects the AgentConfig named by the ai-agent-config
+// annotation, or "consul-ai-agent" when the annotation is absent.
 //
-//  1. AgentConfig named by consul.hashicorp.com/ai-agent-config annotation
-//  2. AgentConfig named "consul-ai-agent" — always present, installed by Helm
-//
-// It then converts the resolved AgentDefaults into a *capi.AgentServiceAI so
-// the endpoints controller can stamp it on the Consul catalog registration.
-// Port defaults are filled in for any zero values (see ApplyAIPortDefaults).
+// Per-pod port and timeout annotations override the selected CRD defaults.
+// The resolved values become the Consul catalog AI block and traffic exclusions.
+// Remaining zero ports use built-in defaults (see ApplyAIPortDefaults).
 func AIConfigFromAgentCRD(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -136,7 +134,38 @@ func AIConfigFromAgentCRD(
 			configName, err)
 	}
 
-	return AIConfigFromAgentDefaults(agentCfg.Spec.Defaults), nil
+	defaults, err := ResolveAIAgentDefaults(pod, agentCfg.Spec.Defaults)
+	if err != nil {
+		return nil, err
+	}
+	return AIConfigFromAgentDefaults(defaults), nil
+}
+
+// ResolveAIAgentDefaults applies non-empty pod annotations over CRD defaults.
+// Port overrides use the same unprivileged range as the AgentConfig schema.
+func ResolveAIAgentDefaults(pod corev1.Pod, defaults v1alpha1.AgentDefaults) (v1alpha1.AgentDefaults, error) {
+	for _, field := range []struct {
+		annotation string
+		port       *int32
+	}{
+		{constants.AnnotationAIAgentInterceptorPort, &defaults.InterceptorPort},
+		{constants.AnnotationAIAgentMCPPort, &defaults.McpPort},
+		{constants.AnnotationAIAgentHITLPort, &defaults.HITL.Port},
+	} {
+		value, err := DetermineAndValidatePort(pod, field.annotation, strconv.Itoa(int(*field.port)), false)
+		if err != nil {
+			return v1alpha1.AgentDefaults{}, err
+		}
+		port, err := strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			return v1alpha1.AgentDefaults{}, fmt.Errorf("invalid %s port: %w", field.annotation, err)
+		}
+		*field.port = int32(port)
+	}
+	if timeout := pod.Annotations[constants.AnnotationAIAgentHITLApprovalTimeout]; timeout != "" {
+		defaults.HITL.ApprovalTimeout = timeout
+	}
+	return defaults, nil
 }
 
 // AIConfigFromAgentDefaults converts an AgentDefaults struct (from the

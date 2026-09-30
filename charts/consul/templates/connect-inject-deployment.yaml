@@ -321,6 +321,9 @@ spec:
                 {{- end }}
                 {{- if and .Values.ai .Values.ai.enabled }}
                 -enable-ai=true \
+                {{- if .Values.ai.inferenceGateway.enabled }}
+                -enable-ai-inference-gateway=true \
+                {{- end }}
                 -ai-inference-gateway-image="{{ .Values.ai.inferenceGateway.image }}" \
                 {{- if and .Values.ai.inferenceGateway.enabled .Values.ai.inferenceGateway.defaults }}
                 {{- with .Values.ai.inferenceGateway.defaults }}

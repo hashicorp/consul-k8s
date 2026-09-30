@@ -15,7 +15,9 @@ import (
 	capi "github.com/hashicorp/consul/api"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1407,6 +1409,7 @@ func gatewayLabels(igw *v1alpha1.InferenceGateway) map[string]string {
 // readyReplicas onto the InferenceGateway status sub-resource.
 // readyReplicas is sourced from the owned Deployment's Status.ReadyReplicas
 // so consumers can see pod readiness without querying the Deployment directly.
+// Unchanged status is not written, avoiding updates triggered by our own watch.
 func (r *InferenceGatewayController) syncGatewayStatus(
 	ctx context.Context,
 	igw *v1alpha1.InferenceGateway,
@@ -1470,12 +1473,17 @@ func (r *InferenceGatewayController) syncGatewayStatus(
 		},
 	}
 
-	patch := client.MergeFrom(igw.DeepCopy())
-	igw.Status.Conditions = mergeConditions(igw.Status.Conditions, conditions)
+	before := igw.DeepCopy()
+	for _, condition := range conditions {
+		meta.SetStatusCondition(&igw.Status.Conditions, condition)
+	}
 	igw.Status.ReadyReplicas = readyReplicas
+	if igw.Status.LastSyncedTime != nil && equality.Semantic.DeepEqual(before.Status, igw.Status) {
+		return nil
+	}
 	igw.Status.LastSyncedTime = &now
 
-	if err := r.Client.Status().Patch(ctx, igw, patch); err != nil {
+	if err := r.Client.Status().Patch(ctx, igw, client.MergeFrom(before)); err != nil {
 		log.Error(err, "failed to patch status")
 		return err
 	}

@@ -44,7 +44,7 @@ data:
       poolRef:
         name: {{ if .poolRef }}{{ default .name .poolRef.name }}{{ else }}{{ .name }}{{ end }}
       image: {{ default $image .image | quote }}
-      replicas: {{ default $defaults.replicas .replicas }}
+      replicas: {{ if hasKey . "replicas" }}{{ .replicas }}{{ else }}{{ $defaults.replicas }}{{ end }}
       {{- $svc := default $defaults.service .service }}
       {{- if $svc }}
       service:

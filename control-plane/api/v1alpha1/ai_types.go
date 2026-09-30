@@ -113,8 +113,8 @@ type InferenceModelConfigStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// LastSyncedTime is the last time the controller successfully reconciled
-	// this resource.
+	// LastSyncedTime is the last time the controller successfully updated this
+	// resource's status. Reconciliations with unchanged status do not advance it.
 	// +optional
 	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
 }
@@ -216,8 +216,8 @@ type McpServerConfigStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// LastSyncedTime is the last time the controller successfully reconciled
-	// this resource.
+	// LastSyncedTime is the last time the controller successfully updated this
+	// resource's status. Reconciliations with unchanged status do not advance it.
 	// +optional
 	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
 }
@@ -330,8 +330,8 @@ type AgentConfigStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// LastSyncedTime is the last time the controller successfully reconciled
-	// this resource.
+	// LastSyncedTime is the last time the controller successfully updated this
+	// resource's status. Reconciliations with unchanged status do not advance it.
 	// +optional
 	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
 }
@@ -491,8 +491,8 @@ type InferencePoolConfigStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// LastSyncedTime is the last time the controller successfully reconciled
-	// this resource.
+	// LastSyncedTime is the last time the controller successfully updated this
+	// resource's status. Reconciliations with unchanged status do not advance it.
 	// +optional
 	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
 }
@@ -1262,8 +1262,8 @@ type InferenceGatewayStatus struct {
 	// +optional
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 
-	// lastSyncedTime is the last time the controller successfully reconciled
-	// this resource.
+	// lastSyncedTime is the last time the controller successfully updated this
+	// resource's status. Reconciliations with unchanged status do not advance it.
 	// +optional
 	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
 }

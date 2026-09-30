@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -162,11 +163,14 @@ func (r *AgentConfigController) syncAgentStatus(ctx context.Context, ac *v1alpha
 		},
 	}
 
-	patch := client.MergeFrom(ac.DeepCopy())
+	before := ac.DeepCopy()
 	ac.Status.Conditions = mergeConditions(ac.Status.Conditions, conditions)
+	if ac.Status.LastSyncedTime != nil && equality.Semantic.DeepEqual(before.Status, ac.Status) {
+		return nil
+	}
 	ac.Status.LastSyncedTime = &now
 
-	if err := r.Client.Status().Patch(ctx, ac, patch); err != nil {
+	if err := r.Client.Status().Patch(ctx, ac, client.MergeFrom(before)); err != nil {
 		log.Error(err, "failed to patch status")
 		return err
 	}

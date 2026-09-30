@@ -252,7 +252,8 @@ spec:
               lastSyncedTime:
                 description: >-
                   lastSyncedTime is the last time the controller successfully
-                  reconciled this resource.
+                  updated this resource's status. Reconciliations with unchanged status
+                  do not advance it.
                 format: date-time
                 type: string
               readyReplicas:

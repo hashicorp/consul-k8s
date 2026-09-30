@@ -141,6 +141,26 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 		require.Contains(t, resp.Result.Message, "ImageConsulOBOInbound must be set")
 	})
 
+	t.Run("agent sidecar uses resolved HITL annotation", func(t *testing.T) {
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		w.ImageAIAgent = "mcp-gateway:test"
+		pod := aiPod()
+		pod.Annotations[constants.AnnotationAIAgentHITLPort] = "approval"
+		pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{Name: "approval", ContainerPort: 23003}}
+		containers := injectedContainers(t, w, pod)
+		require.Equal(t, int32(23003), containers[mcpGatewayContainer].Ports[0].ContainerPort)
+	})
+
+	t.Run("invalid agent port fails admission", func(t *testing.T) {
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		w.ImageAIAgent = "mcp-gateway:test"
+		pod := aiPod()
+		pod.Annotations[constants.AnnotationAIAgentHITLPort] = "invalid"
+		resp := w.Handle(context.Background(), admissionRequest(t, pod))
+		require.False(t, resp.Allowed)
+		require.Contains(t, resp.Result.Message, constants.AnnotationAIAgentHITLPort)
+	})
+
 	t.Run("non ai-agent pod has no obo", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
 		pod := aiPod()

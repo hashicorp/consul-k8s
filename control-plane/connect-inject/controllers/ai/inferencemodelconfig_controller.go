@@ -6,11 +6,14 @@ package ai
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -181,11 +184,14 @@ func (r *InferenceModelConfigController) syncStatus(ctx context.Context, imc *v1
 		},
 	}
 
-	patch := client.MergeFrom(imc.DeepCopy())
+	before := imc.DeepCopy()
 	imc.Status.Conditions = mergeConditions(imc.Status.Conditions, conditions)
+	if imc.Status.LastSyncedTime != nil && equality.Semantic.DeepEqual(before.Status, imc.Status) {
+		return nil
+	}
 	imc.Status.LastSyncedTime = &now
 
-	if err := r.Client.Status().Patch(ctx, imc, patch); err != nil {
+	if err := r.Client.Status().Patch(ctx, imc, client.MergeFrom(before)); err != nil {
 		log.Error(err, "failed to patch status")
 		return err
 	}
@@ -204,33 +210,12 @@ func (r *InferenceModelConfigController) SetupWithManager(mgr ctrl.Manager) erro
 		Complete(r)
 }
 
-// mergeConditions upserts newConditions into existing, preserving
-// LastTransitionTime when the Status has not changed.
+// mergeConditions upserts without mutating existing, preserving condition order
+// and LastTransitionTime when the Status has not changed.
 func mergeConditions(existing, newConditions []metav1.Condition) []metav1.Condition {
-	result := make([]metav1.Condition, 0, len(existing))
-	// Copy conditions that are NOT being updated.
-	for _, e := range existing {
-		found := false
-		for _, n := range newConditions {
-			if e.Type == n.Type {
-				found = true
-				break
-			}
-		}
-		if !found {
-			result = append(result, e)
-		}
-	}
-	// Upsert new conditions, keeping LastTransitionTime stable when Status is unchanged.
-	for _, n := range newConditions {
-		for _, e := range existing {
-			if e.Type == n.Type && e.Status == n.Status {
-				n.LastTransitionTime = e.LastTransitionTime
-				break
-			}
-		}
-		result = append(result, n)
+	result := slices.Clone(existing)
+	for _, condition := range newConditions {
+		meta.SetStatusCondition(&result, condition)
 	}
 	return result
 }
-

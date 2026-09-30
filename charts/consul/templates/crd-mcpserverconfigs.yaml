@@ -200,7 +200,9 @@ spec:
                     - type
                   x-kubernetes-list-type: map
                 lastSyncedTime:
-                  description: LastSyncedTime is the last time the controller successfully reconciled this resource.
+                  description: >-
+                    LastSyncedTime is the last time the controller successfully updated this
+                    resource's status. Reconciliations with unchanged status do not advance it.
                   type: string
                   format: date-time
 {{- end }}
