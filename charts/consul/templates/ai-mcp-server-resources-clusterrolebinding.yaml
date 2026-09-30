@@ -1,0 +1,22 @@
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-mcp-server-resources
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-mcp-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "consul.fullname" . }}-ai-mcp-server-resources
+subjects:
+  - kind: ServiceAccount
+    name: {{ template "consul.fullname" . }}-ai-mcp-server-resources
+    namespace: {{ .Release.Namespace }}
+{{- end }}

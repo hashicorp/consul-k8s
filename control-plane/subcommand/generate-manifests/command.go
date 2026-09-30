@@ -404,6 +404,7 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	case kindGatewayPolicy:
 		convertGatewayPolicyTargetRef(raw)
 	}
+
 }
 
 // TODO code: Creating the manifests for CustomGatewayclass but not using it at the moment.

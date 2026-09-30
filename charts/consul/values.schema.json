@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Consul Helm Chart Values",
+  "type": "object",
+  "properties": {
+    "ai": {
+      "type": "object",
+      "description": "AI feature configuration. All sub-sections are only active when ai.enabled=true.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Master switch for all AI features."
+        },
+        "inferenceModel": {
+          "type": "object",
+          "properties": {
+            "defaults": {
+              "type": "object",
+              "properties": {
+                "interceptorPort": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535,
+                  "not": {
+                    "enum": [20000]
+                  },
+                  "description": "TCP port the inference interceptor container listens on. Must not conflict with 20000 (Envoy)."
+                },
+                "inferencePath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Base URL path forwarded to the upstream LLM endpoint."
+                },
+                "inferenceProtocol": {
+                  "type": "string",
+                  "enum": [
+                    "openai",
+                    "anthropic",
+                    "bedrock"
+                  ],
+                  "description": "Wire protocol used to communicate with the upstream LLM."
+                },
+                "resources": {
+                  "type": "object",
+                  "properties": {
+                    "requests": {
+                      "$ref": "#/definitions/resourceList"
+                    },
+                    "limits": {
+                      "$ref": "#/definitions/resourceList"
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "mcpServer": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "description": "Container image for the MCP server sidecar injected into pods with consul.hashicorp.com/ai-role: mcp-server."
+            },
+            "defaults": {
+              "type": "object",
+              "properties": {
+                "interceptorPort": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535,
+                  "not": {
+                    "enum": [20000]
+                  },
+                  "description": "TCP port the MCP server container listens on. Must not conflict with 20000 (Envoy)."
+                },
+                "transport": {
+                  "type": "string",
+                  "enum": [
+                    "streamable-http",
+                    "sse",
+                    "stdio"
+                  ],
+                  "description": "MCP wire transport."
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "HTTP path the MCP server listens on."
+                },
+                "protocolVersion": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "MCP protocol version the server advertises."
+                },
+                "resources": {
+                  "type": "object",
+                  "properties": {
+                    "requests": {
+                      "$ref": "#/definitions/resourceList"
+                    },
+                    "limits": {
+                      "$ref": "#/definitions/resourceList"
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "description": "Container image for the AI agent sidecar injected into pods with consul.hashicorp.com/ai-role: ai-agent."
+            },
+            "defaults": {
+              "type": "object",
+              "properties": {
+                "interceptorPort": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535,
+                  "not": {
+                    "enum": [20000]
+                  },
+                  "description": "TCP port the agent interceptor listens on. Must not conflict with 20000 (Envoy)."
+                },
+                "mcpPort": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535,
+                  "not": {
+                    "enum": [20000]
+                  },
+                  "description": "TCP port used for MCP connectivity within the pod. Must not conflict with 20000 (Envoy)."
+                },
+                "hitl": {
+                  "type": "object",
+                  "properties": {
+                    "port": {
+                      "type": "integer",
+                      "minimum": 1024,
+                      "maximum": 65535,
+                      "not": {
+                        "enum": [20000]
+                      },
+                      "description": "TCP port the HITL approval server listens on. Must not conflict with 20000 (Envoy)."
+                    },
+                    "approvalTimeout": {
+                      "type": "string",
+                      "minLength": 2,
+                      "pattern": "^[0-9]+(ms|s|m|h)$",
+                      "description": "Duration string (e.g. 60s, 5m) the agent waits for human approval."
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "resources": {
+                  "type": "object",
+                  "properties": {
+                    "requests": {
+                      "$ref": "#/definitions/resourceList"
+                    },
+                    "limits": {
+                      "$ref": "#/definitions/resourceList"
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "obo": {
+          "type": "object",
+          "description": "OBO (on-behalf-of) identity-plane sidecars injected into ai-role=ai-agent pods.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Inject OBO sidecars into ai-role=ai-agent pods. Set false for environments without an IBM Verify tenant."
+            },
+            "inbound": {
+              "type": "object",
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "description": "Container image for consul-obo-inbound (loopback :21102)."
+                }
+              },
+              "additionalProperties": false
+            },
+            "outbound": {
+              "type": "object",
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "description": "Container image for consul-obo-outbound (loopback :21103)."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "inferenceGateway": {
+          "type": "object",
+          "description": "InferenceGateway feature configuration. Controls the container image, defaults, and the list of gateway instances.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable the InferenceGateway feature. When false, the CRD is not installed and no objects are rendered."
+            },
+            "image": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Container image used by the InferenceGateway Deployment."
+            },
+            "defaults": {
+              "type": "object",
+              "description": "Default values applied to every gateway in the gateways list unless overridden per-gateway.",
+              "properties": {
+                "replicas": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Default number of Deployment replicas."
+                },
+                "service": {
+                  "type": "object",
+                  "description": "Default Service configuration for gateway instances.",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+                      "description": "Kubernetes Service type."
+                    },
+                    "ports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["port"],
+                        "properties": {
+                          "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "resources": {
+                  "type": "object",
+                  "description": "Default resource requests and limits for the gateway container.",
+                  "properties": {
+                    "requests": { "$ref": "#/definitions/resourceList" },
+                    "limits":   { "$ref": "#/definitions/resourceList" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "gateways": {
+              "type": "array",
+              "description": "List of InferenceGateway instances to create. Each entry is rendered as a InferenceGateway CRD object.",
+              "items": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Unique name for this InferenceGateway instance."
+                  },
+                  "poolRef": {
+                    "type": "object",
+                    "description": "Reference to the InferencePoolConfig this gateway fronts. Defaults to the gateway name when not set.",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Name of the InferencePoolConfig to attach to."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "image": {
+                    "type": "string",
+                    "description": "Per-gateway image override."
+                  },
+                  "replicas": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Per-gateway replica count override."
+                  },
+                  "service": {
+                    "type": "object",
+                    "description": "Per-gateway Service configuration override.",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+                        "description": "Kubernetes Service type."
+                      },
+                      "ports": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["port"],
+                          "properties": {
+                            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                          },
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "resources": {
+                    "type": "object",
+                    "description": "Per-gateway resource requests/limits override.",
+                    "properties": {
+                      "requests": { "$ref": "#/definitions/resourceList" },
+                      "limits":   { "$ref": "#/definitions/resourceList" }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "resourceList": {
+      "type": "object",
+      "properties": {
+        "memory": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?$",
+          "description": "Memory quantity (e.g. 128Mi, 1Gi)."
+        },
+        "cpu": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(m)?$",
+          "description": "CPU quantity (e.g. 250m, 1)."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

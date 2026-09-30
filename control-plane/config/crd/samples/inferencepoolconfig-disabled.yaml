@@ -1,0 +1,31 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Disabled InferencePoolConfig — spec.enabled=false.
+# The controller will set: Accepted=True, ParentResolved=True, Ready=False.
+# Useful for staging a pool configuration before enabling it.
+#
+# Apply:
+#   kubectl apply -f inferencepoolconfig-disabled.yaml
+# Enable later:
+#   kubectl patch ipc test-pool-disabled -n default \
+#     --type=merge -p '{"spec":{"enabled":true}}'
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: InferencePoolConfig
+metadata:
+  name: test-pool-disabled
+  namespace: default
+spec:
+  enabled: false
+  parentRefs:
+    - kind: InferenceModelConfig
+      name: consul-ai-gateway
+      namespace: default
+  rateLimit:
+    enabled: true
+    mode: local
+    enforcement: shadow
+    default:
+      requests:
+        count: 100
+        window: 1m

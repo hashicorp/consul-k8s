@@ -67,7 +67,8 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:2.1.0-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:2.1.0-rc1
+
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -854,8 +855,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev
-
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-rc1
   # Disable this once the manifests are generated and subsequent helm upgrades
   
   generateManifests: false
@@ -3884,3 +3884,237 @@ telemetryCollector:
   # it could be used to configure custom consul parameters.
   # @type: map
   extraEnvironmentVars: {}
+
+# Configures the AI Inference Model feature for Consul service mesh.
+# When enabled, an interceptor sidecar is injected alongside application
+# pods to handle AI inference traffic (e.g. proxying OpenAI-compatible calls).
+ai:
+  # Master switch for all AI features. When false:
+  #   - The InferenceModelConfig CRD is not installed.
+  #   - The post-install Job, ServiceAccount, ClusterRole, and ClusterRoleBinding
+  #     are not created.
+  #   - The connect-inject controller does NOT start the InferenceModelConfig watcher.
+  # @type: boolean
+  enabled: false
+
+  inferenceModel:
+    defaults:
+      # The port the interceptor container listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21101
+
+      # The base URL path forwarded to the upstream LLM endpoint.
+      # @type: string
+      inferencePath: "/v1"
+
+      # The wire protocol used to communicate with the upstream LLM.
+      # Supported values: "openai", "anthropic", "bedrock"
+      # @type: string
+      inferenceProtocol: "openai"
+
+      # Resource requests and limits for the AI interceptor init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "500m"
+        limits:
+          memory: "512Mi"
+          cpu: "1000m"
+
+  mcpServer:
+    # The container image for the MCP server sidecar injected by the webhook
+    # into pods annotated with consul.hashicorp.com/ai-role: "mcp-server".
+    #
+    # @default: ""
+    # @type: string
+    # TODO: this is yet to be implemented
+    image: "hashicorp/consul-mcp-gateway:2.1.0-rc1"
+
+    defaults:
+      # The port the MCP server container listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21102
+
+      # MCP wire transport: streamable-http | sse | stdio
+      # @type: string
+      transport: "streamable-http"
+
+      # HTTP path the MCP server listens on.
+      # @type: string
+      path: "/mcp"
+
+      # MCP protocol version the server advertises.
+      # @type: string
+      protocolVersion: "2025-03-26"
+
+      # Resource requests and limits for the MCP server init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+
+  inferenceGateway:
+    # Enable the InferenceGateway feature. When false, the CRD is not installed
+    # and its controller and Consul cache are not started. No InferenceGateway
+    # objects are rendered regardless of the gateways list.
+    # Requires ai.enabled=true and connectInject.enabled=true.
+    # @type: boolean
+    enabled: false
+
+    # The container image used by the InferenceGateway Deployment.
+    # The controller creates one Deployment per InferenceGateway resource in the
+    # cluster; this image is the process that receives inference traffic and
+    # forwards it to the backing InferencePoolConfig backends.
+    #
+    # Examples:
+    #
+    # ```yaml
+    # image: "hashicorp/consul-inference-gateway:0.1.0"
+    # image: "myregistry/my-inference-gateway:latest"
+    # ```
+    # @default: hashicorp/consul-inference-gateway:<latest version>
+    # @type: string
+    image: "hashicorp/consul-inference-gateway:2.1.0-rc1"
+
+    # Default values applied to every gateway in the gateways list below unless
+    # overridden on the individual gateway entry.
+    defaults:
+      # Number of replicas for each InferenceGateway Deployment.
+      # An explicit per-gateway replicas value, including zero, overrides this default.
+      # @type: integer
+      replicas: 1
+
+      # Service configuration for the ClusterIP Service fronting each gateway.
+      service:
+        # Kubernetes Service type.
+        # @type: string
+        type: ClusterIP
+
+        # Ports exposed by the Service.
+        # @type: array<map>
+        ports:
+          - port: 8443
+
+      # Resource requests and limits for the InferenceGateway Deployment containers.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+
+    # List of InferenceGateway instances to create. Each entry must have a
+    # unique `name` and may override any field from `defaults` above.
+    # The Helm chart renders one InferenceGateway CRD object per entry.
+    # The controller then reconciles each into a Deployment, Service, and
+    # Consul ai-gateway config entry. The gateway name is used directly for
+    # the Consul service/config entry and ServiceAccount identity.
+    # The service and config entry both use the destination Consul namespace,
+    # or the mirrored Kubernetes namespace (including mirroringK8SPrefix).
+    # With namespace mirroring, same-named gateways in different Kubernetes
+    # namespaces are independent; use the gateway name and mirrored Consul
+    # namespace in service intentions. In OSS or a shared destination namespace,
+    # gateway names must be unique: a conflicting gateway is rejected before
+    # its Deployment is created and cannot overwrite or delete the owner's entry.
+    #
+    # Example:
+    #
+    # ```yaml
+    # gateways:
+    #   - name: travel-inference-pool
+    #     poolRef:
+    #       name: travel-inference-pool  # optional: defaults to .name
+    #     replicas: 3
+    #     service:
+    #       type: ClusterIP
+    #       ports:
+    #         - port: 8443
+    #     resources:
+    #       requests:
+    #         memory: "256Mi"
+    #         cpu: "500m"
+    #       limits:
+    #         memory: "512Mi"
+    #         cpu: "1000m"
+    # ```
+    # @type: array<map>
+    gateways: []
+
+  agent:
+    # The container image used by the AI agent sidecar.
+    # When set and a pod carries consul.hashicorp.com/ai-role: "ai-agent", the
+    # webhook injects this image as an additional sidecar container alongside
+    # consul-dataplane.
+    #
+    # Examples:
+    #
+    # ```yaml
+    # image: "hashicorp/consul-ai-agent:0.1.0"
+    # image: "myregistry/my-ai-agent:latest"
+    # ```
+    # @default: ""
+    # @type: string
+    image: "hashicorp/consul-mcp-gateway:2.1.0-rc1"
+
+    defaults:
+      # The port the agent interceptor listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21101
+
+      # TCP port used for MCP connectivity within the pod.
+      # @type: integer
+      mcpPort: 15101
+
+      # Human-in-the-loop (HITL) approval settings.
+      hitl:
+        # TCP port the HITL approval server listens on inside the pod.
+        # @type: integer
+        port: 16101
+
+        # Duration the agent waits for a human approval before timing out.
+        # @type: string
+        approvalTimeout: "60s"
+
+      # Resource requests and limits for the agent init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+
+  # OBO (on-behalf-of) identity-plane sidecars for ai-agent pods.
+  # Split-knowledge: envelope ciphertext on Envoy UDS + DEK via dataplane broker.
+  # Required when injecting ai-role=ai-agent; webhook errors if unset.
+  obo:
+    # enabled controls whether OBO identity-plane sidecars are injected into
+    # ai-role=ai-agent pods. Set to false for local dev / playground environments
+    # that do not have an IBM Verify tenant. Default: false.
+    # @type: boolean
+    enabled: false
+    inbound:
+      # Docker image for consul-obo-inbound (loopback :21102).
+      # Binary source: consul-ai-apps/gateways/obo-inbound
+      # @type: string
+      image: "hashicorp/consul-obo-inbound:2.1.0-rc1"
+    outbound:
+      # Docker image for consul-obo-outbound (loopback :21103).
+      # Binary source: consul-ai-apps/gateways/obo-outbound
+      # @type: string
+      image: "hashicorp/consul-obo-outbound:2.1.0-rc1"
