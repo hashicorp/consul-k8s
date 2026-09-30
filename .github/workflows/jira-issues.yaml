@@ -63,14 +63,17 @@ jobs:
           # cf[10089] is Issue Link (use JIRA API to retrieve)
           JQL: 'issuetype = "${{ steps.set-ticket-type.outputs.TYPE }}" and cf[10089] = "${{ github.event.issue.html_url || github.event.pull_request.html_url }}"'
         run: |
-          response="$(curl --fail-with-body --silent --show-error \
+          if ! response="$(curl --fail-with-body --silent --show-error \
             --request POST \
             --url "${JIRA_BASE_URL%/}/rest/api/3/search/jql" \
             --user "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" \
             --header "Accept: application/json" \
             --header "Content-Type: application/json" \
             --data "$(jq --null-input --arg jql "${JQL}" \
-              '{jql: $jql, maxResults: 2, fields: ["key"]}')")"
+              '{jql: $jql, maxResults: 2, fields: ["key"]}')")"; then
+            echo "::error::Jira search request failed: ${response}"
+            exit 1
+          fi
 
           matches="$(jq '.issues | length' <<< "${response}")"
           if (( matches > 1 )); then
