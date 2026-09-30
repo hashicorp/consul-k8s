@@ -360,14 +360,6 @@ spec:
                 -ai-agent-image="{{ .Values.ai.agent.image }}" \
                 {{- end }}
                 {{- end }}
-                {{- if .Values.ai }}
-                {{- if .Values.ai.obo.inbound.image }}
-                -consul-obo-inbound-image="{{ .Values.ai.obo.inbound.image }}" \
-                {{- end }}
-                {{- if .Values.ai.obo.outbound.image }}
-                -consul-obo-outbound-image="{{ .Values.ai.obo.outbound.image }}" \
-                {{- end }}
-                {{- end }}
 
 
           startupProbe:

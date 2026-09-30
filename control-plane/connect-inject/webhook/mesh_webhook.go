@@ -87,21 +87,10 @@ type MeshWebhook struct {
 	// annotation, the webhook injects this image as an additional sidecar.
 	ImageMCPServer string
 
-	// ImageAIAgent is the container image for the AI agent sidecar.
-	// When set and a pod carries the consul.hashicorp.com/ai-role: "ai-agent"
-	// annotation, the webhook injects this image as an additional sidecar.
+	// ImageAIAgent is the container image for the AI agent sidecar
+	// (consul-mcp-sc multi-binary: MCP + OBO). Required when IsAIAgent.
+	// Mirrors ai.agent.image from values.yaml.
 	ImageAIAgent string
-
-	// ImageConsulOBOInbound is the container image for consul-obo-inbound.
-	// Injected into ai-agent pods for inbound JWT verify + claim projection
-	// (ext_proc on loopback :21102). Required when IsAIAgent — no silent fallback.
-	ImageConsulOBOInbound string
-
-	// ImageConsulOBOOutbound is the container image for consul-obo-outbound.
-	// Injected into ai-agent pods for outbound RFC 8693 OBO exchange
-	// (ext_proc on loopback :21103). Required when IsAIAgent — no silent fallback.
-	ImageConsulOBOOutbound string
-
 	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	GlobalImagePullPolicy string
 
@@ -299,15 +288,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// Resolve transparent proxy before validating service ports so malformed
 	// transparent-proxy configuration retains its existing error precedence.
-	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
+	nsEarly, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
 	if err != nil {
 		w.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
-	if _, err := common.TransparentProxyEnabled(*ns, pod, w.EnableTransparentProxy); err != nil {
+	if _, err := common.TransparentProxyEnabled(*nsEarly, pod, w.EnableTransparentProxy); err != nil {
 		w.Log.Error(err, "invalid transparent proxy configuration", "request name", req.Name)
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("couldn't check if transparent proxy is enabled: %w", err))
 	}
+	// After defaultAnnotations so the port annotation matches what endpoints will use.
 	if err := w.validateMultiportRegistration(pod); err != nil {
 		w.Log.Error(err, "invalid multi-port service registration", "request name", req.Name)
 		return admission.Errored(http.StatusBadRequest, err)
@@ -348,6 +338,13 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	for i := range pod.Spec.Containers {
 		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, containerEnvVars...)
+	}
+
+	// A user can enable/disable tproxy for an entire namespace via a label.
+	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
+	if err != nil {
+		w.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
 	// Get service names from the annotation. If theres 0-1 service names, it's a single port pod, otherwise it's multi
@@ -507,66 +504,64 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
-	// ai-agent pods get the ai-agent sidecar and the OBO identity-plane sidecars.
+	// NOTE: The mcp-server ai-role only needs consul-dataplane; no additional
+	// sidecar is injected for now. The mcpServerSidecar() implementation is
+	// retained in mcp_server_sidecar.go but the injection is disabled here.
+	//
+	// if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == "mcp-server" && w.ImageMCPServer != "" {
+	// 	mcpDefaults := v1alpha1.McpServerDefaults{}
+	// 	if w.Client != nil {
+	// 		var mcpCfg v1alpha1.McpServerConfig
+	// 		if err := w.Client.Get(ctx, client.ObjectKey{Name: "consul-mcp-server"}, &mcpCfg); err == nil {
+	// 			mcpDefaults = mcpCfg.Spec.Defaults
+	// 		} else {
+	// 			w.Log.Info("McpServerConfig not found, using built-in defaults", "name", "consul-mcp-server")
+	// 		}
+	// 	}
+	// 	mcpContainer := w.mcpServerSidecar(pod, mcpDefaults)
+	// 	pod.Spec.Containers = append(pod.Spec.Containers, mcpContainer)
+	// }
+
+	// ai-agent pods get one combined MCP+OBO sidecar (consul-mcp-sc --mode=agent).
+	// ai.agent.image is required: Envoy OBO/MCP filters dial this container, so a
+	// missing image fails admission rather than leaving dangling listeners.
 	if common.IsAIAgent(pod) {
-		if w.ImageAIAgent != "" {
-			// Port and resource defaults are resolved with a 3-level precedence:
-			//   1. consul.hashicorp.com/ai-agent-config annotation — names a custom
-			//      AgentConfig object; use when a team needs settings that differ
-			//      from the cluster default.
-			//   2. "consul-ai-agent" AgentConfig object — the cluster-wide default
-			//      installed by Helm; always present when ai.enabled=true.
-			//   3. Per-pod annotations (e.g. consul.hashicorp.com/ai-agent-hitl-port)
-			//      override individual ports after the CRD defaults are resolved.
-			agentDefaults := v1alpha1.AgentDefaults{}
-			if w.Client != nil {
-				// Determine which AgentConfig object to read.
-				// Falls back to the Helm-installed "consul-ai-agent" when the
-				// per-pod annotation is absent.
-				configName := "consul-ai-agent"
-				if annotationName := pod.Annotations[constants.AnnotationAIAgentConfig]; annotationName != "" {
-					configName = annotationName
-				}
-
-				var agentCfg v1alpha1.AgentConfig
-				if err := w.Client.Get(ctx, client.ObjectKey{Name: configName}, &agentCfg); err == nil {
-					agentDefaults = agentCfg.Spec.Defaults
-				} else {
-					w.Log.Info("AgentConfig not found, continuing with zero defaults; per-pod annotations or built-in constants will apply",
-						"name", configName)
-				}
-			}
-			agentDefaults, err = common.ResolveAIAgentDefaults(pod, agentDefaults)
-			if err != nil {
-				w.Log.Error(err, "invalid AI agent annotation", "request name", req.Name)
-				return admission.Errored(http.StatusBadRequest, err)
-			}
-			agentContainer := w.aiAgentSidecar(pod, agentDefaults)
-			pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
-		}
-
-		// OBO in/out are required for ai-role=ai-agent (annotation is the only
-		// gate). Missing images fail admission — no separate enable flag.
 		if !haveDataplaneRunAs {
-			err := fmt.Errorf("consul-dataplane container not found; cannot assign OBO runAsUser")
-			w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+			err := fmt.Errorf("consul-dataplane container not found; cannot assign AI sidecar runAsUser")
+			w.Log.Error(err, "error configuring AI sidecar", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
-		oboInbound, err := w.oboInboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
-		if err != nil {
-			w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
-			return admission.Errored(http.StatusInternalServerError,
-				fmt.Errorf("error configuring consul-obo-inbound container: %s", err))
-		}
-		pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
 
-		oboOutbound, err := w.oboOutboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
-		if err != nil {
-			w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
-			return admission.Errored(http.StatusInternalServerError,
-				fmt.Errorf("error configuring consul-obo-outbound container: %s", err))
+		// Port/resource defaults: AgentConfig CRD, then per-pod annotations
+		// (validated via ResolveAIAgentDefaults so catalog/CNI stay consistent).
+		agentDefaults := v1alpha1.AgentDefaults{}
+		if w.Client != nil {
+			configName := "consul-ai-agent"
+			if annotationName := pod.Annotations[constants.AnnotationAIAgentConfig]; annotationName != "" {
+				configName = annotationName
+			}
+
+			var agentCfg v1alpha1.AgentConfig
+			if err := w.Client.Get(ctx, client.ObjectKey{Name: configName}, &agentCfg); err == nil {
+				agentDefaults = agentCfg.Spec.Defaults
+			} else {
+				w.Log.Info("AgentConfig not found, continuing with zero defaults; per-pod annotations or built-in constants will apply",
+					"name", configName)
+			}
 		}
-		pod.Spec.Containers = append(pod.Spec.Containers, oboOutbound)
+		agentDefaults, err = common.ResolveAIAgentDefaults(pod, agentDefaults)
+		if err != nil {
+			w.Log.Error(err, "invalid AI agent annotation", "request name", req.Name)
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		// runAsUser must match dataplane for Local Credential Broker FetchKey.
+		agentContainer, err := w.aiAgentSidecar(pod, agentDefaults, dataplaneRunAsUser, dataplaneRunAsGroup)
+		if err != nil {
+			w.Log.Error(err, "error configuring AI sidecar", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError,
+				fmt.Errorf("error configuring AI sidecar: %s", err))
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
 	}
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
@@ -625,7 +620,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
 	}
 
-	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the traffic redirection config so that the CNI
+	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
 		if err = w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
@@ -697,7 +692,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	}
 
 	if tproxyEnabled && overwriteProbes {
-		// We don't use the loop index because this needs to line up w.nftablesConfigJSON,
+		// We don't use the loop index because this needs to line up w.withiptablesConfigJSON,
 		// which is performed before the sidecar is injected.
 		idx := 0
 		for _, container := range pod.Spec.Containers {
@@ -820,74 +815,6 @@ func defaultConnectServicePortsAnnotation(pod corev1.Pod) string {
 	}
 
 	return strings.Join(defaultPorts, ",")
-}
-
-// validateMultiportRegistration rejects a Pod that would produce a single Consul
-// service registration containing more than one named port.
-//
-// It must run after defaultAnnotations, so the annotation it inspects is the
-// value the endpoints controller will act on rather than the raw user input.
-func (w *MeshWebhook) validateMultiportRegistration(pod corev1.Pod) error {
-	// The legacy consul.hashicorp.com/connect-service=a,b model produces one
-	// Consul registration per service rather than one registration with several
-	// named ports, so it is outside the scope of this gate.
-	if !w.DisableMultiportRegistration || hasMultipleConnectServices(pod) {
-		return nil
-	}
-	if !selectsMultipleServicePorts(pod) {
-		return nil
-	}
-
-	return fmt.Errorf(
-		"multi-port Consul service registration is disabled; set %q to exactly one application port",
-		constants.AnnotationPort,
-	)
-}
-
-// selectsMultipleServicePorts reports whether the Pod will register more than one
-// Consul service port.
-//
-// The port selection is read from the annotation rather than from the first
-// container's port count, because a port token may name a port declared on any
-// container in the Pod. common.PortValue resolves tokens the same way.
-func selectsMultipleServicePorts(pod corev1.Pod) bool {
-	if raw, ok := pod.Annotations[constants.AnnotationPort]; ok {
-		return countNonEmptyCommaSeparatedValues(raw) > 1
-	}
-
-	// defaultAnnotations only sets the annotation from the first container, so an
-	// absent annotation means the first container declares no usable port. The
-	// endpoints controller then derives the port set from the Endpoints object,
-	// which can register every port the Kubernetes Service exposes. Those ports
-	// are not visible at admission time, so fall back to the ports declared
-	// anywhere in the Pod as the closest available approximation.
-	return usablePortCount(pod.Spec.Containers) > 1
-}
-
-func usablePortCount(containers []corev1.Container) int {
-	usable := 0
-	for _, container := range containers {
-		for _, port := range container.Ports {
-			if port.Name != "" || port.ContainerPort > 0 {
-				usable++
-			}
-		}
-	}
-	return usable
-}
-
-func hasMultipleConnectServices(pod corev1.Pod) bool {
-	return countNonEmptyCommaSeparatedValues(pod.Annotations[constants.AnnotationService]) > 1
-}
-
-func countNonEmptyCommaSeparatedValues(value string) int {
-	count := 0
-	for _, token := range strings.Split(value, ",") {
-		if strings.TrimSpace(token) != "" {
-			count++
-		}
-	}
-	return count
 }
 
 // prometheusAnnotations sets the Prometheus scraping configuration
@@ -1045,4 +972,72 @@ func findAccessLogVolumeMount(pod corev1.Pod) (corev1.VolumeMount, bool) {
 	}
 
 	return corev1.VolumeMount{}, false
+}
+
+// validateMultiportRegistration rejects a Pod that would produce a single Consul
+// service registration containing more than one named port.
+//
+// It must run after defaultAnnotations, so the annotation it inspects is the
+// value the endpoints controller will act on rather than the raw user input.
+func (w *MeshWebhook) validateMultiportRegistration(pod corev1.Pod) error {
+	// The legacy consul.hashicorp.com/connect-service=a,b model produces one
+	// Consul registration per service rather than one registration with several
+	// named ports, so it is outside the scope of this gate.
+	if !w.DisableMultiportRegistration || hasMultipleConnectServices(pod) {
+		return nil
+	}
+	if !selectsMultipleServicePorts(pod) {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"multi-port Consul service registration is disabled; set %q to exactly one application port",
+		constants.AnnotationPort,
+	)
+}
+
+// selectsMultipleServicePorts reports whether the Pod will register more than one
+// Consul service port.
+//
+// The port selection is read from the annotation rather than from the first
+// container's port count, because a port token may name a port declared on any
+// container in the Pod. common.PortValue resolves tokens the same way.
+func selectsMultipleServicePorts(pod corev1.Pod) bool {
+	if raw, ok := pod.Annotations[constants.AnnotationPort]; ok {
+		return countNonEmptyCommaSeparatedValues(raw) > 1
+	}
+
+	// defaultAnnotations only sets the annotation from the first container, so an
+	// absent annotation means the first container declares no usable port. The
+	// endpoints controller then derives the port set from the Endpoints object,
+	// which can register every port the Kubernetes Service exposes. Those ports
+	// are not visible at admission time, so fall back to the ports declared
+	// anywhere in the Pod as the closest available approximation.
+	return usablePortCount(pod.Spec.Containers) > 1
+}
+
+func usablePortCount(containers []corev1.Container) int {
+	usable := 0
+	for _, container := range containers {
+		for _, port := range container.Ports {
+			if port.Name != "" || port.ContainerPort > 0 {
+				usable++
+			}
+		}
+	}
+	return usable
+}
+
+func hasMultipleConnectServices(pod corev1.Pod) bool {
+	return countNonEmptyCommaSeparatedValues(pod.Annotations[constants.AnnotationService]) > 1
+}
+
+func countNonEmptyCommaSeparatedValues(value string) int {
+	count := 0
+	for _, token := range strings.Split(value, ",") {
+		if strings.TrimSpace(token) != "" {
+			count++
+		}
+	}
+	return count
 }
