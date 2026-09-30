@@ -59,6 +59,11 @@ const (
 
 	// labelManagedBy is stamped on every K8s resource owned by this controller.
 	labelManagedBy = "consul.hashicorp.com/managed-by"
+
+	// sidecarUserAndGroupID matches mesh connect-inject (webhook sidecarUserAndGroupID).
+	// consul-inference-gateway binds /run/consul/ext_proc.sock mode 0700; Envoy in
+	// consul-dataplane must share this uid or dial fails with Permission denied.
+	sidecarUserAndGroupID = int64(5995)
 )
 
 // InferenceGatewayController reconciles InferenceGateway objects.
@@ -1268,23 +1273,18 @@ func deploymentFor(
 								}
 								return mounts
 							}(),
-							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: boolPtr(false),
-								ReadOnlyRootFilesystem:   boolPtr(true),
-								RunAsNonRoot:             boolPtr(true),
-								Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-							},
+							SecurityContext: meshSidecarSecurityContext(),
 						},
 						{
 							// inference-gateway is the ext_proc sidecar that Envoy calls over UDS.
 							// It only handles LLM request/response processing — it does not run Envoy.
+							// Policy arrives on listener metadata; do not pass -config-entry /
+							// -consul-http-addr (removed from consul-ai-apps; process holds no Consul client).
 							Name:  "inference-gateway",
 							Image: gatewayImage,
 							Args: []string{
 								"-uds-path=/run/consul/ext_proc.sock",
-								"-config-entry=" + inferenceGatewayName(igw),
-								"-consul-http-addr=http://" + fmt.Sprintf("%s:%d", cc.address, cc.httpPort),
-								"-log-level=$(CONSUL_IGW_LOG_LEVEL)",
+								"-log-level=" + logLevel,
 							},
 							Ports: []corev1.ContainerPort{
 								{Name: "metrics", ContainerPort: inferenceGatewayMetricsPort, Protocol: corev1.ProtocolTCP},
@@ -1304,6 +1304,8 @@ func deploymentFor(
 								Name:      "run-consul",
 								MountPath: "/run/consul",
 							}},
+							// Same uid as consul-dataplane — required for 0700 ext_proc UDS.
+							SecurityContext: meshSidecarSecurityContext(),
 						},
 					},
 					Volumes: func() []corev1.Volume {
@@ -1360,7 +1362,21 @@ func deploymentFor(
 }
 
 // boolPtr returns a pointer to the given bool value.
-func boolPtr(b bool) *bool { return &b }
+func boolPtr(b bool) *bool    { return &b }
+func int64Ptr(i int64) *int64 { return &i }
+
+// meshSidecarSecurityContext is shared by consul-dataplane and inference-gateway
+// so the ext_proc UDS (0700) is reachable from Envoy.
+func meshSidecarSecurityContext() *corev1.SecurityContext {
+	return &corev1.SecurityContext{
+		AllowPrivilegeEscalation: boolPtr(false),
+		ReadOnlyRootFilesystem:   boolPtr(true),
+		RunAsNonRoot:             boolPtr(true),
+		RunAsUser:                int64Ptr(sidecarUserAndGroupID),
+		RunAsGroup:               int64Ptr(sidecarUserAndGroupID),
+		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	}
+}
 
 // serviceFor returns the desired Service for an InferenceGateway.
 func serviceFor(igw *v1alpha1.InferenceGateway, svc v1alpha1.InferenceGatewayService) *corev1.Service {

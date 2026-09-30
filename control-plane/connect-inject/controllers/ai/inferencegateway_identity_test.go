@@ -187,7 +187,11 @@ func TestInferenceGatewayNamespaceWiring(t *testing.T) {
 			require.Equal(t, tc.wantNamespace, dep.Spec.Template.Annotations[constants.AnnotationGatewayNamespace])
 			require.Equal(t, entry.GetName(), dep.Spec.Template.Annotations[constants.AnnotationGatewayConsulServiceName])
 			require.Equal(t, entry.GetName(), dep.Spec.Template.Spec.ServiceAccountName)
-			require.Contains(t, dep.Spec.Template.Spec.Containers[1].Args, "-config-entry="+entry.GetName())
+			require.Contains(t, dep.Spec.Template.Spec.Containers[1].Args, "-uds-path=/run/consul/ext_proc.sock")
+			require.NotContains(t, dep.Spec.Template.Spec.Containers[1].Args, "-config-entry="+entry.GetName())
+			require.NotContains(t, dep.Spec.Template.Spec.Containers[1].Args, "-consul-http-addr=")
+			require.Equal(t, sidecarUserAndGroupID, *dep.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
+			require.Equal(t, sidecarUserAndGroupID, *dep.Spec.Template.Spec.Containers[1].SecurityContext.RunAsUser)
 			require.Contains(t, dep.Spec.Template.Spec.InitContainers[0].Command[2], "-service-name="+entry.GetName())
 			sa := &corev1.ServiceAccount{}
 			require.NoError(t, k8sClient.Get(context.Background(), types.NamespacedName{Namespace: igw.Namespace, Name: dep.Spec.Template.Spec.ServiceAccountName}, sa))
