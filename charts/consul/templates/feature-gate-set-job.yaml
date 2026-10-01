@@ -2,18 +2,6 @@
 {{- if (or $serverEnabled .Values.externalServers.enabled) }}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
-#
-# This post-install/post-upgrade Job calls "consul operator feature set" for
-# every feature gate that Helm manages. Consul's feature-gate Raft policy is
-# NOT updated by config-file reloads after the initial bootstrap, so this job
-# is the authoritative path to keep gate state in sync with values.yaml on
-# every install and upgrade.
-#
-# To add a new gate in the future, append another line to the GATES heredoc
-# in the shell script below:
-#   <gate-name> enabled|disabled
-#
-# No other files need to change.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -47,15 +35,23 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/mesh-inject": "false"
-        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.acls.manageSystemACLs) }}
+        {{- if (and .Values.global.secretsBackend.vault.enabled (or .Values.global.tls.enabled .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName)) }}
         "vault.hashicorp.com/agent-pre-populate-only": "true"
         "vault.hashicorp.com/agent-inject": "true"
+        {{- if (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) }}
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.manageSystemACLsRole }}
         {{- if .Values.global.acls.bootstrapToken.secretName }}
         {{- with .Values.global.acls.bootstrapToken }}
         "vault.hashicorp.com/agent-inject-secret-bootstrap-token": "{{ .secretName }}"
         "vault.hashicorp.com/agent-inject-template-bootstrap-token": {{ template "consul.vaultSecretTemplate" . }}
         {{- end }}
+        {{- end }}
+        {{- else }}
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
         {{- end }}
         {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
         "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
@@ -71,29 +67,27 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-feature-gate-set
-      {{- if (or .Values.global.tls.enabled .Values.global.acls.manageSystemACLs) }}
+      {{- if (or (and .Values.global.tls.enabled (not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled))) (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled))) }}
       volumes:
-      {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
-      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
-      - name: consul-ca-cert
-        secret:
-          {{- if .Values.global.tls.caCert.secretName }}
-          secretName: {{ .Values.global.tls.caCert.secretName }}
-          {{- else }}
-          secretName: {{ template "consul.fullname" . }}-ca-cert
-          {{- end }}
-          items:
-          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
-            path: tls.crt
-      {{- end }}
+      {{- if and .Values.global.tls.enabled (not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled)) }}
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+                path: tls.crt
       {{- end }}
       {{- if (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled)) }}
-      - name: bootstrap-acl-token
-        secret:
-          secretName: {{ default (printf "%s-bootstrap-acl-token" (include "consul.fullname" .)) .Values.global.acls.bootstrapToken.secretName }}
-          items:
-          - key: {{ default "token" .Values.global.acls.bootstrapToken.secretKey }}
-            path: token
+        - name: bootstrap-acl-token
+          secret:
+            secretName: {{ default (printf "%s-bootstrap-acl-token" (include "consul.fullname" .)) .Values.global.acls.bootstrapToken.secretName }}
+            items:
+              - key: {{ default "token" .Values.global.acls.bootstrapToken.secretKey }}
+                path: token
       {{- end }}
       {{- end }}
       containers:
@@ -103,28 +97,32 @@ spec:
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
         env:
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
-        {{- if .Values.global.acls.manageSystemACLs }}
+        {{- if (or .Values.global.acls.manageSystemACLs (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
         {{- if .Values.global.secretsBackend.vault.enabled }}
         - name: CONSUL_HTTP_TOKEN_FILE
           value: /vault/secrets/bootstrap-token
+        {{- else if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+        - name: CONSUL_HTTP_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.acls.bootstrapToken.secretName }}
+              key: {{ .Values.global.acls.bootstrapToken.secretKey }}
         {{- else }}
         - name: CONSUL_HTTP_TOKEN_FILE
           value: /consul/acl/tokens/token
         {{- end }}
         {{- end }}
-        {{- if (or .Values.global.tls.enabled .Values.global.acls.manageSystemACLs) }}
+        {{- if (or (and .Values.global.tls.enabled (not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled))) (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled))) }}
         volumeMounts:
-        {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
-        {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
-        - name: consul-ca-cert
-          mountPath: /consul/tls/ca
-          readOnly: true
-        {{- end }}
+        {{- if and .Values.global.tls.enabled (not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled)) }}
+          - name: consul-ca-cert
+            mountPath: /consul/tls/ca
+            readOnly: true
         {{- end }}
         {{- if (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled)) }}
-        - name: bootstrap-acl-token
-          mountPath: /consul/acl/tokens
-          readOnly: true
+          - name: bootstrap-acl-token
+            mountPath: /consul/acl/tokens
+            readOnly: true
         {{- end }}
         {{- end }}
         command:
@@ -155,6 +153,10 @@ spec:
             echo "Setting feature gate: $name=$value"
             consul operator feature set "$name" "$value"
           done
+        {{- if .Values.global.acls.resources }}
+        resources:
+          {{- toYaml .Values.global.acls.resources | nindent 10 }}
+        {{- else }}
         resources:
           requests:
             memory: "50Mi"
@@ -162,8 +164,13 @@ spec:
           limits:
             memory: "50Mi"
             cpu: "50m"
+        {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.global.acls.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.global.acls.nodeSelector . | indent 8 | trim }}
       {{- end }}
 {{- end }}
