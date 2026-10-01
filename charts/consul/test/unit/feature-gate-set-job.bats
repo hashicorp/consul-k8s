@@ -298,8 +298,34 @@ https://[2001:db8::1]:8501" ]
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[] | .name] | contains(["CONSUL_HTTP_TOKEN","CONSUL_HTTP_TOKEN_FILE"])' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
+      yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN" or .name == "CONSUL_HTTP_TOKEN_FILE")] | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
+}
+
+@test "feature-gate-set/Job: ignores replication token when ACL management is disabled" {
+  cd `chart_dir`
+  local job=$(helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.replicationToken.secretName=replication-token' \
+      --set 'global.acls.replicationToken.secretKey=token' \
+      . | yq '.')
+  [ "$(echo "$job" | yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN" or .name == "CONSUL_HTTP_TOKEN_FILE")] | length')" = "0" ]
+  [ "$(echo "$job" | yq '[.spec.template.spec.volumes // [] | .[].name] | contains(["bootstrap-acl-token"])')" = "false" ]
+}
+
+@test "feature-gate-set/Job: rejects a bootstrap token without a secret key" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.bootstrapToken.secretName=bootstrap-token' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set"* ]]
+}
+
+@test "feature-gate-set/Job: rejects a bootstrap token key without a secret name" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.bootstrapToken.secretKey=token' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set"* ]]
 }
 
 @test "feature-gate-set/Job: does not mount bootstrap-acl-token volume when bootstrapToken set inline (no Vault, no manageSystemACLs)" {
@@ -343,6 +369,51 @@ https://[2001:db8::1]:8501" ]
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/consul/acl/tokens/token" ]
+}
+
+@test "feature-gate-set/Job: uses the replication token without a bootstrap token in a secondary datacenter" {
+  cd `chart_dir`
+  local job=$(helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.primaryDatacenter=dc1' \
+      --set 'global.acls.replicationToken.secretName=replication-token' \
+      --set 'global.acls.replicationToken.secretKey=token' \
+      . | yq '.')
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .valueFrom.secretKeyRef.name')" = "replication-token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .valueFrom.secretKeyRef.key')" = "token" ]
+  [ "$(echo "$job" | yq -r '[.spec.template.spec.volumes // [] | .[].name] | contains(["bootstrap-acl-token"])')" = "false" ]
+}
+
+@test "feature-gate-set/Job: explicit bootstrap token takes precedence over replication token" {
+  cd `chart_dir`
+  local job=$(helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=bootstrap-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
+      --set 'global.acls.replicationToken.secretName=replication-token' \
+      --set 'global.acls.replicationToken.secretKey=token' \
+      . | yq '.')
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .valueFrom.secretKeyRef.name')" = "bootstrap-token" ]
+  [ "$(echo "$job" | yq '[.spec.template.spec.volumes // [] | .[].name] | contains(["bootstrap-acl-token"])')" = "false" ]
+}
+
+@test "feature-gate-set/Job: rejects a replication token without a secret key" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.replicationToken.secretName=replication-token' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set"* ]]
+}
+
+@test "feature-gate-set/Job: rejects a replication token key without a secret name" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.replicationToken.secretKey=token' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set"* ]]
 }
 
 #--------------------------------------------------------------------
@@ -687,6 +758,8 @@ https://[2001:db8::1]:8501" ]
   cd `chart_dir`
   run helm template -s templates/feature-gate-set-job.yaml \
       --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=consul/data/bootstrap-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' .
   [ "$status" -eq 1 ]
@@ -697,6 +770,7 @@ https://[2001:db8::1]:8501" ]
   cd `chart_dir`
   run helm template -s templates/feature-gate-set-job.yaml \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' .
   [ "$status" -eq 1 ]
@@ -707,11 +781,74 @@ https://[2001:db8::1]:8501" ]
   cd `chart_dir`
   local actual=$(helm template -s templates/feature-gate-set-job.yaml \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/role"]')
   [ "$actual" = "feature-gate-role" ]
+}
+
+@test "feature-gate-set/Job: requires a token source for Vault-managed ACLs" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"global.acls.bootstrapToken or global.acls.replicationToken must be provided"* ]]
+}
+
+@test "feature-gate-set/Job: requires its own Vault role for replication-only ACLs" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.replicationToken.secretName=consul/data/replication-token' \
+      --set 'global.acls.replicationToken.secretKey=token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-init-role' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"global.secretsBackend.vault.featureGateSetRole is required"* ]]
+}
+
+@test "feature-gate-set/Job: Vault bootstrap token takes precedence over replication token" {
+  cd `chart_dir`
+  local job=$(helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=consul/data/bootstrap-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
+      --set 'global.acls.replicationToken.secretName=consul/data/replication-token' \
+      --set 'global.acls.replicationToken.secretKey=token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=server-role' \
+      --set 'global.secretsBackend.vault.consulClientRole=client-role' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-init-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
+      . | yq '.')
+  [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-secret-bootstrap-token"]')" = "consul/data/bootstrap-token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-secret-replication-token"]')" = "null" ]
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value')" = "/vault/secrets/bootstrap-token" ]
+}
+
+@test "feature-gate-set/Job: injects the replication token from Vault in a secondary datacenter" {
+  cd `chart_dir`
+  local job=$(helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.primaryDatacenter=dc1' \
+      --set 'global.acls.replicationToken.secretName=consul/data/replication-token' \
+      --set 'global.acls.replicationToken.secretKey=token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=server-role' \
+      --set 'global.secretsBackend.vault.consulClientRole=client-role' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-init-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
+      . | yq '.')
+  [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-secret-replication-token"]')" = "consul/data/replication-token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-secret-bootstrap-token"]')" = "null" ]
+  [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-template-replication-token"]' | grep -c 'Data.data.token')" -gt 0 ]
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value')" = "/vault/secrets/replication-token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/role"]')" = "feature-gate-role" ]
 }
 
 @test "feature-gate-set/Job: vault agent uses consulCARole when only TLS enabled (no ACLs)" {
@@ -729,6 +866,16 @@ https://[2001:db8::1]:8501" ]
   [ "${actual}" = "my-ca-role" ]
 }
 
+@test "feature-gate-set/Job: requires consulCARole for Vault TLS without ACL token" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=pki/ca' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"global.secretsBackend.vault.consulCARole is required"* ]]
+}
+
 @test "feature-gate-set/Job: no vault agent annotations when ACLs disabled even with Vault enabled" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -739,6 +886,17 @@ https://[2001:db8::1]:8501" ]
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "null" ]
+}
+
+@test "feature-gate-set/Job: ignores replication token in Vault when ACL management is disabled" {
+  cd `chart_dir`
+  local job=$(helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.replicationToken.secretName=consul/data/replication-token' \
+      --set 'global.acls.replicationToken.secretKey=token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      . | yq '.')
+  [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]')" = "null" ]
+  [ "$(echo "$job" | yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN" or .name == "CONSUL_HTTP_TOKEN_FILE")] | length')" = "0" ]
 }
 
 #--------------------------------------------------------------------

@@ -165,9 +165,11 @@ global:
       # and check the name of `metadata.name`.
       manageSystemACLsRole: ""
 
-      # The Vault role for the feature-gate-set job when it reads the bootstrap ACL token.
+      # The Vault role for the feature-gate-set job when it reads an ACL token.
       # Bind this role to the feature-gate-set ServiceAccount and grant it read access to
-      # `global.acls.bootstrapToken.secretName`. If TLS is enabled, also grant read access
+      # `global.acls.bootstrapToken.secretName`, or `global.acls.replicationToken.secretName`
+      # in a secondary datacenter that does not configure a bootstrap token.
+      # If TLS is enabled, also grant read access
       # to `global.tls.caCert.secretName`.
       # To discover the service account name, run:
       # $ helm template --show-only templates/feature-gate-set-serviceaccount.yaml <release-name> hashicorp/consul
