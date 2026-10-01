@@ -24,6 +24,7 @@ package camp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,6 +48,10 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // Fixture paths (relative to this source file).
@@ -101,10 +106,11 @@ func TestMCPGateway_Basic(t *testing.T) {
 	// We only override the CAMP-specific custom images on top of those defaults.
 	releaseName := helpers.RandomName()
 	helmValues := map[string]string{
-		"connectInject.enabled":                "true",
-		"global.imageConsulDataplane":          "docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev",
-		"global.imageConsulAIMCPInterceptor":   "public.ecr.aws/n9h4m6z2/ajay/consul-mcp-gateway:ai-agent-13",
-		"global.imageK8S":                      "public.ecr.aws/n9h4m6z2/ajay/consul-k8s-control-plane-dev:ai-agent-test-11",
+		"ai.enabled":                         "true",
+		"connectInject.enabled":              "true",
+		"global.imageConsulDataplane":        "docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev",
+		"global.imageConsulAIMCPInterceptor": "public.ecr.aws/n9h4m6z2/ajay/consul-mcp-gateway:ai-agent-13",
+		"global.imageK8S":                    "public.ecr.aws/n9h4m6z2/ajay/consul-k8s-control-plane-dev:ai-agent-test-11",
 	}
 	logger.Log(t, "installing Consul (enterprise) via Helm")
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
@@ -403,6 +409,38 @@ func TestMCPGateway_Basic(t *testing.T) {
 	})
 }
 
+func TestMCPGateway_AIDisabled(t *testing.T) {
+	skipUnlessEnterpriseWithLicense(t)
+
+	cfg := suite.Config()
+	ctx := suite.Environment().DefaultContext(t)
+	releaseName := helpers.RandomName()
+	consulCluster := consul.NewHelmCluster(t, map[string]string{
+		"ai.enabled":            "false",
+		"connectInject.enabled": "true",
+	}, ctx, cfg, releaseName)
+	consulCluster.Create(t)
+
+	namespace := ctx.KubectlOptions(t).Namespace
+	configMap, err := ctx.KubernetesClient(t).CoreV1().ConfigMaps(namespace).Get(
+		context.Background(), releaseName+"-consul-server-config", metav1.GetOptions{})
+	require.NoError(t, err)
+	var featureGates struct {
+		FeatureGates struct {
+			Bootstrap map[string]bool `json:"bootstrap"`
+		} `json:"feature_gates"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(configMap.Data["feature-gates-config.json"]), &featureGates))
+	enabled, present := featureGates.FeatureGates.Bootstrap["consul-ai"]
+	require.True(t, present, "consul-ai feature gate is missing from server configuration")
+	require.False(t, enabled, "consul-ai feature gate must be disabled")
+
+	err = ctx.ControllerRuntimeClient(t).Get(context.Background(),
+		types.NamespacedName{Name: "inferencemodelconfigs.consul.hashicorp.com"},
+		&apiextensionsv1.CustomResourceDefinition{})
+	require.True(t, apierrors.IsNotFound(err), "AI InferenceModelConfig CRD must not be installed when ai.enabled=false: %v", err)
+}
+
 // ─── Helper functions ─────────────────────────────────────────────────────────
 
 // skipUnlessEnterpriseWithLicense skips the test unless both -enable-enterprise
@@ -683,8 +721,8 @@ func mcpToolsCall(t require.TestingT, baseURL, sessID, toolName string, args map
 	body := unwrapMCPSSE(string(raw))
 
 	var result struct {
-		Error    *struct{} `json:"error"`
-		Result   *struct {
+		Error  *struct{} `json:"error"`
+		Result *struct {
 			IsError bool `json:"isError"`
 		} `json:"result"`
 	}
