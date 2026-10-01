@@ -251,7 +251,7 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
   echo "${actual}" | grep -q "consul-ai disabled"
   # Must not contain the literal word "null"
-  echo "${actual}" | grep -qv "null"
+  ! echo "${actual}" | grep -q "null"
 }
 
 #--------------------------------------------------------------------
