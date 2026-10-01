@@ -181,7 +181,7 @@ type Command struct {
 	flagEnableCustomGatewayCRDController bool
 	//enable tcp routes
 	flagEnableTCPRoute bool
-	// AI feature flags
+	// AI feature flags. OBO sidecars follow ai-role=ai-agent; there is no enable-obo switch.
 	flagEnableAI                 bool
 	flagEnableAIInferenceGateway bool
 	flagAIInferenceGatewayImage  string // Docker image for the InferenceGateway Deployment
@@ -189,7 +189,6 @@ type Command struct {
 	flagAIAgentImage             string // Docker image for the AI agent sidecar
 	flagConsulOBOInboundImage    string // Docker image for consul-obo-inbound (ai-agent pods)
 	flagConsulOBOOutboundImage   string // Docker image for consul-obo-outbound (ai-agent pods)
-	flagEnableOBO                bool   // inject OBO sidecars into ai-role=ai-agent pods
 	// InferenceGateway defaults sourced from ai.inferenceGateway.defaults in values.yaml
 	flagAIInferenceGatewayDefaultServiceType string // default Service type (ClusterIP/NodePort/LoadBalancer)
 	flagAIInferenceGatewayDefaultServicePort int    // default Service port
@@ -336,10 +335,6 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagConsulOBOOutboundImage, "consul-obo-outbound-image", "",
 		"Docker image for consul-obo-outbound. OUTBOUND OBO sidecar for ai-agent pods. "+
 			"Mirrors ai.obo.outbound.image from values.yaml.")
-	c.flagSet.BoolVar(&c.flagEnableOBO, "enable-obo", false,
-		"Inject OBO identity-plane sidecars (consul-obo-inbound/outbound) into "+
-			"ai-role=ai-agent pods. Set to false for environments without an IBM Verify tenant. "+
-			"Mirrors ai.obo.enabled from values.yaml.")
 
 	// custom controller flags
 	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")

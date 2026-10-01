@@ -30,6 +30,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	injectcommon "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	igwcache "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/ai/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -59,6 +60,11 @@ const (
 
 	// labelManagedBy is stamped on every K8s resource owned by this controller.
 	labelManagedBy = "consul.hashicorp.com/managed-by"
+
+	// sidecarUserAndGroupID matches mesh connect-inject (webhook sidecarUserAndGroupID).
+	// consul-inference-gateway binds /run/consul/ext_proc.sock mode 0700; Envoy in
+	// consul-dataplane must share this uid or dial fails with Permission denied.
+	sidecarUserAndGroupID = int64(5995)
 )
 
 // InferenceGatewayController reconciles InferenceGateway objects.
@@ -166,6 +172,12 @@ type InferenceGatewayController struct {
 	// Mirrors the same field on MeshWebhook.
 	EnableK8SNSMirroring bool
 
+	// EnableOpenShift selects the shared sidecar uid/gid from the namespace
+	// SCC range (openshift.io/sa.scc.uid-range) instead of sidecarUserAndGroupID.
+	// Both consul-dataplane and inference-gateway must use that same identity
+	// so the mode-0700 ext_proc socket is reachable under a restricted SCC.
+	EnableOpenShift bool
+
 	NSMirroringPrefix string
 	CrossNSACLPolicy  string
 
@@ -181,6 +193,7 @@ type InferenceGatewayController struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 
 func (r *InferenceGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("inferenceGateway", req.NamespacedName)
@@ -784,6 +797,11 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		resources = *igw.Spec.Resources
 	}
 
+	runAsUser, runAsGroup, err := r.sidecarIdentity(ctx, igw.Namespace)
+	if err != nil {
+		return err
+	}
+
 	// Resolve the Consul catalog service port — same precedence as reconcileService:
 	// spec.service.ports[0] → DefaultService.ports[0] → 8443.
 	servicePort := inferenceGatewayServicePort
@@ -793,7 +811,7 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		servicePort = r.DefaultService.Ports[0].Port
 	}
 
-	desired := deploymentFor(igw, pool, r.DataplaneImage, r.ConsulK8SImage, gatewayImage, servicePort, resources, deploymentConsulConfig{
+	desired := deploymentFor(igw, pool, r.DataplaneImage, r.ConsulK8SImage, gatewayImage, servicePort, resources, runAsUser, runAsGroup, deploymentConsulConfig{
 		address:              r.ConsulAddress,
 		grpcPort:             r.ConsulClientConfig.GRPCPort,
 		httpPort:             r.ConsulClientConfig.HTTPPort,
@@ -814,7 +832,7 @@ func (r *InferenceGatewayController) reconcileDeployment(
 
 	existing := &appsv1.Deployment{}
 	key := types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}
-	err := r.Client.Get(ctx, key, existing)
+	err = r.Client.Get(ctx, key, existing)
 	if k8serrors.IsNotFound(err) {
 		log.Info("creating Deployment", "deployment", desired.Name)
 		if err := r.Client.Create(ctx, desired); err != nil {
@@ -1145,6 +1163,7 @@ func deploymentFor(
 	gatewayImage string,
 	servicePort int32,
 	resources corev1.ResourceRequirements,
+	runAsUser, runAsGroup int64,
 	cc deploymentConsulConfig,
 ) *appsv1.Deployment {
 	logLevel := igw.Spec.LogLevel
@@ -1268,23 +1287,18 @@ func deploymentFor(
 								}
 								return mounts
 							}(),
-							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: boolPtr(false),
-								ReadOnlyRootFilesystem:   boolPtr(true),
-								RunAsNonRoot:             boolPtr(true),
-								Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-							},
+							SecurityContext: meshSidecarSecurityContext(runAsUser, runAsGroup),
 						},
 						{
 							// inference-gateway is the ext_proc sidecar that Envoy calls over UDS.
 							// It only handles LLM request/response processing — it does not run Envoy.
+							// Policy arrives on listener metadata; do not pass -config-entry /
+							// -consul-http-addr (removed from consul-ai-apps; process holds no Consul client).
 							Name:  "inference-gateway",
 							Image: gatewayImage,
 							Args: []string{
 								"-uds-path=/run/consul/ext_proc.sock",
-								"-config-entry=" + inferenceGatewayName(igw),
-								"-consul-http-addr=http://" + fmt.Sprintf("%s:%d", cc.address, cc.httpPort),
-								"-log-level=$(CONSUL_IGW_LOG_LEVEL)",
+								"-log-level=" + logLevel,
 							},
 							Ports: []corev1.ContainerPort{
 								{Name: "metrics", ContainerPort: inferenceGatewayMetricsPort, Protocol: corev1.ProtocolTCP},
@@ -1304,6 +1318,8 @@ func deploymentFor(
 								Name:      "run-consul",
 								MountPath: "/run/consul",
 							}},
+							// Same uid as consul-dataplane — required for 0700 ext_proc UDS.
+							SecurityContext: meshSidecarSecurityContext(runAsUser, runAsGroup),
 						},
 					},
 					Volumes: func() []corev1.Volume {
@@ -1360,7 +1376,44 @@ func deploymentFor(
 }
 
 // boolPtr returns a pointer to the given bool value.
-func boolPtr(b bool) *bool { return &b }
+func boolPtr(b bool) *bool    { return &b }
+func int64Ptr(i int64) *int64 { return &i }
+
+// sidecarIdentity is the uid/gid shared by consul-dataplane and inference-gateway.
+// Non-OpenShift clusters use sidecarUserAndGroupID. OpenShift restricted SCC
+// rejects that fixed id, so both containers take the same id from the namespace
+// range the mesh webhook uses for consul-dataplane.
+func (r *InferenceGatewayController) sidecarIdentity(ctx context.Context, namespace string) (int64, int64, error) {
+	if !r.EnableOpenShift {
+		return sidecarUserAndGroupID, sidecarUserAndGroupID, nil
+	}
+	ns := &corev1.Namespace{}
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		return 0, 0, fmt.Errorf("reading namespace %q for OpenShift sidecar uid: %w", namespace, err)
+	}
+	uid, err := injectcommon.GetDataplaneUID(*ns, corev1.Pod{}, r.DataplaneImage, r.ConsulK8SImage)
+	if err != nil {
+		return 0, 0, fmt.Errorf("openshift sidecar uid for namespace %q: %w", namespace, err)
+	}
+	gid, err := injectcommon.GetDataplaneGroupID(*ns, corev1.Pod{}, r.DataplaneImage, r.ConsulK8SImage)
+	if err != nil {
+		return 0, 0, fmt.Errorf("openshift sidecar gid for namespace %q: %w", namespace, err)
+	}
+	return uid, gid, nil
+}
+
+// meshSidecarSecurityContext is shared by consul-dataplane and inference-gateway
+// so the ext_proc UDS (0700) is reachable from Envoy.
+func meshSidecarSecurityContext(runAsUser, runAsGroup int64) *corev1.SecurityContext {
+	return &corev1.SecurityContext{
+		AllowPrivilegeEscalation: boolPtr(false),
+		ReadOnlyRootFilesystem:   boolPtr(true),
+		RunAsNonRoot:             boolPtr(true),
+		RunAsUser:                int64Ptr(runAsUser),
+		RunAsGroup:               int64Ptr(runAsGroup),
+		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	}
+}
 
 // serviceFor returns the desired Service for an InferenceGateway.
 func serviceFor(igw *v1alpha1.InferenceGateway, svc v1alpha1.InferenceGatewayService) *corev1.Service {

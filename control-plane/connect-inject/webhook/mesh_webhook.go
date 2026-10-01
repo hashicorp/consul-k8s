@@ -102,13 +102,6 @@ type MeshWebhook struct {
 	// (ext_proc on loopback :21103). Required when IsAIAgent — no silent fallback.
 	ImageConsulOBOOutbound string
 
-	// EnableOBO controls whether the OBO identity-plane sidecars
-	// (consul-obo-inbound and consul-obo-outbound) are injected into
-	// ai-role=ai-agent pods. Set to false to run without an IBM Verify
-	// tenant (e.g. local dev / playground). Mirrors ai.obo.enabled in
-	// values.yaml.
-	EnableOBO bool
-
 	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	GlobalImagePullPolicy string
 
@@ -596,28 +589,28 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
 		}
 
-		if w.EnableOBO {
-			if !haveDataplaneRunAs {
-				err := fmt.Errorf("consul-dataplane container not found; cannot assign OBO runAsUser")
-				w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
-				return admission.Errored(http.StatusInternalServerError, err)
-			}
-			oboInbound, err := w.oboInboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
-			if err != nil {
-				w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
-				return admission.Errored(http.StatusInternalServerError,
-					fmt.Errorf("error configuring consul-obo-inbound container: %s", err))
-			}
-			pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
-
-			oboOutbound, err := w.oboOutboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
-			if err != nil {
-				w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
-				return admission.Errored(http.StatusInternalServerError,
-					fmt.Errorf("error configuring consul-obo-outbound container: %s", err))
-			}
-			pod.Spec.Containers = append(pod.Spec.Containers, oboOutbound)
+		// OBO in/out are required for ai-role=ai-agent (annotation is the only
+		// gate). Missing images fail admission — no separate enable flag.
+		if !haveDataplaneRunAs {
+			err := fmt.Errorf("consul-dataplane container not found; cannot assign OBO runAsUser")
+			w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, err)
 		}
+		oboInbound, err := w.oboInboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
+		if err != nil {
+			w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError,
+				fmt.Errorf("error configuring consul-obo-inbound container: %s", err))
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
+
+		oboOutbound, err := w.oboOutboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
+		if err != nil {
+			w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError,
+				fmt.Errorf("error configuring consul-obo-outbound container: %s", err))
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, oboOutbound)
 	}
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
