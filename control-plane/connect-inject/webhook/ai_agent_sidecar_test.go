@@ -61,11 +61,11 @@ func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 
 	t.Run("tcp mcp uses startup tcp probe", func(t *testing.T) {
 		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-			constants.AnnotationAIAgentAddr: "127.0.0.1:21101",
+			constants.AnnotationAIAgentAddr: ":21101",
 		}}}
 		c, err := w.aiAgentSidecar(pod, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
 		require.NoError(t, err)
-		require.Contains(t, c.Args, "--mcp-addr=127.0.0.1:21101")
+		require.Contains(t, c.Args, "--mcp-addr=:21101")
 		require.NotNil(t, c.StartupProbe.TCPSocket)
 		require.Equal(t, int32(21101), c.StartupProbe.TCPSocket.Port.IntVal)
 		require.Equal(t, int32(constants.DefaultOBOOutboundPort), c.ReadinessProbe.TCPSocket.Port.IntVal)
@@ -127,7 +127,8 @@ func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 	}
 
 	t.Run("one combined sidecar uses dataplane uid", func(t *testing.T) {
-		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		clientset := fake.NewSimpleClientset(namespaceWithOpenShift(false))
+		w := baseWebhook(clientset)
 		containers := injectedContainers(t, w, aiPod())
 		require.Contains(t, containers, mcpGatewayContainer)
 		require.NotContains(t, containers, constants.ConsulOBOInboundContainerName)
@@ -139,6 +140,14 @@ func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 		require.Equal(t, dp.SecurityContext.RunAsGroup, ai.SecurityContext.RunAsGroup)
 		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), ai.SecurityContext.RunAsUser)
 		require.Contains(t, ai.Args, "--mode=agent")
+
+		namespaceGets := 0
+		for _, action := range clientset.Actions() {
+			if action.GetVerb() == "get" && action.GetResource().Resource == "namespaces" {
+				namespaceGets++
+			}
+		}
+		require.Equal(t, 1, namespaceGets)
 	})
 
 	t.Run("missing image fails admission", func(t *testing.T) {
@@ -156,6 +165,16 @@ func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 		resp := w.Handle(context.Background(), admissionRequest(t, pod))
 		require.False(t, resp.Allowed)
 		require.Contains(t, resp.Result.Message, constants.AnnotationAIAgentHITLPort)
+	})
+
+	t.Run("loopback MCP listener fails admission", func(t *testing.T) {
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		pod := aiPod()
+		pod.Annotations[constants.AnnotationAIAgentAddr] = "127.0.0.1:21101"
+		resp := w.Handle(context.Background(), admissionRequest(t, pod))
+		require.False(t, resp.Allowed)
+		require.Equal(t, int32(400), resp.Result.Code)
+		require.Contains(t, resp.Result.Message, "must use wildcard listener format :port")
 	})
 
 	t.Run("non ai-agent pod has no ai sidecar", func(t *testing.T) {

@@ -103,6 +103,38 @@ func TestResolveAIAgentDefaults_InvalidPorts(t *testing.T) {
 	}
 }
 
+func TestValidateAIAgentAddress(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		address string
+		port    int32
+		enabled bool
+		wantErr bool
+	}{
+		{name: "unset"},
+		{name: "wildcard", address: ":21101", port: 21101, enabled: true},
+		{name: "loopback", address: "127.0.0.1:21101", wantErr: true},
+		{name: "IPv6 loopback", address: "[::1]:21101", wantErr: true},
+		{name: "specific interface", address: "10.0.0.1:21101", wantErr: true},
+		{name: "privileged port", address: ":80", wantErr: true},
+		{name: "invalid port", address: ":invalid", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+				constants.AnnotationAIAgentAddr: tc.address,
+			}}}
+			port, enabled, err := ValidateAIAgentAddress(pod)
+			if tc.wantErr {
+				require.ErrorContains(t, err, constants.AnnotationAIAgentAddr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.port, port)
+			require.Equal(t, tc.enabled, enabled)
+		})
+	}
+}
+
 func TestAIConfigFromAgentCRD_MissingConfig(t *testing.T) {
 	s := runtime.NewScheme()
 	require.NoError(t, v1alpha1.AddToScheme(s))
