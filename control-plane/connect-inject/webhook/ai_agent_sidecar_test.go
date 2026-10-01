@@ -113,7 +113,6 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 			Clientset:              clientset,
 			ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 			ImageConsulDataplane:   "dataplane:test",
-			EnableOBO:              true,
 			ImageConsulOBOInbound:  "obo-inbound:test",
 			ImageConsulOBOOutbound: "obo-outbound:test",
 		}
@@ -139,6 +138,14 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 		resp := w.Handle(context.Background(), admissionRequest(t, aiPod()))
 		require.False(t, resp.Allowed)
 		require.Contains(t, resp.Result.Message, "ImageConsulOBOInbound must be set")
+	})
+
+	t.Run("missing obo outbound image fails admission", func(t *testing.T) {
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		w.ImageConsulOBOOutbound = ""
+		resp := w.Handle(context.Background(), admissionRequest(t, aiPod()))
+		require.False(t, resp.Allowed)
+		require.Contains(t, resp.Result.Message, "ImageConsulOBOOutbound must be set")
 	})
 
 	t.Run("agent sidecar uses resolved HITL annotation", func(t *testing.T) {

@@ -5,11 +5,11 @@
   "properties": {
     "ai": {
       "type": "object",
-      "description": "AI feature configuration. All sub-sections are only active when ai.enabled=true.",
+      "description": "AI feature configuration. Sub-sections other than ai.obo are only active when ai.enabled=true.",
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Master switch for all AI features."
+          "description": "Enables the AI controllers and CRDs. OBO sidecars are not affected; they are injected into any pod with the consul.hashicorp.com/ai-role=ai-agent annotation."
         },
         "inferenceModel": {
           "type": "object",
@@ -180,12 +180,8 @@
         },
         "obo": {
           "type": "object",
-          "description": "OBO (on-behalf-of) identity-plane sidecars injected into ai-role=ai-agent pods.",
+          "description": "OBO (on-behalf-of) identity-plane sidecars injected into ai-role=ai-agent pods, independent of ai.enabled.",
           "properties": {
-            "enabled": {
-              "type": "boolean",
-              "description": "Inject OBO sidecars into ai-role=ai-agent pods. Set false for environments without an IBM Verify tenant."
-            },
             "inbound": {
               "type": "object",
               "properties": {
