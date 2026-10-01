@@ -4152,9 +4152,9 @@ ai:
     # image: "hashicorp/consul-mcp-sc:0.1.0"
     # image: "myregistry/consul-mcp-sc:latest"
     # ```
-    # @default: ""
+    # @default: "hashicorp/consul-mcp-sc:2.1.0-rc1"
     # @type: string
-    image: ""
+    image: "hashicorp/consul-mcp-sc:2.1.0-rc1"
 
     defaults:
       # The port the agent interceptor listens on inside the pod.

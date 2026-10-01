@@ -57,20 +57,20 @@ gw_flags=(
     [[ "$command" != *"-enable-ai-inference-gateway=true"* ]]
 }
 
-@test "ai/agent image: passed when ai.enabled is false" {
+@test "ai/agent image: default is passed when ai.enabled is false" {
     cd `chart_dir`
     local command=$(helm template -s templates/connect-inject-deployment.yaml \
-        --set 'ai.enabled=false' \
-        --set 'ai.agent.image=hashicorp/consul-mcp-sc:test' . |
+        --set 'ai.enabled=false' . |
         yq -r '.spec.template.spec.containers[0].command | join(" ")')
     [[ "$command" != *"-enable-ai=true"* ]]
-    [[ "$command" == *"-ai-agent-image=\"hashicorp/consul-mcp-sc:test\""* ]]
+    [[ "$command" == *"-ai-agent-image=\"hashicorp/consul-mcp-sc:2.1.0-rc1\""* ]]
 }
 
 @test "ai/agent image: omitted when unset" {
     cd `chart_dir`
     local command=$(helm template -s templates/connect-inject-deployment.yaml \
-        --set 'ai.enabled=false' . |
+        --set 'ai.enabled=false' \
+        --set 'ai.agent.image=' . |
         yq -r '.spec.template.spec.containers[0].command | join(" ")')
     [[ "$command" != *"-ai-agent-image="* ]]
 }
