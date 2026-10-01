@@ -90,9 +90,9 @@ spec:
       {{- if (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled)) }}
       - name: bootstrap-acl-token
         secret:
-          secretName: {{ template "consul.fullname" . }}-bootstrap-acl-token
+          secretName: {{ default (printf "%s-bootstrap-acl-token" (include "consul.fullname" .)) .Values.global.acls.bootstrapToken.secretName }}
           items:
-          - key: token
+          - key: {{ default "token" .Values.global.acls.bootstrapToken.secretKey }}
             path: token
       {{- end }}
       {{- end }}
