@@ -283,10 +283,11 @@ const (
 	// Falls back to AgentConfig CRD defaults when not set.
 	AnnotationAIAgentHITLApprovalTimeout = "consul.hashicorp.com/ai-agent-hitl-approval-timeout"
 
-	// AnnotationAIAgentAddr overrides the TCP address consul-mcp-gateway listens on when
-	// --socket is not used. Defaults to :21101 per the binary's built-in default.
+	// AnnotationAIAgentAddr overrides the TCP address consul-mcp-sc listens on when
+	// --mcp-socket is not used. It must use :port so the listener is reachable
+	// through the pod IP by the Kubernetes startup probe.
 	// Only useful in local development or environments where a shared UDS volume is unavailable.
-	// Maps to the --addr flag on consul-mcp-gateway.
+	// Maps to the --mcp-addr flag on consul-mcp-sc.
 	// e.g. consul.hashicorp.com/ai-agent-addr: ":21200".
 	AnnotationAIAgentAddr = "consul.hashicorp.com/ai-agent-addr"
 

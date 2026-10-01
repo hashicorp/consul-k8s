@@ -6,7 +6,9 @@ package common
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
+	"strings"
 
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -165,7 +167,38 @@ func ResolveAIAgentDefaults(pod corev1.Pod, defaults v1alpha1.AgentDefaults) (v1
 	if timeout := pod.Annotations[constants.AnnotationAIAgentHITLApprovalTimeout]; timeout != "" {
 		defaults.HITL.ApprovalTimeout = timeout
 	}
+	if _, _, err := ValidateAIAgentAddress(pod); err != nil {
+		return v1alpha1.AgentDefaults{}, err
+	}
 	return defaults, nil
+}
+
+// ValidateAIAgentAddress validates the optional MCP TCP listener override.
+// Kubernetes TCP probes connect through the pod IP, so the listener must bind
+// all pod interfaces rather than a loopback or interface-specific address.
+func ValidateAIAgentAddress(pod corev1.Pod) (int32, bool, error) {
+	addr := pod.Annotations[constants.AnnotationAIAgentAddr]
+	if addr == "" {
+		return 0, false, nil
+	}
+	if !strings.HasPrefix(addr, ":") {
+		return 0, false, fmt.Errorf(
+			"invalid %s %q: must use wildcard listener format :port",
+			constants.AnnotationAIAgentAddr, addr)
+	}
+	host, portValue, err := net.SplitHostPort(addr)
+	if err != nil || host != "" {
+		return 0, false, fmt.Errorf(
+			"invalid %s %q: must use wildcard listener format :port",
+			constants.AnnotationAIAgentAddr, addr)
+	}
+	port, err := strconv.ParseInt(portValue, 10, 32)
+	if err != nil || port < 1024 || port > 65535 {
+		return 0, false, fmt.Errorf(
+			"invalid %s %q: port must be between 1024 and 65535",
+			constants.AnnotationAIAgentAddr, addr)
+	}
+	return int32(port), true, nil
 }
 
 // AIConfigFromAgentDefaults converts an AgentDefaults struct (from the

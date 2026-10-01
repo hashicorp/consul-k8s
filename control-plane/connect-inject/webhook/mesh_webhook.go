@@ -288,12 +288,12 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// Resolve transparent proxy before validating service ports so malformed
 	// transparent-proxy configuration retains its existing error precedence.
-	nsEarly, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
+	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
 	if err != nil {
 		w.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
-	if _, err := common.TransparentProxyEnabled(*nsEarly, pod, w.EnableTransparentProxy); err != nil {
+	if _, err := common.TransparentProxyEnabled(*ns, pod, w.EnableTransparentProxy); err != nil {
 		w.Log.Error(err, "invalid transparent proxy configuration", "request name", req.Name)
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("couldn't check if transparent proxy is enabled: %w", err))
 	}
@@ -338,13 +338,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	for i := range pod.Spec.Containers {
 		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, containerEnvVars...)
-	}
-
-	// A user can enable/disable tproxy for an entire namespace via a label.
-	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
-	if err != nil {
-		w.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
 	// Get service names from the annotation. If theres 0-1 service names, it's a single port pod, otherwise it's multi

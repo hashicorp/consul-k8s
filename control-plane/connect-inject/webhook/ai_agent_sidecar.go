@@ -13,6 +13,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
@@ -41,6 +42,10 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 			"AI sidecar image must be set for ai-agent pods; " +
 				"configure ai.agent.image to the consul-mcp-sc multi-binary image")
 	}
+	mcpPort, useMCPAddr, err := common.ValidateAIAgentAddress(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
 
 	// HITL / interceptor / MCP ports come from ResolveAIAgentDefaults (caller).
 	hitlPort := defaults.HITL.Port
@@ -65,8 +70,8 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 
 	// MCP transport: TCP when ai-agent-addr is set (xDS dials that addr);
 	// otherwise UDS shared with dataplane Envoy.
-	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
-		args = append(args, "--mcp-addr="+addr)
+	if useMCPAddr {
+		args = append(args, "--mcp-addr="+pod.Annotations[constants.AnnotationAIAgentAddr])
 	} else {
 		args = append(args, "--mcp-socket="+mcpGatewayUDSPath)
 	}
@@ -105,7 +110,7 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 		// StartupProbe: MCP transport (UDS or TCP), matching pre-combined inject.
 		// ReadinessProbe: OBO outbound TCP — kubelet can probe the pod IP on :21103.
 		// Both must pass before the pod is Ready (startup gates readiness).
-		StartupProbe:   w.mcpScStartupProbe(pod, hitlPort),
+		StartupProbe:   w.mcpScStartupProbe(useMCPAddr, mcpPort),
 		ReadinessProbe: w.mcpScReadinessProbe(),
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser:                ptr.To(runAsUser),
@@ -129,23 +134,10 @@ func (w *MeshWebhook) mcpScImage() string {
 }
 
 // mcpScStartupProbe waits for the MCP ext_proc transport used by Envoy:
-//   - TCP when ai-agent-addr is set
+//   - TCP on the validated wildcard listener when ai-agent-addr is set
 //   - UDS socket file otherwise (Kubernetes has no native UDS probe)
-func (w *MeshWebhook) mcpScStartupProbe(pod corev1.Pod, hitlPort int32) *corev1.Probe {
-	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
-		port := hitlPort
-		host, portStr, err := net.SplitHostPort(addr)
-		if err != nil {
-			if h, p, err2 := net.SplitHostPort("127.0.0.1" + addr); err2 == nil {
-				host, portStr, err = h, p, nil
-			}
-		}
-		_ = host
-		if err == nil {
-			if p, parseErr := strconv.ParseInt(portStr, 10, 32); parseErr == nil {
-				port = int32(p)
-			}
-		}
+func (w *MeshWebhook) mcpScStartupProbe(useTCP bool, port int32) *corev1.Probe {
+	if useTCP {
 		return &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
