@@ -47,6 +47,27 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/mesh-inject": "false"
+        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.acls.manageSystemACLs) }}
+        "vault.hashicorp.com/agent-pre-populate-only": "true"
+        "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.manageSystemACLsRole }}
+        {{- if .Values.global.acls.bootstrapToken.secretName }}
+        {{- with .Values.global.acls.bootstrapToken }}
+        "vault.hashicorp.com/agent-inject-secret-bootstrap-token": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-bootstrap-token": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- end }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+        {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace"))) }}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-feature-gate-set
@@ -66,7 +87,7 @@ spec:
             path: tls.crt
       {{- end }}
       {{- end }}
-      {{- if .Values.global.acls.manageSystemACLs }}
+      {{- if (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled)) }}
       - name: bootstrap-acl-token
         secret:
           secretName: {{ template "consul.fullname" . }}-bootstrap-acl-token
@@ -83,8 +104,13 @@ spec:
         env:
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         {{- if .Values.global.acls.manageSystemACLs }}
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+        - name: CONSUL_HTTP_TOKEN_FILE
+          value: /vault/secrets/bootstrap-token
+        {{- else }}
         - name: CONSUL_HTTP_TOKEN_FILE
           value: /consul/acl/tokens/token
+        {{- end }}
         {{- end }}
         {{- if (or .Values.global.tls.enabled .Values.global.acls.manageSystemACLs) }}
         volumeMounts:
@@ -95,7 +121,7 @@ spec:
           readOnly: true
         {{- end }}
         {{- end }}
-        {{- if .Values.global.acls.manageSystemACLs }}
+        {{- if (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: bootstrap-acl-token
           mountPath: /consul/acl/tokens
           readOnly: true
