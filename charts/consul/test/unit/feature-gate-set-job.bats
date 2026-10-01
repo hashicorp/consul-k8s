@@ -247,6 +247,7 @@ load _helpers
   # This test guards against null being rendered as the string "null" or empty.
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
+      --set 'ai=null' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
   echo "${actual}" | grep -q "consul-ai disabled"
