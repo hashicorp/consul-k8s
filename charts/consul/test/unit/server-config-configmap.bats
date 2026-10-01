@@ -1658,3 +1658,64 @@ load _helpers
       yq -r '.data["global-registry-config.json"]' | yq '.global_registry | has("token_file")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
+
+#--------------------------------------------------------------------
+# ai.enabled / feature-gates-config.json
+
+@test "server/ConfigMap: feature-gates-config.json is always present" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq '.data["feature-gates-config.json"] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: consul-ai feature gate is false when ai is null" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ai=null' \
+      . | tee /dev/stderr |
+      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap["consul-ai"]' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: consul-ai feature gate is false when ai.enabled=false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ai.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap["consul-ai"]' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: consul-ai feature gate is true when ai.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ai.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap["consul-ai"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: feature-gates-config.json is valid JSON for default values" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["feature-gates-config.json"]' | jq . | tee /dev/stderr)
+  [ -n "${actual}" ]
+}
+
+@test "server/ConfigMap: feature-gates-config.json is valid JSON when ai.enabled=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ai.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["feature-gates-config.json"]' | jq . | tee /dev/stderr)
+  [ -n "${actual}" ]
+}
