@@ -50,8 +50,6 @@ try:
 except ValueError:
     HITL_FAIL_RATE = 0.25
 
-HITL_FAIL_RATE = 0.0
-
 
 def log(msg: str) -> None:
     ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
