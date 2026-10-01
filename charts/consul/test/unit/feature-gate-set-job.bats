@@ -195,7 +195,7 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set-string 'externalServers.hosts[0]=exec=echo 127.0.0.1' .
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DNS name or IP address; exec= addresses are not supported"* ]]
+  [[ "$output" == *"DNS name, IP address, or provider= auto-join string; exec= addresses are not supported"* ]]
 }
 
 @test "feature-gate-set/Job: brackets IPv6 hosts in the HTTP URL" {

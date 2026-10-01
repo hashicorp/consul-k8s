@@ -229,7 +229,7 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=provider=my-cloud config=val' \
       . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | any(contains("-server-addr=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
+      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ") | contains("-server-addr=\"provider=my-cloud config=val\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
