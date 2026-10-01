@@ -243,8 +243,8 @@ const (
 	// This is only meant to be used by Deployment/consul-telemetry-collector.
 	LabelTelemetryCollector = "consul.hashicorp.com/telemetry-collector"
 
-	// AnnotationAIRole is the key of the annotation that identifies the AI role of a pod.
-	// When set to "mcp-server", the webhook injects the MCP server sidecar container.
+	// AnnotationAIRole identifies the AI role of a pod, such as "mcp-server",
+	// "ai-agent", or "inference-model".
 	AnnotationAIRole = "consul.hashicorp.com/ai-role"
 
 	// AnnotationAIAgentConfig selects the AgentConfig resource used for pod defaults.
@@ -332,11 +332,6 @@ const (
 	// annotations for sidecar access volumes.
 	AnnotationConsulSidecarAccessLogEnabled = "consul.hashicorp.com/consul-sidecar-access-log-enabled"
 	AnnotationConsulSidecarAccessLogPath    = "consul.hashicorp.com/consul-sidecar-access-log-path"
-
-	// AnnotationAIRole indicates this pod is an AI workload and specifies its role.
-	// The only supported value is "ai-agent". When set, a consul-mcp-gateway sidecar
-	// container is injected alongside the standard consul-dataplane sidecar.
-	AnnotationAIRole = "consul.hashicorp.com/ai-role"
 
 	// AnnotationAIAgentMCPConfig is the name of the Kubernetes ConfigMap that holds
 	// the MCP agent configuration (inference, mcp, rate_limits, and interceptor blocks).
