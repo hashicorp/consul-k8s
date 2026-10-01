@@ -51,6 +51,37 @@ load _helpers
       .
 }
 
+@test "feature-gate-set/Job: not rendered when server.updatePartition > 0" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.updatePartition=1' \
+      .
+}
+
+@test "feature-gate-set/Job: rendered when server.updatePartition=0" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.updatePartition=0' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "feature-gate-set/Job: rendered when externalServers.enabled=true and server.updatePartition > 0" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul.example.com' \
+      --set 'server.updatePartition=1' \
+      . | tee /dev/stderr |
+      yq 'length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # Hook annotations
 
@@ -530,6 +561,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -543,6 +575,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -556,6 +589,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -570,6 +604,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -897,6 +932,8 @@ https://[2001:db8::1]:8501" ]
   cd `chart_dir`
   run helm template -s templates/feature-gate-set-job.yaml \
       --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=pki/ca' .
   [ "$status" -eq 1 ]
