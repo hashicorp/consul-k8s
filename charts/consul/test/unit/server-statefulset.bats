@@ -1143,7 +1143,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 0c3baa78b3d60a625975411f6f8eb6123c0d2dc6dadbb8edf5f23a83f68e7dd3 ]
+  [ "${actual}" = 48e267ed41b854ec41b20b2317c46085012893dd76b8d4c7a7530ab511bcb5d3 ]
 }
 
 #--------------------------------------------------------------------
@@ -2504,6 +2504,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulClientRole=test' \
     --set 'global.secretsBackend.vault.consulServerRole=foo' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     --set 'global.acls.manageSystemACLs=true' \
     --set 'global.acls.bootstrapToken.secretName=vault/bootstrap-token' \
     --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -2511,18 +2512,17 @@ load _helpers
       yq -r '.spec.template' | tee /dev/stderr)
 
   # Check that Vault annotations are set.
-  local actual="$(echo $object |
+  local actual="$(printf '%s\n' "$object" |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-bootstrap-token-config.hcl"]' | tee /dev/stderr)"
   [ "${actual}" = "vault/bootstrap-token" ]
 
-  local actual="$(echo $object |
+  local actual="$(printf '%s\n' "$object" |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-bootstrap-token-config.hcl"]' | tee /dev/stderr)"
   local expected=$'{{- with secret \"vault/bootstrap-token\" -}}\nacl { tokens { initial_management = \"{{- .Data.data.token -}}\" }}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   # Check that path to Vault secret config is provided to the command.
-  local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/bootstrap-token-config.hcl"))' | tee /dev/stderr)"
-  [ "${actual}" = "true" ]
+  [[ "$object" == *"-config-file=/vault/secrets/bootstrap-token-config.hcl"* ]]
 }
 
 #--------------------------------------------------------------------

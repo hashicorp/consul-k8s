@@ -651,6 +651,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
@@ -709,10 +710,11 @@ load _helpers
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
-  local actual="$(echo $cmd |
+  local actual="$(printf '%s\n' "$cmd" |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
   [ "${actual}" = "vns" ]
 }
@@ -734,10 +736,11 @@ load _helpers
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
-  local actual="$(echo $cmd |
+  local actual="$(printf '%s\n' "$cmd" |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
   [ "${actual}" = "vns" ]
 }
@@ -759,10 +762,11 @@ load _helpers
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
-  local actual="$(echo $cmd |
+  local actual="$(printf '%s\n' "$cmd" |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
   [ "${actual}" = "bar" ]
 }
@@ -783,42 +787,43 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq -o=json '.spec.template' | tee /dev/stderr)
 
   # Check annotations
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-enable"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-enable"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-listener-port"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-listener-port"]' | tee /dev/stderr)
   [ "${actual}" = "8200" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-enable-quit"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-enable-quit"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "aclrole" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 
   # Check that the consul-ca-cert volume is not attached
-  local actual=$(echo $object | jq -r '.spec.volumes')
+  local actual=$(printf '%s\n' "$object" | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  local actual=$(printf '%s\n' "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 }
 
@@ -838,12 +843,13 @@ load _helpers
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
@@ -864,12 +870,13 @@ load _helpers
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
@@ -890,12 +897,13 @@ load _helpers
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
@@ -917,12 +925,13 @@ load _helpers
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
   [ "${actual}" = "ca" ]
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
 
@@ -939,33 +948,33 @@ load _helpers
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     --set 'global.acls.replicationToken.secretName=/vault/secret' \
     --set 'global.acls.replicationToken.secretKey=token' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq -o=json '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
   [ "${actual}" = "acl-role" ]
 
   # Check Vault secret annotations.
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
   [ "${actual}" = "/vault/secret" ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
   local expected=$'{{- with secret \"/vault/secret\" -}}\n{{- .Data.data.token -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(echo $object | jq -r '.spec.volumes')
+  local actual=$(printf '%s\n' "$object" | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  local actual=$(printf '%s\n' "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
-  [ "${actual}" = "true" ]
+  [[ "$object" == *"-acl-replication-token-file=/vault/secrets/replication-token"* ]]
 }
 
 @test "serverACLInit/Job: both replication and bootstrap tokens can be provided together" {
@@ -978,44 +987,41 @@ load _helpers
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     --set 'global.acls.replicationToken.secretName=/vault/replication' \
     --set 'global.acls.replicationToken.secretKey=token' \
     --set 'global.acls.bootstrapToken.secretName=/vault/bootstrap' \
     --set 'global.acls.bootstrapToken.secretKey=token' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq -o=json '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
   [ "${actual}" = "acl-role" ]
 
   # Check Vault secret annotations.
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
   [ "${actual}" = "/vault/replication" ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
   local expected=$'{{- with secret \"/vault/replication\" -}}\n{{- .Data.data.token -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-secrets-backend=vault"))')
-  [ "${actual}" = "true" ]
+  [[ "$object" == *"-secrets-backend=vault"* ]]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-name=/vault/bootstrap"))')
-  [ "${actual}" = "true" ]
+  [[ "$object" == *"-bootstrap-token-secret-name=/vault/bootstrap"* ]]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-key=token"))')
-  [ "${actual}" = "true" ]
+  [[ "$object" == *"-bootstrap-token-secret-key=token"* ]]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(echo $object | jq -r '.spec.volumes')
+  local actual=$(printf '%s\n' "$object" | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  local actual=$(printf '%s\n' "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 
   # Replication token file is passed.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
-  [ "${actual}" = "true" ]
+  [[ "$object" == *"-acl-replication-token-file=/vault/secrets/replication-token"* ]]
 }
 
 #--------------------------------------------------------------------
@@ -1031,6 +1037,7 @@ load _helpers
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.consulCARole=carole' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     --set 'global.acls.bootstrapToken.secretName=/vault/boot' \
     --set 'global.acls.bootstrapToken.secretKey=token' \
     --set 'global.acls.partitionToken.secretName=/vault/secret' \
@@ -1039,30 +1046,29 @@ load _helpers
     --set "global.adminPartitions.name=default" \
     --set 'global.enableConsulNamespaces=true' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq -o=json '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
   [ "${actual}" = "acl-role" ]
 
   # Check Vault secret annotations.
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-partition-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-partition-token"')
   [ "${actual}" = "/vault/secret" ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-partition-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-partition-token"')
   local expected=$'{{- with secret \"/vault/secret\" -}}\n{{- .Data.data.token -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(echo $object | jq -r '.spec.volumes')
+  local actual=$(printf '%s\n' "$object" | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  local actual=$(printf '%s\n' "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-partition-token-file=/vault/secrets/partition-token"))')
-  [ "${actual}" = "true" ]
+  [[ "$object" == *"-partition-token-file=/vault/secrets/partition-token"* ]]
 }
 
 #--------------------------------------------------------------------
@@ -1081,8 +1087,9 @@ load _helpers
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -r .spec.template.metadata.annotations | tee /dev/stderr)
+      yq -o=json '.spec.template.metadata.annotations' | tee /dev/stderr)
 
   local expected=$(echo '{
     "consul.hashicorp.com/connect-inject": "false",
@@ -1115,6 +1122,7 @@ load _helpers
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)

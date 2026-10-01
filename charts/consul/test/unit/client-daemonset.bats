@@ -2266,6 +2266,7 @@ rollingUpdate:
   run helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'server.enabled=false' \
       --set 'global.secretsBackend.vault.enabled=true'  \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       .
@@ -2325,6 +2326,7 @@ rollingUpdate:
   run helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'server.enabled=false' \
       --set 'global.secretsBackend.vault.enabled=true'  \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2333,7 +2335,7 @@ rollingUpdate:
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.enabled=true' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true" ]]
+  [[ "$output" == *"global.secretsBackend.vault.consulCARole must be provided if global.secretsBackend.vault.enabled=true and global.tls.enabled=true"* ]]
 }
 
 @test "client/DaemonSet: vault annotations not set by default" {
@@ -2653,6 +2655,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclsrole' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     --set 'global.enterpriseLicense.secretName=path/to/secret' \
     --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
     --set 'global.acls.manageSystemACLs=true' \
@@ -2661,11 +2664,11 @@ rollingUpdate:
     . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(printf '%s\n' "$object" |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt"]' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
-  local actual="$(echo $object |
+  local actual="$(printf '%s\n' "$object" |
       yq -r '.annotations["vault.hashicorp.com/agent-inject-template-enterpriselicense.txt"]' | tee /dev/stderr)"
   [ "${actual}" = "null" ]
 }
@@ -2721,7 +2724,7 @@ rollingUpdate:
 
 @test "client/DaemonSet: vault adds consul envvars CONSUL_CACERT on acl-init init container when ACLs are enabled and tls is enabled" {
   cd `chart_dir`
-  local env=$(helm template \
+  local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -2732,15 +2735,15 @@ rollingUpdate:
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
 
-  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
-    [ "${actual}" = "/vault/secrets/serverca.crt" ]
+  [ "${actual}" = "/vault/secrets/serverca.crt" ]
 }
 
 @test "client/DaemonSet: Vault does not add consul ca cert volumeMount to acl-init init container when ACLs are enabled" {
