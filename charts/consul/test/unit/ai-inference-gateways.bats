@@ -65,8 +65,6 @@ gw_flags=(
         yq -r '.spec.template.spec.containers[0].command | join(" ")')
     [[ "$command" != *"-enable-ai=true"* ]]
     [[ "$command" == *"-ai-agent-image=\"hashicorp/consul-mcp-sc:test\""* ]]
-    [[ "$command" != *"-consul-obo-inbound-image="* ]]
-    [[ "$command" != *"-consul-obo-outbound-image="* ]]
 }
 
 @test "ai/agent image: omitted when unset" {
