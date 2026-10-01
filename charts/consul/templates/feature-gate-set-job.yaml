@@ -1,5 +1,8 @@
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
 {{- if (or $serverEnabled .Values.externalServers.enabled) }}
+{{- if and .Values.global.secretsBackend.vault.enabled (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) (not .Values.global.secretsBackend.vault.featureGateSetRole) }}{{ fail "global.secretsBackend.vault.featureGateSetRole is required when the feature-gate-set job reads a Vault bootstrap token." }}{{ end -}}
+{{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+{{- if and .Values.externalServers.enabled (not (regexMatch "^([A-Za-z0-9][A-Za-z0-9.-]*|[0-9a-fA-F:.]+)$" (.Values.externalServers.hosts | first))) }}{{ fail "The feature-gate-set job requires externalServers.hosts[0] to be a DNS name or IP address; exec= addresses are not supported." }}{{ end -}}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 apiVersion: batch/v1
@@ -39,7 +42,7 @@ spec:
         "vault.hashicorp.com/agent-pre-populate-only": "true"
         "vault.hashicorp.com/agent-inject": "true"
         {{- if (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) }}
-        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.manageSystemACLsRole }}
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.featureGateSetRole }}
         {{- if .Values.global.acls.bootstrapToken.secretName }}
         {{- with .Values.global.acls.bootstrapToken }}
         "vault.hashicorp.com/agent-inject-secret-bootstrap-token": "{{ .secretName }}"
@@ -129,8 +132,12 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
+          case "$CONSUL_ADDRESSES" in
+            *:*) consul_host="[$CONSUL_ADDRESSES]" ;;
+            *) consul_host="$CONSUL_ADDRESSES" ;;
+          esac
           {{- if .Values.global.tls.enabled }}
-          export CONSUL_HTTP_ADDR="https://${CONSUL_ADDRESSES}:${CONSUL_HTTP_PORT}"
+          export CONSUL_HTTP_ADDR="https://${consul_host}:${CONSUL_HTTP_PORT}"
           {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
           {{- if .Values.global.secretsBackend.vault.enabled }}
           export CONSUL_CACERT=/vault/secrets/serverca.crt
@@ -139,7 +146,7 @@ spec:
           {{- end }}
           {{- end }}
           {{- else }}
-          export CONSUL_HTTP_ADDR="http://${CONSUL_ADDRESSES}:${CONSUL_HTTP_PORT}"
+          export CONSUL_HTTP_ADDR="http://${consul_host}:${CONSUL_HTTP_PORT}"
           {{- end }}
 
           # Each line: <gate-name> <enabled|disabled>

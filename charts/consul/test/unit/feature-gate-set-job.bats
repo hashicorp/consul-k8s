@@ -148,6 +148,39 @@ load _helpers
   [ "${actual}" = "consul.example.com" ]
 }
 
+@test "feature-gate-set/Job: rejects missing external server hosts" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"externalServers.hosts must be set"* ]]
+}
+
+@test "feature-gate-set/Job: rejects exec-based external server hosts" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set-string 'externalServers.hosts[0]=exec=echo 127.0.0.1' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DNS name or IP address; exec= addresses are not supported"* ]]
+}
+
+@test "feature-gate-set/Job: brackets IPv6 hosts in the HTTP URL" {
+  cd `chart_dir`
+  local script=$(helm template -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set-string 'externalServers.hosts[0]=2001:db8::1' \
+      --set 'global.tls.enabled=true' \
+      . | yq -r '.spec.template.spec.containers[0].command[2]')
+  local actual=$(CONSUL_ADDRESSES=2001:db8::1 CONSUL_HTTP_PORT=8501 \
+      /bin/sh -ec 'consul() { printf "%s\n" "$CONSUL_HTTP_ADDR"; }; '"$script")
+  [ "$actual" = "Setting feature gate: consul-ai=disabled
+https://[2001:db8::1]:8501" ]
+}
+
 #--------------------------------------------------------------------
 # global.tls.enabled
 
@@ -408,7 +441,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -421,7 +454,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -434,7 +467,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -447,7 +480,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -461,7 +494,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -474,7 +507,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -491,7 +524,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
@@ -507,7 +540,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
@@ -528,7 +561,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -542,7 +575,7 @@ load _helpers
   actual=$(echo "$annotations" | yq -r '.["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  # ACL role takes precedence over CA role when both are set
+  # The feature-gate role takes precedence over the CA role when both are set
   actual=$(echo "$annotations" | yq -r '.["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "acl-role" ]
 
@@ -560,7 +593,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -576,7 +609,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -592,7 +625,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -613,7 +646,7 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -628,13 +661,13 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 }
 
-@test "feature-gate-set/Job: vault agent uses manageSystemACLsRole" {
+@test "feature-gate-set/Job: vault agent uses featureGateSetRole" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
@@ -642,12 +675,43 @@ load _helpers
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.manageSystemACLsRole=my-acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=my-acl-role' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "my-acl-role" ]
+}
+
+@test "feature-gate-set/Job: requires its own Vault role for managed ACLs" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"global.secretsBackend.vault.featureGateSetRole is required"* ]]
+}
+
+@test "feature-gate-set/Job: requires its own Vault role for externally managed ACLs" {
+  cd `chart_dir`
+  run helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' .
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"global.secretsBackend.vault.featureGateSetRole is required"* ]]
+}
+
+@test "feature-gate-set/Job: uses its own Vault role for externally managed ACLs" {
+  cd `chart_dir`
+  local actual=$(helm template -s templates/feature-gate-set-job.yaml \
+      --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
+      . | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/role"]')
+  [ "$actual" = "feature-gate-role" ]
 }
 
 @test "feature-gate-set/Job: vault agent uses consulCARole when only TLS enabled (no ACLs)" {
