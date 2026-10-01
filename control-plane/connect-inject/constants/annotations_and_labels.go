@@ -285,10 +285,11 @@ const (
 
 	// AnnotationAIAgentAddr overrides the TCP address consul-mcp-sc listens on when
 	// --mcp-socket is not used. It must use :port so the listener is reachable
-	// through the pod IP by the Kubernetes startup probe.
+	// through the pod IP by the Kubernetes startup probe, and its port must match
+	// the resolved AI agent interceptor port.
 	// Only useful in local development or environments where a shared UDS volume is unavailable.
 	// Maps to the --mcp-addr flag on consul-mcp-sc.
-	// e.g. consul.hashicorp.com/ai-agent-addr: ":21200".
+	// e.g. consul.hashicorp.com/ai-agent-addr: ":21101".
 	AnnotationAIAgentAddr = "consul.hashicorp.com/ai-agent-addr"
 
 	// AnnotationAIAgentChildBinary sets the path to a child binary supervised by consul-mcp-gateway.

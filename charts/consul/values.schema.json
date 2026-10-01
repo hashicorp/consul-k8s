@@ -5,11 +5,11 @@
   "properties": {
     "ai": {
       "type": "object",
-      "description": "AI feature configuration. Sub-sections other than ai.obo are only active when ai.enabled=true.",
+      "description": "AI feature configuration. AI controllers and CRDs require ai.enabled=true; ai.agent configures annotation-driven AI agent sidecar injection independently.",
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Enables the AI controllers and CRDs. OBO sidecars are not affected; they are injected into any pod with the consul.hashicorp.com/ai-role=ai-agent annotation."
+          "description": "Enables the AI controllers and CRDs. The combined AI agent sidecar is configured separately by ai.agent and injected into pods with the consul.hashicorp.com/ai-role=ai-agent annotation."
         },
         "inferenceModel": {
           "type": "object",
