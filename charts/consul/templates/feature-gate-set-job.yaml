@@ -131,8 +131,12 @@ spec:
         - |
           {{- if .Values.global.tls.enabled }}
           export CONSUL_HTTP_ADDR="https://${CONSUL_ADDRESSES}:${CONSUL_HTTP_PORT}"
-          {{- if and (not .Values.global.secretsBackend.vault.enabled) (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
+          {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          export CONSUL_CACERT=/vault/secrets/serverca.crt
+          {{- else }}
           export CONSUL_CACERT=/consul/tls/ca/tls.crt
+          {{- end }}
           {{- end }}
           {{- else }}
           export CONSUL_HTTP_ADDR="http://${CONSUL_ADDRESSES}:${CONSUL_HTTP_PORT}"
