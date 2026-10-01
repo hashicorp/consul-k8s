@@ -108,9 +108,6 @@ func TestMCPGateway_Basic(t *testing.T) {
 	helmValues := map[string]string{
 		"ai.enabled":                         "true",
 		"connectInject.enabled":              "true",
-		"global.imageConsulDataplane":        "docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev",
-		"global.imageConsulAIMCPInterceptor": "public.ecr.aws/n9h4m6z2/ajay/consul-mcp-gateway:ai-agent-13",
-		"global.imageK8S":                    "public.ecr.aws/n9h4m6z2/ajay/consul-k8s-control-plane-dev:ai-agent-test-11",
 	}
 	logger.Log(t, "installing Consul (enterprise) via Helm")
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
