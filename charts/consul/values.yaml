@@ -3989,11 +3989,13 @@ telemetryCollector:
 # When enabled, an interceptor sidecar is injected alongside application
 # pods to handle AI inference traffic (e.g. proxying OpenAI-compatible calls).
 ai:
-  # Master switch for all AI features. When false:
+  # Enables the AI controllers and CRDs. When false:
   #   - The InferenceModelConfig CRD is not installed.
   #   - The post-install Job, ServiceAccount, ClusterRole, and ClusterRoleBinding
   #     are not created.
   #   - The connect-inject controller does NOT start the InferenceModelConfig watcher.
+  # OBO sidecars are not affected by this setting. They are injected into
+  # any pod with the consul.hashicorp.com/ai-role=ai-agent annotation.
   # @type: boolean
   enabled: false
 
@@ -4201,13 +4203,9 @@ ai:
 
   # OBO (on-behalf-of) identity-plane sidecars for ai-agent pods.
   # Split-knowledge: envelope ciphertext on Envoy UDS + DEK via dataplane broker.
-  # Required when injecting ai-role=ai-agent; webhook errors if unset.
+  # Injected whenever a pod has consul.hashicorp.com/ai-role=ai-agent; webhook
+  # errors if images are unset. No separate enable flag — the ai-role is the gate.
   obo:
-    # enabled controls whether OBO identity-plane sidecars are injected into
-    # ai-role=ai-agent pods. Set to false for local dev / playground environments
-    # that do not have an IBM Verify tenant. Default: false.
-    # @type: boolean
-    enabled: false
     inbound:
       # Docker image for consul-obo-inbound (loopback :21102).
       # Binary source: consul-ai-apps/gateways/obo-inbound
