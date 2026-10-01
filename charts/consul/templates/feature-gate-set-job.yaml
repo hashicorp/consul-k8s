@@ -7,7 +7,7 @@
 {{- if and .Values.global.secretsBackend.vault.enabled (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) (not .Values.global.secretsBackend.vault.featureGateSetRole) }}{{ fail "global.secretsBackend.vault.featureGateSetRole is required when the feature-gate-set job reads a Vault ACL token." }}{{ end -}}
 {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled (not (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName)) (not .Values.global.secretsBackend.vault.consulCARole) }}{{ fail "global.secretsBackend.vault.consulCARole is required when the feature-gate-set job reads only a Vault CA certificate." }}{{ end -}}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
-{{- if and .Values.externalServers.enabled (not (regexMatch "^([A-Za-z0-9][A-Za-z0-9.-]*|[0-9a-fA-F:.]+)$" (.Values.externalServers.hosts | first))) }}{{ fail "The feature-gate-set job requires externalServers.hosts[0] to be a DNS name or IP address; exec= addresses are not supported." }}{{ end -}}
+{{- if .Values.externalServers.enabled }}{{ if not (regexMatch "^([A-Za-z0-9][A-Za-z0-9.-]*|[0-9a-fA-F:.]+)$" (.Values.externalServers.hosts | first | toString)) }}{{ fail "The feature-gate-set job requires externalServers.hosts[0] to be a DNS name or IP address; exec= addresses are not supported." }}{{ end }}{{ end -}}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 apiVersion: batch/v1
