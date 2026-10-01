@@ -28,6 +28,7 @@ const (
 	StaticClientName         = "static-client"
 	KubernetesAuthMethodPath = "kubernetes"
 	ManageSystemACLsRole     = "server-acl-init"
+	FeatureGateSetRole       = "feature-gate-set"
 	ClientRole               = "client"
 	ServerRole               = "server"
 )
@@ -210,6 +211,16 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	}
 	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
+	// feature-gate-set
+	featureGateSetAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, FeatureGateSetRole),
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            FeatureGateSetRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, serverPKIConfig.PolicyName),
+	}
+	featureGateSetAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
 	// allow all components to access server ca
 	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
@@ -238,6 +249,7 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
 		"global.secretsBackend.vault.connectInjectRole":    connectInjectorWebhookPKIConfig.RoleName,
 		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
+		"global.secretsBackend.vault.featureGateSetRole":   FeatureGateSetRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
