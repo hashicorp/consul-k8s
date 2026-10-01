@@ -497,24 +497,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
-	// NOTE: The mcp-server ai-role only needs consul-dataplane; no additional
-	// sidecar is injected for now. The mcpServerSidecar() implementation is
-	// retained in mcp_server_sidecar.go but the injection is disabled here.
-	//
-	// if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == "mcp-server" && w.ImageMCPServer != "" {
-	// 	mcpDefaults := v1alpha1.McpServerDefaults{}
-	// 	if w.Client != nil {
-	// 		var mcpCfg v1alpha1.McpServerConfig
-	// 		if err := w.Client.Get(ctx, client.ObjectKey{Name: "consul-mcp-server"}, &mcpCfg); err == nil {
-	// 			mcpDefaults = mcpCfg.Spec.Defaults
-	// 		} else {
-	// 			w.Log.Info("McpServerConfig not found, using built-in defaults", "name", "consul-mcp-server")
-	// 		}
-	// 	}
-	// 	mcpContainer := w.mcpServerSidecar(pod, mcpDefaults)
-	// 	pod.Spec.Containers = append(pod.Spec.Containers, mcpContainer)
-	// }
-
 	// ai-agent pods get one combined MCP+OBO sidecar (consul-mcp-sc --mode=agent).
 	// ai.agent.image is required: Envoy OBO/MCP filters dial this container, so a
 	// missing image fails admission rather than leaving dangling listeners.
@@ -685,7 +667,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	}
 
 	if tproxyEnabled && overwriteProbes {
-		// We don't use the loop index because this needs to line up w.withiptablesConfigJSON,
+		// We don't use the loop index because this needs to line up with nftablesConfigJSON,
 		// which is performed before the sidecar is injected.
 		idx := 0
 		for _, container := range pod.Spec.Containers {

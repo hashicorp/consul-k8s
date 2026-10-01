@@ -42,7 +42,7 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 			"AI sidecar image must be set for ai-agent pods; " +
 				"configure ai.agent.image to the consul-mcp-sc multi-binary image")
 	}
-	mcpPort, useMCPAddr, err := common.ValidateAIAgentAddress(pod)
+	mcpPort, useMCPAddr, err := common.ValidateAIAgentAddress(pod, defaults.InterceptorPort)
 	if err != nil {
 		return corev1.Container{}, err
 	}
