@@ -1,0 +1,4 @@
+```release-note:feature
+api-gateway: support overriding Envoy proxy concurrency on API Gateway pods via the
+`consul.hashicorp.com/consul-envoy-proxy-concurrency` annotation.
+```
