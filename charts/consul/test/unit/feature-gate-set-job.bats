@@ -377,6 +377,10 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.federation.enabled=true' \
       --set 'global.federation.primaryDatacenter=dc1' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=consul-ca-cert' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.acls.replicationToken.secretName=replication-token' \
       --set 'global.acls.replicationToken.secretKey=token' \
       . | yq '.')
@@ -512,6 +516,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -595,6 +600,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -611,6 +617,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -632,6 +639,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -664,6 +672,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -680,6 +689,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -696,6 +706,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -746,6 +757,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=my-acl-role' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
@@ -761,6 +773,8 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.bootstrapToken.secretName=consul/data/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=server-role' \
+      --set 'global.secretsBackend.vault.consulClientRole=client-role' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' .
   [ "$status" -eq 1 ]
   [[ "$output" == *"global.secretsBackend.vault.featureGateSetRole is required"* ]]
@@ -772,6 +786,8 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=server-role' \
+      --set 'global.secretsBackend.vault.consulClientRole=client-role' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' .
   [ "$status" -eq 1 ]
   [[ "$output" == *"global.secretsBackend.vault.featureGateSetRole is required"* ]]
@@ -783,6 +799,8 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=server-role' \
+      --set 'global.secretsBackend.vault.consulClientRole=client-role' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=server-acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/role"]')
@@ -794,6 +812,9 @@ https://[2001:db8::1]:8501" ]
   run helm template -s templates/feature-gate-set-job.yaml \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=server-role' \
+      --set 'global.secretsBackend.vault.consulClientRole=client-role' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-init-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' .
   [ "$status" -eq 1 ]
   [[ "$output" == *"global.acls.bootstrapToken or global.acls.replicationToken must be provided"* ]]
@@ -806,6 +827,8 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.replicationToken.secretName=consul/data/replication-token' \
       --set 'global.acls.replicationToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=server-role' \
+      --set 'global.secretsBackend.vault.consulClientRole=client-role' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-init-role' .
   [ "$status" -eq 1 ]
   [[ "$output" == *"global.secretsBackend.vault.featureGateSetRole is required"* ]]
@@ -836,6 +859,10 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.federation.enabled=true' \
       --set 'global.federation.primaryDatacenter=dc1' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=consul-ca-cert' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.acls.replicationToken.secretName=consul/data/replication-token' \
       --set 'global.acls.replicationToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
