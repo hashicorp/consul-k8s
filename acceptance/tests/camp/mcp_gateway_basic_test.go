@@ -80,7 +80,7 @@ var campConfigFiles = []string{
 	"weatherly-defaults.yaml",
 	"ameduss-intentions.yaml",
 	"weatherly-intentions.yaml",
-	"agent-planner-mcp-configmap.yaml",
+	"agent-planner-mcp-agentconfig.yaml",
 	"ameduss.yaml",
 	"weatherly.yaml",
 	"ai-app.yaml",

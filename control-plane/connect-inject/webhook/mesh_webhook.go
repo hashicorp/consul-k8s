@@ -342,26 +342,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("unable to mount additional access log volume: %s", err))
 	}
 
-	// If this is an AI agent pod, mount the MCP config ConfigMap as a volume.
-	if isAIAgent(pod) {
-		cmName := aiAgentMCPConfigName(pod)
-		if cmName == "" {
-			return admission.Errored(http.StatusBadRequest,
-				fmt.Errorf("annotation %s is required when %s is %s",
-					constants.AnnotationAIAgentMCPConfig,
-					constants.AnnotationAIRole,
-					constants.AIAgentRole))
-		}
-		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-			Name: aiAgentConfigVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-				},
-			},
-		})
-	}
-
 	// Optionally add any volumes that are to be used by the envoy sidecar.
 	if _, ok := pod.Annotations[constants.AnnotationConsulSidecarUserVolume]; ok {
 		var userVolumes []corev1.Volume
@@ -443,17 +423,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
 		} else {
 			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
-		}
-
-		// Inject the AI agent mcp-gateway sidecar when the pod carries the AI role annotation.
-		if isAIAgent(pod) {
-			aiSidecar, err := w.aiAgentSidecar(pod)
-			if err != nil {
-				w.Log.Error(err, "error configuring ai agent mcp-gateway container", "request name", req.Name)
-				return admission.Errored(http.StatusInternalServerError,
-					fmt.Errorf("error configuring ai agent mcp-gateway container: %s", err))
-			}
-			pod.Spec.Containers = append(pod.Spec.Containers, aiSidecar)
 		}
 
 	} else {

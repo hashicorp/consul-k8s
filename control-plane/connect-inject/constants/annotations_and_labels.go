@@ -332,11 +332,6 @@ const (
 	// annotations for sidecar access volumes.
 	AnnotationConsulSidecarAccessLogEnabled = "consul.hashicorp.com/consul-sidecar-access-log-enabled"
 	AnnotationConsulSidecarAccessLogPath    = "consul.hashicorp.com/consul-sidecar-access-log-path"
-
-	// AnnotationAIAgentMCPConfig is the name of the Kubernetes ConfigMap that holds
-	// the MCP agent configuration (inference, mcp, rate_limits, and interceptor blocks).
-	// Required when AnnotationAIRole is set to "ai-agent".
-	AnnotationAIAgentMCPConfig = "consul.hashicorp.com/ai-agent-mcp-config"
 )
 
 // Annotations used by Prometheus.

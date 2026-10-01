@@ -8,7 +8,7 @@
 #
 # The connect-inject controller reads the annotations below and:
 #   1. Injects an Envoy sidecar proxy.
-#   2. Reads the ai-role + mcp-config annotations to wire the consul-mcp-gateway
+#   2. Reads the ai-role + agent-config annotations to wire the consul-mcp-gateway
 #      (interceptor on :21101) and the HITL http_service path (:16101).
 #   3. Configures transparent proxy so all app egress is captured by the sidecar.
 #
@@ -50,8 +50,8 @@ spec:
         consul.hashicorp.com/connect-inject: "true"
         # Declare the ai-agent role so the controller wires consul-mcp-gateway.
         consul.hashicorp.com/ai-role: "ai-agent"
-        # Reference the ConfigMap that carries the MCP/HITL/interceptor config.
-        consul.hashicorp.com/ai-agent-mcp-config: "agent-planner-mcp"
+        # Reference the AgentConfig that carries the MCP/HITL/interceptor defaults.
+        consul.hashicorp.com/ai-agent-config: "agent-planner-mcp"
         # Transparent proxy: all pod egress is captured by the sidecar Envoy.
         consul.hashicorp.com/transparent-proxy: "true"
         # Exclude the ai-app HTTP port (8080) and HITL port (16101) and the
