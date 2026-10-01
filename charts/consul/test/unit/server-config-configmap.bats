@@ -1671,10 +1671,11 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/ConfigMap: consul-ai feature gate is false by default (ai.enabled not set)" {
+@test "server/ConfigMap: consul-ai feature gate is false when ai is null" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
+      --set 'ai=null' \
       . | tee /dev/stderr |
       yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap["consul-ai"]' | tee /dev/stderr)
   [ "${actual}" = "false" ]
