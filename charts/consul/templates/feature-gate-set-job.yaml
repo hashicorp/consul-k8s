@@ -1,5 +1,5 @@
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
-{{- if (or $serverEnabled .Values.externalServers.enabled) }}
+{{- if (or (and $serverEnabled (eq (int .Values.server.updatePartition) 0)) .Values.externalServers.enabled) }}
 {{- $useReplicationToken := and .Values.global.acls.manageSystemACLs (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.replicationToken.secretName -}}
 {{- if or (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) (and .Values.global.acls.bootstrapToken.secretKey (not .Values.global.acls.bootstrapToken.secretName)) }}{{ fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided" }}{{ end -}}
 {{- if and .Values.global.acls.manageSystemACLs (or (and .Values.global.acls.replicationToken.secretName (not .Values.global.acls.replicationToken.secretKey)) (and .Values.global.acls.replicationToken.secretKey (not .Values.global.acls.replicationToken.secretName))) }}{{ fail "both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set if one of them is provided" }}{{ end -}}
