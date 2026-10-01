@@ -11,7 +11,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -19,8 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
@@ -29,6 +31,47 @@ const (
 	defaultPodName   = "fakePod"
 	defaultNamespace = "default"
 )
+
+func TestAIAgentRedirectTrafficOverrides(t *testing.T) {
+	for _, source := range []string{"selected CRD", "missing CRD", "no client"} {
+		t.Run(source, func(t *testing.T) {
+			s := runtime.NewScheme()
+			require.NoError(t, v1alpha1.AddToScheme(s))
+			builder := fake.NewClientBuilder().WithScheme(s)
+			if source == "selected CRD" {
+				builder.WithObjects(&v1alpha1.AgentConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: "custom"},
+					Spec: v1alpha1.AgentConfigSpec{Defaults: v1alpha1.AgentDefaults{
+						InterceptorPort: 22001, McpPort: 22002, HITL: v1alpha1.AgentHITL{Port: 22003},
+					}},
+				})
+			}
+			w := MeshWebhook{Log: logrtest.New(t)}
+			if source != "no client" {
+				w.Client = builder.Build()
+			}
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+				constants.AnnotationAIRole:                 constants.AIAgentRole,
+				constants.AnnotationAIAgentConfig:          "custom",
+				constants.AnnotationAIAgentInterceptorPort: "23001",
+				constants.AnnotationAIAgentMCPPort:         "23002",
+				constants.AnnotationAIAgentHITLPort:        "23003",
+			}}}
+			raw, err := w.nftablesConfigJSON(pod, corev1.Namespace{})
+			require.NoError(t, err)
+			var cfg nftables.Config
+			require.NoError(t, json.Unmarshal([]byte(raw), &cfg))
+			require.Equal(t, []string{"23002", "23003", "23001",
+				strconv.Itoa(constants.DefaultOBOInboundPort), strconv.Itoa(constants.DefaultOBOOutboundPort)}, cfg.ExcludeInboundPorts)
+			require.Equal(t, []string{"23002",
+				strconv.Itoa(constants.DefaultOBOInboundPort), strconv.Itoa(constants.DefaultOBOOutboundPort)}, cfg.ExcludeOutboundPorts)
+
+			pod.Annotations[constants.AnnotationAIAgentMCPPort] = "invalid"
+			_, err = w.nftablesConfigJSON(pod, corev1.Namespace{})
+			require.ErrorContains(t, err, constants.AnnotationAIAgentMCPPort)
+		})
+	}
+}
 
 func TestAddRedirectTrafficConfig(t *testing.T) {
 	s := runtime.NewScheme()
@@ -43,7 +86,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		pod        *corev1.Pod
 		namespace  corev1.Namespace
 		dnsEnabled bool
-		expCfg     iptables.Config
+		expCfg     nftables.Config
 		expErr     error
 	}{
 		{
@@ -68,11 +111,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:       "",
 				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:  constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort: nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{"5996"},
 			},
 		},
@@ -100,11 +143,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort:   nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{"21000"},
 			},
@@ -134,11 +177,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort:   nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{"13373"},
 			},
@@ -168,11 +211,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort:   nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{"13373"},
 			},
@@ -210,11 +253,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort:   nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{strconv.Itoa(exposedPathsLivenessPortsRangeStart)},
 			},
@@ -243,11 +286,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:         "",
 				ProxyUserID:         strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:    constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort:   iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort:   nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:         []string{"5996"},
 				ExcludeInboundPorts: []string{"1111", "11111"},
 			},
@@ -276,11 +319,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:          "",
 				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:     constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort:    nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:          []string{"5996"},
 				ExcludeOutboundPorts: []string{"2222", "22222"},
 			},
@@ -309,11 +352,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:          "",
 				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:     constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort:    nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:          []string{strconv.Itoa(initContainersUserAndGroupID)},
 				ExcludeOutboundCIDRs: []string{"3.3.3.3", "3.3.3.3/24"},
 			},
@@ -342,11 +385,11 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ConsulDNSIP:       "",
 				ProxyUserID:       strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:  constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort: iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort: nftables.DefaultTProxyOutboundPort,
 				ExcludeUIDs:       []string{"4444", "44444", strconv.Itoa(initContainersUserAndGroupID)},
 			},
 		},
@@ -377,14 +420,47 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 					},
 				},
 			},
-			expCfg: iptables.Config{
+			expCfg: nftables.Config{
 				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
 				ProxyInboundPort:     constants.ProxyDefaultInboundPort,
-				ProxyOutboundPort:    iptables.DefaultTProxyOutboundPort,
+				ProxyOutboundPort:    nftables.DefaultTProxyOutboundPort,
 				ExcludeInboundPorts:  []string{"1111", "11111"},
 				ExcludeOutboundPorts: []string{"2222", "22222"},
 				ExcludeOutboundCIDRs: []string{"3.3.3.3", "3.3.3.3/24"},
 				ExcludeUIDs:          []string{"4444", "44444", strconv.Itoa(initContainersUserAndGroupID)},
+			},
+		},
+		{
+			name: "AI agent pod excludes MCP, HITL, interceptor, and OBO ports",
+			webhook: MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: defaultNamespace,
+					Name:      defaultPodName,
+					Annotations: map[string]string{
+						constants.AnnotationAIRole: constants.AIAgentRole,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "test",
+						},
+					},
+				},
+			},
+			expCfg: nftables.Config{
+				ProxyUserID:          strconv.Itoa(sidecarUserAndGroupID),
+				ProxyInboundPort:     constants.ProxyDefaultInboundPort,
+				ProxyOutboundPort:    nftables.DefaultTProxyOutboundPort,
+				ExcludeInboundPorts:  []string{"21003", "21004", "21005", "21102", "21103"},
+				ExcludeOutboundPorts: []string{"21003", "21102", "21103"},
+				ExcludeUIDs:          []string{strconv.Itoa(initContainersUserAndGroupID)},
 			},
 		},
 	}
@@ -392,13 +468,13 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			err := c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
 
-			// Only compare annotation and iptables config on successful runs
+			// Only compare annotation and nft config on successful runs
 			if c.expErr == nil {
 				require.NoError(t, err)
 				anno, ok := c.pod.Annotations[constants.AnnotationRedirectTraffic]
 				require.Equal(t, ok, true)
 
-				actualConfig := iptables.Config{}
+				actualConfig := nftables.Config{}
 				err = json.Unmarshal([]byte(anno), &actualConfig)
 				require.NoError(t, err)
 				assert.ObjectsAreEqual(c.expCfg, actualConfig)
@@ -464,11 +540,11 @@ func TestRedirectTraffic_consulDNS(t *testing.T) {
 
 			ns := testNS
 			ns.Labels = c.namespaceLabel
-			iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+			nftCfg, err := w.nftablesConfigJSON(*pod, ns)
 			require.NoError(t, err)
 
-			actualConfig := iptables.Config{}
-			err = json.Unmarshal([]byte(iptablesConfig), &actualConfig)
+			actualConfig := nftables.Config{}
+			err = json.Unmarshal([]byte(nftCfg), &actualConfig)
 			require.NoError(t, err)
 			if c.expectConsulDNSConfig {
 				require.Equal(t, "127.0.0.1", actualConfig.ConsulDNSIP)

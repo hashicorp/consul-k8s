@@ -1,0 +1,1670 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
+package ai
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"testing"
+	"time"
+
+	logrtest "github.com/go-logr/logr/testr"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	capi "github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+)
+
+// ── mock Consul httptest helpers ──────────────────────────────────────────────
+//
+// These helpers replace test.TestServerWithMockConnMgrWatcher so tests never
+// require a consul binary on $PATH. The mock server accepts any ConfigEntries
+// call and returns 200/OK so the controller's upsertConfigEntry / deleteConfigEntry
+// calls succeed without errors. Exact response bodies are not validated here;
+// unit tests for config-entry mapping are in TestToConsulConfigEntry below.
+
+// consulMockServer starts an httptest server that responds 200 to all Consul
+// API calls. It returns a consul.Config pointing at the server and a
+// MockServerConnectionManager. This pattern matches the cache/consul_test.go
+// approach: no consul binary needed.
+func consulMockServer(t *testing.T) (*consul.Config, consul.ServerConnectionManager) {
+	t.Helper()
+
+	return consulMockServerWithHandler(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle any Consul API call generically.
+		switch r.Method {
+		case http.MethodPut:
+			// ConfigEntries().Set() — return a minimal success payload.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(true)
+		case http.MethodDelete:
+			// ConfigEntries().Delete()
+			w.WriteHeader(http.StatusOK)
+		case http.MethodGet:
+			// ConfigEntries().Get() — return 404 so deleteConfigEntry treats it
+			// as "already removed" and returns nil (not an error).
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte("404 - Unexpected format for token"))
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+}
+
+func consulMockServerWithHandler(t *testing.T, handler http.Handler) (*consul.Config, consul.ServerConnectionManager) {
+	t.Helper()
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+
+	host, portStr, err := net.SplitHostPort(srv.Listener.Addr().String())
+	require.NoError(t, err)
+	port, err := strconv.Atoi(portStr)
+	require.NoError(t, err)
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		addrs, err2 := net.LookupHost(host)
+		require.NoError(t, err2)
+		ip = net.ParseIP(addrs[0])
+	}
+
+	cfg := &consul.Config{
+		APIClientConfig: &capi.Config{
+			Address: fmt.Sprintf("%s:%s", host, portStr),
+			Scheme:  "http",
+		},
+		HTTPPort: port,
+	}
+
+	watcher := consul.NewMockServerConnectionManager(t)
+	// Maybe() marks this expectation as optional so that tests which return
+	// early (e.g. resource-not-found) without calling ConsulServerConnMgr.State()
+	// do not fail the mock's AssertExpectations check.
+	watcher.On("State").Maybe().Return(discovery.State{
+		Address: discovery.Addr{
+			TCPAddr: net.TCPAddr{IP: ip, Port: port},
+		},
+	}, nil)
+
+	return cfg, watcher
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile — happy/sad path table tests (K8s only)
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile(t *testing.T) {
+	t.Parallel()
+
+	deletionTimestamp := metav1.Now()
+
+	cases := []struct {
+		name       string
+		k8sObjects func() []runtime.Object
+		expErr     string
+		requeue    bool
+	}{
+		{
+			name: "resource not found returns no error",
+			k8sObjects: func() []runtime.Object {
+				return []runtime.Object{}
+			},
+		},
+		{
+			name: "new resource gets finalizer and requeues",
+			k8sObjects: func() []runtime.Object {
+				return []runtime.Object{minimalIGW("my-gw", "default", "my-pool")}
+			},
+			requeue: true,
+		},
+		{
+			name: "resource marked for deletion — finalizer is removed",
+			k8sObjects: func() []runtime.Object {
+				igw := minimalIGW("my-gw", "default", "my-pool")
+				igw.ObjectMeta.DeletionTimestamp = &deletionTimestamp
+				igw.ObjectMeta.Finalizers = []string{inferenceGatewayFinalizer}
+				return []runtime.Object{igw}
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			consulCfg, watcher := consulMockServer(t)
+
+			s := igwScheme(t)
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(s).
+				WithRuntimeObjects(tt.k8sObjects()...).
+				WithStatusSubresource(&v1alpha1.InferenceGateway{}).
+				Build()
+
+			controller := igwController(t, fakeClient, consulCfg, watcher)
+
+			resp, err := controller.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "my-gw",
+					Namespace: "default",
+				},
+			})
+
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.requeue, resp.Requeue)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_Finalizer — finalizer lifecycle
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_Finalizer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("finalizer is added on first reconcile", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		igw := minimalIGW("gw", "default", "pool")
+		require.Empty(t, igw.Finalizers, "should start without finalizers")
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.Recorder = recorder
+
+		resp, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+		require.True(t, resp.Requeue, "should requeue after adding finalizer")
+
+		got := &v1alpha1.InferenceGateway{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, got))
+		require.Contains(t, got.Finalizers, inferenceGatewayFinalizer)
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonFinalizerAdded)
+	})
+
+	t.Run("finalizer is idempotent on subsequent reconciles", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.Recorder = recorder
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		got := &v1alpha1.InferenceGateway{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, got))
+
+		count := 0
+		for _, f := range got.Finalizers {
+			if f == inferenceGatewayFinalizer {
+				count++
+			}
+		}
+		require.Equal(t, 1, count, "finalizer must appear exactly once")
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonSynced)
+	})
+
+	t.Run("finalizer is removed on deletion", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		ts := metav1.Now()
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.DeletionTimestamp = &ts
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.Recorder = recorder
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		got := &v1alpha1.InferenceGateway{}
+		getErr := fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, got)
+		if getErr == nil {
+			require.NotContains(t, got.Finalizers, inferenceGatewayFinalizer)
+		} else {
+			require.True(t, k8serrors.IsNotFound(getErr),
+				"expected not-found after finalizer removal, got: %v", getErr)
+		}
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonFinalizerRemoved)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_PoolRef — pool resolution behaviour
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_PoolRef(t *testing.T) {
+	t.Parallel()
+
+	t.Run("missing pool sets PoolResolved=False and requeues", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		igw := minimalIGW("gw", "default", "does-not-exist")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+
+		resp, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 10*time.Second, resp.RequeueAfter, "should requeue after pool not found")
+
+		got := &v1alpha1.InferenceGateway{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, got))
+
+		cond := findCondition(got.Status.Conditions, conditionTypePoolResolved)
+		require.NotNil(t, cond, "PoolResolved condition must be set")
+		require.Equal(t, metav1.ConditionFalse, cond.Status)
+		require.Equal(t, reasonPoolNotReady, cond.Reason)
+	})
+
+	t.Run("disabled pool sets Ready=False", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		pool.Spec.Enabled = false
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		got := &v1alpha1.InferenceGateway{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, got))
+
+		ready := findCondition(got.Status.Conditions, conditionTypeReady)
+		require.NotNil(t, ready)
+		require.Equal(t, metav1.ConditionFalse, ready.Status, "Ready must be False when pool is disabled")
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_ChildResources — Deployment and Service
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_ChildResources(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Deployment and Service are created on first sync", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		// Deployment must exist.
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+		require.Equal(t, "gw", dep.Name)
+		require.Equal(t, "default", dep.Namespace)
+
+		// Pod annotations: webhook opted out, gateway-kind set for endpoints controller.
+		require.Equal(t, "false", dep.Spec.Template.Annotations[constants.AnnotationInject])
+		require.Equal(t, "inference-gateway", dep.Spec.Template.Annotations[constants.AnnotationGatewayKind])
+		require.Equal(t, inferenceGatewayName(igw), dep.Spec.Template.Annotations[constants.AnnotationGatewayConsulServiceName])
+		// No spec.service set → falls back to inferenceGatewayServicePort (8443).
+		require.Equal(t, "8443", dep.Spec.Template.Annotations[constants.AnnotationInferenceGatewayPort])
+
+		// Pod labels: ManagedByValue label present so registerGateway() fires.
+		require.Equal(t, constants.ManagedByValue, dep.Spec.Template.Labels[constants.KeyManagedBy])
+
+		// Init container is connect-init using the consul-k8s image.
+		require.Len(t, dep.Spec.Template.Spec.InitContainers, 1)
+		require.Equal(t, "connect-init", dep.Spec.Template.Spec.InitContainers[0].Name)
+		require.Equal(t, "consul-k8s:latest", dep.Spec.Template.Spec.InitContainers[0].Image)
+		// CONSUL_ADDRESSES must be set from ConsulAddress so connect-init can resolve the server.
+		initEnvMap := make(map[string]string)
+		for _, e := range dep.Spec.Template.Spec.InitContainers[0].Env {
+			initEnvMap[e.Name] = e.Value
+		}
+		require.Equal(t, "consul-server.default.svc", initEnvMap["CONSUL_ADDRESSES"])
+
+		// First container is consul-dataplane (Envoy).
+		require.Equal(t, "consul-dataplane", dep.Spec.Template.Spec.Containers[0].Name)
+		require.Equal(t, "consul-dataplane:latest", dep.Spec.Template.Spec.Containers[0].Image)
+
+		// Second container is inference-gateway (ext_proc sidecar).
+		require.Equal(t, "inference-gateway", dep.Spec.Template.Spec.Containers[1].Name)
+		require.Equal(t, "test-gateway-image:latest", dep.Spec.Template.Spec.Containers[1].Image)
+		// Only the metrics port is exposed on the ext_proc sidecar.
+		require.Equal(t, inferenceGatewayMetricsPort, dep.Spec.Template.Spec.Containers[1].Ports[0].ContainerPort)
+
+		// ext_proc sidecar must carry pool env vars.
+		envMap := make(map[string]string)
+		for _, e := range dep.Spec.Template.Spec.Containers[1].Env {
+			envMap[e.Name] = e.Value
+		}
+		require.Equal(t, "pool", envMap["POOL_NAME"])
+		require.Equal(t, "default", envMap["POOL_NAMESPACE"])
+
+		// Three shared volumes: consul-service (proxy-id), consul-connect-inject-data
+		// (CA cert + proxy token written by connect-init), and run-consul (UDS socket).
+		require.Len(t, dep.Spec.Template.Spec.Volumes, 3)
+		volNames := make([]string, len(dep.Spec.Template.Spec.Volumes))
+		for i, v := range dep.Spec.Template.Spec.Volumes {
+			volNames[i] = v.Name
+		}
+		require.Contains(t, volNames, "consul-service")
+		require.Contains(t, volNames, "consul-connect-inject-data")
+		require.Contains(t, volNames, "run-consul")
+
+		// Service must exist with the controller's DefaultService values.
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+		// DefaultService is zero — falls back to inferenceGatewayServicePort constant (8443).
+		require.Equal(t, inferenceGatewayServicePort, svc.Spec.Ports[0].Port)
+	})
+
+	t.Run("spec.service.ports[0] is stamped as AnnotationInferenceGatewayPort", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.Spec.Service = &v1alpha1.InferenceGatewayService{
+			Ports: []v1alpha1.InferenceGatewayServicePort{{Port: 9443}},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		// spec.service.ports[0]=9443 must win over the 8443 default.
+		require.Equal(t, "9443", dep.Spec.Template.Annotations[constants.AnnotationInferenceGatewayPort])
+	})
+
+	t.Run("Deployment has owner reference pointing to InferenceGateway", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		require.Len(t, dep.OwnerReferences, 1, "Deployment must have exactly one owner reference")
+		require.Equal(t, "InferenceGateway", dep.OwnerReferences[0].Kind)
+		require.Equal(t, "gw", dep.OwnerReferences[0].Name)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_StatusConditions — exact condition values
+// ---------------------------------------------------------------------------
+
+func TestSyncGatewayStatus_OnlyPatchesChanges(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	oldTime := metav1.NewTime(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
+	for _, tc := range []struct {
+		name      string
+		mutate    func(*v1alpha1.InferenceGateway)
+		poolReady bool
+		message   string
+		replicas  int32
+		wantPatch bool
+	}{
+		{name: "unchanged", poolReady: true, message: "pool resolved", replicas: 1},
+		{name: "replicas changed", poolReady: true, message: "pool resolved", replicas: 2, wantPatch: true},
+		{name: "pool became unavailable", message: "pool unavailable", wantPatch: true},
+		{name: "message changed", poolReady: true, message: "pool updated", replicas: 1, wantPatch: true},
+		{name: "generation changed", poolReady: true, message: "pool resolved", replicas: 1, wantPatch: true,
+			mutate: func(igw *v1alpha1.InferenceGateway) { igw.Generation++ }},
+		{name: "reason drifted", poolReady: true, message: "pool resolved", replicas: 1, wantPatch: true,
+			mutate: func(igw *v1alpha1.InferenceGateway) { igw.Status.Conditions[0].Reason = "Stale" }},
+		{name: "missing timestamp", poolReady: true, message: "pool resolved", replicas: 1, wantPatch: true,
+			mutate: func(igw *v1alpha1.InferenceGateway) { igw.Status.LastSyncedTime = nil }},
+		{name: "initial status", poolReady: true, message: "pool resolved", replicas: 1, wantPatch: true,
+			mutate: func(igw *v1alpha1.InferenceGateway) { igw.Status = v1alpha1.InferenceGatewayStatus{} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			igw := minimalIGW("gw", "default", "pool")
+			igw.Generation = 1
+			patches := 0
+			k8sClient := fake.NewClientBuilder().WithScheme(igwScheme(t)).
+				WithObjects(igw).WithStatusSubresource(igw).
+				WithInterceptorFuncs(interceptor.Funcs{
+					SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+						require.Equal(t, "status", subresource)
+						patches++
+						return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
+					},
+				}).Build()
+			controller := &InferenceGatewayController{Client: k8sClient, Log: logrtest.New(t)}
+			require.NoError(t, controller.syncGatewayStatus(ctx, igw, true, "pool resolved", 1))
+			require.Equal(t, 1, patches)
+
+			key := client.ObjectKeyFromObject(igw)
+			require.NoError(t, k8sClient.Get(ctx, key, igw))
+			for i := range igw.Status.Conditions {
+				igw.Status.Conditions[i].LastTransitionTime = oldTime
+			}
+			igw.Status.Conditions = append(igw.Status.Conditions, metav1.Condition{
+				Type: "External", Status: metav1.ConditionTrue, Reason: "External",
+				Message: "preserve", LastTransitionTime: oldTime,
+			})
+			igw.Status.LastSyncedTime = &oldTime
+			if tc.mutate != nil {
+				tc.mutate(igw)
+			}
+			status := igw.DeepCopy().Status
+			require.NoError(t, k8sClient.Update(ctx, igw))
+			igw.Status = status
+			require.NoError(t, k8sClient.Status().Update(ctx, igw))
+			require.NoError(t, k8sClient.Get(ctx, key, igw))
+			before := igw.DeepCopy()
+			patches = 0
+
+			require.NoError(t, controller.syncGatewayStatus(ctx, igw, tc.poolReady, tc.message, tc.replicas))
+			require.NoError(t, k8sClient.Get(ctx, key, igw))
+			if tc.wantPatch {
+				require.Equal(t, 1, patches)
+				require.NotNil(t, igw.Status.LastSyncedTime)
+				require.True(t, igw.Status.LastSyncedTime.After(oldTime.Time))
+			} else {
+				require.Zero(t, patches)
+				require.Equal(t, before.ResourceVersion, igw.ResourceVersion)
+				require.Equal(t, before.Status, igw.Status)
+			}
+			require.Equal(t, tc.replicas, igw.Status.ReadyReplicas)
+			condition := findCondition(igw.Status.Conditions, conditionTypePoolResolved)
+			require.NotNil(t, condition)
+			require.Equal(t, igw.Generation, condition.ObservedGeneration)
+			require.Equal(t, tc.message, condition.Message)
+			if tc.poolReady && tc.name != "initial status" {
+				require.True(t, oldTime.Equal(&condition.LastTransitionTime))
+			}
+			if tc.name != "initial status" {
+				require.Equal(t, findCondition(before.Status.Conditions, "External"), findCondition(igw.Status.Conditions, "External"))
+			}
+
+			// A status-update event must settle without another API write.
+			patches = 0
+			before = igw.DeepCopy()
+			require.NoError(t, controller.syncGatewayStatus(ctx, igw, tc.poolReady, tc.message, tc.replicas))
+			require.Zero(t, patches)
+			require.NoError(t, k8sClient.Get(ctx, key, igw))
+			require.Equal(t, before.ResourceVersion, igw.ResourceVersion)
+			require.Equal(t, before.Status, igw.Status)
+		})
+	}
+}
+
+func TestSyncGatewayStatus_PatchFailure(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	igw := minimalIGW("gw", "default", "pool")
+	patchErr := fmt.Errorf("status patch failed")
+	failPatch := true
+	k8sClient := fake.NewClientBuilder().WithScheme(igwScheme(t)).
+		WithObjects(igw).WithStatusSubresource(igw).
+		WithInterceptorFuncs(interceptor.Funcs{
+			SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+				if failPatch {
+					return patchErr
+				}
+				return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
+			},
+		}).Build()
+	controller := &InferenceGatewayController{Client: k8sClient, Log: logrtest.New(t)}
+	require.ErrorIs(t, controller.syncGatewayStatus(ctx, igw, true, "pool resolved", 1), patchErr)
+	require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(igw), igw))
+	require.Nil(t, igw.Status.LastSyncedTime)
+	require.Empty(t, igw.Status.Conditions)
+
+	failPatch = false
+	require.NoError(t, controller.syncGatewayStatus(ctx, igw, true, "pool resolved", 1))
+	require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(igw), igw))
+	require.NotNil(t, igw.Status.LastSyncedTime)
+	require.Len(t, igw.Status.Conditions, 3)
+}
+
+func TestInferenceGatewayReconcile_StatusConditions(t *testing.T) {
+	t.Parallel()
+
+	type condWant struct {
+		condType string
+		status   metav1.ConditionStatus
+		reason   string
+	}
+
+	cases := []struct {
+		name      string
+		buildIGW  func() *v1alpha1.InferenceGateway
+		buildPool func() *v1alpha1.InferencePoolConfig
+		wantConds []condWant
+	}{
+		{
+			name:      "enabled pool → PoolResolved=True, Available=True, Ready=True",
+			buildIGW:  func() *v1alpha1.InferenceGateway { return minimalIGW("gw", "default", "pool") },
+			buildPool: func() *v1alpha1.InferencePoolConfig { return enabledPool("pool", "default") },
+			wantConds: []condWant{
+				{conditionTypePoolResolved, metav1.ConditionTrue, reasonPoolResolved},
+				{"Available", metav1.ConditionTrue, reasonReconciled},
+				{conditionTypeReady, metav1.ConditionTrue, reasonReconciled},
+			},
+		},
+		{
+			name:     "disabled pool → PoolResolved=False, Available=False, Ready=False",
+			buildIGW: func() *v1alpha1.InferenceGateway { return minimalIGW("gw", "default", "pool") },
+			buildPool: func() *v1alpha1.InferencePoolConfig {
+				p := enabledPool("pool", "default")
+				p.Spec.Enabled = false
+				return p
+			},
+			wantConds: []condWant{
+				{conditionTypePoolResolved, metav1.ConditionFalse, reasonPoolNotReady},
+				{"Available", metav1.ConditionFalse, reasonReconciled},
+				{conditionTypeReady, metav1.ConditionFalse, reasonReconciled},
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			consulCfg, watcher := consulMockServer(t)
+			s := igwScheme(t)
+
+			igw := tt.buildIGW()
+			igw.Finalizers = []string{inferenceGatewayFinalizer}
+			pool := tt.buildPool()
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(s).WithRuntimeObjects(igw, pool).
+				WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+			controller := igwController(t, fakeClient, consulCfg, watcher)
+
+			_, err := controller.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: igw.Name, Namespace: igw.Namespace},
+			})
+			require.NoError(t, err)
+
+			got := &v1alpha1.InferenceGateway{}
+			require.NoError(t, fakeClient.Get(context.Background(),
+				types.NamespacedName{Name: igw.Name, Namespace: igw.Namespace}, got))
+
+			require.NotNil(t, got.Status.LastSyncedTime, "LastSyncedTime must be set after reconcile")
+
+			for _, want := range tt.wantConds {
+				cond := findCondition(got.Status.Conditions, want.condType)
+				require.NotNilf(t, cond, "condition %q not found", want.condType)
+				require.Equalf(t, want.status, cond.Status,
+					"condition %q: got %q want %q", want.condType, cond.Status, want.status)
+				require.Equalf(t, want.reason, cond.Reason,
+					"condition %q: got reason %q want %q", want.condType, cond.Reason, want.reason)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_ReadyReplicas — readyReplicas propagation
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_ReadyReplicas(t *testing.T) {
+	t.Parallel()
+
+	t.Run("readyReplicas is zero before Deployment pods start", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		got := &v1alpha1.InferenceGateway{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, got))
+		// No pods have started yet — fake client returns ReadyReplicas=0.
+		require.Equal(t, int32(0), got.Status.ReadyReplicas,
+			"readyReplicas should be 0 before any Deployment pods start")
+	})
+
+	t.Run("readyReplicas mirrors Deployment.Status.ReadyReplicas", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		// Pre-create a Deployment with ReadyReplicas=1 in the fake store.
+		// The controller reads Deployment.Status.ReadyReplicas after reconcileDeployment,
+		// so seeding it here simulates a running pod.
+		existingDep := deploymentFor(igw, pool, "consul-dataplane:latest", "consul-k8s:latest", "test-gateway-image:latest", inferenceGatewayServicePort, corev1.ResourceRequirements{}, deploymentConsulConfig{address: "consul-server.default.svc"})
+		existingDep.Status.ReadyReplicas = 1
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).
+			WithRuntimeObjects(igw, pool, existingDep).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}, &appsv1.Deployment{}).
+			Build()
+
+		// Update the Deployment status directly so the fake reflects ReadyReplicas=1.
+		depCopy := existingDep.DeepCopy()
+		depCopy.Status.ReadyReplicas = 1
+		require.NoError(t, fakeClient.Status().Update(context.Background(), depCopy))
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		got := &v1alpha1.InferenceGateway{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, got))
+		require.Equal(t, int32(1), got.Status.ReadyReplicas,
+			"readyReplicas must mirror Deployment.Status.ReadyReplicas")
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_EnableConsulNamespaces — namespace guard
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_EnableConsulNamespaces(t *testing.T) {
+	t.Parallel()
+
+	t.Run("EnableConsulNamespaces=false never sends ?ns= to Consul", func(t *testing.T) {
+		// This test verifies the OSS namespace guard: when EnableConsulNamespaces=false
+		// the controller must not append ?ns= to any Consul API call.
+		var capturedURL string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedURL = r.URL.String()
+			w.Header().Set("Content-Type", "application/json")
+			switch r.Method {
+			case http.MethodPut:
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(true)
+			case http.MethodGet:
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte("404 Not Found"))
+			default:
+				w.WriteHeader(http.StatusOK)
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		host, portStr, err := net.SplitHostPort(srv.Listener.Addr().String())
+		require.NoError(t, err)
+		port, err := strconv.Atoi(portStr)
+		require.NoError(t, err)
+
+		ip := net.ParseIP(host)
+		if ip == nil {
+			addrs, err2 := net.LookupHost(host)
+			require.NoError(t, err2)
+			ip = net.ParseIP(addrs[0])
+		}
+
+		cfg := &consul.Config{
+			APIClientConfig: &capi.Config{
+				Address: fmt.Sprintf("%s:%s", host, portStr),
+				Scheme:  "http",
+			},
+			HTTPPort: port,
+		}
+		watcher := consul.NewMockServerConnectionManager(t)
+		watcher.On("State").Maybe().Return(discovery.State{
+			Address: discovery.Addr{TCPAddr: net.TCPAddr{IP: ip, Port: port}},
+		}, nil)
+
+		s := igwScheme(t)
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, cfg, watcher)
+		controller.EnableConsulNamespaces = false // OSS mode — must NOT send ?ns=
+		controller.ConsulNamespace = "default"    // even though ConsulNamespace is set
+
+		_, err = controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		require.NotContains(t, capturedURL, "ns=",
+			"OSS: no ?ns= param must be sent to Consul when EnableConsulNamespaces=false; URL was: %s", capturedURL)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_Events — Synced event emission
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_Events(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successful reconcile emits Synced event", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.Recorder = recorder
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, recorder.Events, 1)
+		event := <-recorder.Events
+		require.Contains(t, event, string(corev1.EventTypeNormal))
+		require.Contains(t, event, eventReasonSynced)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
+
+// igwScheme builds a runtime.Scheme containing all types needed by the
+// InferenceGatewayController: core K8s types, apps/v1 (Deployment), and the
+// consul-k8s AI CRDs.
+func igwScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+	s := runtime.NewScheme()
+	require.NoError(t, clientgoscheme.AddToScheme(s))
+	require.NoError(t, appsv1.AddToScheme(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+	return s
+}
+
+// igwController constructs an InferenceGatewayController wired to the given
+// K8s client and Consul test-server config.
+func igwController(
+	t *testing.T,
+	k8sClient client.Client,
+	consulCfg *consul.Config,
+	watcher consul.ServerConnectionManager,
+) *InferenceGatewayController {
+	t.Helper()
+	return &InferenceGatewayController{
+		Client:              k8sClient,
+		Log:                 logrtest.New(t),
+		Recorder:            record.NewFakeRecorder(10),
+		GatewayImage:        "test-gateway-image:latest",
+		DataplaneImage:      "consul-dataplane:latest",
+		ConsulK8SImage:      "consul-k8s:latest",
+		ConsulClientConfig:  consulCfg,
+		ConsulServerConnMgr: watcher,
+		ConsulAddress:       "consul-server.default.svc",
+		Datacenter:          "dc1",
+		// EnableConsulNamespaces defaults to false (OSS mode) — safe default.
+	}
+}
+
+// minimalIGW returns the minimum valid InferenceGateway pointing at poolName.
+func minimalIGW(name, namespace, poolName string) *v1alpha1.InferenceGateway {
+	return &v1alpha1.InferenceGateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(namespace + "-" + name),
+		},
+		Spec: v1alpha1.InferenceGatewaySpec{
+			PoolRef: v1alpha1.InferencePoolRef{Name: poolName},
+		},
+	}
+}
+
+// enabledPool returns a minimal enabled InferencePoolConfig.
+func enabledPool(name, namespace string) *v1alpha1.InferencePoolConfig {
+	return &v1alpha1.InferencePoolConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1alpha1.InferencePoolConfigSpec{
+			Enabled: true,
+			ParentRefs: []v1alpha1.InferencePoolParentRef{
+				{Kind: v1alpha1.InferenceGatewayKind, Name: name},
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestToConsulConfigEntry — config-entry mapping
+// ---------------------------------------------------------------------------
+
+func TestToConsulConfigEntry(t *testing.T) {
+	t.Parallel()
+
+	// TODO: Uncomment when capi.InferenceGatewayConfigEntry re-adds StateStore.
+	// t.Run("pool with stateStore maps to capi.InferenceGatewayStateStore", func(t *testing.T) {
+	// 	igw := minimalIGW("gw", "default", "pool")
+	// 	pool := enabledPool("pool", "default")
+	// 	pool.Spec.StateStore = &v1alpha1.InferencePoolStateStore{
+	// 		Service:       "valkey",
+	// 		LocalBindPort: 6379,
+	// 	}
+	// 	r := &InferenceGatewayController{Datacenter: "dc1"}
+	// 	entry := r.toConsulConfigEntry(igw, pool)
+	// 	aige := entry.(*capi.InferenceGatewayConfigEntry)
+	// 	require.NotNil(t, aige.StateStore, "StateStore must be mapped when pool.Spec.StateStore is set")
+	// 	require.Equal(t, "valkey", aige.StateStore.Service)
+	// 	require.Equal(t, 6379, aige.StateStore.LocalBindPort)
+	// })
+	//
+	// t.Run("pool without stateStore sends nil StateStore to Consul", func(t *testing.T) {
+	// 	igw := minimalIGW("gw", "default", "pool")
+	// 	pool := enabledPool("pool", "default")
+	// 	r := &InferenceGatewayController{Datacenter: "dc1"}
+	// 	entry := r.toConsulConfigEntry(igw, pool)
+	// 	aige := entry.(*capi.InferenceGatewayConfigEntry)
+	// 	require.Nil(t, aige.StateStore, "StateStore must be nil when pool.Spec.StateStore is not set")
+	// })
+
+	t.Run("minimal pool produces InferenceGatewayConfigEntry with correct kind and name", func(t *testing.T) {
+		igw := minimalIGW("my-gw", "default", "my-pool")
+		pool := enabledPool("my-pool", "default")
+
+		r := &InferenceGatewayController{
+			Datacenter:      "dc1",
+			ConsulPartition: "",
+			ConsulNamespace: "",
+		}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		require.Equal(t, capi.InferenceGateway, entry.GetKind())
+		require.Equal(t, inferenceGatewayName(igw), entry.GetName())
+		require.Equal(t, "dc1", entry.GetMeta()["consul.hashicorp.com/source-datacenter"])
+
+		aige, ok := entry.(*capi.InferenceGatewayConfigEntry)
+		require.True(t, ok, "entry must be *capi.InferenceGatewayConfigEntry")
+		// No failover on a minimal pool.
+		// TODO: re-add require.Nil(t, aige.RateLimit) when RateLimit returns to the API.
+		require.Nil(t, aige.Failover)
+		// Default FailureMode when pool.Spec.Processor is unset.
+		require.Equal(t, "closed", aige.Processor.FailureMode)
+		require.False(t, aige.Processor.BodyModelRouting)
+	})
+
+	t.Run("pool with routing.Fallback maps to InferenceGatewayFailover", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		pool.Spec.Routing = &v1alpha1.InferencePoolRouting{
+			Fallback: &v1alpha1.InferencePoolFallback{
+				RetryOn:       []string{"5xx", "reset"},
+				MaxTiers:      3,
+				PerTryTimeout: "30s",
+			},
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.NotNil(t, aige.Failover)
+		require.Equal(t, []string{"5xx", "reset"}, aige.Failover.RetryOn)
+		require.Equal(t, 3, aige.Failover.MaxTiers)
+		require.Equal(t, "30s", aige.Failover.PerTryTimeout)
+	})
+
+	t.Run("pool with routing but no Fallback leaves Failover nil", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		pool.Spec.Routing = &v1alpha1.InferencePoolRouting{
+			// MatchRules etc. are not surfaced on the config entry in the
+			// enterprise schema — routing lives in the catalog.
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.Nil(t, aige.Failover,
+			"Failover must be nil when Routing.Fallback is not set")
+	})
+
+	// TODO: Uncomment when capi.InferenceGatewayConfigEntry re-adds RateLimit.
+	// t.Run("pool with rate-limit maps all RateLimit fields", func(t *testing.T) {
+	// 	igw := minimalIGW("gw", "default", "pool")
+	// 	pool := enabledPool("pool", "default")
+	// 	pool.Spec.RateLimit = &v1alpha1.InferencePoolRateLimit{
+	// 		Enabled:     true,
+	// 		Enforcement: "deny",
+	// 		Mode:        "soft",
+	// 		CountMode:   "total",
+	// 		Dimensions:  []string{"tier", "global"},
+	// 		DegradeMode: "fail_closed",
+	// 		Default: &v1alpha1.InferencePoolLimitPair{
+	// 			Requests: &v1alpha1.InferencePoolLimit{Count: 100, Window: "minute"},
+	// 			Tokens:   &v1alpha1.InferencePoolLimit{Count: 50000, Window: "minute"},
+	// 		},
+	// 		TierLimits: []v1alpha1.InferencePoolTierLimit{
+	// 			{Tier: "premium", Requests: &v1alpha1.InferencePoolLimit{Count: 500, Window: "minute"}, MaxCompletionTokensCap: 4096},
+	// 		},
+	// 		TierBindings: []v1alpha1.InferencePoolTierBinding{
+	// 			{Tier: "premium", SPIFFEIDs: []string{"spiffe://dc1/ns/default/dc/dc1/svc/my-app"}},
+	// 		},
+	// 	}
+	// 	r := &InferenceGatewayController{Datacenter: "dc1"}
+	// 	entry := r.toConsulConfigEntry(igw, pool)
+	// 	aige := entry.(*capi.InferenceGatewayConfigEntry)
+	// 	require.NotNil(t, aige.RateLimit)
+	// 	require.True(t, aige.RateLimit.Enabled)
+	// 	require.Equal(t, "deny", aige.RateLimit.Enforcement)
+	// 	require.Equal(t, []string{"tier", "global"}, aige.RateLimit.Dimensions)
+	// 	require.Equal(t, 100, aige.RateLimit.Default.Requests.Count)
+	// 	require.Len(t, aige.RateLimit.TierLimits, 1)
+	// 	require.Len(t, aige.RateLimit.TierBindings, 1)
+	// })
+
+	t.Run("EnableConsulNamespaces=false does not set Namespace on entry", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+
+		r := &InferenceGatewayController{
+			Datacenter:             "dc1",
+			ConsulNamespace:        "my-ns",
+			EnableConsulNamespaces: false, // OSS mode
+		}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.Equal(t, "", aige.Namespace,
+			"OSS mode: entry.Namespace must be empty when EnableConsulNamespaces=false")
+	})
+
+	t.Run("EnableConsulNamespaces=true sets Namespace on entry", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+
+		r := &InferenceGatewayController{
+			Datacenter:             "dc1",
+			ConsulNamespace:        "my-ns",
+			EnableConsulNamespaces: true, // Enterprise mode
+		}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.Equal(t, "my-ns", aige.Namespace,
+			"Enterprise mode: entry.Namespace must be set when EnableConsulNamespaces=true")
+	})
+
+	t.Run("pool with Processor.FailureMode from pool.Spec.Processor", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		pool.Spec.Processor = &v1alpha1.InferencePoolProcessor{
+			FailureMode:      "open",
+			BodyModelRouting: true,
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.Equal(t, "open", aige.Processor.FailureMode)
+		require.True(t, aige.Processor.BodyModelRouting)
+	})
+
+	t.Run("pool without Observability leaves Observability nil", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.Nil(t, aige.Observability,
+			"Observability must be nil when pool.Spec.Observability is not set")
+	})
+
+	t.Run("pool with Observability.Metrics maps to capi.InferenceGatewayMetrics", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		enabled := true
+		pool.Spec.Observability = &v1alpha1.InferencePoolObservability{
+			Metrics: &v1alpha1.InferencePoolObservabilityMetrics{
+				Enabled:       &enabled,
+				SemconvSchema: "https://opentelemetry.io/schemas/1.21.0",
+				CustomLabels:  []string{"env=prod", "team=ai"},
+				Prometheus: &v1alpha1.InferencePoolObservabilityMetricsPrometheus{
+					Port: 9090,
+					Path: "/metrics",
+				},
+				OTLP: &v1alpha1.InferencePoolOTLPExport{
+					Endpoint: "http://otel-collector:4318",
+					Insecure: true,
+				},
+			},
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.NotNil(t, aige.Observability)
+		require.NotNil(t, aige.Observability.Metrics)
+		require.True(t, *aige.Observability.Metrics.Enabled)
+		// SemconvSchema and CustomLabels are not yet on capi.InferenceGatewayMetrics;
+		// they are dropped at the controller→API boundary until the API adds them.
+		require.NotNil(t, aige.Observability.Metrics.Prometheus)
+		require.Equal(t, 9090, *aige.Observability.Metrics.Prometheus.Port)
+		// Path is not on capi.InferenceGatewayMetricsPrometheus; always served on /metrics.
+		require.NotNil(t, aige.Observability.Metrics.OTLP)
+		require.Equal(t, "otel-collector:4318", aige.Observability.Metrics.OTLP.Endpoint)
+		require.True(t, aige.Observability.Metrics.OTLP.Insecure)
+		require.Nil(t, aige.Observability.Tracing)
+	})
+
+	t.Run("pool with Observability.Tracing maps to capi.InferenceGatewayTracing", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		pool.Spec.Observability = &v1alpha1.InferencePoolObservability{
+			Tracing: &v1alpha1.InferencePoolObservabilityTracing{
+				Enabled:     true,
+				SampleRatio: 0.01,
+				OTLP: &v1alpha1.InferencePoolOTLPExport{
+					Endpoint: "http://otel-collector:4317",
+					Insecure: false,
+				},
+			},
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.NotNil(t, aige.Observability)
+		require.NotNil(t, aige.Observability.Tracing)
+		require.True(t, aige.Observability.Tracing.Enabled)
+		require.Equal(t, 0.01, aige.Observability.Tracing.SampleRatio)
+		require.NotNil(t, aige.Observability.Tracing.OTLP)
+		// otlpHostPort strips the http:// scheme before writing to the Consul API.
+		require.Equal(t, "otel-collector:4317", aige.Observability.Tracing.OTLP.Endpoint)
+		require.False(t, aige.Observability.Tracing.OTLP.Insecure)
+		require.Nil(t, aige.Observability.Metrics)
+	})
+
+	t.Run("pool with both Observability pillars maps Metrics and Tracing", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		enabled := false
+		pool.Spec.Observability = &v1alpha1.InferencePoolObservability{
+			Metrics: &v1alpha1.InferencePoolObservabilityMetrics{
+				Enabled: &enabled,
+			},
+			Tracing: &v1alpha1.InferencePoolObservabilityTracing{
+				Enabled: true,
+			},
+		}
+
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
+
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.NotNil(t, aige.Observability)
+		require.NotNil(t, aige.Observability.Metrics)
+		require.False(t, *aige.Observability.Metrics.Enabled)
+		require.NotNil(t, aige.Observability.Tracing)
+		require.True(t, aige.Observability.Tracing.Enabled)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestNormaliseWindow — normaliseWindow covers every alias and edge case
+// ---------------------------------------------------------------------------
+
+func TestNormaliseWindow(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		input string
+		want  string
+	}{
+		// ── Already-canonical values pass through unchanged ──────────────────
+		{"second", "second"},
+		{"minute", "minute"},
+		{"hour", "hour"},
+		{"day", "day"},
+		// ── Go-duration shorthand (the bug: objects stored before the enum fix) ──
+		{"1s", "second"},
+		{"s", "second"},
+		{"1m", "minute"},
+		{"m", "minute"},
+		{"1h", "hour"},
+		{"h", "hour"},
+		{"1d", "day"},
+		{"d", "day"},
+		// ── Common English aliases ────────────────────────────────────────────
+		{"sec", "second"},
+		{"secs", "second"},
+		{"min", "minute"},
+		{"mins", "minute"},
+		{"hr", "hour"},
+		{"hrs", "hour"},
+		// ── Case-insensitive ─────────────────────────────────────────────────
+		{"MINUTE", "minute"},
+		{"Hour", "hour"},
+		{"1M", "minute"},
+		// ── Empty / unknown → Consul default (minute) ────────────────────────
+		{"", "minute"},
+		{"15m", "minute"}, // multi-digit duration string → fallback
+		{"forever", "minute"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			got := normaliseWindow(tc.input)
+			require.Equalf(t, tc.want, got,
+				"normaliseWindow(%q) = %q, want %q", tc.input, got, tc.want)
+		})
+	}
+}
+
+// TODO: uncomment TestToConsulLimit_NormaliseIntegration when RateLimit returns to the Consul API.
+// TestToConsulLimit_NormaliseIntegration verifies that toConsulLimit
+// normalises the Window field before it reaches Consul — the end-to-end
+// path that caused the HTTP 500.
+// func TestToConsulLimit_NormaliseIntegration(t *testing.T) {
+// 	t.Parallel()
+//
+// 	cases := []struct {
+// 		name      string
+// 		poolLimit v1alpha1.InferencePoolLimit
+// 		wantUnit  string
+// 	}{
+// 		{"canonical minute", v1alpha1.InferencePoolLimit{Count: 100, Window: "minute"}, "minute"},
+// 		{"legacy 1m", v1alpha1.InferencePoolLimit{Count: 100, Window: "1m"}, "minute"},
+// 		{"legacy 1h", v1alpha1.InferencePoolLimit{Count: 100, Window: "1h"}, "hour"},
+// 		{"legacy 1s", v1alpha1.InferencePoolLimit{Count: 100, Window: "1s"}, "second"},
+// 		{"empty defaults to minute", v1alpha1.InferencePoolLimit{Count: 100, Window: ""}, "minute"},
+// 	}
+//
+// 	for _, tc := range cases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			got := toConsulLimit(&tc.poolLimit)
+// 			require.NotNil(t, got)
+// 			require.Equal(t, tc.wantUnit, got.Unit,
+// 				"toConsulLimit window=%q → Unit should be %q, got %q",
+// 				tc.poolLimit.Window, tc.wantUnit, got.Unit)
+// 		})
+// 	}
+// }
+
+// ---------------------------------------------------------------------------
+// TestGatewaysForPool — pool → gateway mapper used by the Watches clause
+// ---------------------------------------------------------------------------
+
+func TestGatewaysForPool(t *testing.T) {
+	t.Parallel()
+
+	s := igwScheme(t)
+
+	t.Run("returns matching gateway in same namespace", func(t *testing.T) {
+		pool := enabledPool("my-pool", "default")
+		igw := minimalIGW("gw1", "default", "my-pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(igw).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		requests := r.gatewaysForPool(context.Background(), pool)
+
+		require.Len(t, requests, 1)
+		require.Equal(t, types.NamespacedName{Name: "gw1", Namespace: "default"}, requests[0].NamespacedName)
+	})
+
+	t.Run("returns multiple gateways that share the same pool", func(t *testing.T) {
+		pool := enabledPool("shared-pool", "default")
+		igw1 := minimalIGW("gw1", "default", "shared-pool")
+		igw2 := minimalIGW("gw2", "default", "shared-pool")
+		igw3 := minimalIGW("gw3", "default", "other-pool") // should NOT be returned
+
+		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(igw1, igw2, igw3).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		requests := r.gatewaysForPool(context.Background(), pool)
+
+		require.Len(t, requests, 2)
+		names := []string{requests[0].Name, requests[1].Name}
+		require.ElementsMatch(t, []string{"gw1", "gw2"}, names)
+	})
+
+	t.Run("returns nothing when no gateway references the pool", func(t *testing.T) {
+		pool := enabledPool("pool-x", "default")
+		igw := minimalIGW("gw1", "default", "pool-y")
+
+		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(igw).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		requests := r.gatewaysForPool(context.Background(), pool)
+
+		require.Empty(t, requests)
+	})
+
+	t.Run("ignores gateways in a different namespace", func(t *testing.T) {
+		pool := enabledPool("pool", "ns-a")
+		igw := minimalIGW("gw1", "ns-b", "pool") // same pool name, different namespace
+
+		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(igw).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		requests := r.gatewaysForPool(context.Background(), pool)
+
+		require.Empty(t, requests)
+	})
+
+	t.Run("wrong object type returns nil", func(t *testing.T) {
+		fakeClient := fake.NewClientBuilder().WithScheme(s).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		// Pass a non-InferencePoolConfig object — mapper must return nil safely.
+		requests := r.gatewaysForPool(context.Background(), &v1alpha1.InferenceGateway{})
+
+		require.Nil(t, requests)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_Resources — container resource resolution
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_Resources(t *testing.T) {
+	t.Parallel()
+
+	parseQty := func(s string) resource.Quantity {
+		q, err := resource.ParseQuantity(s)
+		if err != nil {
+			t.Fatalf("invalid quantity %q: %v", s, err)
+		}
+		return q
+	}
+
+	t.Run("DefaultResources applied when spec.resources is nil", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.DefaultResources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    parseQty("250m"),
+				corev1.ResourceMemory: parseQty("128Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    parseQty("500m"),
+				corev1.ResourceMemory: parseQty("256Mi"),
+			},
+		}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		// Resources are applied to the inference-gateway ext_proc sidecar (index 1).
+		res := dep.Spec.Template.Spec.Containers[1].Resources
+		require.Equal(t, parseQty("250m"), res.Requests[corev1.ResourceCPU])
+		require.Equal(t, parseQty("128Mi"), res.Requests[corev1.ResourceMemory])
+		require.Equal(t, parseQty("500m"), res.Limits[corev1.ResourceCPU])
+		require.Equal(t, parseQty("256Mi"), res.Limits[corev1.ResourceMemory])
+	})
+
+	t.Run("spec.resources overrides DefaultResources", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.Spec.Resources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: parseQty("512Mi"),
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.DefaultResources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: parseQty("128Mi"),
+			},
+		}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		// Resources are applied to the inference-gateway ext_proc sidecar (index 1).
+		res := dep.Spec.Template.Spec.Containers[1].Resources
+		require.Equal(t, parseQty("512Mi"), res.Requests[corev1.ResourceMemory],
+			"spec.resources must win over DefaultResources")
+	})
+
+	t.Run("zero DefaultResources leaves container resources empty", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		// DefaultResources left as zero value.
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		// Resources are applied to the inference-gateway ext_proc sidecar (index 1).
+		res := dep.Spec.Template.Spec.Containers[1].Resources
+		require.Empty(t, res.Requests, "no requests when both DefaultResources and spec.resources are zero")
+		require.Empty(t, res.Limits, "no limits when both DefaultResources and spec.resources are zero")
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_Service — Service port/type resolution
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_Service(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DefaultService applied when spec.service is nil", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.DefaultService = v1alpha1.InferenceGatewayService{
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []v1alpha1.InferenceGatewayServicePort{{Port: 8443}},
+		}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+		require.Equal(t, int32(8443), svc.Spec.Ports[0].Port)
+	})
+
+	t.Run("spec.service overrides DefaultService", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.Spec.Service = &v1alpha1.InferenceGatewayService{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []v1alpha1.InferenceGatewayServicePort{{Port: 9443}},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.DefaultService = v1alpha1.InferenceGatewayService{
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []v1alpha1.InferenceGatewayServicePort{{Port: 8443}},
+		}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Equal(t, corev1.ServiceTypeLoadBalancer, svc.Spec.Type,
+			"spec.service.type must win over DefaultService")
+		require.Equal(t, int32(9443), svc.Spec.Ports[0].Port,
+			"spec.service.ports must win over DefaultService")
+	})
+
+	t.Run("zero DefaultService falls back to inferenceGatewayServicePort constant", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		// DefaultService left as zero value (no ports, no type).
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+		require.Equal(t, inferenceGatewayServicePort, svc.Spec.Ports[0].Port)
+	})
+
+	t.Run("multiple ports in spec.service are all rendered on the Service", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.Spec.Service = &v1alpha1.InferenceGatewayService{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []v1alpha1.InferenceGatewayServicePort{
+				{Port: 9000},
+				{Port: 9001},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		_, err := igwController(t, fakeClient, consulCfg, watcher).Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Len(t, svc.Spec.Ports, 2)
+		require.Equal(t, int32(9000), svc.Spec.Ports[0].Port)
+		require.Equal(t, int32(9001), svc.Spec.Ports[1].Port)
+		require.Equal(t, "grpc", svc.Spec.Ports[0].Name)
+		require.Equal(t, "grpc-1", svc.Spec.Ports[1].Name)
+	})
+}

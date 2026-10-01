@@ -38,6 +38,12 @@ const (
 	// service is registered.
 	AnnotationMeshGatewayContainerPort = "consul.hashicorp.com/mesh-gateway-container-port"
 
+	// AnnotationInferenceGatewayPort is the Consul catalog service port for an
+	// inference-gateway pod. Stamped by InferenceGatewayController from
+	// spec.service.ports[0] (defaulting to 8443) so createGatewayRegistrations
+	// can read the correct port from the pod without accessing the CRD.
+	AnnotationInferenceGatewayPort = "consul.hashicorp.com/inference-gateway-port"
+
 	// AnnotationGatewayWANSource is the key of the annotation that determines which
 	// source to use to determine the wan address and wan port for the mesh-gateway
 	// service registration.
@@ -202,8 +208,8 @@ const (
 	// to point to the Envoy proxy when running in Transparent Proxy mode.
 	AnnotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
-	// AnnotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
-	// iptables rules.
+	// AnnotationRedirectTraffic stores nftables.Config information so that the CNI plugin can use it to apply
+	// nft traffic redirection rules.
 	AnnotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
 	// AnnotationDualStack stores if pod need to run in dualstack mode.
@@ -236,6 +242,76 @@ const (
 	// Collector. If this is set, during connect-inject, the endpoints-controller ensures the deployed Namespace exists in Consul and create it if it does not.
 	// This is only meant to be used by Deployment/consul-telemetry-collector.
 	LabelTelemetryCollector = "consul.hashicorp.com/telemetry-collector"
+
+	// AnnotationAIRole is the key of the annotation that identifies the AI role of a pod.
+	// When set to "mcp-server", the webhook injects the MCP server sidecar container.
+	AnnotationAIRole = "consul.hashicorp.com/ai-role"
+
+	// AnnotationAIAgentConfig selects the AgentConfig resource used for pod defaults.
+	// The resource is resolved in the pod's namespace.
+	AnnotationAIAgentConfig = "consul.hashicorp.com/ai-agent-config"
+
+	// AnnotationAIMCPServerPort overrides the MCP interceptor port for a specific pod.
+	// Falls back to McpServerConfig CRD defaults when not set.
+	AnnotationAIMCPServerPort = "consul.hashicorp.com/ai-mcp-server-interceptor-port"
+
+	// AnnotationAIMCPServerTransport overrides the MCP wire transport for a specific pod.
+	// Falls back to McpServerConfig CRD defaults when not set.
+	AnnotationAIMCPServerTransport = "consul.hashicorp.com/ai-mcp-server-transport"
+
+	// AnnotationAIMCPServerPath overrides the MCP HTTP path for a specific pod.
+	// Falls back to McpServerConfig CRD defaults when not set.
+	AnnotationAIMCPServerPath = "consul.hashicorp.com/ai-mcp-server-path"
+
+	// AnnotationAIMCPServerProtocolVersion overrides the MCP protocol version for a specific pod.
+	// Falls back to McpServerConfig CRD defaults when not set.
+	AnnotationAIMCPServerProtocolVersion = "consul.hashicorp.com/ai-mcp-server-protocol-version"
+
+	// AnnotationAIAgentInterceptorPort overrides the agent interceptor port for a specific pod.
+	// Falls back to AgentConfig CRD defaults when not set.
+	AnnotationAIAgentInterceptorPort = "consul.hashicorp.com/ai-agent-interceptor-port"
+
+	// AnnotationAIAgentMCPPort overrides the agent MCP connectivity port for a specific pod.
+	// Falls back to AgentConfig CRD defaults when not set.
+	AnnotationAIAgentMCPPort = "consul.hashicorp.com/ai-agent-mcp-port"
+
+	// AnnotationAIAgentHITLPort overrides the HITL approval server port for a specific pod.
+	// Falls back to AgentConfig CRD defaults when not set.
+	AnnotationAIAgentHITLPort = "consul.hashicorp.com/ai-agent-hitl-port"
+
+	// AnnotationAIAgentHITLApprovalTimeout overrides the HITL approval timeout for a specific pod.
+	// Falls back to AgentConfig CRD defaults when not set.
+	AnnotationAIAgentHITLApprovalTimeout = "consul.hashicorp.com/ai-agent-hitl-approval-timeout"
+
+	// AnnotationAIAgentAddr overrides the TCP address consul-mcp-gateway listens on when
+	// --socket is not used. Defaults to :21101 per the binary's built-in default.
+	// Only useful in local development or environments where a shared UDS volume is unavailable.
+	// Maps to the --addr flag on consul-mcp-gateway.
+	// e.g. consul.hashicorp.com/ai-agent-addr: ":21200".
+	AnnotationAIAgentAddr = "consul.hashicorp.com/ai-agent-addr"
+
+	// AnnotationAIAgentChildBinary sets the path to a child binary supervised by consul-mcp-gateway.
+	// When set, the mcp-gateway container launches this binary alongside the ext_proc server
+	// with a shared lifecycle. Maps to the --child flag on consul-mcp-gateway.
+	// e.g. consul.hashicorp.com/ai-agent-child-binary: "/app/consul-ai-agent".
+	AnnotationAIAgentChildBinary = "consul.hashicorp.com/ai-agent-child-binary"
+
+	// AnnotationAIAgentChildArgs passes space-separated arguments to the child binary.
+	// Only used when AnnotationAIAgentChildBinary is also set.
+	// Maps to the --child-args flag on consul-mcp-gateway.
+	// e.g. consul.hashicorp.com/ai-agent-child-args: "--port=8080 --log-level=debug".
+	AnnotationAIAgentChildArgs = "consul.hashicorp.com/ai-agent-child-args"
+
+	// AnnotationAIInferenceModelProtocol sets the wire protocol for an inference-model
+	// service registration. Valid values: openai | anthropic | passthrough.
+	// Stamped on the Consul service's AI.InferenceModel.Protocol field.
+	// e.g. consul.hashicorp.com/ai-inference-model-protocol: "openai".
+	AnnotationAIInferenceModelProtocol = "consul.hashicorp.com/ai-inference-model-protocol"
+
+	// AnnotationAIInferenceModelPath sets the base URL path for an inference-model
+	// service registration (e.g. "/v1"). Stamped on AI.InferenceModel.Path.
+	// e.g. consul.hashicorp.com/ai-inference-model-path: "/v1".
+	AnnotationAIInferenceModelPath = "consul.hashicorp.com/ai-inference-model-path"
 
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	Injected = "injected"

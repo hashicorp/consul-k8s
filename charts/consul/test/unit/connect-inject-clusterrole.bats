@@ -42,37 +42,49 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[2]' | tee /dev/stderr)
+      yq -r '.rules[] | select(
+        .apiGroups[0] == "" and
+        (.resources | contains(["secrets"])) and
+        (.resources | contains(["serviceaccounts"]))
+      )' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.resources[| index("secrets")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["secrets"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.resources[| index("serviceaccounts")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["serviceaccounts"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.resources[| index("services")' | tee /dev/stderr)
-  [ "${actual}" != null ]
-
-  local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
+  local actual=$(echo "$object" | yq -r '.apiGroups[0]' | tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("get")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["get"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("list")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["list"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("watch")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["watch"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("delete")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["delete"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("create")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["create"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("update")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["update"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'global.enabled=false' \
+      --set 'client.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | yq -r '.rules[] | select(
+        .apiGroups[0] == "" and
+        (.resources | contains(["services"]))
+      ) | .verbs | contains(["create", "delete", "get", "list", "update", "watch"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/ClusterRole: sets get, list, and watch access to endpoints, namespaces and nodes in core api group" {
@@ -83,28 +95,33 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[3]' | tee /dev/stderr)
+      yq -r '.rules[] | select(
+        .apiGroups[0] == "" and
+        (.resources | contains(["endpoints"])) and
+        (.resources | contains(["namespaces"])) and
+        (.resources | contains(["nodes"]))
+      )' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.resources[| index("endpoints")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["endpoints"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.resources[| index("namespaces")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["namespaces"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.resources[| index("nodes")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["nodes"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
+  local actual=$(echo "$object" | yq -r '.apiGroups[0]' | tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("get")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["get"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("list")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["list"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("watch")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["watch"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/ClusterRole: sets get, list, watch and update access to pods in all api groups" {
@@ -115,25 +132,28 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[5]' | tee /dev/stderr)
+      yq -r '.rules[] | select(
+        .apiGroups[0] == "" and
+        (.resources | contains(["pods"]))
+      )' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.resources[| index("pods")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["pods"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
+  local actual=$(echo "$object" | yq -r '.apiGroups[0]' | tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("get")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["get"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("list")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["list"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("watch")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["watch"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("update")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["update"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/ClusterRole: sets create, get, list, and update access to leases in the coordination.k8s.io api group" {
@@ -144,25 +164,28 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[6]' | tee /dev/stderr)
+      yq -r '.rules[] | select(
+        .apiGroups[0] == "coordination.k8s.io" and
+        (.resources | contains(["leases"]))
+      )' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.resources[| index("leases")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["leases"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
+  local actual=$(echo "$object" | yq -r '.apiGroups[0]' | tee /dev/stderr)
   [ "${actual}" = "coordination.k8s.io" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("create")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["create"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("get")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["get"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("list")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["list"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("update")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["update"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/ClusterRole: sets get access to serviceaccounts and secrets when manageSystemACLSis true" {
@@ -174,19 +197,23 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[2]' | tee /dev/stderr)
+      yq -r '.rules[] | select(
+        .apiGroups[0] == "" and
+        (.resources | contains(["secrets"])) and
+        (.resources | contains(["serviceaccounts"]))
+      )' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.resources[| index("serviceaccounts")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["serviceaccounts"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.resources[| index("secrets")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.resources | contains(["secrets"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
+  local actual=$(echo "$object" | yq -r '.apiGroups[0]' | tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("get")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["get"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -235,25 +262,28 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       . | tee /dev/stderr |
-      yq -r '.rules[7]' | tee /dev/stderr)
+      yq -r '.rules[] | select(
+        .apiGroups[0] == "admissionregistration.k8s.io" and
+        (.resources | contains(["mutatingwebhookconfigurations"]))
+      )' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.resources[0]' | tee /dev/stderr)
+  local actual=$(echo "$object" | yq -r '.resources[0]' | tee /dev/stderr)
   [ "${actual}" = "mutatingwebhookconfigurations" ]
 
-  local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
+  local actual=$(echo "$object" | yq -r '.apiGroups[0]' | tee /dev/stderr)
   [ "${actual}" = "admissionregistration.k8s.io" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("get")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["get"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("list")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["list"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("patch")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["patch"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | yq -r '.verbs | index("watch")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+  local actual=$(echo "$object" | yq -r '.verbs | contains(["watch"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -265,8 +295,8 @@ load _helpers
       -s templates/connect-inject-clusterrole.yaml  \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[] | select(.apiGroups[] == "security.openshift.io" and .resources[] == "securitycontextconstraints") | .resourceNames | index("restricted-v2")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+      yq -r '.rules[] | select(.apiGroups[] == "security.openshift.io" and .resources[] == "securitycontextconstraints") | .resourceNames | contains(["restricted-v2"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "connectInject/ClusterRole: adds permission to securitycontextconstraints for Openshift with global.openshift.enabled=true and sets apiGateway Openshift SCC Name" {
@@ -276,6 +306,6 @@ load _helpers
       --set 'global.openshift.enabled=true' \
       --set 'connectInject.apiGateway.managedGatewayClass.openshiftSCCName=fakescc' \
       . | tee /dev/stderr |
-      yq -r '.rules[] | select(.apiGroups[] == "security.openshift.io" and .resources[] == "securitycontextconstraints") | .resourceNames | index("fakescc")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+      yq -r '.rules[] | select(.apiGroups[] == "security.openshift.io" and .resources[] == "securitycontextconstraints") | .resourceNames | contains(["fakescc"])' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }

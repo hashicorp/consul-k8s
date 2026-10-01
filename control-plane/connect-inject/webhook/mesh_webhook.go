@@ -23,8 +23,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -57,6 +59,10 @@ var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.Name
 
 // MeshWebhook is the HTTP meshWebhook for admission webhooks.
 type MeshWebhook struct {
+	// Client is the controller-runtime client used to look up AI config CRDs
+	// (AgentConfig, McpServerConfig) at admission time.
+	client.Client
+
 	Clientset kubernetes.Interface
 
 	// ConsulConfig is the config to create a Consul API client.
@@ -75,6 +81,33 @@ type MeshWebhook struct {
 	// ImageConsulK8S is the container image for consul-k8s to use.
 	// This image is used for the consul-sidecar container.
 	ImageConsulK8S string
+
+	// ImageMCPServer is the container image for the MCP server sidecar.
+	// When set and a pod carries the consul.hashicorp.com/ai-role: "mcp-server"
+	// annotation, the webhook injects this image as an additional sidecar.
+	ImageMCPServer string
+
+	// ImageAIAgent is the container image for the AI agent sidecar.
+	// When set and a pod carries the consul.hashicorp.com/ai-role: "ai-agent"
+	// annotation, the webhook injects this image as an additional sidecar.
+	ImageAIAgent string
+
+	// ImageConsulOBOInbound is the container image for consul-obo-inbound.
+	// Injected into ai-agent pods for inbound JWT verify + claim projection
+	// (ext_proc on loopback :21102). Required when IsAIAgent — no silent fallback.
+	ImageConsulOBOInbound string
+
+	// ImageConsulOBOOutbound is the container image for consul-obo-outbound.
+	// Injected into ai-agent pods for outbound RFC 8693 OBO exchange
+	// (ext_proc on loopback :21103). Required when IsAIAgent — no silent fallback.
+	ImageConsulOBOOutbound string
+
+	// EnableOBO controls whether the OBO identity-plane sidecars
+	// (consul-obo-inbound and consul-obo-outbound) are injected into
+	// ai-role=ai-agent pods. Set to false to run without an IBM Verify
+	// tenant (e.g. local dev / playground). Mirrors ai.obo.enabled in
+	// values.yaml.
+	EnableOBO bool
 
 	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	GlobalImagePullPolicy string
@@ -371,10 +404,28 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		w.Log.Error(err, "unable to get consul-dataplane as sidecar container in kubernetes enabled status")
 	}
 
+	// OBO must run as the dataplane process. Record the IDs from the container
+	// this webhook just built, not from a name scan: an application container
+	// such as consul-dataplane-metrics would otherwise match first.
+	var dataplaneRunAsUser, dataplaneRunAsGroup int64
+	haveDataplaneRunAs := false
+	recordDataplaneRunAs := func(c corev1.Container) error {
+		if haveDataplaneRunAs {
+			return nil
+		}
+		uid, group, runAsErr := dataplaneContainerRunAs(c)
+		if runAsErr != nil {
+			return runAsErr
+		}
+		dataplaneRunAsUser, dataplaneRunAsGroup = uid, group
+		haveDataplaneRunAs = true
+		return nil
+	}
+
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
-		initContainer, err := w.containerInit(*ns, pod, multiPortInfo{})
+		initContainer, err := w.containerInit(ctx, *ns, pod, multiPortInfo{})
 		if err != nil {
 			w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -386,6 +437,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		if err != nil {
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
+		}
+		if err := recordDataplaneRunAs(envoySidecar); err != nil {
+			w.Log.Error(err, "error reading consul-dataplane runAs", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error reading consul-dataplane runAs: %s", err))
 		}
 		//Append the Envoy sidecar before the application container only if lifecycle enabled.
 		if lifecycleEnabled && !consulDataplaneSidecarEnabled && ok == nil {
@@ -468,7 +523,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			}
 
 			// Add the init container that registers the service and sets up the Envoy configuration.
-			initContainer, err := w.containerInit(*ns, pod, mpi)
+			initContainer, err := w.containerInit(ctx, *ns, pod, mpi)
 			if err != nil {
 				w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -480,6 +535,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			if err != nil {
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
+			}
+			if err := recordDataplaneRunAs(envoySidecar); err != nil {
+				w.Log.Error(err, "error reading consul-dataplane runAs", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error reading consul-dataplane runAs: %s", err))
 			}
 			// If Lifecycle is enabled, add to the list of sidecar containers to be added
 			// to pod containers at the end in order to preserve relative ordering.
@@ -496,6 +555,68 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		//Add sidecar containers first if lifecycle enabled.
 		if lifecycleEnabled {
 			pod.Spec.Containers = append(sidecarContainers, pod.Spec.Containers...)
+		}
+	}
+
+	// ai-agent pods get the ai-agent sidecar and the OBO identity-plane sidecars.
+	if common.IsAIAgent(pod) {
+		if w.ImageAIAgent != "" {
+			// Port and resource defaults are resolved with a 3-level precedence:
+			//   1. consul.hashicorp.com/ai-agent-config annotation — names a custom
+			//      AgentConfig object; use when a team needs settings that differ
+			//      from the cluster default.
+			//   2. "consul-ai-agent" AgentConfig object — the cluster-wide default
+			//      installed by Helm; always present when ai.enabled=true.
+			//   3. Per-pod annotations (e.g. consul.hashicorp.com/ai-agent-hitl-port)
+			//      override individual ports after the CRD defaults are resolved.
+			agentDefaults := v1alpha1.AgentDefaults{}
+			if w.Client != nil {
+				// Determine which AgentConfig object to read.
+				// Falls back to the Helm-installed "consul-ai-agent" when the
+				// per-pod annotation is absent.
+				configName := "consul-ai-agent"
+				if annotationName := pod.Annotations[constants.AnnotationAIAgentConfig]; annotationName != "" {
+					configName = annotationName
+				}
+
+				var agentCfg v1alpha1.AgentConfig
+				if err := w.Client.Get(ctx, client.ObjectKey{Name: configName}, &agentCfg); err == nil {
+					agentDefaults = agentCfg.Spec.Defaults
+				} else {
+					w.Log.Info("AgentConfig not found, continuing with zero defaults; per-pod annotations or built-in constants will apply",
+						"name", configName)
+				}
+			}
+			agentDefaults, err = common.ResolveAIAgentDefaults(pod, agentDefaults)
+			if err != nil {
+				w.Log.Error(err, "invalid AI agent annotation", "request name", req.Name)
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			agentContainer := w.aiAgentSidecar(pod, agentDefaults)
+			pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
+		}
+
+		if w.EnableOBO {
+			if !haveDataplaneRunAs {
+				err := fmt.Errorf("consul-dataplane container not found; cannot assign OBO runAsUser")
+				w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError, err)
+			}
+			oboInbound, err := w.oboInboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
+			if err != nil {
+				w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError,
+					fmt.Errorf("error configuring consul-obo-inbound container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
+
+			oboOutbound, err := w.oboOutboundSidecar(dataplaneRunAsUser, dataplaneRunAsGroup)
+			if err != nil {
+				w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError,
+					fmt.Errorf("error configuring consul-obo-outbound container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, oboOutbound)
 		}
 	}
 
@@ -555,7 +676,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
 	}
 
-	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
+	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the traffic redirection config so that the CNI
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
 		if err = w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
@@ -627,7 +748,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	}
 
 	if tproxyEnabled && overwriteProbes {
-		// We don't use the loop index because this needs to line up w.withiptablesConfigJSON,
+		// We don't use the loop index because this needs to line up w.nftablesConfigJSON,
 		// which is performed before the sidecar is injected.
 		idx := 0
 		for _, container := range pod.Spec.Containers {
@@ -696,6 +817,16 @@ func (w *MeshWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, erro
 	// all other checks.
 	if raw, ok := pod.Annotations[constants.AnnotationInject]; ok {
 		return strconv.ParseBool(raw)
+	}
+
+	// A pod annotated with an ai-role implicitly opts in to injection so that a
+	// single annotation is sufficient to get consul-dataplane + the role sidecar
+	// — no need to also set connect-inject: "true".
+	if role, ok := pod.Annotations[constants.AnnotationAIRole]; ok {
+		switch role {
+		case "mcp-server", "ai-agent", "inference-gateway":
+			return true, nil
+		}
 	}
 
 	return !w.RequireAnnotation, nil
@@ -896,7 +1027,7 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 	if err != nil {
 		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
 	}
-	if isAIAgent(pod) {
+	if common.IsAIAgent(pod) {
 		return fmt.Errorf("ai-agent role is not supported on multi-port pods")
 	}
 	if tproxyEnabled {
@@ -912,6 +1043,7 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 }
 
 func (w *MeshWebhook) SetupWithManager(mgr ctrl.Manager) {
+	w.Client = mgr.GetClient()
 	w.decoder = admission.NewDecoder(mgr.GetScheme())
 	mgr.GetWebhookServer().Register("/mutate", &admission.Webhook{Handler: w})
 }

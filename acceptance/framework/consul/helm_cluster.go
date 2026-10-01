@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -161,6 +161,9 @@ func NewHelmClusterFromReleasedChart(
 		}
 	}
 	cluster.helmOptions.Version = chartVersion
+	cluster.helmOptions.ExtraArgs["upgrade"] = append(
+		cluster.helmOptions.ExtraArgs["upgrade"], "--version", chartVersion,
+	)
 	return cluster
 }
 
@@ -182,7 +185,21 @@ func (h *HelmCluster) UpgradeToLocalChart(t *testing.T, helmValues map[string]st
 		}
 	}
 	h.helmOptions.Version = config.HelmChartPath
+	h.removeReleasedChartVersion()
 	h.Upgrade(t, helmValues)
+}
+
+func (h *HelmCluster) removeReleasedChartVersion() {
+	args := h.helmOptions.ExtraArgs["upgrade"]
+	filtered := args[:0]
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--version" && i+1 < len(args) {
+			i++
+			continue
+		}
+		filtered = append(filtered, args[i])
+	}
+	h.helmOptions.ExtraArgs["upgrade"] = filtered
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
@@ -258,9 +275,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Forcibly delete all gateway classes and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
 
-	var gatewayClassList gwv1beta1.GatewayClassList
+	var gatewayClassList gwv1.GatewayClassList
 	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
 	}) == nil {

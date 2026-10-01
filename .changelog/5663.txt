@@ -1,0 +1,4 @@
+```release-note:feature
+connect-inject: Support for ai-crds, ai agent and inference gtw
+connect-inject: For ai-role=ai-agent pods, inject consul-obo-inbound/outbound with envelope+broker UDS and enable dataplane -credential-broker-bind-addr. Gated on ai.role (not oauth_client). from pr 5662
+```

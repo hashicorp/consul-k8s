@@ -87,33 +87,49 @@ const (
 	TLSServerNameEnvVar   = "CONSUL_TLS_SERVER_NAME"
 	ConsulDualStackEnvVar = "CONSUL_DUAL_STACK"
 
-	// AI agent role and container name constants.
+	// AI agent role and port constants.
 
 	// AIAgentRole is the expected value of AnnotationAIRole for an AI agent workload.
+	// The webhook injects the mcp-gateway + OBO sidecars and the endpoints controller
+	// stamps the AI block on the Consul catalog registration for pods with this role.
 	AIAgentRole = "ai-agent"
 
-	// AIContainerName is the injected container name for the consul-mcp-gateway sidecar.
-	AIContainerName = "consul-mcp-gateway"
+	// DefaultAIMCPPort is the loopback port the mcp-gateway outbound listener binds
+	// to inside the pod (ai.agent.mcp.port in the Consul service registration).
+	DefaultAIMCPPort = 15101
 
-	// DefaultAIMCPOutboundPort is the loopback port the mcp-gateway dedicated outbound
-	// listener binds to (maps to ai.agent.mcp.port in the service definition).
-	DefaultAIMCPOutboundPort = 15101
-
-	// DefaultAIHITLPort is the loopback port the agent HTTP server listens on for
-	// human-in-the-loop approval callbacks (ai.agent.mcp.hitl.port).
+	// DefaultAIHITLPort is the loopback port the mcp-gateway HTTP server listens on
+	// for human-in-the-loop approval callbacks (ai.agent.mcp.hitl.port).
 	DefaultAIHITLPort = 16101
 
-	// DefaultAIInterceptorPort is the loopback port the mcp-gateway interceptor proxy
-	// binds to (ai.agent.interceptor.port).
+	// DefaultAIInterceptorPort is the loopback port the governance interceptor proxy
+	// binds to for inbound MCP traffic inspection (ai.agent.interceptor.port).
 	DefaultAIInterceptorPort = 21101
 
-	// DefaultGatewayBinary is the path to the consul-mcp-gateway binary inside the
-	// consul-mcp-gateway image, used as the -gateway-binary argument.
-	DefaultGatewayBinary = "/app/consul-mcp-gateway"
-	// ConsulBinarypath is the path to the consulbinary inside the
-	// consul-mcp-gateway image.
-	ConsulBinarypath = "/app/consul"
+	// ConsulOBOInboundContainerName is the injected container name for consul-obo-inbound.
+	ConsulOBOInboundContainerName = "consul-obo-inbound"
 
+	// ConsulOBOOutboundContainerName is the injected container name for consul-obo-outbound.
+	ConsulOBOOutboundContainerName = "consul-obo-outbound"
+
+	// DefaultOBOInboundPort is the loopback port for consul-obo-inbound ext_proc
+	// (inbound JWT verify + claim projection). Must not collide with
+	// DefaultAIInterceptorPort (21101).
+	DefaultOBOInboundPort = 21102
+
+	// DefaultOBOOutboundPort is the loopback port for consul-obo-outbound ext_proc
+	// (RFC 8693 OBO exchange). Must not collide with 21101 or 21102.
+	DefaultOBOOutboundPort = 21103
+
+	// DefaultOBOInboundBinary is the path to consul-obo-inbound inside its image.
+	DefaultOBOInboundBinary = "/usr/local/bin/consul-obo-inbound"
+
+	// DefaultOBOOutboundBinary is the path to consul-obo-outbound inside its image.
+	DefaultOBOOutboundBinary = "/usr/local/bin/consul-obo-outbound"
+
+	// DefaultEnvoyAdminPort is the loopback port for Envoy admin (/ready) that
+	// OBO sidecars poll before opening the envelope UDS.
+	DefaultEnvoyAdminPort = 19000
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace
