@@ -98,9 +98,9 @@ spec:
             - name: config
               mountPath: /consul/config
               readOnly: true
-      {{- if .Values.global.acls.tolerations }}
+      {{- if .Values.connectInject.apiGateway.managedGatewayClass.resourceJob.tolerations }}
       tolerations:
-        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+        {{ tpl .Values.connectInject.apiGateway.managedGatewayClass.resourceJob.tolerations . | indent 8 | trim }}
       {{- end }}
       volumes:
         - name: config

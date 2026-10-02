@@ -122,6 +122,14 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+      {{- if .Values.global.tls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.tls.tolerations . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.global.tls.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.global.tls.nodeSelector . | indent 8 | trim }}
+      {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
