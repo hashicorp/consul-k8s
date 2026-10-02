@@ -107,7 +107,11 @@ func (c *Command) updateOrCreateACLRole(client *consul.DynamicClient, role *api.
 				return err
 			}
 			if aclRole != nil {
-				_, _, err := client.ConsulClient.ACL().RoleUpdate(aclRole, &api.WriteOptions{})
+				// Copy the existing ID onto the desired role so the update targets the
+				// correct record. Use `role` (the desired state) rather than `aclRole`
+				// (the stale read) so new policy assignments are actually applied.
+				role.ID = aclRole.ID
+				_, _, err := client.ConsulClient.ACL().RoleUpdate(role, &api.WriteOptions{})
 				if err != nil {
 					c.log.Error("unable to update role", err)
 					return err
