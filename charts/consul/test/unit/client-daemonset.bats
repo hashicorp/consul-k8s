@@ -1254,6 +1254,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'client.extraEnvironmentVars.custom_proxy=fakeproxy' \
       --set 'client.extraEnvironmentVars.no_proxy=custom_no_proxy' \
+      --set "client.extraEnvironmentVars.from_annotations.fieldRef.fieldPath=metadata.annotations['foo']" \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
 
@@ -1264,6 +1265,10 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.[] | select(.name=="no_proxy").value' | tee /dev/stderr)
   [ "${actual}" = "custom_no_proxy" ]
+
+  local actual=$(echo $object |
+      yq -r '.[] | select(.name=="from_annotations").valueFrom.fieldRef.fieldPath' | tee /dev/stderr)
+  [ "${actual}" = "metadata.annotations['foo']" ]
 }
 
 #--------------------------------------------------------------------
