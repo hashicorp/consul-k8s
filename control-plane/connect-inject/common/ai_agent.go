@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -173,23 +172,24 @@ func ResolveAIAgentDefaults(pod corev1.Pod, defaults v1alpha1.AgentDefaults) (v1
 	return defaults, nil
 }
 
-// ValidateAIAgentAddress validates the optional MCP TCP listener override.
-// Kubernetes TCP probes connect through the pod IP, so the listener must bind
-// all pod interfaces rather than a loopback or interface-specific address.
+// ValidateAIAgentAddress validates the optional MCP TCP listener override and
+// returns its port. Only the port is used: the ext_proc listener is
+// unauthenticated, so it always binds 127.0.0.1, which is where Envoy dials
+// it. The host may be empty or loopback; any other host is rejected.
 func ValidateAIAgentAddress(pod corev1.Pod, interceptorPort int32) (int32, bool, error) {
 	addr := pod.Annotations[constants.AnnotationAIAgentAddr]
 	if addr == "" {
 		return 0, false, nil
 	}
-	if !strings.HasPrefix(addr, ":") {
+	host, portValue, err := net.SplitHostPort(addr)
+	if err != nil {
 		return 0, false, fmt.Errorf(
-			"invalid %s %q: must use wildcard listener format :port",
+			"invalid %s %q: must use :port or a loopback host:port",
 			constants.AnnotationAIAgentAddr, addr)
 	}
-	host, portValue, err := net.SplitHostPort(addr)
-	if err != nil || host != "" {
+	if ip := net.ParseIP(host); host != "" && (ip == nil || !ip.IsLoopback()) {
 		return 0, false, fmt.Errorf(
-			"invalid %s %q: must use wildcard listener format :port",
+			"invalid %s %q: host must be empty or loopback; the listener always binds 127.0.0.1",
 			constants.AnnotationAIAgentAddr, addr)
 	}
 	port, err := strconv.ParseInt(portValue, 10, 32)

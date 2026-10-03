@@ -47,28 +47,35 @@ func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 		require.Contains(t, c.Args, "--envelope-uds=/consul/connect-inject/oauth-envelope.sock")
 		require.Contains(t, c.Args, "--broker-uds=/consul/connect-inject/credential-broker.sock")
 		require.Contains(t, c.Args, "--dataplane-ready-url=http://127.0.0.1:19000/ready")
-		require.Contains(t, c.Args, "--obo-inbound-addr=:21102")
-		require.Contains(t, c.Args, "--obo-outbound-addr=:21103")
+		require.Contains(t, c.Args, "--obo-inbound-addr=127.0.0.1:21102")
+		require.Contains(t, c.Args, "--obo-outbound-addr=127.0.0.1:21103")
 		require.Contains(t, c.Args, "--mcp-socket="+mcpGatewayUDSPath)
 		require.Equal(t, []string{defaultMCPScBinary}, c.Command)
 		require.NotNil(t, c.StartupProbe)
 		require.NotNil(t, c.StartupProbe.Exec)
-		require.Equal(t, []string{"test", "-S", mcpGatewayUDSPath}, c.StartupProbe.Exec.Command)
+		require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=mcp",
+			"--mcp-socket=" + mcpGatewayUDSPath}, c.StartupProbe.Exec.Command)
 		require.NotNil(t, c.ReadinessProbe)
-		require.NotNil(t, c.ReadinessProbe.TCPSocket)
-		require.Equal(t, int32(constants.DefaultOBOOutboundPort), c.ReadinessProbe.TCPSocket.Port.IntVal)
+		require.NotNil(t, c.ReadinessProbe.Exec)
+		require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=agent",
+			"--obo-inbound-addr=127.0.0.1:21102",
+			"--obo-outbound-addr=127.0.0.1:21103",
+			"--mcp-socket=" + mcpGatewayUDSPath}, c.ReadinessProbe.Exec.Command)
 	})
 
-	t.Run("tcp mcp uses startup tcp probe", func(t *testing.T) {
-		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-			constants.AnnotationAIAgentAddr: ":21101",
-		}}}
-		c, err := w.aiAgentSidecar(pod, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
-		require.NoError(t, err)
-		require.Contains(t, c.Args, "--mcp-addr=:21101")
-		require.NotNil(t, c.StartupProbe.TCPSocket)
-		require.Equal(t, int32(21101), c.StartupProbe.TCPSocket.Port.IntVal)
-		require.Equal(t, int32(constants.DefaultOBOOutboundPort), c.ReadinessProbe.TCPSocket.Port.IntVal)
+	t.Run("tcp mcp binds loopback and probes it", func(t *testing.T) {
+		for _, addr := range []string{":21101", "127.0.0.1:21101", "[::1]:21101"} {
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+				constants.AnnotationAIAgentAddr: addr,
+			}}}
+			c, err := w.aiAgentSidecar(pod, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
+			require.NoError(t, err, addr)
+			require.Contains(t, c.Args, "--mcp-addr=127.0.0.1:21101", addr)
+			require.NotContains(t, c.Args, "--mcp-socket="+mcpGatewayUDSPath, addr)
+			require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=mcp",
+				"--mcp-addr=127.0.0.1:21101"}, c.StartupProbe.Exec.Command, addr)
+			require.Contains(t, c.ReadinessProbe.Exec.Command, "--mcp-addr=127.0.0.1:21101", addr)
+		}
 	})
 
 	t.Run("openshift uid", func(t *testing.T) {
@@ -87,8 +94,9 @@ func TestAIAgentSidecarReadyURLDualStack(t *testing.T) {
 	c, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
 	require.NoError(t, err)
 	require.Contains(t, c.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
-	require.Contains(t, c.Args, "--obo-inbound-addr=:21102")
-	require.Contains(t, c.Args, "--obo-outbound-addr=:21103")
+	// Envoy dials the ext_proc clusters on 127.0.0.1 in every IP family.
+	require.Contains(t, c.Args, "--obo-inbound-addr=127.0.0.1:21102")
+	require.Contains(t, c.Args, "--obo-outbound-addr=127.0.0.1:21103")
 }
 
 func TestHandleAIAgentCombinedSidecar(t *testing.T) {
@@ -167,14 +175,14 @@ func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 		require.Contains(t, resp.Result.Message, constants.AnnotationAIAgentHITLPort)
 	})
 
-	t.Run("loopback MCP listener fails admission", func(t *testing.T) {
+	t.Run("non-loopback MCP listener fails admission", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
 		pod := aiPod()
-		pod.Annotations[constants.AnnotationAIAgentAddr] = "127.0.0.1:21101"
+		pod.Annotations[constants.AnnotationAIAgentAddr] = "0.0.0.0:21101"
 		resp := w.Handle(context.Background(), admissionRequest(t, pod))
 		require.False(t, resp.Allowed)
 		require.Equal(t, int32(400), resp.Result.Code)
-		require.Contains(t, resp.Result.Message, "must use wildcard listener format :port")
+		require.Contains(t, resp.Result.Message, "host must be empty or loopback")
 	})
 
 	t.Run("non ai-agent pod has no ai sidecar", func(t *testing.T) {

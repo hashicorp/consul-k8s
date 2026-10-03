@@ -112,10 +112,13 @@ func TestValidateAIAgentAddress(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "unset"},
-		{name: "wildcard", address: ":21101", port: 21101, enabled: true},
-		{name: "loopback", address: "127.0.0.1:21101", wantErr: true},
-		{name: "IPv6 loopback", address: "[::1]:21101", wantErr: true},
+		{name: "port only", address: ":21101", port: 21101, enabled: true},
+		{name: "loopback", address: "127.0.0.1:21101", port: 21101, enabled: true},
+		{name: "IPv6 loopback", address: "[::1]:21101", port: 21101, enabled: true},
 		{name: "specific interface", address: "10.0.0.1:21101", wantErr: true},
+		{name: "all IPv4 interfaces", address: "0.0.0.0:21101", wantErr: true},
+		{name: "hostname", address: "localhost:21101", wantErr: true},
+		{name: "missing port", address: "127.0.0.1", wantErr: true},
 		{name: "different interceptor port", address: ":21200", wantErr: true},
 		{name: "OBO inbound conflict", address: ":21102", wantErr: true},
 		{name: "OBO outbound conflict", address: ":21103", wantErr: true},
