@@ -195,7 +195,7 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set-string 'externalServers.hosts[0]=exec=echo 127.0.0.1' .
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DNS name or IP address; exec= addresses are not supported"* ]]
+  [[ "$output" == *"DNS name, IP address, or provider= auto-join string; exec= addresses are not supported"* ]]
 }
 
 @test "feature-gate-set/Job: brackets IPv6 hosts in the HTTP URL" {
@@ -618,6 +618,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=acl-role' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
@@ -958,6 +959,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.replicationToken.secretName=consul/data/replication-token' \
       --set 'global.acls.replicationToken.secretKey=token' \
       --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
       . | yq '.')
   [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]')" = "null" ]
   [ "$(echo "$job" | yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN" or .name == "CONSUL_HTTP_TOKEN_FILE")] | length')" = "0" ]

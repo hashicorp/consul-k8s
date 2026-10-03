@@ -653,7 +653,7 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq -o=json '.spec.template' | tee /dev/stderr)
 
   # Check annotations
   actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
@@ -789,7 +789,7 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq -r '.spec.template | @json' | tee /dev/stderr)
 
   # Check annotations
   local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
@@ -952,7 +952,7 @@ load _helpers
     --set 'global.acls.replicationToken.secretName=/vault/secret' \
     --set 'global.acls.replicationToken.secretKey=token' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq -r '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
   local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
@@ -967,11 +967,11 @@ load _helpers
   [ "${actual}" = "${expected}" ]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(printf '%s\n' "$object" | jq -r '.spec.volumes')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
   [[ "$object" == *"-acl-replication-token-file=/vault/secrets/replication-token"* ]]
@@ -993,7 +993,7 @@ load _helpers
     --set 'global.acls.bootstrapToken.secretName=/vault/bootstrap' \
     --set 'global.acls.bootstrapToken.secretKey=token' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq -r '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
   local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
@@ -1014,11 +1014,11 @@ load _helpers
   [[ "$object" == *"-bootstrap-token-secret-key=token"* ]]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(printf '%s\n' "$object" | jq -r '.spec.volumes')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
 
   # Replication token file is passed.
   [[ "$object" == *"-acl-replication-token-file=/vault/secrets/replication-token"* ]]
@@ -1046,7 +1046,7 @@ load _helpers
     --set "global.adminPartitions.name=default" \
     --set 'global.enableConsulNamespaces=true' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq -r '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
   local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
@@ -1061,11 +1061,11 @@ load _helpers
   [ "${actual}" = "${expected}" ]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(printf '%s\n' "$object" | jq -r '.spec.volumes')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
   [[ "$object" == *"-partition-token-file=/vault/secrets/partition-token"* ]]
@@ -1089,7 +1089,7 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template.metadata.annotations' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | @json' | tee /dev/stderr)
 
   local expected=$(echo '{
     "consul.hashicorp.com/connect-inject": "false",
