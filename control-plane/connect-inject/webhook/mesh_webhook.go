@@ -239,6 +239,19 @@ type MeshWebhook struct {
 	// for situations where Consul servers are behind a load balancer.
 	SkipServerWatch bool
 
+	// GatewayBinary is the path to the consul-mcp-gateway binary inside the
+	// consul-ai-mcp-interceptor image. Passed as -gateway-binary to
+	// consul connect mcp-gateway for AI agent pods.
+	// Defaults to constants.DefaultGatewayBinary if empty.
+	GatewayBinary string
+
+	// ImageConsulAIMCPInterceptor is the container image used for the
+	// consul-mcp-gateway sidecar injected into AI agent pods. It must contain
+	// the consul binary with the `consul connect mcp-gateway` subcommand.
+	// Maps to global.imageConsulAIMCPInterceptor / connectInject.imageConsulAIMCPInterceptor
+	// in the Helm values.
+	ImageConsulAIMCPInterceptor string
+
 	// ReleaseNamespace is the Kubernetes namespace where this webhook is running.
 	ReleaseNamespace string
 

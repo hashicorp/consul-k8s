@@ -288,6 +288,7 @@ reservedNameTest() {
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.adminPartitionsRole=aprole' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=foo' \
       --set 'global.acls.bootstrapToken.secretKey=bar' \
@@ -296,32 +297,32 @@ reservedNameTest() {
 
   # Check annotations
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "aprole" ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-bootstrap-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-bootstrap-token"')
   [ "${actual}" = "foo" ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-bootstrap-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-bootstrap-token"')
   local expected=$'{{- with secret \"foo\" -}}\n{{- .Data.data.bar -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   # Check that the bootstrap token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 
   # Check that no (secret) volumes are not attached
-  local actual=$(echo $object | jq -r '.spec.volumes')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
 }
 
 @test "partitionInit/Job: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
@@ -425,27 +426,27 @@ reservedNameTest() {
 
   # Check annotations
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "carole" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 
   # Check that the consul-ca-cert volume is not attached
-  local actual=$(echo $object | jq -r '.spec.volumes')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
 }
 
 @test "partitionInit/Job: configures vault annotations when both ACLs and TLS are enabled" {
@@ -466,6 +467,7 @@ reservedNameTest() {
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.adminPartitionsRole=aprole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=foo' \
       --set 'global.acls.bootstrapToken.secretKey=bar' \
@@ -474,38 +476,38 @@ reservedNameTest() {
 
   # Check annotations
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "aprole" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
   local actual
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-bootstrap-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-bootstrap-token"')
   [ "${actual}" = "foo" ]
 
-  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-bootstrap-token"')
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-bootstrap-token"')
   local expected=$'{{- with secret \"foo\" -}}\n{{- .Data.data.bar -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   # Check that the bootstrap token flag is set to the path of the Vault secret.
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 
   # Check that the consul-ca-cert volume is not attached
-  local actual=$(echo $object | jq -r '.spec.volumes')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts')
-  [ "${actual}" = "null" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
 }
 
 @test "partitionInit/Job: vault CA is not configured by default" {
