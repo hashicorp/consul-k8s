@@ -103,6 +103,54 @@ func TestResolveAIAgentDefaults_InvalidPorts(t *testing.T) {
 	}
 }
 
+func TestValidateAIAgentAddress(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		address string
+		port    int32
+		enabled bool
+		wantErr bool
+	}{
+		{name: "unset"},
+		{name: "port only", address: ":21101", port: 21101, enabled: true},
+		{name: "loopback", address: "127.0.0.1:21101", port: 21101, enabled: true},
+		{name: "IPv6 loopback", address: "[::1]:21101", port: 21101, enabled: true},
+		{name: "specific interface", address: "10.0.0.1:21101", wantErr: true},
+		{name: "all IPv4 interfaces", address: "0.0.0.0:21101", wantErr: true},
+		{name: "hostname", address: "localhost:21101", wantErr: true},
+		{name: "missing port", address: "127.0.0.1", wantErr: true},
+		{name: "different interceptor port", address: ":21200", wantErr: true},
+		{name: "OBO inbound conflict", address: ":21102", wantErr: true},
+		{name: "OBO outbound conflict", address: ":21103", wantErr: true},
+		{name: "privileged port", address: ":80", wantErr: true},
+		{name: "invalid port", address: ":invalid", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+				constants.AnnotationAIAgentAddr: tc.address,
+			}}}
+			port, enabled, err := ValidateAIAgentAddress(pod, constants.DefaultAIInterceptorPort)
+			if tc.wantErr {
+				require.ErrorContains(t, err, constants.AnnotationAIAgentAddr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.port, port)
+			require.Equal(t, tc.enabled, enabled)
+		})
+	}
+
+	t.Run("matches overridden interceptor port", func(t *testing.T) {
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			constants.AnnotationAIAgentAddr: ":21200",
+		}}}
+		port, enabled, err := ValidateAIAgentAddress(pod, 21200)
+		require.NoError(t, err)
+		require.Equal(t, int32(21200), port)
+		require.True(t, enabled)
+	})
+}
+
 func TestAIConfigFromAgentCRD_MissingConfig(t *testing.T) {
 	s := runtime.NewScheme()
 	require.NoError(t, v1alpha1.AddToScheme(s))

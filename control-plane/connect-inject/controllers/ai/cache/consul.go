@@ -148,6 +148,12 @@ func (c *Cache) subscribeToConsul(ctx context.Context) {
 
 		entries, meta, err := consulClient.ConfigEntries().List(capi.InferenceGateway, opts.WithContext(ctx))
 		if err != nil {
+			// Shutdown cancels the blocking query. Logging that with the test
+			// logger after the test has returned panics ("Log in goroutine
+			// after Test has completed").
+			if ctx.Err() != nil {
+				return
+			}
 			if !isLongPollErr(err) {
 				c.logger.Error(err, "error listing inference-gateway config entries")
 				select {
