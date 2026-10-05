@@ -356,16 +356,10 @@ spec:
                 {{- if .Values.ai.mcpServer.image }}
                 -ai-mcp-server-image="{{ .Values.ai.mcpServer.image }}" \
                 {{- end }}
-                {{- if .Values.ai.agent.image }}
-                -ai-agent-image="{{ .Values.ai.agent.image }}" \
-                {{- end }}
                 {{- end }}
                 {{- if .Values.ai }}
-                {{- if .Values.ai.obo.inbound.image }}
-                -consul-obo-inbound-image="{{ .Values.ai.obo.inbound.image }}" \
-                {{- end }}
-                {{- if .Values.ai.obo.outbound.image }}
-                -consul-obo-outbound-image="{{ .Values.ai.obo.outbound.image }}" \
+                {{- if .Values.ai.agent.image }}
+                -ai-agent-image="{{ .Values.ai.agent.image }}" \
                 {{- end }}
                 {{- end }}
 
