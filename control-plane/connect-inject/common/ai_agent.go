@@ -6,6 +6,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 
 	capi "github.com/hashicorp/consul/api"
@@ -165,7 +166,52 @@ func ResolveAIAgentDefaults(pod corev1.Pod, defaults v1alpha1.AgentDefaults) (v1
 	if timeout := pod.Annotations[constants.AnnotationAIAgentHITLApprovalTimeout]; timeout != "" {
 		defaults.HITL.ApprovalTimeout = timeout
 	}
+	if _, _, err := ValidateAIAgentAddress(pod, defaults.InterceptorPort); err != nil {
+		return v1alpha1.AgentDefaults{}, err
+	}
 	return defaults, nil
+}
+
+// ValidateAIAgentAddress validates the optional MCP TCP listener override and
+// returns its port. Only the port is used: the ext_proc listener is
+// unauthenticated, so it always binds 127.0.0.1, which is where Envoy dials
+// it. The host may be empty or loopback; any other host is rejected.
+func ValidateAIAgentAddress(pod corev1.Pod, interceptorPort int32) (int32, bool, error) {
+	addr := pod.Annotations[constants.AnnotationAIAgentAddr]
+	if addr == "" {
+		return 0, false, nil
+	}
+	host, portValue, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0, false, fmt.Errorf(
+			"invalid %s %q: must use :port or a loopback host:port",
+			constants.AnnotationAIAgentAddr, addr)
+	}
+	if ip := net.ParseIP(host); host != "" && (ip == nil || !ip.IsLoopback()) {
+		return 0, false, fmt.Errorf(
+			"invalid %s %q: host must be empty or loopback; the listener always binds 127.0.0.1",
+			constants.AnnotationAIAgentAddr, addr)
+	}
+	port, err := strconv.ParseInt(portValue, 10, 32)
+	if err != nil || port < 1024 || port > 65535 {
+		return 0, false, fmt.Errorf(
+			"invalid %s %q: port must be between 1024 and 65535",
+			constants.AnnotationAIAgentAddr, addr)
+	}
+	if port == constants.DefaultOBOInboundPort || port == constants.DefaultOBOOutboundPort {
+		return 0, false, fmt.Errorf(
+			"invalid %s %q: port conflicts with an OBO listener",
+			constants.AnnotationAIAgentAddr, addr)
+	}
+	if interceptorPort == 0 {
+		interceptorPort = constants.DefaultAIInterceptorPort
+	}
+	if int32(port) != interceptorPort {
+		return 0, false, fmt.Errorf(
+			"invalid %s %q: port must match the resolved AI agent interceptor port %d",
+			constants.AnnotationAIAgentAddr, addr, interceptorPort)
+	}
+	return interceptorPort, true, nil
 }
 
 // AIConfigFromAgentDefaults converts an AgentDefaults struct (from the

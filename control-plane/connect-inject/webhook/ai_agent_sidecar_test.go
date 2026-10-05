@@ -18,72 +18,108 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/utils/ptr"
+	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
-func TestOBOSidecarRequiresImage(t *testing.T) {
+func TestAIAgentSidecarRequiresImage(t *testing.T) {
 	w := &MeshWebhook{}
-
-	_, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
-	require.ErrorContains(t, err, "ImageConsulOBOInbound must be set")
-
-	_, err = w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
-	require.ErrorContains(t, err, "ImageConsulOBOOutbound must be set")
+	_, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
+	require.ErrorContains(t, err, "AI sidecar image must be set")
 }
 
-func TestOBOSidecarUsesDataplaneRunAs(t *testing.T) {
+func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 	w := &MeshWebhook{
-		ImageConsulOBOInbound:  "obo-inbound:test",
-		ImageConsulOBOOutbound: "obo-outbound:test",
+		ImageAIAgent: "consul-mcp-sc:test",
+		LogLevel:     "info",
 	}
 
-	t.Run("stock kubernetes", func(t *testing.T) {
-		inbound, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
+	t.Run("stock uid", func(t *testing.T) {
+		c, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
 		require.NoError(t, err)
-		outbound, err := w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
-		require.NoError(t, err)
+		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), c.SecurityContext.RunAsUser)
+		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), c.SecurityContext.RunAsGroup)
+		require.Contains(t, c.Args, "--mode=agent")
+		require.Contains(t, c.Args, "--envelope-uds=/consul/connect-inject/oauth-envelope.sock")
+		require.Contains(t, c.Args, "--broker-uds=/consul/connect-inject/credential-broker.sock")
+		require.Contains(t, c.Args, "--dataplane-ready-url=http://127.0.0.1:19000/ready")
+		require.Contains(t, c.Args, "--obo-inbound-addr=127.0.0.1:21102")
+		require.Contains(t, c.Args, "--obo-outbound-addr=127.0.0.1:21103")
+		require.Contains(t, c.Args, "--mcp-socket="+mcpGatewayUDSPath)
+		require.Equal(t, []string{defaultMCPScBinary}, c.Command)
+		require.NotNil(t, c.StartupProbe)
+		require.NotNil(t, c.StartupProbe.Exec)
+		require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=mcp",
+			"--mcp-socket=" + mcpGatewayUDSPath}, c.StartupProbe.Exec.Command)
+		require.NotNil(t, c.ReadinessProbe)
+		require.NotNil(t, c.ReadinessProbe.Exec)
+		require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=agent",
+			"--obo-inbound-addr=127.0.0.1:21102",
+			"--obo-outbound-addr=127.0.0.1:21103",
+			"--mcp-socket=" + mcpGatewayUDSPath}, c.ReadinessProbe.Exec.Command)
+	})
 
-		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), inbound.SecurityContext.RunAsUser)
-		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), inbound.SecurityContext.RunAsGroup)
-		require.Equal(t, inbound.SecurityContext.RunAsUser, outbound.SecurityContext.RunAsUser)
-		require.Equal(t, inbound.SecurityContext.RunAsGroup, outbound.SecurityContext.RunAsGroup)
-		require.Contains(t, inbound.Args, "--dataplane-ready-url=http://127.0.0.1:19000/ready")
-		require.Contains(t, inbound.Args, "127.0.0.1:21102")
+	t.Run("tcp mcp binds loopback and probes it", func(t *testing.T) {
+		for _, addr := range []string{":21101", "127.0.0.1:21101", "[::1]:21101"} {
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+				constants.AnnotationAIAgentAddr: addr,
+			}}}
+			c, err := w.aiAgentSidecar(pod, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
+			require.NoError(t, err, addr)
+			require.Contains(t, c.Args, "--mcp-addr=127.0.0.1:21101", addr)
+			require.NotContains(t, c.Args, "--mcp-socket="+mcpGatewayUDSPath, addr)
+			require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=mcp",
+				"--mcp-addr=127.0.0.1:21101"}, c.StartupProbe.Exec.Command, addr)
+			require.Contains(t, c.ReadinessProbe.Exec.Command, "--mcp-addr=127.0.0.1:21101", addr)
+		}
+	})
+
+	t.Run("invalid listener is returned to the caller", func(t *testing.T) {
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			constants.AnnotationAIAgentAddr: "10.0.0.1:21101",
+		}}}
+		_, err := w.aiAgentSidecar(pod, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
+		require.ErrorContains(t, err, "host must be empty or loopback")
+	})
+
+	t.Run("forwards mcp child binary and args", func(t *testing.T) {
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			constants.AnnotationAIAgentChildBinary: "/app/server",
+			constants.AnnotationAIAgentChildArgs:   "--port=9",
+		}}}
+		c, err := w.aiAgentSidecar(pod, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
+		require.NoError(t, err)
+		require.Contains(t, c.Args, "--mcp-child=/app/server")
+		require.Contains(t, c.Args, "--mcp-child-args=--port=9")
 	})
 
 	t.Run("openshift uid", func(t *testing.T) {
 		const openShiftID int64 = 1000799998
-		inbound, err := w.oboInboundSidecar(openShiftID, openShiftID)
+		c, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, openShiftID, openShiftID)
 		require.NoError(t, err)
-		require.Equal(t, ptr.To(openShiftID), inbound.SecurityContext.RunAsUser)
-		require.Equal(t, ptr.To(openShiftID), inbound.SecurityContext.RunAsGroup)
+		require.Equal(t, ptr.To(openShiftID), c.SecurityContext.RunAsUser)
+		require.Equal(t, ptr.To(openShiftID), c.SecurityContext.RunAsGroup)
 	})
 }
 
-func TestOBOSidecarReadyURLDualStack(t *testing.T) {
+func TestAIAgentSidecarReadyURLDualStack(t *testing.T) {
 	t.Setenv(constants.ConsulDualStackEnvVar, "true")
 
-	w := &MeshWebhook{
-		ImageConsulOBOInbound:  "obo-inbound:test",
-		ImageConsulOBOOutbound: "obo-outbound:test",
-	}
-	inbound, err := w.oboInboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
+	w := &MeshWebhook{ImageAIAgent: "consul-mcp-sc:test", LogLevel: "info"}
+	c, err := w.aiAgentSidecar(corev1.Pod{}, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
 	require.NoError(t, err)
-	outbound, err := w.oboOutboundSidecar(sidecarUserAndGroupID, sidecarUserAndGroupID)
-	require.NoError(t, err)
-
-	require.Contains(t, inbound.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
-	require.Contains(t, outbound.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
-	// xDS OBO clusters stay on IPv4 loopback.
-	require.Contains(t, inbound.Args, "127.0.0.1:21102")
-	require.Contains(t, outbound.Args, "127.0.0.1:21103")
+	require.Contains(t, c.Args, "--dataplane-ready-url=http://[::1]:19000/ready")
+	// Envoy dials the ext_proc clusters on 127.0.0.1 in every IP family.
+	require.Contains(t, c.Args, "--obo-inbound-addr=127.0.0.1:21102")
+	require.Contains(t, c.Args, "--obo-outbound-addr=127.0.0.1:21103")
 }
 
-func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
+func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 	s := runtime.NewScheme()
 	s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
 	decoder := admission.NewDecoder(s)
@@ -106,116 +142,124 @@ func TestHandleAIAgentOBOIndependentOfMCPImage(t *testing.T) {
 
 	baseWebhook := func(clientset *fake.Clientset) MeshWebhook {
 		return MeshWebhook{
-			Log:                    logrtest.New(t),
-			AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:   mapset.NewSet(),
-			decoder:                decoder,
-			Clientset:              clientset,
-			ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
-			ImageConsulDataplane:   "dataplane:test",
-			ImageConsulOBOInbound:  "obo-inbound:test",
-			ImageConsulOBOOutbound: "obo-outbound:test",
+			Log:                   logrtest.New(t),
+			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+			DenyK8sNamespacesSet:  mapset.NewSet(),
+			decoder:               decoder,
+			Clientset:             clientset,
+			ConsulConfig:          &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+			ImageConsulDataplane:  "dataplane:test",
+			ImageAIAgent:          "consul-mcp-sc:test",
+			LogLevel:              "info",
 		}
 	}
 
-	t.Run("obo injected when mcp gateway image is unset", func(t *testing.T) {
-		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+	t.Run("one combined sidecar uses dataplane uid", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset(namespaceWithOpenShift(false))
+		w := baseWebhook(clientset)
 		containers := injectedContainers(t, w, aiPod())
-		require.NotContains(t, containers, mcpGatewayContainer)
-		require.Contains(t, containers, constants.ConsulOBOInboundContainerName)
-		require.Contains(t, containers, constants.ConsulOBOOutboundContainerName)
+		require.Contains(t, containers, mcpGatewayContainer)
+		require.NotContains(t, containers, constants.ConsulOBOInboundContainerName)
+		require.NotContains(t, containers, constants.ConsulOBOOutboundContainerName)
 
 		dp := containers[sidecarContainer]
-		inbound := containers[constants.ConsulOBOInboundContainerName]
-		require.Equal(t, dp.SecurityContext.RunAsUser, inbound.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsGroup, inbound.SecurityContext.RunAsGroup)
-		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), inbound.SecurityContext.RunAsUser)
+		ai := containers[mcpGatewayContainer]
+		require.Equal(t, dp.SecurityContext.RunAsUser, ai.SecurityContext.RunAsUser)
+		require.Equal(t, dp.SecurityContext.RunAsGroup, ai.SecurityContext.RunAsGroup)
+		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), ai.SecurityContext.RunAsUser)
+		require.Contains(t, ai.Args, "--mode=agent")
+
+		namespaceGets := 0
+		for _, action := range clientset.Actions() {
+			if action.GetVerb() == "get" && action.GetResource().Resource == "namespaces" {
+				namespaceGets++
+			}
+		}
+		require.Equal(t, 1, namespaceGets)
 	})
 
-	t.Run("missing obo image fails admission", func(t *testing.T) {
+	t.Run("missing image fails admission", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
-		w.ImageConsulOBOInbound = ""
+		w.ImageAIAgent = ""
 		resp := w.Handle(context.Background(), admissionRequest(t, aiPod()))
 		require.False(t, resp.Allowed)
-		require.Contains(t, resp.Result.Message, "ImageConsulOBOInbound must be set")
+		require.Contains(t, resp.Result.Message, "AI sidecar image must be set")
 	})
 
-	t.Run("missing obo outbound image fails admission", func(t *testing.T) {
+	t.Run("invalid AI port annotation fails admission", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
-		w.ImageConsulOBOOutbound = ""
-		resp := w.Handle(context.Background(), admissionRequest(t, aiPod()))
-		require.False(t, resp.Allowed)
-		require.Contains(t, resp.Result.Message, "ImageConsulOBOOutbound must be set")
-	})
-
-	t.Run("agent sidecar uses resolved HITL annotation", func(t *testing.T) {
-		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
-		w.ImageAIAgent = "mcp-gateway:test"
 		pod := aiPod()
-		pod.Annotations[constants.AnnotationAIAgentHITLPort] = "approval"
-		pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{Name: "approval", ContainerPort: 23003}}
-		containers := injectedContainers(t, w, pod)
-		require.Equal(t, int32(23003), containers[mcpGatewayContainer].Ports[0].ContainerPort)
-	})
-
-	t.Run("invalid agent port fails admission", func(t *testing.T) {
-		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
-		w.ImageAIAgent = "mcp-gateway:test"
-		pod := aiPod()
-		pod.Annotations[constants.AnnotationAIAgentHITLPort] = "invalid"
+		pod.Annotations[constants.AnnotationAIAgentHITLPort] = "80"
 		resp := w.Handle(context.Background(), admissionRequest(t, pod))
 		require.False(t, resp.Allowed)
 		require.Contains(t, resp.Result.Message, constants.AnnotationAIAgentHITLPort)
 	})
 
-	t.Run("non ai-agent pod has no obo", func(t *testing.T) {
+	t.Run("non-loopback MCP listener fails admission", func(t *testing.T) {
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		pod := aiPod()
+		pod.Annotations[constants.AnnotationAIAgentAddr] = "0.0.0.0:21101"
+		resp := w.Handle(context.Background(), admissionRequest(t, pod))
+		require.False(t, resp.Allowed)
+		require.Equal(t, int32(400), resp.Result.Code)
+		require.Contains(t, resp.Result.Message, "host must be empty or loopback")
+	})
+
+	t.Run("non ai-agent pod has no ai sidecar", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
 		pod := aiPod()
 		delete(pod.Annotations, constants.AnnotationAIRole)
 		containers := injectedContainers(t, w, pod)
-		require.NotContains(t, containers, constants.ConsulOBOInboundContainerName)
-		require.NotContains(t, containers, constants.ConsulOBOOutboundContainerName)
+		require.NotContains(t, containers, mcpGatewayContainer)
 	})
 
-	t.Run("application container named consul-dataplane-metrics is ignored", func(t *testing.T) {
+	t.Run("AgentConfig interceptor port is bound on loopback", func(t *testing.T) {
+		scheme := runtime.NewScheme()
+		require.NoError(t, v1alpha1.AddToScheme(scheme))
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		w.Client = ctrlfake.NewClientBuilder().WithScheme(scheme).WithObjects(&v1alpha1.AgentConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-agent"},
+			Spec:       v1alpha1.AgentConfigSpec{Defaults: v1alpha1.AgentDefaults{InterceptorPort: 17101}},
+		}).Build()
 		pod := aiPod()
-		pod.Spec.Containers = []corev1.Container{
-			{
-				Name:  "consul-dataplane-metrics",
-				Image: "app:test",
-				SecurityContext: &corev1.SecurityContext{
-					RunAsUser:  ptr.To(int64(1000)),
-					RunAsGroup: ptr.To(int64(1000)),
-				},
-			},
-			{Name: "web", Image: "app:test"},
-		}
-		containers := injectedContainers(t, w, pod)
-		dp := containers[sidecarContainer]
-		inbound := containers[constants.ConsulOBOInboundContainerName]
-		require.Equal(t, ptr.To(int64(sidecarUserAndGroupID)), dp.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsUser, inbound.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsGroup, inbound.SecurityContext.RunAsGroup)
-		require.NotEqual(t, ptr.To(int64(1000)), inbound.SecurityContext.RunAsUser)
+		pod.Annotations[constants.AnnotationAIAgentConfig] = "my-agent"
+		pod.Annotations[constants.AnnotationAIAgentAddr] = "127.0.0.1:17101"
+		ai := injectedContainers(t, w, pod)[mcpGatewayContainer]
+		require.Contains(t, ai.Args, "--mcp-addr=127.0.0.1:17101")
+		require.Contains(t, ai.Args, "--obo-inbound-addr=127.0.0.1:21102")
+		require.Contains(t, ai.Args, "--obo-outbound-addr=127.0.0.1:21103")
+		require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=mcp",
+			"--mcp-addr=127.0.0.1:17101"}, ai.StartupProbe.Exec.Command)
 	})
 
-	t.Run("openshift obo uid matches dataplane", func(t *testing.T) {
+	t.Run("missing AgentConfig still binds the loopback listeners", func(t *testing.T) {
+		scheme := runtime.NewScheme()
+		require.NoError(t, v1alpha1.AddToScheme(scheme))
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		w.Client = ctrlfake.NewClientBuilder().WithScheme(scheme).Build()
+		ai := injectedContainers(t, w, aiPod())[mcpGatewayContainer]
+		require.Contains(t, ai.Args, "--mode=agent")
+		require.Contains(t, ai.Args, "--obo-inbound-addr=127.0.0.1:21102")
+		require.Contains(t, ai.Args, "--obo-outbound-addr=127.0.0.1:21103")
+		require.Contains(t, ai.Args, "--mcp-socket="+mcpGatewayUDSPath)
+		require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=agent",
+			"--obo-inbound-addr=127.0.0.1:21102",
+			"--obo-outbound-addr=127.0.0.1:21103",
+			"--mcp-socket=" + mcpGatewayUDSPath}, ai.ReadinessProbe.Exec.Command)
+	})
+
+	t.Run("openshift ai sidecar uid matches dataplane", func(t *testing.T) {
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(true)))
 		w.EnableOpenShift = true
-		w.ImageAIAgent = "mcp-gateway:test"
 		containers := injectedContainers(t, w, aiPod())
 		require.Contains(t, containers, mcpGatewayContainer)
 
 		dp := containers[sidecarContainer]
-		inbound := containers[constants.ConsulOBOInboundContainerName]
-		outbound := containers[constants.ConsulOBOOutboundContainerName]
+		ai := containers[mcpGatewayContainer]
 		require.NotNil(t, dp.SecurityContext.RunAsUser)
 		require.NotEqual(t, int64(sidecarUserAndGroupID), *dp.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsUser, inbound.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsGroup, inbound.SecurityContext.RunAsGroup)
-		require.Equal(t, dp.SecurityContext.RunAsUser, outbound.SecurityContext.RunAsUser)
-		require.Equal(t, dp.SecurityContext.RunAsGroup, outbound.SecurityContext.RunAsGroup)
+		require.Equal(t, dp.SecurityContext.RunAsUser, ai.SecurityContext.RunAsUser)
+		require.Equal(t, dp.SecurityContext.RunAsGroup, ai.SecurityContext.RunAsGroup)
 	})
 }
 
@@ -256,78 +300,4 @@ func injectedContainers(t *testing.T, w MeshWebhook, pod *corev1.Pod) map[string
 		found[c.Name] = c
 	}
 	return found
-}
-
-func TestMCPGatewayReadinessProbe(t *testing.T) {
-	w := &MeshWebhook{}
-
-	tests := []struct {
-		name         string
-		annotations  map[string]string
-		hitlPort     int32
-		expectedPort int32
-		isTCP        bool
-	}{
-		{
-			name:        "uds default",
-			annotations: map[string]string{},
-			hitlPort:    16101,
-			isTCP:       false,
-		},
-		{
-			name: "tcp colon-port",
-			annotations: map[string]string{
-				constants.AnnotationAIAgentAddr: ":21101",
-			},
-			hitlPort:     16101,
-			expectedPort: 21101,
-			isTCP:        true,
-		},
-		{
-			name: "tcp host-port",
-			annotations: map[string]string{
-				constants.AnnotationAIAgentAddr: "127.0.0.1:21101",
-			},
-			hitlPort:     16101,
-			expectedPort: 21101,
-			isTCP:        true,
-		},
-		{
-			name: "tcp ipv6 host-port",
-			annotations: map[string]string{
-				constants.AnnotationAIAgentAddr: "[::1]:21101",
-			},
-			hitlPort:     16101,
-			expectedPort: 21101,
-			isTCP:        true,
-		},
-		{
-			name: "malformed addr falls back to hitlPort",
-			annotations: map[string]string{
-				constants.AnnotationAIAgentAddr: "invalid-addr",
-			},
-			hitlPort:     16101,
-			expectedPort: 16101,
-			isTCP:        true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			pod := corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: tc.annotations,
-				},
-			}
-			probe := w.mcpGatewayReadinessProbe(pod, tc.hitlPort)
-			require.NotNil(t, probe)
-			if tc.isTCP {
-				require.NotNil(t, probe.TCPSocket)
-				require.Equal(t, int(tc.expectedPort), probe.TCPSocket.Port.IntValue())
-			} else {
-				require.NotNil(t, probe.Exec)
-				require.Equal(t, []string{"test", "-S", mcpGatewayUDSPath}, probe.Exec.Command)
-			}
-		})
-	}
 }
