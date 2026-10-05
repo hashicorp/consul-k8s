@@ -57,25 +57,22 @@ gw_flags=(
     [[ "$command" != *"-enable-ai-inference-gateway=true"* ]]
 }
 
-@test "ai/OBO images: passed when ai.enabled is false" {
+@test "ai/agent image: default is passed when ai.enabled is false" {
     cd `chart_dir`
     local command=$(helm template -s templates/connect-inject-deployment.yaml \
         --set 'ai.enabled=false' . |
         yq -r '.spec.template.spec.containers[0].command | join(" ")')
     [[ "$command" != *"-enable-ai=true"* ]]
-    [[ "$command" == *"-consul-obo-inbound-image="* ]]
-    [[ "$command" == *"-consul-obo-outbound-image="* ]]
+    [[ "$command" == *"-ai-agent-image=\"hashicorp/consul-mcp-sc:2.1.0-rc1\""* ]]
 }
 
-@test "ai/OBO images: omitted when unset" {
+@test "ai/agent image: omitted when unset" {
     cd `chart_dir`
     local command=$(helm template -s templates/connect-inject-deployment.yaml \
         --set 'ai.enabled=false' \
-        --set 'ai.obo.inbound.image=' \
-        --set 'ai.obo.outbound.image=' . |
+        --set 'ai.agent.image=' . |
         yq -r '.spec.template.spec.containers[0].command | join(" ")')
-    [[ "$command" != *"-consul-obo-inbound-image="* ]]
-    [[ "$command" != *"-consul-obo-outbound-image="* ]]
+    [[ "$command" != *"-ai-agent-image="* ]]
 }
 
 @test "ai/InferenceGateway/controller: enabled with its CRD" {
