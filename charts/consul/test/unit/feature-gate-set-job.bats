@@ -207,8 +207,10 @@ load _helpers
       --set 'global.tls.enabled=true' \
       . | yq -r '.spec.template.spec.containers[0].command[2]')
   local actual=$(CONSUL_ADDRESSES=2001:db8::1 CONSUL_HTTP_PORT=8501 \
-      /bin/sh -ec 'consul() { printf "%s\n" "$CONSUL_HTTP_ADDR"; }; '"$script")
-  [ "$actual" = "Setting feature gate: consul-ai=disabled
+      /bin/sh -ec 'consul() { printf "%s\n" "$CONSUL_HTTP_ADDR"; }; curl() { printf "\"127.0.0.1:8300\""; }; '"$script")
+  [ "$actual" = "Waiting for Consul leader...
+Consul leader is ready: \"127.0.0.1:8300\"
+Setting feature gate: consul-ai=disabled
 https://[2001:db8::1]:8501" ]
 }
 

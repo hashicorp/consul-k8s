@@ -170,13 +170,23 @@ spec:
           export CONSUL_HTTP_ADDR="http://${consul_host}:${CONSUL_HTTP_PORT}"
           {{- end }}
 
-          # Wait for the Consul server to be ready before setting feature gates.
+          # Wait until a Consul leader is elected before setting feature gates.
+          # /v1/status/leader returns "" when no leader is elected, or "host:port" when one is.
           while true; do
-            echo "Checking if Consul is ready..."
-            if consul members 2>/dev/null; then
+            echo "Waiting for Consul leader..."
+            {{- if .Values.global.tls.enabled }}
+            {{- if and .Values.externalServers.enabled .Values.externalServers.useSystemRoots }}
+            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null)
+            {{- else }}
+            leader=$(curl -s --cacert "${CONSUL_CACERT}" "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null)
+            {{- end }}
+            {{- else }}
+            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null)
+            {{- end }}
+            if echo "${leader}" | grep -qE '".+"'; then
+              echo "Consul leader is ready: ${leader}"
               break
             fi
-            echo "Consul is not ready, retrying in 2s..."
             sleep 2
           done
 
