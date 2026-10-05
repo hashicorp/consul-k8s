@@ -77,7 +77,7 @@ load _helpers
 
 @test "partitionInit/Job: consul env defaults" {
   cd `chart_dir`
-  local env=$(helm template \
+  local job=$(helm template \
       -s templates/partition-init-job.yaml \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
@@ -85,27 +85,26 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'server.enabled=false' \
-      . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+      . | tee /dev/stderr)
 
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_ADDRESSES").value' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ADDRESSES").value' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
 
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_GRPC_PORT").value' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_GRPC_PORT").value' | tee /dev/stderr)
   [ "${actual}" = "8502" ]
 
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
   [ "${actual}" = "8501" ]
 
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_DATACENTER").value' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_DATACENTER").value' | tee /dev/stderr)
   [ "${actual}" = "dc1" ]
 
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_API_TIMEOUT").value' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_API_TIMEOUT").value' | tee /dev/stderr)
   [ "${actual}" = "5s" ]
 }
 
@@ -114,7 +113,7 @@ load _helpers
 
 @test "partitionInit/Job: sets TLS env vars when global.tls.enabled" {
   cd `chart_dir`
-  local env=$(helm template \
+  local job=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
@@ -123,25 +122,24 @@ load _helpers
       --set 'global.adminPartitions.name=bar' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
-      . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+      . | tee /dev/stderr)
 
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
   [ "${actual}" = "8501" ]
 
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_USE_TLS").value' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_USE_TLS").value' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
 @test "partitionInit/Job: does not set consul ca cert when .externalServers.useSystemRoots is true" {
   cd `chart_dir`
-  local spec=$(helm template \
+  local job=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
@@ -150,25 +148,24 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
       --set 'externalServers.useSystemRoots=true' \
-      . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec' | tee /dev/stderr)
+      . | tee /dev/stderr)
 
-  local actual=$(echo "$spec" |
-    jq -r '.containers[0].env[] | select(.name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_CACERT_FILE")] | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
 
-  local actual=$(echo "$spec" |
-    jq -r '.volumes[]? | select(.name == "consul-ca-cert")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '[.spec.template.spec.volumes[]? | select(.name == "consul-ca-cert")] | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
 
-  local actual=$(echo "$spec" |
-    jq -r '.containers[0].volumeMounts[]? | select(.name == "consul-ca-cert")' | tee /dev/stderr)
-  [ "${actual}" = "" ]
+  local actual=$(printf '%s\n' "$job" |
+    yq -r '[.spec.template.spec.containers[0].volumeMounts[]? | select(.name == "consul-ca-cert")] | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
 }
 
 @test "partitionInit/Job: can overwrite CA secret with the provided one" {
   cd `chart_dir`
-  local ca_cert_volume=$(helm template \
+  local job=$(helm template \
       -s templates/partition-init-job.yaml  \
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
@@ -181,16 +178,17 @@ load _helpers
       --set 'global.tls.caCert.secretKey=key' \
       --set 'global.tls.caKey.secretName=foo-ca-key' \
       --set 'global.tls.caKey.secretKey=key' \
-      . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec.volumes[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+      . | tee /dev/stderr)
 
   # check that the provided ca cert secret is attached as a volume
   local actual
-  actual=$(printf '%s\n' "$ca_cert_volume" | jq -r '.secret.secretName' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert").secret.secretName' | tee /dev/stderr)
   [ "${actual}" = "foo-ca-cert" ]
 
   # check that the volume uses the provided secret key
-  actual=$(printf '%s\n' "$ca_cert_volume" | jq -r '.secret.items[0].key' | tee /dev/stderr)
+  actual=$(printf '%s\n' "$job" |
+    yq -r '.spec.template.spec.volumes[] | select(.name == "consul-ca-cert").secret.items[0].key' | tee /dev/stderr)
   [ "${actual}" = "key" ]
 }
 
