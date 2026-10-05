@@ -74,13 +74,13 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8301\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8301\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8301\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8301\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8301\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8301\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -94,13 +94,13 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:9301\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -117,10 +117,10 @@ load _helpers
       . | tee /dev/stderr |
       yq -c '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"1.1.1.1\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"1.1.1.1\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"2.2.2.2\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"2.2.2.2\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -136,7 +136,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -c '.spec.template.spec.containers[0].command')
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-retry-join=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -149,7 +149,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("grpc"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("grpc"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -160,7 +160,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'client.grpc=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("grpc"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("grpc"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -173,7 +173,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-node-meta=pod-name:${HOSTNAME}"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-node-meta=pod-name:${HOSTNAME}"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -183,7 +183,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-node-meta=host-ip:${HOST_IP}"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-node-meta=host-ip:${HOST_IP}"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -194,7 +194,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'client.nodeMeta.pod-name=foobar' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-node-meta=pod-name:foobar"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-node-meta=pod-name:foobar"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -205,7 +205,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'client.nodeMeta.cluster-name=cluster01' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-node-meta=cluster-name:cluster01"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-node-meta=cluster-name:cluster01"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -718,7 +718,7 @@ load _helpers
     --set 'client.enabled=true' \
     --set 'global.gossipEncryption.autoGenerate=true' \
     . | tee /dev/stderr |
-    yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | any_c(contains("-encrypt=\"${GOSSIP_KEY}\""))' \
+    yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | any(contains("-encrypt=\"${GOSSIP_KEY}\""))' \
     | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -753,7 +753,7 @@ load _helpers
       --set 'global.gossipEncryption.secretKey=foo' \
       --set 'global.gossipEncryption.secretName=bar' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env | any_c(.name == "GOSSIP_KEY")' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[] | select(.name=="consul") | .env | any(.name == "GOSSIP_KEY")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1298,7 +1298,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("/consul/aclconfig"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("/consul/aclconfig"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1312,11 +1312,11 @@ load _helpers
       yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("secret-name"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("secret-name"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
@@ -1344,15 +1344,15 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("init-type=\"client\""))' | tee /dev/stderr)
+      yq -r '.command | any(contains("init-type=\"client\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("log-level=info"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("log-level=info"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("log-json=false"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("log-json=false"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 }
 
@@ -1368,13 +1368,13 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("min_delay=10"))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("min_delay=10"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("max_delay=40"))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("max_delay=40"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("client-acl-init: staggering for"))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("client-acl-init: staggering for"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1387,7 +1387,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("startupStagger"))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("startupStagger"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1404,11 +1404,11 @@ load _helpers
       yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("consul-k8s-control-plane acl-init"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("secret-name"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("secret-name"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]  
 
   local actual=$(echo "$object" |
@@ -1452,15 +1452,15 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("init-type=\"client\""))' | tee /dev/stderr)
+      yq -r '.command | any(contains("init-type=\"client\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("log-level=info"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("log-level=info"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
 
   local actual=$(echo "$object" |
-      yq -r '.command | any_c(contains("log-json=false"))' | tee /dev/stderr)
+      yq -r '.command | any(contains("log-json=false"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1471,7 +1471,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=false' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[] | select(.name == "consul") | .env[] | .name] | any_c(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[] | select(.name == "consul") | .env[] | .name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1482,7 +1482,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[] | select(.name == "consul") | .env[] | .name] | any_c(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[] | select(.name == "consul") | .env[] | .name] | any(contains("CONSUL_HTTP_TOKEN_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1493,7 +1493,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[1]] | any_c(contains("logout"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[1]] | any(contains("logout"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1663,7 +1663,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-tls-server-name"))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-tls-server-name"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1679,7 +1679,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-use-https"))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-use-https"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1718,7 +1718,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-use-https"))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-use-https"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1734,7 +1734,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
 
-  local actual=$(echo "$command" | yq '. | any_c(contains("-server-port"))' | tee /dev/stderr)
+  local actual=$(echo "$command" | yq '. | any(contains("-server-port"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1775,7 +1775,7 @@ load _helpers
       --set 'server.enabled=true' \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[] | select(.name=="consul") | .ports[] | select(.containerPort==8301)] | any_c(has("hostPort"))' |
+      yq '[.spec.template.spec.containers[] | select(.name=="consul") | .ports[] | select(.containerPort==8301)] | any(has("hostPort"))' |
       tee /dev/stderr)
   [ "${has_exposed_host_ports}" = "false" ]
 }
@@ -1788,7 +1788,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'client.exposeGossipPorts=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[] | select(.name=="consul") | .ports[] | select(.containerPort==8301)] | all_c(has("hostPort"))' |
+      yq '[.spec.template.spec.containers[] | select(.name=="consul") | .ports[] | select(.containerPort==8301)] | all(has("hostPort"))' |
       tee /dev/stderr)
   [ "${has_exposed_host_ports}" = "true" ]
 }
@@ -2480,7 +2480,7 @@ rollingUpdate:
   [ "${actual}" = "" ]
 
   local actual=$(echo "$object" |
-    yq -r '.containers[] | select(.name=="consul") | .command | any_c(contains("GOSSIP_KEY="))' \
+    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("GOSSIP_KEY="))' \
       | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -2617,7 +2617,7 @@ rollingUpdate:
   [ "${actual}" = "" ]
 
   local actual=$(echo "$object" |
-      yq -r '.containers[0].command | any_c(contains("ca_file = \"/vault/secrets/serverca.crt\""))' | tee /dev/stderr)
+      yq -r '.containers[0].command | any(contains("ca_file = \"/vault/secrets/serverca.crt\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

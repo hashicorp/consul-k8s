@@ -1463,7 +1463,7 @@ load _helpers
     -s templates/server-statefulset.yaml \
     --set 'global.gossipEncryption.autoGenerate=true' \
     . | tee /dev/stderr |
-    yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | any_c(contains("-encrypt=\"${GOSSIP_KEY}\""))' \
+    yq '.spec.template.spec.containers[] | select(.name=="consul") | .command | any(contains("-encrypt=\"${GOSSIP_KEY}\""))' \
     | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1743,7 +1743,7 @@ load _helpers
 
   # Test the flag is not set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any_c(contains("ACL_BOOTSTRAP_TOKEN"))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].command | any(contains("ACL_BOOTSTRAP_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   # Test the ACL_BOOTSTRAP_TOKEN environment variable is not set.
@@ -1763,7 +1763,7 @@ load _helpers
 
   # Test the flag is set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any_c(contains("-hcl=\"acl { tokens { initial_management = \\\"${ACL_BOOTSTRAP_TOKEN}\\\" } }\""))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].command | any(contains("-hcl=\"acl { tokens { initial_management = \\\"${ACL_BOOTSTRAP_TOKEN}\\\" } }\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   # Test the ACL_BOOTSTRAP_TOKEN environment variable is set.
@@ -1783,7 +1783,7 @@ load _helpers
 
   # Test the flag is not set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any_c(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].command | any(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   # Test the ACL_REPLICATION_TOKEN environment variable is not set.
@@ -1801,7 +1801,7 @@ load _helpers
 
   # Test the flag is not set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any_c(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].command | any(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   # Test the ACL_REPLICATION_TOKEN environment variable is not set.
@@ -1819,7 +1819,7 @@ load _helpers
 
   # Test the flag is not set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any_c(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].command | any(contains("ACL_REPLICATION_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   # Test the ACL_REPLICATION_TOKEN environment variable is not set.
@@ -1838,7 +1838,7 @@ load _helpers
 
   # Test the flag is set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any_c(contains("-hcl=\"acl { tokens { agent = \\\"${ACL_REPLICATION_TOKEN}\\\", replication = \\\"${ACL_REPLICATION_TOKEN}\\\" } }\""))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].command | any(contains("-hcl=\"acl { tokens { agent = \\\"${ACL_REPLICATION_TOKEN}\\\", replication = \\\"${ACL_REPLICATION_TOKEN}\\\" } }\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   # Test the ACL_REPLICATION_TOKEN environment variable is set.
@@ -2079,7 +2079,7 @@ load _helpers
   [ "${actual}" = "" ]
 
   local actual=$(echo "$object" |
-    yq -r '.containers[] | select(.name=="consul") | .command | any_c(contains("GOSSIP_KEY="))' \
+    yq -r '.containers[] | select(.name=="consul") | .command | any(contains("GOSSIP_KEY="))' \
       | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -2523,7 +2523,7 @@ load _helpers
   [ "${actual}" = "${expected}" ]
 
   # Check that path to Vault secret config is provided to the command.
-  local actual="$(echo "$object" | yq -r '.spec.containers[] | select(.name=="consul").command | any_c(contains("-config-file=/vault/secrets/bootstrap-token-config.hcl"))' | tee /dev/stderr)"
+  local actual="$(echo "$object" | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/bootstrap-token-config.hcl"))' | tee /dev/stderr)"
   [ "${actual}" = "true" ]
 }
 
@@ -2557,7 +2557,7 @@ load _helpers
   [ "${actual}" = "" ]
 
   # Check that path to Vault secret config is provided to the command.
-  local actual="$(echo "$object" | yq -r '.spec.containers[] | select(.name=="consul").command | any_c(contains("-config-file=/vault/secrets/replication-token-config.hcl"))' | tee /dev/stderr)"
+  local actual="$(echo "$object" | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/replication-token-config.hcl"))' | tee /dev/stderr)"
   [ "${actual}" = "true" ]
 }
 
@@ -3126,7 +3126,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       -s templates/server-statefulset.yaml  \
       --set 'server.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[1].env | any_c(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[1].env | any(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -3153,7 +3153,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'connectInject.consulNamespaces.consulDestinationNamespace=dest-ns' \
       --namespace consul \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[1].env | any_c(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[1].env | any(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 

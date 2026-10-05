@@ -120,7 +120,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("allow-dns"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -131,7 +131,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.transparentProxy.defaultEnabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("allow-dns"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -143,7 +143,7 @@ load _helpers
       --set 'connectInject.transparentProxy.defaultEnabled=false' \
       --set 'dns.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("allow-dns"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -154,7 +154,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'dns.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("allow-dns"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -165,7 +165,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'dns.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("allow-dns"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("allow-dns"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -178,7 +178,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-acl-binding-rule-selector=serviceaccount.name!=default"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-acl-binding-rule-selector=serviceaccount.name!=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -190,7 +190,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.aclBindingRuleSelector="foo"' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-acl-binding-rule-selector=\"foo\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-acl-binding-rule-selector=\"foo\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -205,7 +205,7 @@ load _helpers
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-enterprise-license-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -218,7 +218,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-snapshot-agent"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-snapshot-agent"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -229,7 +229,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'server.snapshotAgent.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-snapshot-agent"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-snapshot-agent"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -242,7 +242,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-sync-catalog"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-catalog"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -253,7 +253,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-sync-catalog"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-catalog"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -264,7 +264,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-sync-consul-node-name=k8s-sync"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-consul-node-name=k8s-sync"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -276,7 +276,7 @@ load _helpers
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.consulNodeName=new-node-name' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-sync-consul-node-name=new-node-name"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-consul-node-name=new-node-name"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -290,7 +290,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-mesh-gateway"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-mesh-gateway"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -302,7 +302,7 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-mesh-gateway"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-mesh-gateway"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -316,7 +316,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-ingress-gateway-name"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-ingress-gateway-name"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -328,7 +328,7 @@ load _helpers
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-ingress-gateway-name=\"ingress-gateway\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-ingress-gateway-name=\"ingress-gateway\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -366,7 +366,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-ingress-gateway-name=\"ingress-gateway.default\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-ingress-gateway-name=\"ingress-gateway.default\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -380,7 +380,7 @@ load _helpers
       --set 'global.enableConsulNamespaces=true' \
       --set 'ingressGateways.defaults.consulNamespace=' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-ingress-gateway-name=\"ingress-gateway\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-ingress-gateway-name=\"ingress-gateway\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -422,7 +422,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-terminating-gateway-name"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -434,7 +434,7 @@ load _helpers
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-terminating-gateway-name=\"terminating-gateway\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -472,7 +472,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-terminating-gateway-name=\"terminating-gateway.default\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway.default\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -491,7 +491,7 @@ load _helpers
       --set 'terminatingGateways.defaults.consulNamespace=' \
       --namespace consul \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-terminating-gateway-name=\"terminating-gateway.consul\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway.consul\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -536,19 +536,19 @@ load _helpers
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq '[.env[7].name] | any_c(contains("CONSUL_USE_TLS"))' | tee /dev/stderr)
+      yq '[.env[7].name] | any(contains("CONSUL_USE_TLS"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[7].value] | any_c(contains("true"))' | tee /dev/stderr)
+      yq '[.env[7].value] | any(contains("true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[8].name] | any_c(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
+      yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[8].value] | any_c(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+      yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1147,35 +1147,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1194,35 +1194,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1237,35 +1237,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1281,35 +1281,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1326,35 +1326,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix=k8s-"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix=k8s-"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1373,35 +1373,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1416,35 +1416,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1460,35 +1460,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1505,35 +1505,35 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-namespaces=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
+    yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
+    yq 'any(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("sync-k8s-namespace-mirroring-prefix=k8s-"))' | tee /dev/stderr)
+    yq 'any(contains("sync-k8s-namespace-mirroring-prefix=k8s-"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("connect-inject"))' | tee /dev/stderr)
+    yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
+    yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
+    yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
+    yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1549,7 +1549,7 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-peering"))' | tee /dev/stderr)
+    yq 'any(contains("enable-peering"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1566,7 +1566,7 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-peering"))' | tee /dev/stderr)
+    yq 'any(contains("enable-peering"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1582,11 +1582,11 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("enable-partitions"))' | tee /dev/stderr)
+    yq 'any(contains("enable-partitions"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   local actual=$(echo "$object" |
-    yq 'any_c(contains("partition"))' | tee /dev/stderr)
+    yq 'any(contains("partition"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1601,19 +1601,19 @@ load _helpers
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq '[.env[7].name] | any_c(contains("CONSUL_PARTITION"))' | tee /dev/stderr)
+      yq '[.env[7].name] | any(contains("CONSUL_PARTITION"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[7].value] | any_c(contains("default"))' | tee /dev/stderr)
+      yq '[.env[7].value] | any(contains("default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[8].name] | any_c(contains("CONSUL_LOGIN_PARTITION"))' | tee /dev/stderr)
+      yq '[.env[8].name] | any(contains("CONSUL_LOGIN_PARTITION"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[8].value] | any_c(contains("default"))' | tee /dev/stderr)
+      yq '[.env[8].value] | any(contains("default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1626,7 +1626,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-create-acl-replication-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-acl-replication-token"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1637,7 +1637,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.createReplicationToken=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-create-acl-replication-token"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-acl-replication-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1673,7 +1673,7 @@ load _helpers
 
   # Test the flag is not set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any_c(contains("-acl-replication-token-file"))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].command | any(contains("-acl-replication-token-file"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
   # Test the volume doesn't exist
@@ -1698,7 +1698,7 @@ load _helpers
 
   # Test the -acl-replication-token-file flag is set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any_c(contains("-acl-replication-token-file=/consul/acl/tokens/acl-replication-token"))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].command | any(contains("-acl-replication-token-file=/consul/acl/tokens/acl-replication-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   # Test the volume exists
@@ -1783,11 +1783,11 @@ load _helpers
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq '[.env[2].name] | any_c(contains("CONSUL_ADDRESSES"))' | tee /dev/stderr)
+      yq '[.env[2].name] | any(contains("CONSUL_ADDRESSES"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[2].value] | any_c(contains("foo.com"))' | tee /dev/stderr)
+      yq '[.env[2].value] | any(contains("foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1803,11 +1803,11 @@ load _helpers
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq '[.env[4].name] | any_c(contains("CONSUL_HTTP_PORT"))' | tee /dev/stderr)
+      yq '[.env[4].name] | any(contains("CONSUL_HTTP_PORT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[4].value] | any_c(contains("8501"))' | tee /dev/stderr)
+      yq '[.env[4].value] | any(contains("8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1824,11 +1824,11 @@ load _helpers
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq '[.env[4].name] | any_c(contains("CONSUL_HTTP_PORT"))' | tee /dev/stderr)
+      yq '[.env[4].name] | any(contains("CONSUL_HTTP_PORT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[4].value] | any_c(contains("443"))' | tee /dev/stderr)
+      yq '[.env[4].value] | any(contains("443"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1843,7 +1843,7 @@ load _helpers
       --set 'externalServers.hosts[0]=1.1.1.1' \
       --set 'externalServers.httpsPort=443' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-server-port=8501"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-server-port=8501"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1858,7 +1858,7 @@ load _helpers
       --set 'externalServers.hosts[0]=1.1.1.1' \
       --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-consul-ca-cert=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1876,11 +1876,11 @@ load _helpers
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq '[.env[8].name] | any_c(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
+      yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[8].value] | any_c(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+      yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1897,11 +1897,11 @@ load _helpers
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq '[.env[8].name] | any_c(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
+      yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[8].value] | any_c(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+      yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1919,11 +1919,11 @@ load _helpers
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-      yq '[.env[9].name] | any_c(contains("CONSUL_TLS_SERVER_NAME"))' | tee /dev/stderr)
+      yq '[.env[9].name] | any(contains("CONSUL_TLS_SERVER_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo "$object" |
-      yq '[.env[9].value] | any_c(contains("foo"))' | tee /dev/stderr)
+      yq '[.env[9].value] | any(contains("foo"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1991,7 +1991,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-auth-method-host"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -2004,7 +2004,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-auth-method-name-prefix=release-name-consul"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-name-prefix=release-name-consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2015,7 +2015,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.authMethod.name=cluster-b' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-auth-method-name-prefix=cluster-b"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-name-prefix=cluster-b"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2025,7 +2025,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-create-auth-methods=true"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-auth-methods=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2036,7 +2036,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.authMethod.create=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-create-auth-methods=false"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-auth-methods=false"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2048,7 +2048,7 @@ load _helpers
       --set 'externalServers.k8sAuthMethodHost=foo.com' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-auth-method-host"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -2063,7 +2063,7 @@ load _helpers
       --set 'externalServers.hosts[0]=foo.com' \
       --set 'externalServers.k8sAuthMethodHost=foo.com' \
       . | tee /dev/stderr|
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-auth-method-host=foo.com"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host=foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2080,7 +2080,7 @@ load _helpers
       --set 'global.federation.k8sAuthMethodHost=foo.com' \
       --set 'meshGateway.enabled=true' \
       . | tee /dev/stderr|
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-auth-method-host=foo.com"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host=foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2097,7 +2097,7 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any_c(contains("-federation"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-federation"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2157,7 +2157,7 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any_c(contains("-log-level=info"))' | tee /dev/stderr)
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2171,7 +2171,7 @@ load _helpers
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any_c(contains("-log-level=debug"))' | tee /dev/stderr)
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2275,7 +2275,7 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$( echo "$command" |
-    yq 'any_c(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -2291,7 +2291,7 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$( echo "$command" |
-    yq 'any_c(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2308,6 +2308,6 @@ load _helpers
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
   local actual=$( echo "$command" |
-    yq 'any_c(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
