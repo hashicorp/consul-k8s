@@ -176,12 +176,12 @@ spec:
             echo "Waiting for Consul leader..."
             {{- if .Values.global.tls.enabled }}
             {{- if and .Values.externalServers.enabled .Values.externalServers.useSystemRoots }}
-            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null)
+            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
             {{- else }}
-            leader=$(curl -s --cacert "${CONSUL_CACERT}" "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null)
+            leader=$(curl -s --cacert "${CONSUL_CACERT}" "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
             {{- end }}
             {{- else }}
-            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null)
+            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
             {{- end }}
             if echo "${leader}" | grep -qE '".+"'; then
               echo "Consul leader is ready: ${leader}"
