@@ -144,6 +144,7 @@ load _helpers
       --set 'global.enabled=false' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo' \
@@ -155,12 +156,12 @@ load _helpers
   [ "${actual}" = "0" ]
 
   local actual=$(printf '%s\n' "$job" |
-    yq -r '[.spec.template.spec.volumes[]? | select(.name == "consul-ca-cert")] | length' | tee /dev/stderr)
-  [ "${actual}" = "0" ]
+    yq -r '[.spec.template.spec.volumes // [] | .[].name] | contains(["consul-ca-cert"])' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 
   local actual=$(printf '%s\n' "$job" |
-    yq -r '[.spec.template.spec.containers[0].volumeMounts[]? | select(.name == "consul-ca-cert")] | length' | tee /dev/stderr)
-  [ "${actual}" = "0" ]
+    yq -r '[.spec.template.spec.containers[0].volumeMounts // [] | .[].name] | contains(["consul-ca-cert"])' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "partitionInit/Job: can overwrite CA secret with the provided one" {
