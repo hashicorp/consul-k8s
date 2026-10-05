@@ -115,7 +115,7 @@ load _helpers
       --set 'client.join[0]=1.1.1.1' \
       --set 'client.join[1]=2.2.2.2' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command')
+      yq -c '.spec.template.spec.containers[0].command')
 
   local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"1.1.1.1\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -134,7 +134,7 @@ load _helpers
       --set 'externalServers.hosts[0]=foo' \
       --set 'client.join[0]=provider=my-cloud config=val' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command')
+      yq -c '.spec.template.spec.containers[0].command')
 
   local actual=$(echo "$command" | yq '. | any_c(contains("-retry-join=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -218,7 +218,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
   [ "${actual}" = '{"limits":{"cpu":"100m","memory":"100Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
 }
 
@@ -609,7 +609,7 @@ load _helpers
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command | join(" ") | contains("telemetry { prometheus_retention_time = \"1m\" }")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].command | join(" ") | contains("telemetry { prometheus_retention_time = \"1m\" }")' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }
@@ -623,7 +623,7 @@ load _helpers
       --set 'global.metrics.enableAgentMetrics=true'  \
       --set 'global.metrics.agentMetricsRetentionTime=5m'  \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command | join(" ") | contains("telemetry { prometheus_retention_time = \"5m\" }")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].command | join(" ") | contains("telemetry { prometheus_retention_time = \"5m\" }")' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }
@@ -902,7 +902,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'global.tls.httpsOnly=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command | join(" ") | contains("ports { http = -1 }")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].command | join(" ") | contains("ports { http = -1 }")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -913,7 +913,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command | join(" ") | contains("ports { grpc = -1, grpc_tls = 8502 }")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].command | join(" ") | contains("ports { grpc = -1, grpc_tls = 8502 }")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -923,7 +923,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command | join(" ") | contains("ports { grpc = 8502, grpc_tls = -1 }")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].command | join(" ") | contains("ports { grpc = 8502, grpc_tls = -1 }")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -946,7 +946,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+      yq -c '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo "$env" | jq -r '. | select(.name == "CONSUL_ADDRESSES") | .value' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-server.default.svc" ]
@@ -962,7 +962,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+      yq -c '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo "$env" | jq -r '. | select(.name == "CONSUL_ADDRESSES") | .value' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-server.default.svc" ]
@@ -991,7 +991,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+      yq -c '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo "$env" | jq -r '. | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
     [ "${actual}" = "/consul/tls/ca/tls.crt" ]
@@ -1027,7 +1027,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
   local actual
   actual=$(echo "$env" | jq -r '. | select(.name == "CONSUL_HTTP_ADDR") | .value' | tee /dev/stderr)
@@ -1135,7 +1135,7 @@ load _helpers
       --set 'global.tls.caKey.secretName=foo-ca-key' \
       --set 'global.tls.caKey.secretKey=key' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec' | tee /dev/stderr)
+      yq '.spec.template.spec' | tee /dev/stderr)
 
   # check that the provided ca cert secret is attached as a volume
   local actual
@@ -2020,7 +2020,7 @@ rollingUpdate:
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"consul-license","secret":{"secretName":"foo"}}' ]
 }
 
@@ -2032,7 +2032,7 @@ rollingUpdate:
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"consul-license","mountPath":"/consul/license","readOnly":true}' ]
 }
 
@@ -2044,7 +2044,7 @@ rollingUpdate:
       --set 'global.enterpriseLicense.secretName=foo' \
       --set 'global.enterpriseLicense.secretKey=bar' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
       [ "${actual}" = '{"name":"CONSUL_LICENSE_PATH","value":"/consul/license/bar"}' ]
 }
 
@@ -2057,7 +2057,7 @@ rollingUpdate:
       --set 'global.enterpriseLicense.secretKey=bar' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = "" ]
 }
 
@@ -2070,7 +2070,7 @@ rollingUpdate:
       --set 'global.enterpriseLicense.secretKey=bar' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = "" ]
 }
 
@@ -2083,7 +2083,7 @@ rollingUpdate:
       --set 'global.enterpriseLicense.secretKey=bar' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_LICENSE_PATH")' | tee /dev/stderr)
       [ "${actual}" = "" ]
 }
 
@@ -2120,7 +2120,7 @@ rollingUpdate:
       --set 'client.enabled=true' \
       --set 'global.recursors[0]=1.2.3.4' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command | join(" ") | contains("-recursor=\"1.2.3.4\"")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].command | join(" ") | contains("-recursor=\"1.2.3.4\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 #--------------------------------------------------------------------
@@ -2134,7 +2134,7 @@ rollingUpdate:
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.adminPartitions.enabled=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"default\"")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"default\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2150,7 +2150,7 @@ rollingUpdate:
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=bar' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"test\"")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].command | join(" ") | contains("partition = \"test\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2472,7 +2472,7 @@ rollingUpdate:
     --set 'global.gossipEncryption.secretName=a/b/c/d' \
     --set 'global.gossipEncryption.secretKey=gossip' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec' | tee /dev/stderr)
+      yq '.spec.template.spec' | tee /dev/stderr)
 
 
   local actual=$(echo "$object" |
@@ -2494,7 +2494,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
@@ -2512,7 +2512,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
@@ -2530,7 +2530,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
@@ -2549,7 +2549,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
   [ "${actual}" = "ca" ]
@@ -2597,7 +2597,7 @@ rollingUpdate:
     --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
     --set 'server.serverCert.secretName=pki_int/issue/test' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec' | tee /dev/stderr)
+      yq '.spec.template.spec' | tee /dev/stderr)
 
 
   local actual=$(echo "$object" |
@@ -2681,7 +2681,7 @@ rollingUpdate:
     --set 'global.enterpriseLicense.secretName=a/b/c/d' \
     --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
     . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
   local actual
 
@@ -2700,7 +2700,7 @@ rollingUpdate:
       --set 'global.enterpriseLicense.secretName=a/b/c/d' \
       --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.volumes[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = "" ]
 }
 
@@ -2715,7 +2715,7 @@ rollingUpdate:
       --set 'global.enterpriseLicense.secretName=a/b/c/d' \
       --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "consul-license")' | tee /dev/stderr)
       [ "${actual}" = "" ]
 }
 
@@ -2738,7 +2738,7 @@ rollingUpdate:
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+      yq -c '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo "$env" | jq -r '. | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
     [ "${actual}" = "/vault/secrets/serverca.crt" ]

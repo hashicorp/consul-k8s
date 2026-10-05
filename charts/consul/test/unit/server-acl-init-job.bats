@@ -533,7 +533,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
       yq '[.env[7].name] | any_c(contains("CONSUL_USE_TLS"))' | tee /dev/stderr)
@@ -583,7 +583,7 @@ load _helpers
       --set 'global.tls.caKey.secretName=foo-ca-key' \
       --set 'global.tls.caKey.secretKey=key' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec.volumes[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+      yq '.spec.template.spec.volumes[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
 
   # check that the provided ca cert secret is attached as a volume
   local actual
@@ -653,7 +653,7 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check annotations
   actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
@@ -789,7 +789,7 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check annotations
   local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
@@ -845,7 +845,7 @@ load _helpers
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
@@ -872,7 +872,7 @@ load _helpers
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
@@ -899,7 +899,7 @@ load _helpers
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
@@ -927,7 +927,7 @@ load _helpers
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
   [ "${actual}" = "ca" ]
@@ -952,7 +952,7 @@ load _helpers
     --set 'global.acls.replicationToken.secretName=/vault/secret' \
     --set 'global.acls.replicationToken.secretKey=token' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
   local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
@@ -994,7 +994,7 @@ load _helpers
     --set 'global.acls.bootstrapToken.secretName=/vault/bootstrap' \
     --set 'global.acls.bootstrapToken.secretKey=token' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
   local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
@@ -1051,7 +1051,7 @@ load _helpers
     --set "global.adminPartitions.name=default" \
     --set 'global.enableConsulNamespaces=true' \
     . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
   local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
@@ -1095,7 +1095,7 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template.metadata.annotations' | tee /dev/stderr)
+      yq '.spec.template.metadata.annotations' | tee /dev/stderr)
 
   local expected=$(echo '{
     "consul.hashicorp.com/connect-inject": "false",
@@ -1780,7 +1780,7 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
   local actual=$(echo "$object" |
       yq '[.env[2].name] | any_c(contains("CONSUL_ADDRESSES"))' | tee /dev/stderr)
@@ -1957,7 +1957,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=name' \
       --set 'global.acls.bootstrapToken.secretKey=key' \
-      . | yq -o=json '.spec.template' | tee /dev/stderr)
+      . | yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-name=name"))')
   [ "${actual}" = "true" ]
@@ -1975,7 +1975,7 @@ load _helpers
       --set 'global.acls.bootstrapToken.secretKey=key' \
       --set 'global.acls.replicationToken.secretName=replication' \
       --set 'global.acls.replicationToken.secretKey=token' \
-      . | yq -o=json '.spec.template' | tee /dev/stderr)
+      . | yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-name=name"))')
   [ "${actual}" = "true" ]
@@ -2184,7 +2184,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -o=json -I=0 '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
   [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
 }
 
