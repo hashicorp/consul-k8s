@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 // Volume names, mount paths, and identities for terminating-gateway Vault-only
@@ -100,7 +101,7 @@ func applyTerminatingGatewayCredentialInjection(
 			campVaultAgentContainer("camp-vault-agent-init", true, ci, imagePullPolicy),
 		)
 		podSpec.Containers = append(podSpec.Containers,
-			campVaultAgentContainer("camp-vault-agent", false, ci, imagePullPolicy),
+			campVaultAgentContainer(constants.CredentialVaultAgentContainerName, false, ci, imagePullPolicy),
 		)
 	}
 	podSpec.Containers = append(podSpec.Containers,
@@ -316,7 +317,7 @@ func campAuthProcessorContainer(
 	}
 
 	container := corev1.Container{
-		Name:            "camp-auth-processor",
+		Name:            constants.CredentialProcessorContainerName,
 		Image:           ci.ProcessorImage,
 		ImagePullPolicy: imagePullPolicy,
 		Command:         []string{"camp-auth-processor"},
