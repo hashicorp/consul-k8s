@@ -323,8 +323,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					}
 
 					if isGateway(pod) {
+						gatewayHealth, overridden := credentialGatewayHealth(pod, healthStatus)
+						if overridden {
+							r.Log.Info("Vault Agent sidecar not ready; credential-injection gateway stays healthy",
+								"name", pod.Name, "ns", pod.Namespace)
+						}
 						serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
-						if err = r.registerGateway(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
+						if err = r.registerGateway(apiClient, pod, address.IP, serviceEndpoints, gatewayHealth); err != nil {
 							r.Log.Error(err, "failed to register gateway or health check", "name", serviceName, "ns", serviceNamespace)
 							errs = multierror.Append(errs, err)
 						}
@@ -378,10 +383,13 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 						Name:      svcName,
 						Namespace: obj.GetNamespace(),
 					},
-				}}
+				}				}
 			},
-		)).
-		Complete(r)
+			)).
+			// Container readiness inside a credential-injection gateway pod can
+			// change without changing the pod's EndpointSlice readiness.
+			Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForCredentialGatewayPod)).
+			Complete(r)
 }
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
