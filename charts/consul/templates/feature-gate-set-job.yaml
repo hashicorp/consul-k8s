@@ -170,6 +170,16 @@ spec:
           export CONSUL_HTTP_ADDR="http://${consul_host}:${CONSUL_HTTP_PORT}"
           {{- end }}
 
+          # Wait for the Consul server to be ready before setting feature gates.
+          while true; do
+            echo "Checking if Consul is ready..."
+            if consul members 2>/dev/null; then
+              break
+            fi
+            echo "Consul is not ready, retrying in 2s..."
+            sleep 2
+          done
+
           # Each line: <gate-name> <enabled|disabled>
           # To add a future gate, append a new line here.
           GATES="
