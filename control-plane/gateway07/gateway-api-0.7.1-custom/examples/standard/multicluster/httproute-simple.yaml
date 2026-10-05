@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 #$ Used in:
 #$ - geps/gep-1748.md
 kind: HTTPRoute
