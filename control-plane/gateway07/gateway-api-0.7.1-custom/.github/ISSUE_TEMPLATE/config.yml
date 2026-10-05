@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 contact_links:
 - name: "Issue regarding a specific implementation of the API"
   url: https://gateway-api.sigs.k8s.io/implementations/

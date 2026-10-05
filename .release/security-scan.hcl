@@ -1,4 +1,4 @@
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2018, 2026
 # SPDX-License-Identifier: MPL-2.0
 
 # These scan results are run as part of CRT workflows.
