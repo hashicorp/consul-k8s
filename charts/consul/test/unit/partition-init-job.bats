@@ -1,382 +1,730 @@
 #!/usr/bin/env bats
-# This file tests the helpers in _helpers.tpl.
 
 load _helpers
 
-#--------------------------------------------------------------------
-# consul.fullname
-# These tests use test-runner.yaml to test the consul.fullname helper
-# since we need an existing template that calls the consul.fullname helper.
+@test "partitionInit/Job: disabled by default" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/partition-init-job.yaml  \
+      .
+}
 
-@test "helper/consul.fullname: defaults to release-name-consul" {
+@test "partitionInit/Job: enabled with global.adminPartitions.enabled=true and server.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      . | tee /dev/stderr |
-      yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-test" ]
-}
-
-@test "helper/consul.fullname: fullnameOverride overrides the name" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set fullnameOverride=override \
-      . | tee /dev/stderr |
-      yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "override-test" ]
-}
-
-@test "helper/consul.fullname: fullnameOverride is truncated to 63 chars" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set fullnameOverride=abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz \
-      . | tee /dev/stderr |
-      yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk-test" ]
-}
-
-@test "helper/consul.fullname: fullnameOverride has trailing '-' trimmed" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set fullnameOverride=override- \
-      . | tee /dev/stderr |
-      yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "override-test" ]
-}
-
-@test "helper/consul.fullname: global.name overrides the name" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set global.name=override \
-      . | tee /dev/stderr |
-      yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "override-test" ]
-}
-
-@test "helper/consul.fullname: global.name is truncated to 63 chars" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set global.name=abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz \
-      . | tee /dev/stderr |
-      yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk-test" ]
-}
-
-@test "helper/consul.fullname: global.name has trailing '-' trimmed" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set global.name=override- \
-      . | tee /dev/stderr |
-      yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "override-test" ]
-}
-
-@test "helper/consul.fullname: nameOverride is supported" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set nameOverride=override \
-      . | tee /dev/stderr |
-      yq -r '.metadata.name' | tee /dev/stderr)
-  [ "${actual}" = "release-name-override-test" ]
-}
-
-#--------------------------------------------------------------------
-# template consul.fullname
-#
-# This test ensures that we use {{ template "consul.fullname" }} everywhere instead of
-# {{ .Release.Name }} because that's required in order to support the name
-# override settings fullnameOverride and global.name. In some cases, we need to
-# use .Release.Name. In those cases, add your exception to this list.
-#
-# If this test fails, you're likely using {{ .Release.Name }} where you should
-# be using {{ template "consul.fullname" }}
-@test "helper/consul.fullname: used everywhere" {
-  cd `chart_dir`
-  # Grep for uses of .Release.Name that aren't using it as a label.
-  local actual=$(grep -r '{{ .Release.Name }}' templates/*.yaml | grep -v -E 'release: |-release-name=' | tee /dev/stderr )
-  [ "${actual}" = '' ]
-}
-
-#--------------------------------------------------------------------
-# template namespace
-#
-# This test ensures that we set "namespace: " in every file. The exceptions are files with CRDs and clusterroles and
-# clusterrolebindings.
-#
-# If this test fails, you're likely missing setting the namespace.
-
-@test "helper/namespace: used everywhere" {
-  cd `chart_dir`
-  # Grep for files that don't have 'namespace: ' in them
-  local actual=$(grep -L 'namespace: ' templates/*.yaml | grep -v 'crd' | grep -v 'clusterrole' | grep -v 'gateway-gateway' | grep -v 'ai-validate.yaml' | grep -v 'consul.hashicorp.com_inferencegateways.yaml' | tee /dev/stderr )
-  [ "${actual}" = '' ]
-}
-
-#--------------------------------------------------------------------
-# component label
-#
-# This test ensures that we set a "component: <blah>" in every file.
-#
-# If this test fails, you're likely missing setting that label somewhere.
-
-@test "helper/component-label: used everywhere" {
-  cd `chart_dir`
-  # Grep for files that don't have 'component: ' in them
-  local actual=$(grep -L 'component: ' templates/*.yaml | grep -v 'ai-validate.yaml' | grep -v 'consul.hashicorp.com_inferencegateways.yaml' | tee /dev/stderr )
-  [ "${actual}" = '' ]
-}
-
-#--------------------------------------------------------------------
-# consul.getAutoEncryptClientCA
-# Similarly to consul.fullname tests, these tests use test-runner.yaml to test the
-# consul.getAutoEncryptClientCA helper since we need an existing template that calls
-# the consul.getAutoEncryptClientCA helper.
-
-@test "helper/consul.getAutoEncryptClientCA: get-auto-encrypt-client-ca uses server's stateful set address by default and passes ca cert" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/tests/test-runner.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
-
-  # check server address
-  actual=$(echo "$command" | yq '. | contains("-server-addr=release-name-consul-server")')
-  [ "${actual}" = "true" ]
-
-  # check server port
-  actual=$(echo "$command" | yq '. | contains("-server-port=8501")')
-  [ "${actual}" = "true" ]
-
-  # check server's CA cert
-  actual=$(echo "$command" | yq '. | contains("-ca-file=/consul/tls/ca/tls.crt")')
-  [ "${actual}" = "true" ]
-}
-
-@test "helper/consul.getAutoEncryptClientCA: can set the provided server hosts if externalServers.enabled is true" {
-  cd `chart_dir`
-  local command=$(helm template \
-      -s templates/tests/test-runner.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'server.enabled=false' \
+      --set 'global.adminPartitions.name=bar' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=consul.io' \
+      --set 'externalServers.hosts[0]=foo' \
       . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
-
-  # check server address
-  actual=$(echo "$command" | yq '. | contains("-server-addr=\"consul.io\"")')
-  [ "${actual}" = "true" ]
-
-  # check the default server port is 443 if not provided
-  actual=$(echo "$command" | yq '. | contains("-server-port=8501")')
-  [ "${actual}" = "true" ]
-
-  # check server's CA cert
-  actual=$(echo "$command" | yq '. | contains("-ca-file=/consul/tls/ca/tls.crt")')
+      yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: fails if externalServers.enabled is true but externalServers.hosts are not provided" {
+@test "partitionInit/Job: disabled with global.adminPartitions.enabled=true and servers = true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=true' \
+      .
+}
+
+@test "partitionInit/Job: disabled with global.adminPartitions.enabled=true and adminPartition.name = default" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=false' \
+      .
+}
+
+@test "partitionInit/Job: disabled with global.adminPartitions.enabled=true and global.enabled = true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.enabled=true' \
+      .
+}
+
+@test "partitionInit/Job: disabled with global.adminPartitions.enabled=false" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.adminPartitions.enabled=false' \
+      .
+}
+
+@test "partitionInit/Job: fails if externalServers.enabled = false with non-default adminPartition" {
   cd `chart_dir`
   run helm template \
-      -s templates/tests/test-runner.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'externalServers.enabled=true' .
+      -s templates/partition-init-job.yaml  \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=false' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "externalServers.hosts must be set if externalServers.enabled is true" ]]
+  [[ "$output" =~ "externalServers.enabled needs to be true and configured to create a non-default partition." ]]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: can set the provided port if externalServers.enabled is true" {
+@test "partitionInit/Job: consul env defaults" {
   cd `chart_dir`
-  local command=$(helm template \
-      -s templates/tests/test-runner.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.enabled=false' \
+  local env=$(helm template \
+      -s templates/partition-init-job.yaml \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=consul.io' \
-      --set 'externalServers.httpsPort=443' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'server.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ")' | tee /dev/stderr)
+      yq -o=json '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
-  # check server address
-  actual=$(echo "$command" | yq '. | contains("-server-addr=\"consul.io\"")')
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_ADDRESSES").value' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
 
-  # check the default server port is 443 if not provided
-  actual=$(echo "$command" | yq '. | contains("-server-port=443")')
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_GRPC_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8502" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8501" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_DATACENTER").value' | tee /dev/stderr)
+  [ "${actual}" = "dc1" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_API_TIMEOUT").value' | tee /dev/stderr)
+  [ "${actual}" = "5s" ]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: can pass cloud auto-join string to server address via externalServers.hosts" {
+#--------------------------------------------------------------------
+# global.tls.enabled
+
+@test "partitionInit/Job: sets TLS env vars when global.tls.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml  \
+  local env=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.enabled=false' \
+      --set 'global.adminPartitions.name=bar' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=provider=my-cloud config=val' \
+      --set 'externalServers.hosts[0]=foo' \
       . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | any(contains("-server-addr=\"provider=my-cloud config=val\""))' | tee /dev/stderr)
+      yq -o=json '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_HTTP_PORT").value' | tee /dev/stderr)
+  [ "${actual}" = "8501" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_USE_TLS").value' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: can set TLS server name if externalServers.enabled is true" {
+@test "partitionInit/Job: does not set consul ca cert when .externalServers.useSystemRoots is true" {
   cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml  \
+  local spec=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
       --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=consul.io' \
-      --set 'externalServers.tlsServerName=custom-server-name' \
-      . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ") | contains("-tls-server-name=custom-server-name")' | tee /dev/stderr)
-
-  [ "${actual}" = "true" ]
-}
-
-@test "helper/consul.getAutoEncryptClientCA: doesn't provide the CA if externalServers.enabled is true and externalServers.useSystemRoots is true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=consul.io' \
+      --set 'externalServers.hosts[0]=foo' \
       --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").command | join(" ") | contains("-ca-file=/consul/tls/ca/tls.crt")' | tee /dev/stderr)
+      yq -o=json '.spec.template.spec' | tee /dev/stderr)
 
+  local actual=$(echo "$spec" |
+    jq -r '.containers[0].env[] | select(.name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" |
+    jq -r '.volumes[]? | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo "$spec" |
+    jq -r '.containers[0].volumeMounts[]? | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+}
+
+@test "partitionInit/Job: can overwrite CA secret with the provided one" {
+  cd `chart_dir`
+  local ca_cert_volume=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo-ca-cert' \
+      --set 'global.tls.caCert.secretKey=key' \
+      --set 'global.tls.caKey.secretName=foo-ca-key' \
+      --set 'global.tls.caKey.secretKey=key' \
+      . | tee /dev/stderr |
+      yq -o=json '.spec.template.spec.volumes[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
+
+  # check that the provided ca cert secret is attached as a volume
+  local actual
+  actual=$(printf '%s\n' "$ca_cert_volume" | jq -r '.secret.secretName' | tee /dev/stderr)
+  [ "${actual}" = "foo-ca-cert" ]
+
+  # check that the volume uses the provided secret key
+  actual=$(printf '%s\n' "$ca_cert_volume" | jq -r '.secret.items[0].key' | tee /dev/stderr)
+  [ "${actual}" = "key" ]
+}
+
+#--------------------------------------------------------------------
+# global.acls.bootstrapToken
+
+@test "partitionInit/Job: CONSUL_ACL_TOKEN is set when global.acls.bootstrapToken is provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.acls.bootstrapToken.secretName=partition-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN")] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# partition reserved name
+
+@test "partitionInit/Job: fails when adminPartitions.name=system" {
+  reservedNameTest "system"
+}
+
+@test "partitionInit/Job: fails when adminPartitions.name=universal" {
+  reservedNameTest "universal"
+}
+
+@test "partitionInit/Job: fails when adminPartitions.name=operator" {
+  reservedNameTest "operator"
+}
+
+@test "partitionInit/Job: fails when adminPartitions.name=root" {
+  reservedNameTest "root"
+}
+
+# reservedNameTest is a helper function that tests if certain partition names
+# fail because the name is reserved.
+reservedNameTest() {
+  cd `chart_dir`
+  local -r name="$1"
+		run helm template \
+				-s templates/partition-init-job.yaml  \
+				--set 'global.enabled=false' \
+				--set 'externalServers.enabled=true' \
+                --set 'externalServers.hosts[0]=foo' \
+				--set 'global.adminPartitions.enabled=true' \
+				--set "global.adminPartitions.name=$name" .
+
+		[ "$status" -eq 1 ]
+		[[ "$output" =~ "The name $name set for key global.adminPartitions.name is reserved by Consul for future use" ]]
+}
+
+#--------------------------------------------------------------------
+# Vault
+
+@test "partitionInit/Job: fails when vault and ACLs are enabled but adminPartitionsRole is not provided" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=boot' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=test' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "global.secretsBackend.vault.adminPartitionsRole is required when global.secretsBackend.vault.enabled and global.acls.manageSystemACLs are true." ]]
+}
+
+@test "partitionInit/Job: configures vault annotations when ACLs are enabled but TLS disabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.adminPartitionsRole=aprole' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check annotations
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "aprole" ]
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-bootstrap-token"')
+  [ "${actual}" = "foo" ]
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-bootstrap-token"')
+  local expected=$'{{- with secret \"foo\" -}}\n{{- .Data.data.bar -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  # Check that the bootstrap token flag is set to the path of the Vault secret.
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
+  [ "${actual}" = "/vault/secrets/bootstrap-token" ]
+
+  # Check that no (secret) volumes are not attached
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
+}
+
+@test "partitionInit/Job: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(printf '%s\n' "$cmd" |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "partitionInit/Job: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set without vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/agent-extra-secret: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(printf '%s\n' "$cmd" |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "partitionInit/Job: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(printf '%s\n' "$cmd" |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "bar" ]
+}
+
+@test "partitionInit/Job: configures server CA to come from vault when vault and TLS are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check annotations
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "carole" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
+  [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
+
+  # Check that the consul-ca-cert volume is not attached
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
+}
+
+@test "partitionInit/Job: configures vault annotations when both ACLs and TLS are enabled" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.adminPartitionsRole=aprole' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  # Check annotations
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  [ "${actual}" = "aprole" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
+  [ "${actual}" = "foo" ]
+  local actual
+  actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
+  [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-bootstrap-token"')
+  [ "${actual}" = "foo" ]
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-bootstrap-token"')
+  local expected=$'{{- with secret \"foo\" -}}\n{{- .Data.data.bar -}}\n{{- end -}}'
+  [ "${actual}" = "${expected}" ]
+
+  # Check that the bootstrap token flag is set to the path of the Vault secret.
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").env[] | select(.name=="CONSUL_ACL_TOKEN_FILE").value')
+  [ "${actual}" = "/vault/secrets/bootstrap-token" ]
+
+  # Check that the consul-ca-cert volume is not attached
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
+  [ "${actual}" = "true" ]
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="partition-init-job").volumeMounts == null')
+  [ "${actual}" = "true" ]
+}
+
+@test "partitionInit/Job: vault CA is not configured by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/partition-init-job.yaml  \
+    --set 'global.enabled=false' \
+    --set 'global.adminPartitions.enabled=true' \
+    --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
+    --set 'externalServers.enabled=true' \
+    --set 'externalServers.hosts[0]=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: doesn't mount the consul-ca-cert volume if externalServers.enabled is true and externalServers.useSystemRoots is true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/tests/test-runner.yaml  \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=consul.io' \
-      --set 'externalServers.useSystemRoots=true' \
-      . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca").volumeMounts[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
-
-  [ "${actual}" = "" ]
-}
-
-@test "helper/consul.getAutoEncryptClientCA: uses the correct -ca-file when vault is enabled and external servers disabled" {
+@test "partitionInit/Job: vault CA is not configured when secretName is set but secretKey is not" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/tests/test-runner.yaml  \
-      --set 'global.secretsBackend.vault.enabled=true' \
-      --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.consulServerRole=foo' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.serverCert.secretName=pki_int/issue/test' \
-      --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
-      . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
+    -s templates/partition-init-job.yaml  \
+    --set 'global.enabled=false' \
+    --set 'global.adminPartitions.enabled=true' \
+    --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
+    --set 'externalServers.enabled=true' \
+    --set 'externalServers.hosts[0]=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
+    --set 'global.secretsBackend.vault.ca.secretName=ca' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
 
-  actual=$(echo "$object" | yq '.command | join(" ") | contains("-ca-file=/vault/secrets/serverca.crt")')
-  [ "${actual}" = "true" ]
-
-  actual=$(echo "$object" | yq '.volumeMounts[] | select(.name == "consul-ca-cert")')
-  [ "${actual}" = "" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  [ "${actual}" = "false" ]
 }
 
-@test "helper/consul.getAutoEncryptClientCA: uses the correct -ca-file when vault and external servers is enabled" {
+@test "partitionInit/Job: vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/tests/test-runner.yaml  \
-      --set 'global.secretsBackend.vault.enabled=true' \
-      --set 'global.secretsBackend.vault.consulClientRole=test' \
-      --set 'global.secretsBackend.vault.consulServerRole=foo' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.serverCert.secretName=pki_int/issue/test' \
-      --set 'global.tls.caCert.secretName=pki_int/ca/pem' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=consul.io' \
-      . | tee /dev/stderr |
-      yq '.spec.initContainers[] | select(.name == "get-auto-encrypt-client-ca")' | tee /dev/stderr)
+    -s templates/partition-init-job.yaml  \
+    --set 'global.enabled=false' \
+    --set 'global.adminPartitions.enabled=true' \
+    --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
+    --set 'externalServers.enabled=true' \
+    --set 'externalServers.hosts[0]=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
+    --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
 
-  actual=$(echo "$object" | yq '.command | join(" ") | contains("-ca-file=/vault/secrets/serverca.crt")')
-  [ "${actual}" = "true" ]
-
-  actual=$(echo "$object" | yq '.volumeMounts[] | select(.name == "consul-ca-cert")')
-  [ "${actual}" = "" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  [ "${actual}" = "false" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  [ "${actual}" = "false" ]
 }
 
+@test "partitionInit/Job: vault CA is configured when both secretName and secretKey are set" {
+  cd `chart_dir`
+  local object=$(helm template \
+    -s templates/partition-init-job.yaml  \
+    --set 'global.enabled=false' \
+    --set 'global.adminPartitions.enabled=true' \
+    --set "global.adminPartitions.name=bar" \
+    --set 'global.enableConsulNamespaces=true' \
+    --set 'externalServers.enabled=true' \
+    --set 'externalServers.hosts[0]=foo' \
+    --set 'global.tls.enabled=true' \
+    --set 'global.tls.enableAutoEncrypt=true' \
+    --set 'global.tls.caCert.secretName=foo' \
+    --set 'global.secretsBackend.vault.enabled=true' \
+    --set 'global.secretsBackend.vault.consulClientRole=foo' \
+    --set 'global.secretsBackend.vault.consulCARole=carole' \
+    --set 'global.secretsBackend.vault.ca.secretName=ca' \
+    --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+    . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
+  [ "${actual}" = "ca" ]
+  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
+  [ "${actual}" = "/vault/custom/tls.crt" ]
+}
 
 #--------------------------------------------------------------------
-# consul.imagePullPolicy
-# These tests use test-runner.yaml to "unit test" the imagePullPolicy function
+# Vault agent annotations
 
-@test "helper/consul.imagePullPolicy: bad input" {
+@test "partitionInit/Job: no vault agent annotations defined by default" {
   cd `chart_dir`
-  run helm template \
-      -s templates/tests/test-runner.yaml \
-      --set 'global.imagePullPolicy=Garbage' .
- [ "$status" -eq 1 ]
- [[ "$output" =~ "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" ]]
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."vault.hashicorp.com/agent-inject") |
+      del(."vault.hashicorp.com/agent-pre-populate-only") |
+      del(."vault.hashicorp.com/role") |
+      del(."vault.hashicorp.com/agent-inject-secret-serverca.crt") |
+      del(."vault.hashicorp.com/agent-inject-template-serverca.crt")' |
+      tee /dev/stderr)
+  [ "${actual}" = "{}" ]
 }
 
-@test "helper/consul.imagePullPolicy: empty input" {
+@test "partitionInit/Job: vault agent annotations can be set" {
   cd `chart_dir`
-  local output=$(helm template \
-      -s templates/tests/test-runner.yaml \
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' \
       . | tee /dev/stderr |
-      yq -r '.spec.containers[0].imagePullPolicy' | tee /dev/stderr)
-  [ "${output}" = null ]
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
 }
 
-@test "helper/consul.imagePullPolicy: IfNotPresent" {
+#--------------------------------------------------------------------
+# extraLabels
+
+@test "partitionInit/Job: no extra labels defined by default" {
   cd `chart_dir`
-  local output=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set 'global.imagePullPolicy=IfNotPresent' \
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=false' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       . | tee /dev/stderr |
-      yq -r '.spec.containers[0].imagePullPolicy' | tee /dev/stderr)
-  [ "${output}" = "IfNotPresent" ]
+      yq -r '.spec.template.metadata.labels | del(."app") | del(."chart") | del(."release") | del(."component")' | tee /dev/stderr)
+  [ "${actual}" = "{}" ]
 }
 
-@test "helper/consul.imagePullPolicy: Always" {
+@test "partitionInit/Job: extra global labels can be set" {
   cd `chart_dir`
-  local output=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set 'global.imagePullPolicy=Always' \
-      . | tee /dev/stderr |
-      yq -r '.spec.containers[0].imagePullPolicy' | tee /dev/stderr)
-  [ "${output}" = "Always" ]
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=false' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.extraLabels.foo=bar' \
+      . | tee /dev/stderr)
+  local actualBar=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
+  [ "${actualBar}" = "bar" ]
+  local actualTemplateBar=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  [ "${actualTemplateBar}" = "bar" ]
 }
 
-@test "helper/consul.imagePullPolicy: Never" {
+@test "partitionInit/Job: multiple global extra labels can be set" {
   cd `chart_dir`
-  local output=$(helm template \
-      -s templates/tests/test-runner.yaml \
-      --set 'global.imagePullPolicy=Never' \
-      . | tee /dev/stderr |
-      yq -r '.spec.containers[0].imagePullPolicy' | tee /dev/stderr)
-  [ "${output}" = "Never" ]
+  local actual=$(helm template \
+      -s templates/partition-init-job.yaml \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=false' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.extraLabels.foo=bar' \
+      --set 'global.extraLabels.baz=qux' \
+      . | tee /dev/stderr)
+  local actualFoo=$(echo "${actual}" | yq -r '.metadata.labels.foo' | tee /dev/stderr)
+  local actualBaz=$(echo "${actual}" | yq -r '.metadata.labels.baz' | tee /dev/stderr)
+  [ "${actualFoo}" = "bar" ]
+  [ "${actualBaz}" = "qux" ]
+  local actualTemplateFoo=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.foo' | tee /dev/stderr)
+  local actualTemplateBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
+  [ "${actualTemplateFoo}" = "bar" ]
+  [ "${actualTemplateBaz}" = "qux" ]
 }

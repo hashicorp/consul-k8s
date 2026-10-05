@@ -214,6 +214,22 @@ Setting feature gate: consul-ai=disabled
 https://[2001:db8::1]:8501" ]
 }
 
+@test "feature-gate-set/Job: applies externalServers.tlsServerName to curl and the Consul CLI" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=192.0.2.1' \
+      --set 'externalServers.tlsServerName=consul.example.com' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+  echo "${actual}" | grep -q 'export CONSUL_TLS_SERVER_NAME="consul.example.com"'
+  echo "${actual}" | grep -q 'export CONSUL_CURL_ADDR="https://${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}"'
+  echo "${actual}" | grep -q -- '--connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}"'
+}
+
 #--------------------------------------------------------------------
 # global.tls.enabled
 
@@ -941,6 +957,45 @@ https://[2001:db8::1]:8501" ]
       --set 'global.tls.caCert.secretName=pki/ca' .
   [ "$status" -eq 1 ]
   [[ "$output" == *"global.secretsBackend.vault.consulCARole is required"* ]]
+}
+
+@test "feature-gate-set/Job: does not require or inject a Vault CA when external servers use system roots" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul.example.com' \
+      --set 'externalServers.useSystemRoots=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      . | tee /dev/stderr |
+      yq '.spec.template.metadata.annotations' | tee /dev/stderr)
+  [ "$(echo "$annotations" | yq -r '."vault.hashicorp.com/agent-inject"')" = "null" ]
+  [ "$(echo "$annotations" | yq -r '."vault.hashicorp.com/agent-inject-secret-serverca.crt"')" = "null" ]
+}
+
+@test "feature-gate-set/Job: does not inject a Vault CA for an ACL token when external servers use system roots" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul.example.com' \
+      --set 'externalServers.useSystemRoots=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.acls.bootstrapToken.secretName=consul/data/bootstrap-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
+      . | tee /dev/stderr |
+      yq '.spec.template.metadata.annotations' | tee /dev/stderr)
+  [ "$(echo "$annotations" | yq -r '."vault.hashicorp.com/agent-inject"')" = "true" ]
+  [ "$(echo "$annotations" | yq -r '."vault.hashicorp.com/agent-inject-secret-serverca.crt"')" = "null" ]
 }
 
 @test "feature-gate-set/Job: no vault agent annotations when ACLs disabled even with Vault enabled" {

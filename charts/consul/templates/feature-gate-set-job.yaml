@@ -1,11 +1,14 @@
 {{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
 {{- if (or (and $serverEnabled (eq (int .Values.server.updatePartition) 0)) .Values.externalServers.enabled) }}
 {{- $useReplicationToken := and .Values.global.acls.manageSystemACLs (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.replicationToken.secretName -}}
+{{- $useExternalSystemRoots := and .Values.externalServers.enabled .Values.externalServers.useSystemRoots -}}
+{{- $useVaultACLToken := and .Values.global.secretsBackend.vault.enabled (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) -}}
+{{- $useVaultCA := and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled (not $useExternalSystemRoots) -}}
 {{- if or (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) (and .Values.global.acls.bootstrapToken.secretKey (not .Values.global.acls.bootstrapToken.secretName)) }}{{ fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided" }}{{ end -}}
 {{- if and .Values.global.acls.manageSystemACLs (or (and .Values.global.acls.replicationToken.secretName (not .Values.global.acls.replicationToken.secretKey)) (and .Values.global.acls.replicationToken.secretKey (not .Values.global.acls.replicationToken.secretName))) }}{{ fail "both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set if one of them is provided" }}{{ end -}}
 {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.manageSystemACLs (not (or .Values.global.acls.bootstrapToken.secretName $useReplicationToken)) }}{{ fail "global.acls.bootstrapToken or global.acls.replicationToken must be provided when global.secretsBackend.vault.enabled and global.acls.manageSystemACLs are true" }}{{ end -}}
 {{- if and .Values.global.secretsBackend.vault.enabled (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) (not .Values.global.secretsBackend.vault.featureGateSetRole) }}{{ fail "global.secretsBackend.vault.featureGateSetRole is required when the feature-gate-set job reads a Vault ACL token." }}{{ end -}}
-{{- if and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled (not (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName)) (not .Values.global.secretsBackend.vault.consulCARole) }}{{ fail "global.secretsBackend.vault.consulCARole is required when the feature-gate-set job reads only a Vault CA certificate." }}{{ end -}}
+{{- if and $useVaultCA (not $useVaultACLToken) (not .Values.global.secretsBackend.vault.consulCARole) }}{{ fail "global.secretsBackend.vault.consulCARole is required when the feature-gate-set job reads only a Vault CA certificate." }}{{ end -}}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
 {{- if .Values.externalServers.enabled -}}
 {{- $externalServerHost := .Values.externalServers.hosts | first | toString -}}
@@ -47,7 +50,7 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/mesh-inject": "false"
-        {{- if (and .Values.global.secretsBackend.vault.enabled (or .Values.global.tls.enabled .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName)) }}
+        {{- if or $useVaultCA $useVaultACLToken }}
         "vault.hashicorp.com/agent-pre-populate-only": "true"
         "vault.hashicorp.com/agent-inject": "true"
         {{- if (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) }}
@@ -64,7 +67,7 @@ spec:
         {{- else }}
         "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
         {{- end }}
-        {{- if .Values.global.tls.enabled }}
+        {{- if $useVaultCA }}
         "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
         "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
         {{- end }}
@@ -159,7 +162,11 @@ spec:
           esac
           {{- if .Values.global.tls.enabled }}
           export CONSUL_HTTP_ADDR="https://${consul_host}:${CONSUL_HTTP_PORT}"
-          {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+          {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+          export CONSUL_TLS_SERVER_NAME={{ .Values.externalServers.tlsServerName | quote }}
+          export CONSUL_CURL_ADDR="https://${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}"
+          {{- end }}
+          {{- if not $useExternalSystemRoots }}
           {{- if .Values.global.secretsBackend.vault.enabled }}
           export CONSUL_CACERT=/vault/secrets/serverca.crt
           {{- else }}
@@ -175,7 +182,13 @@ spec:
           while true; do
             echo "Waiting for Consul leader..."
             {{- if .Values.global.tls.enabled }}
-            {{- if and .Values.externalServers.enabled .Values.externalServers.useSystemRoots }}
+            {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+            {{- if $useExternalSystemRoots }}
+            leader=$(curl -s --connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}" "${CONSUL_CURL_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
+            {{- else }}
+            leader=$(curl -s --cacert "${CONSUL_CACERT}" --connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}" "${CONSUL_CURL_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
+            {{- end }}
+            {{- else if $useExternalSystemRoots }}
             leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
             {{- else }}
             leader=$(curl -s --cacert "${CONSUL_CACERT}" "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
