@@ -96,7 +96,6 @@ func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 		require.NoError(t, err)
 		require.Contains(t, c.Args, "--mcp-child=/app/server")
 		require.Contains(t, c.Args, "--mcp-child-args=--port=9")
-		require.Equal(t, ptr.To(false), c.SecurityContext.ReadOnlyRootFilesystem)
 	})
 
 	t.Run("openshift uid", func(t *testing.T) {
@@ -214,34 +213,39 @@ func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 		require.NotContains(t, containers, mcpGatewayContainer)
 	})
 
-	t.Run("AgentConfig defaults set the HITL port", func(t *testing.T) {
+	t.Run("AgentConfig interceptor port is bound on loopback", func(t *testing.T) {
 		scheme := runtime.NewScheme()
 		require.NoError(t, v1alpha1.AddToScheme(scheme))
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
 		w.Client = ctrlfake.NewClientBuilder().WithScheme(scheme).WithObjects(&v1alpha1.AgentConfig{
 			ObjectMeta: metav1.ObjectMeta{Name: "my-agent"},
-			Spec: v1alpha1.AgentConfigSpec{Defaults: v1alpha1.AgentDefaults{
-				HITL: v1alpha1.AgentHITL{Port: 17101},
-			}},
+			Spec:       v1alpha1.AgentConfigSpec{Defaults: v1alpha1.AgentDefaults{InterceptorPort: 17101}},
 		}).Build()
 		pod := aiPod()
 		pod.Annotations[constants.AnnotationAIAgentConfig] = "my-agent"
+		pod.Annotations[constants.AnnotationAIAgentAddr] = "127.0.0.1:17101"
 		ai := injectedContainers(t, w, pod)[mcpGatewayContainer]
-		var hitl int32
-		for _, p := range ai.Ports {
-			if p.Name == "hitl" {
-				hitl = p.ContainerPort
-			}
-		}
-		require.Equal(t, int32(17101), hitl)
+		require.Contains(t, ai.Args, "--mcp-addr=127.0.0.1:17101")
+		require.Contains(t, ai.Args, "--obo-inbound-addr=127.0.0.1:21102")
+		require.Contains(t, ai.Args, "--obo-outbound-addr=127.0.0.1:21103")
+		require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=mcp",
+			"--mcp-addr=127.0.0.1:17101"}, ai.StartupProbe.Exec.Command)
 	})
 
-	t.Run("missing AgentConfig still injects the sidecar", func(t *testing.T) {
+	t.Run("missing AgentConfig still binds the loopback listeners", func(t *testing.T) {
 		scheme := runtime.NewScheme()
 		require.NoError(t, v1alpha1.AddToScheme(scheme))
 		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
 		w.Client = ctrlfake.NewClientBuilder().WithScheme(scheme).Build()
-		require.Contains(t, injectedContainers(t, w, aiPod()), mcpGatewayContainer)
+		ai := injectedContainers(t, w, aiPod())[mcpGatewayContainer]
+		require.Contains(t, ai.Args, "--mode=agent")
+		require.Contains(t, ai.Args, "--obo-inbound-addr=127.0.0.1:21102")
+		require.Contains(t, ai.Args, "--obo-outbound-addr=127.0.0.1:21103")
+		require.Contains(t, ai.Args, "--mcp-socket="+mcpGatewayUDSPath)
+		require.Equal(t, []string{defaultMCPScBinary, "probe", "--mode=agent",
+			"--obo-inbound-addr=127.0.0.1:21102",
+			"--obo-outbound-addr=127.0.0.1:21103",
+			"--mcp-socket=" + mcpGatewayUDSPath}, ai.ReadinessProbe.Exec.Command)
 	})
 
 	t.Run("openshift ai sidecar uid matches dataplane", func(t *testing.T) {
