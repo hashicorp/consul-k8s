@@ -2653,6 +2653,7 @@ rollingUpdate:
     --set 'global.secretsBackend.vault.consulClientRole=foo' \
     --set 'global.secretsBackend.vault.consulServerRole=test' \
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclsrole' \
+    --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     --set 'global.enterpriseLicense.secretName=path/to/secret' \
     --set 'global.enterpriseLicense.secretKey=enterpriselicense' \
     --set 'global.acls.manageSystemACLs=true' \
