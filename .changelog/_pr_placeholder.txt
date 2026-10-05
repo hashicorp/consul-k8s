@@ -1,0 +1,3 @@
+```release-note:feature
+helm: add `server.exposeServicePerReplica` to create a per-replica Kubernetes Service (type `LoadBalancer`) for each Consul server, with an optional `advertise` mode that has each server look up and advertise its own per-replica Service's external address instead of its pod IP.
+```

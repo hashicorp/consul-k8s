@@ -1432,6 +1432,67 @@ server:
     # @type: string
     annotations: null
 
+  # Configures a dedicated Kubernetes Service of type LoadBalancer per server
+  # StatefulSet replica, so each Consul server can be reached individually
+  # from outside the Kubernetes cluster.
+  exposeServicePerReplica:
+    # When enabled, deploys one Kubernetes Service per server replica.
+    # @type: boolean
+    enabled: false
+    # When enabled, each server looks up its own per-replica Service's
+    # external address at startup and advertises that address instead of
+    # its pod IP. Has no effect unless `enabled` is also true. Defaults to
+    # false so existing clusters keep advertising their pod IP unless this
+    # is explicitly opted into.
+    # @type: boolean
+    advertise: false
+    # Ports to expose on each per-replica service. Defaults to the serf LAN
+    # (both TCP and UDP, since gossip uses both) and server RPC ports, which
+    # are the ports a server needs reachable from outside the Kubernetes
+    # network for other agents to join and communicate with it.
+    #
+    # ```yaml
+    # ports:
+    #   - name: serflan-tcp
+    #     port: 8301
+    #     targetPort: 8301
+    #     protocol: TCP
+    #   - name: serflan-udp
+    #     port: 8301
+    #     targetPort: 8301
+    #     protocol: UDP
+    #   - name: rpc
+    #     port: 8300
+    #     targetPort: 8300
+    # ```
+    #
+    # @type: array<map>
+    ports:
+      - name: serflan-tcp
+        port: 8301
+        targetPort: 8301
+        protocol: TCP
+      - name: serflan-udp
+        port: 8301
+        targetPort: 8301
+        protocol: UDP
+      - name: rpc
+        port: 8300
+        targetPort: 8300
+    # This value defines additional annotations for the per-replica server
+    # services. This should be formatted as a multi-line string.
+    #
+    # The replica's StatefulSet ordinal is available as `.index` so you can
+    # template a unique value per service, e.g. for external-dns:
+    #
+    # ```yaml
+    # annotations: |
+    #   external-dns.alpha.kubernetes.io/hostname: consul-server-{{ .index }}.example.com
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # Server service properties.
   service:
     # Annotations to apply to the server service.
