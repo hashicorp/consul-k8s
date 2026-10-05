@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/utils/ptr"
+	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -76,6 +77,26 @@ func TestAIAgentSidecarUsesDataplaneRunAs(t *testing.T) {
 				"--mcp-addr=127.0.0.1:21101"}, c.StartupProbe.Exec.Command, addr)
 			require.Contains(t, c.ReadinessProbe.Exec.Command, "--mcp-addr=127.0.0.1:21101", addr)
 		}
+	})
+
+	t.Run("invalid listener is returned to the caller", func(t *testing.T) {
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			constants.AnnotationAIAgentAddr: "10.0.0.1:21101",
+		}}}
+		_, err := w.aiAgentSidecar(pod, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
+		require.ErrorContains(t, err, "host must be empty or loopback")
+	})
+
+	t.Run("forwards mcp child binary and args", func(t *testing.T) {
+		pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			constants.AnnotationAIAgentChildBinary: "/app/server",
+			constants.AnnotationAIAgentChildArgs:   "--port=9",
+		}}}
+		c, err := w.aiAgentSidecar(pod, v1alpha1.AgentDefaults{}, sidecarUserAndGroupID, sidecarUserAndGroupID)
+		require.NoError(t, err)
+		require.Contains(t, c.Args, "--mcp-child=/app/server")
+		require.Contains(t, c.Args, "--mcp-child-args=--port=9")
+		require.Equal(t, ptr.To(false), c.SecurityContext.ReadOnlyRootFilesystem)
 	})
 
 	t.Run("openshift uid", func(t *testing.T) {
@@ -191,6 +212,36 @@ func TestHandleAIAgentCombinedSidecar(t *testing.T) {
 		delete(pod.Annotations, constants.AnnotationAIRole)
 		containers := injectedContainers(t, w, pod)
 		require.NotContains(t, containers, mcpGatewayContainer)
+	})
+
+	t.Run("AgentConfig defaults set the HITL port", func(t *testing.T) {
+		scheme := runtime.NewScheme()
+		require.NoError(t, v1alpha1.AddToScheme(scheme))
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		w.Client = ctrlfake.NewClientBuilder().WithScheme(scheme).WithObjects(&v1alpha1.AgentConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-agent"},
+			Spec: v1alpha1.AgentConfigSpec{Defaults: v1alpha1.AgentDefaults{
+				HITL: v1alpha1.AgentHITL{Port: 17101},
+			}},
+		}).Build()
+		pod := aiPod()
+		pod.Annotations[constants.AnnotationAIAgentConfig] = "my-agent"
+		ai := injectedContainers(t, w, pod)[mcpGatewayContainer]
+		var hitl int32
+		for _, p := range ai.Ports {
+			if p.Name == "hitl" {
+				hitl = p.ContainerPort
+			}
+		}
+		require.Equal(t, int32(17101), hitl)
+	})
+
+	t.Run("missing AgentConfig still injects the sidecar", func(t *testing.T) {
+		scheme := runtime.NewScheme()
+		require.NoError(t, v1alpha1.AddToScheme(scheme))
+		w := baseWebhook(fake.NewSimpleClientset(namespaceWithOpenShift(false)))
+		w.Client = ctrlfake.NewClientBuilder().WithScheme(scheme).Build()
+		require.Contains(t, injectedContainers(t, w, aiPod()), mcpGatewayContainer)
 	})
 
 	t.Run("openshift ai sidecar uid matches dataplane", func(t *testing.T) {
