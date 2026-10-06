@@ -3564,6 +3564,25 @@ ingressGateways:
     # Amount of seconds to wait for graceful termination before killing the pod.
     terminationGracePeriodSeconds: 10
 
+    # Optional Kubernetes lifecycle hooks for the ingress gateway dataplane container.
+    # A preStop hook can keep the proxy running while removal from upstream routing
+    # propagates. The hook duration counts toward terminationGracePeriodSeconds;
+    # allow additional time for the dataplane's graceful shutdown to complete.
+    # Values on a specific gateway replace this entire map. Use lifecycle: {}
+    # on a gateway to disable hooks inherited from defaults.
+    # @type: map
+    lifecycle: {}
+
+    # Extra environment variables for the ingress gateway dataplane container.
+    # Values are rendered as strings. For example, supported Consul Dataplane
+    # versions can use DP_SHUTDOWN_DRAIN_LISTENERS and
+    # DP_SHUTDOWN_GRACE_PERIOD_SECONDS to configure graceful shutdown.
+    # Values on a specific gateway replace this entire map, rather than merging
+    # with defaults. Use extraEnvironmentVars: {} to disable inherited variables.
+    # Do not duplicate environment variable names already set by the chart.
+    # @type: map
+    extraEnvironmentVars: {}
+
     # Annotations to apply to the ingress gateway deployment. Annotations defined
     # here will be applied to all ingress gateway deployments in addition to any
     # annotations defined for a specific gateway in `ingressGateways.gateways`.
