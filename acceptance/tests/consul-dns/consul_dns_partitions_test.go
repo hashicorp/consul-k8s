@@ -4,6 +4,7 @@
 package consuldns
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -221,6 +222,64 @@ func internalLoadBalancerAnnotation(cfg *config.TestConfig) string {
 	}
 }
 
+// waitForPrivateAddress retries DNS readiness while preserving the private-address check.
+// The caller must provide a context with a deadline. This function will:
+//   1. Accept IP address literals directly
+//   2. Retry DNS resolution with exponential backoff
+//   3. Validate that all resolved IPs are private
+//   4. Respect the context deadline
+//
+// This is secure by design: it never bypasses the privacy check, it only
+// adds retry logic to handle transient DNS resolution delays.
+func waitForPrivateAddress(ctx context.Context, host string) error {
+	check := func(ips []net.IP) error {
+		for _, ip := range ips {
+			if !isPrivateAddress(ip) {
+				return fmt.Errorf(
+					"Consul server address %q resolved to non-private IP %s",
+					host, ip,
+				)
+			}
+		}
+		return nil
+	}
+
+	// If the host is already an IP literal, validate it immediately.
+	if ip := net.ParseIP(host); ip != nil {
+		return check([]net.IP{ip})
+	}
+
+	// For hostnames, retry DNS resolution with a deadline.
+	var lastErr error
+	for {
+		queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		answers, err := net.DefaultResolver.LookupIPAddr(queryCtx, host)
+		cancel()
+
+		if err == nil && len(answers) > 0 {
+			ips := make([]net.IP, len(answers))
+			for i, answer := range answers {
+				ips[i] = answer.IP
+			}
+			return check(ips)
+		}
+
+		lastErr = err
+		if lastErr == nil {
+			lastErr = fmt.Errorf("DNS returned no addresses")
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf(
+				"could not resolve Consul server address %q: %w; last lookup: %v",
+				host, ctx.Err(), lastErr,
+			)
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
 // requirePrivateServerAddress fails the test unless the address the other
 // cluster is about to dial is on a private network.
 //
@@ -236,6 +295,10 @@ func internalLoadBalancerAnnotation(cfg *config.TestConfig) string {
 // address is known. Failing here keeps the window to the length of one failed
 // install instead of a full test run, and the cluster is torn down on the way
 // out.
+//
+// It uses waitForPrivateAddress with a reasonable timeout (3 minutes) to handle
+// DNS resolution delays on cloud providers where the load balancer hostname
+// propagates through DNS asynchronously.
 func requirePrivateServerAddress(t *testing.T, cfg *config.TestConfig, address string) {
 	t.Helper()
 
@@ -245,18 +308,14 @@ func requirePrivateServerAddress(t *testing.T, cfg *config.TestConfig, address s
 		return
 	}
 
-	// AWS hands out a hostname rather than an address, so this has to resolve.
-	// It also accepts an address literal unchanged.
-	ips, err := net.LookupIP(address)
-	require.NoErrorf(t, err, "could not resolve Consul server address %q to verify it is private", address)
-	require.NotEmptyf(t, ips, "Consul server address %q resolved to nothing", address)
+	// Create a context with a 3-minute deadline for DNS resolution and validation.
+	// This gives the cloud provider's load balancer time to propagate through DNS
+	// while still failing fast if the address is public when resolved.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
 
-	for _, ip := range ips {
-		require.Truef(t, isPrivateAddress(ip),
-			"the Consul servers are reachable at %s (%s), which is a public address: this cluster did not "+
-				"honour the internal load balancer annotation, so the servers are exposed to the internet. "+
-				"Refusing to continue.", address, ip)
-	}
+	err := waitForPrivateAddress(ctx, address)
+	require.NoErrorf(t, err, "Consul server address validation failed for %q", address)
 }
 
 // isPrivateAddress reports whether ip is on a network that is not routable from
