@@ -174,6 +174,15 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		log.Info("Loaded TerminatingGateway", "termGW", string(termGWBytes))
 	}
 
+	if err := credentialInjectionAIGateError(termGW, helmValues); err != nil {
+		log.Error(err, "rejecting terminating gateway")
+		termGW.SetSyncedCondition(corev1.ConditionFalse, "CredentialInjectionRequiresAI", err.Error())
+		if statusErr := r.UpdateStatus(ctx, termGW); statusErr != nil {
+			return ctrl.Result{}, statusErr
+		}
+		return ctrl.Result{}, err
+	}
+
 	aclsEnabled, err := r.aclsEnabled()
 	if err != nil {
 		log.Error(err, "error checking if ACLs are enabled")
@@ -237,6 +246,18 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	return result, nil
+}
+
+// credentialInjectionAIGateError rejects a gateway that uses credential
+// injection while ai.enabled is false. Consul gates credential injection behind
+// the consul-ai feature gate, which ai.enabled controls, so Consul would reject
+// the config entry and the credential sidecars could never be used. Deleting a
+// gateway is never blocked.
+func credentialInjectionAIGateError(termGW *consulv1alpha1.TerminatingGateway, helmValues *helmvalues.HelmValues) error {
+	if !termGW.GetDeletionTimestamp().IsZero() || !termGW.UsesCredentialInjection() || helmValues.AI.Enabled {
+		return nil
+	}
+	return fmt.Errorf("credential injection requires ai.enabled=true (credential injection is gated by the consul-ai feature gate)")
 }
 
 func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Logger {

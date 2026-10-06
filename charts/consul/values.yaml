@@ -3763,6 +3763,9 @@ terminatingGateways:
       # sidecars are added to the terminating gateway deployment.
       # Credential injection is not supported on OpenShift: rendering fails if
       # this is true while `global.openshift.enabled` is true.
+      # Credential injection is part of Consul AI and requires `ai.enabled=true`,
+      # which enables the Consul `consul-ai` feature gate: rendering fails if this
+      # is true while `ai.enabled` is false.
       enabled: false
 
       # Source selects the credential delivery mechanism: "vault" (default) runs
