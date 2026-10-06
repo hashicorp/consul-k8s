@@ -106,33 +106,33 @@ load _helpers
 #--------------------------------------------------------------------
 # consul-ai gate value
 
-@test "feature-gate-set/Job: consul-ai gate is disabled by default" {
+@test "feature-gate-set/Job: consul-ai gate is omitted by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q "consul-ai disabled"
+  ! echo "${actual}" | grep -q "consul-ai"
 }
 
-@test "feature-gate-set/Job: consul-ai gate is disabled when ai.enabled is null (not set)" {
+@test "feature-gate-set/Job: consul-ai gate is omitted when ai is null" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
+      --set 'ai=null' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q "consul-ai disabled"
-  echo "${actual}" | grep -qv "null"
+  ! echo "${actual}" | grep -q "consul-ai"
 }
 
-@test "feature-gate-set/Job: consul-ai gate is disabled when ai.enabled=false" {
+@test "feature-gate-set/Job: consul-ai gate is omitted when ai.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       --set 'ai.enabled=false' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q "consul-ai disabled"
+  ! echo "${actual}" | grep -q "consul-ai"
 }
 
 @test "feature-gate-set/Job: consul-ai gate is enabled when ai.enabled=true" {
@@ -205,12 +205,13 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set-string 'externalServers.hosts[0]=2001:db8::1' \
       --set 'global.tls.enabled=true' \
+      --set 'ai.enabled=true' \
       . | yq -r '.spec.template.spec.containers[0].command[2]')
   local actual=$(CONSUL_ADDRESSES=2001:db8::1 CONSUL_HTTP_PORT=8501 \
       /bin/sh -ec 'consul() { printf "%s\n" "$CONSUL_HTTP_ADDR"; }; curl() { printf "\"127.0.0.1:8300\""; }; '"$script")
   [ "$actual" = "Waiting for Consul leader...
 Consul leader is ready: \"127.0.0.1:8300\"
-Setting feature gate: consul-ai=disabled
+Setting feature gate: consul-ai=enabled
 https://[2001:db8::1]:8501" ]
 }
 

@@ -208,8 +208,6 @@ spec:
           GATES="
           {{- if default false (and .Values.ai .Values.ai.enabled) }}
           consul-ai enabled
-          {{- else }}
-          consul-ai disabled
           {{- end }}
           "
 
