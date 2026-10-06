@@ -1,0 +1,131 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Standalone manifests that mirror exactly what the InferenceGatewayController
+# generates from an InferenceGateway CR. Apply these if you want to run the
+# gateway without the controller, or use them for debugging.
+#
+# Apply:
+#   kubectl apply -f inferencegateway-deployment.yaml
+#
+# Prerequisites:
+#   1. Image loaded into the cluster:
+#        kind load docker-image localhost/consul-inference-gateway:0.1.0-dev --name <cluster>
+#   2. ConfigMap created (see bottom of this file).
+# ---------------------------------------------------------------------------
+
+# ── ConfigMap: inference-registry ──────────────────────────────────────────
+# The controller mounts this at /app/configs/inference-registry.yaml inside
+# the gateway container. Keep cluster names in sync with your Envoy CDS catalog.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inference-registry
+  namespace: default
+data:
+  inference-registry.yaml: |
+    clusters:
+      - name: gpt-5.3-codex
+        vendor: openai
+        labels: [code]
+        model: "gpt-5.3-codex"
+
+      - name: claude-4.7-review
+        vendor: anthropic
+        labels: [code-review, code]
+        model: "claude-4.7-sonnet-review"
+
+      - name: gpt-5.3
+        vendor: openai
+        labels: [document, general]
+        model: "gpt-5.3"
+
+# ---
+# # ── Deployment: my-inference-gateway-full ──────────────────────────────────
+# # Mirrors deploymentFor() in inferencegateway_controller.go.
+# #
+# # The pod opts IN to connect-inject (consul.hashicorp.com/connect-inject: "true").
+# # The mesh webhook automatically injects:
+# #   - consul-connect-inject-init  (init container — registers the service, writes proxy-id)
+# #   - consul-dataplane            (sidecar — runs Envoy and manages the mTLS proxy)
+# #
+# # The controller also removes the manual Catalog registration (reconcileRegistrations)
+# # that was present when connect-inject was disabled; the endpoints controller now
+# # handles Consul service registration via the injected sidecar.
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: my-inference-gateway-full
+#   namespace: default
+#   labels:
+#     app: my-inference-gateway-full
+#     consul.hashicorp.com/managed-by: consul-connect-inject
+# spec:
+#   replicas: 3
+#   selector:
+#     matchLabels:
+#       app: my-inference-gateway-full
+#       consul.hashicorp.com/managed-by: consul-connect-inject
+#   template:
+#     metadata:
+#       labels:
+#         app: my-inference-gateway-full
+#         consul.hashicorp.com/managed-by: consul-connect-inject
+#       annotations:
+#         # Opt IN to the connect-inject webhook so the mesh webhook injects
+#         # consul-dataplane (Envoy sidecar) and connect-init automatically.
+#         consul.hashicorp.com/connect-inject: "true"
+#     spec:
+#       containers:
+#         - name: inference-gateway
+#           image: localhost/consul-inference-gateway:0.1.0-dev
+#           args:
+#             - -addr=:9000
+#             - -metrics-addr=:9090
+#             - -registry-file=/app/configs/inference-registry.yaml
+#           ports:
+#             - name: grpc
+#               containerPort: 9000
+#               protocol: TCP
+#             - name: metrics
+#               containerPort: 9090
+#               protocol: TCP
+#           env:
+#             - name: POOL_NAME
+#               value: test-pool-full
+#             - name: POOL_NAMESPACE
+#               value: default
+#             - name: POOL_ENABLED
+#               value: "true"
+#           volumeMounts:
+#             - name: inference-registry
+#               mountPath: /app/configs/inference-registry.yaml
+#               subPath: inference-registry.yaml
+#               readOnly: true
+#       volumes:
+#         - name: inference-registry
+#           configMap:
+#             name: inference-registry
+
+# ---
+# # ── Service: my-inference-gateway-full ─────────────────────────────────────
+# # Mirrors serviceFor() in inferencegateway_controller.go.
+# # ClusterIP exposes the gRPC ext_proc port to Envoy inside the cluster.
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: my-inference-gateway-full
+#   namespace: default
+#   labels:
+#     app: my-inference-gateway-full
+#     consul.hashicorp.com/managed-by: consul-connect-inject
+# spec:
+#   type: ClusterIP
+#   selector:
+#     app: my-inference-gateway-full
+#     consul.hashicorp.com/managed-by: consul-connect-inject
+#   ports:
+#     - name: grpc
+#       port: 9000
+#       targetPort: 9000
+#       protocol: TCP
