@@ -209,3 +209,5 @@ require (
 )
 
 replace github.com/hashicorp/consul/troubleshoot => github.com/hashicorp/consul/troubleshoot v0.0.0-20260922143634-a221db5d588a
+
+exclude github.com/hashicorp/vic v1.5.1-0.20190403131502-bbfe86ec9443
