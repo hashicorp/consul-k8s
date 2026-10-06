@@ -2295,3 +2295,20 @@ key2: value2' \
       . | tee /dev/stderr | yq -s 'length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }
+
+@test "terminatingGateways/Deployment: a credentialInjection install bootstraps the consul-ai feature gate" {
+  cd `chart_dir`
+  # Credential injection requires ai.enabled, which must in turn enable the Consul
+  # consul-ai feature gate that gates credential injection on the servers.
+  local args="--set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set ai.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.source=kubernetesSecret \
+      --set terminatingGateways.defaults.credentialInjection.secretName=camp-creds \
+      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc"
+  helm template -s templates/terminating-gateways-deployment.yaml ${args} . > /dev/null
+  local actual=$(helm template -s templates/server-config-configmap.yaml ${args} . | tee /dev/stderr |
+      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap["consul-ai"]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
