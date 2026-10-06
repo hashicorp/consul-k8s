@@ -1671,23 +1671,23 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/ConfigMap: consul-ai feature gate is false when ai is null" {
+@test "server/ConfigMap: consul-ai feature gate is omitted when ai is null" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'ai=null' \
       . | tee /dev/stderr |
-      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap["consul-ai"]' | tee /dev/stderr)
+      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap | has("consul-ai")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "server/ConfigMap: consul-ai feature gate is false when ai.enabled=false" {
+@test "server/ConfigMap: consul-ai feature gate is omitted when ai.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'ai.enabled=false' \
       . | tee /dev/stderr |
-      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap["consul-ai"]' | tee /dev/stderr)
+      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap | has("consul-ai")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 

@@ -239,7 +239,9 @@ data:
     {
       "feature_gates": {
         "bootstrap": {
-          "consul-ai": {{ default false (and .Values.ai .Values.ai.enabled) }}
+          {{- if and .Values.ai .Values.ai.enabled }}
+          "consul-ai": true
+          {{- end }}
         }
       }
     }
