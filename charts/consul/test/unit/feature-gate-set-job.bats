@@ -106,33 +106,33 @@ load _helpers
 #--------------------------------------------------------------------
 # consul-ai gate value
 
-@test "feature-gate-set/Job: consul-ai gate is disabled by default" {
+@test "feature-gate-set/Job: consul-ai gate is omitted by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q "consul-ai disabled"
+  ! echo "${actual}" | grep -q "consul-ai"
 }
 
-@test "feature-gate-set/Job: consul-ai gate is disabled when ai.enabled is null (not set)" {
+@test "feature-gate-set/Job: consul-ai gate is omitted when ai is null" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
+      --set 'ai=null' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q "consul-ai disabled"
-  echo "${actual}" | grep -qv "null"
+  ! echo "${actual}" | grep -q "consul-ai"
 }
 
-@test "feature-gate-set/Job: consul-ai gate is disabled when ai.enabled=false" {
+@test "feature-gate-set/Job: consul-ai gate is omitted when ai.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       --set 'ai.enabled=false' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q "consul-ai disabled"
+  ! echo "${actual}" | grep -q "consul-ai"
 }
 
 @test "feature-gate-set/Job: consul-ai gate is enabled when ai.enabled=true" {
@@ -205,11 +205,30 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set-string 'externalServers.hosts[0]=2001:db8::1' \
       --set 'global.tls.enabled=true' \
+      --set 'ai.enabled=true' \
       . | yq -r '.spec.template.spec.containers[0].command[2]')
   local actual=$(CONSUL_ADDRESSES=2001:db8::1 CONSUL_HTTP_PORT=8501 \
-      /bin/sh -ec 'consul() { printf "%s\n" "$CONSUL_HTTP_ADDR"; }; '"$script")
-  [ "$actual" = "Setting feature gate: consul-ai=disabled
+      /bin/sh -ec 'consul() { printf "%s\n" "$CONSUL_HTTP_ADDR"; }; curl() { printf "\"127.0.0.1:8300\""; }; '"$script")
+  [ "$actual" = "Waiting for Consul leader...
+Consul leader is ready: \"127.0.0.1:8300\"
+Setting feature gate: consul-ai=enabled
 https://[2001:db8::1]:8501" ]
+}
+
+@test "feature-gate-set/Job: applies externalServers.tlsServerName to curl and the Consul CLI" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=192.0.2.1' \
+      --set 'externalServers.tlsServerName=consul.example.com' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
+  echo "${actual}" | grep -q 'export CONSUL_TLS_SERVER_NAME="consul.example.com"'
+  echo "${actual}" | grep -q 'export CONSUL_CURL_ADDR="https://${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}"'
+  echo "${actual}" | grep -q -- '--connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}"'
 }
 
 #--------------------------------------------------------------------
@@ -939,6 +958,45 @@ https://[2001:db8::1]:8501" ]
       --set 'global.tls.caCert.secretName=pki/ca' .
   [ "$status" -eq 1 ]
   [[ "$output" == *"global.secretsBackend.vault.consulCARole is required"* ]]
+}
+
+@test "feature-gate-set/Job: does not require or inject a Vault CA when external servers use system roots" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul.example.com' \
+      --set 'externalServers.useSystemRoots=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      . | tee /dev/stderr |
+      yq '.spec.template.metadata.annotations' | tee /dev/stderr)
+  [ "$(echo "$annotations" | yq -r '."vault.hashicorp.com/agent-inject"')" = "null" ]
+  [ "$(echo "$annotations" | yq -r '."vault.hashicorp.com/agent-inject-secret-serverca.crt"')" = "null" ]
+}
+
+@test "feature-gate-set/Job: does not inject a Vault CA for an ACL token when external servers use system roots" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/feature-gate-set-job.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=consul.example.com' \
+      --set 'externalServers.useSystemRoots=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.acls.bootstrapToken.secretName=consul/data/bootstrap-token' \
+      --set 'global.acls.bootstrapToken.secretKey=token' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=test' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
+      . | tee /dev/stderr |
+      yq '.spec.template.metadata.annotations' | tee /dev/stderr)
+  [ "$(echo "$annotations" | yq -r '."vault.hashicorp.com/agent-inject"')" = "true" ]
+  [ "$(echo "$annotations" | yq -r '."vault.hashicorp.com/agent-inject-secret-serverca.crt"')" = "null" ]
 }
 
 @test "feature-gate-set/Job: no vault agent annotations when ACLs disabled even with Vault enabled" {

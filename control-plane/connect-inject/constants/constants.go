@@ -78,6 +78,14 @@ const (
 
 	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 
+	// CredentialVaultAgentContainerName is the Vault Agent sidecar that renders
+	// credentials for a credential-injection terminating gateway.
+	CredentialVaultAgentContainerName = "camp-vault-agent"
+
+	// CredentialProcessorContainerName is the credential-injection processor
+	// container in a terminating gateway pod.
+	CredentialProcessorContainerName = "camp-auth-processor"
+
 	// MeshV2VolumePath is the name of the volume that contains the proxy ID.
 	MeshV2VolumePath = "/consul/mesh-inject"
 

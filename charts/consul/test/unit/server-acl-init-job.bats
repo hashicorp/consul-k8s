@@ -344,16 +344,16 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'contains("-ingress-gateway-name=\"gateway1\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'contains("-ingress-gateway-name=\"gateway2\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
-    yq 'indices("-ingress-gateway-name") | length' | tee /dev/stderr)
+  local actual=$(echo "$object" |
+    yq 'split("-ingress-gateway-name") | length - 1' | tee /dev/stderr)
   [ "${actual}" = 2 ]
 }
 
@@ -399,16 +399,16 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'contains("-ingress-gateway-name=\"gateway1.default-namespace\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'contains("-ingress-gateway-name=\"gateway2.namespace2\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
-    yq 'indices("-ingress-gateway-name") | length' | tee /dev/stderr)
+  local actual=$(echo "$object" |
+    yq 'split("-ingress-gateway-name") | length - 1' | tee /dev/stderr)
   [ "${actual}" = 2 ]
 }
 
@@ -450,16 +450,16 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'contains("-terminating-gateway-name=\"gateway1\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'contains("-terminating-gateway-name=\"gateway2\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
-    yq 'indices("-terminating-gateway-name") | length' | tee /dev/stderr)
+  local actual=$(echo "$object" |
+    yq 'split("-terminating-gateway-name") | length - 1' | tee /dev/stderr)
   [ "${actual}" = 2 ]
 }
 
@@ -510,16 +510,16 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'contains("-terminating-gateway-name=\"gateway1.default-namespace\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'contains("-terminating-gateway-name=\"gateway2.namespace2\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
-    yq 'indices("-terminating-gateway-name") | length' | tee /dev/stderr)
+  local actual=$(echo "$object" |
+    yq 'split("-terminating-gateway-name") | length - 1' | tee /dev/stderr)
   [ "${actual}" = 2 ]
 }
 
@@ -533,21 +533,21 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[7].name] | any(contains("CONSUL_USE_TLS"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[7].value] | any(contains("true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -565,10 +565,10 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec' | tee /dev/stderr)
 
-  actual=$(echo $spec | jq -r '.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  actual=$(echo "$spec" | jq -r '.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  actual=$(echo $spec | jq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  actual=$(echo "$spec" | jq -r '.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
 
@@ -587,11 +587,11 @@ load _helpers
 
   # check that the provided ca cert secret is attached as a volume
   local actual
-  actual=$(echo $ca_cert_volume | jq -r '.secret.secretName' | tee /dev/stderr)
+  actual=$(echo "$ca_cert_volume" | jq -r '.secret.secretName' | tee /dev/stderr)
   [ "${actual}" = "foo-ca-cert" ]
 
   # check that the volume uses the provided secret key
-  actual=$(echo $ca_cert_volume | jq -r '.secret.items[0].key' | tee /dev/stderr)
+  actual=$(echo "$ca_cert_volume" | jq -r '.secret.items[0].key' | tee /dev/stderr)
   [ "${actual}" = "key" ]
 }
 
@@ -653,44 +653,44 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -o=json '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check annotations
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
+  actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-enable"]' | tee /dev/stderr)
+  actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-enable"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-listener-port"]' | tee /dev/stderr)
+  actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-listener-port"]' | tee /dev/stderr)
   [ "${actual}" = "8200" ]
 
-  actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-enable-quit"]' | tee /dev/stderr)
+  actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-enable-quit"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "aclrole" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-secrets-backend=vault"))')
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-secrets-backend=vault"))')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-name=foo"))')
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-name=foo"))')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-key=bar"))')
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-key=bar"))')
   [ "${actual}" = "true" ]
 
   # Check that no (secret) volumes are not attached
-  local actual=$(echo $object | jq -r '.spec.volumes')
+  local actual=$(echo "$object" | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 }
 
@@ -714,7 +714,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
-  local actual="$(printf '%s\n' "$cmd" |
+  local actual="$(echo "$cmd" |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
   [ "${actual}" = "vns" ]
 }
@@ -740,7 +740,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
-  local actual="$(printf '%s\n' "$cmd" |
+  local actual="$(echo "$cmd" |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
   [ "${actual}" = "vns" ]
 }
@@ -766,7 +766,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
-  local actual="$(printf '%s\n' "$cmd" |
+  local actual="$(echo "$cmd" |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
   [ "${actual}" = "bar" ]
 }
@@ -789,41 +789,41 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -r '.spec.template | @json' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check annotations
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-pre-populate-only"]' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-enable"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-enable"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-listener-port"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-cache-listener-port"]' | tee /dev/stderr)
   [ "${actual}" = "8200" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-enable-quit"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-enable-quit"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "aclrole" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
+  local actual=$(echo "$object" | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 
   # Check that the consul-ca-cert volume is not attached
-  local actual=$(printf '%s\n' "$object" | jq -r '.spec.volumes')
+  local actual=$(echo "$object" | jq -r '.spec.volumes')
   [ "${actual}" = "null" ]
 
-  local actual=$(printf '%s\n' "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
 }
 
@@ -845,11 +845,11 @@ load _helpers
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
@@ -872,11 +872,11 @@ load _helpers
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
@@ -899,11 +899,11 @@ load _helpers
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
@@ -927,11 +927,11 @@ load _helpers
     --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
     --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
   [ "${actual}" = "ca" ]
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
 
@@ -952,29 +952,30 @@ load _helpers
     --set 'global.acls.replicationToken.secretName=/vault/secret' \
     --set 'global.acls.replicationToken.secretKey=token' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
   [ "${actual}" = "acl-role" ]
 
   # Check Vault secret annotations.
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
   [ "${actual}" = "/vault/secret" ]
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
   local expected=$'{{- with secret \"/vault/secret\" -}}\n{{- .Data.data.token -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$object" | jq -r '.spec.volumes')
+  [ "${actual}" = "null" ]
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts == null')
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  [ "${actual}" = "null" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
-  [[ "$object" == *"-acl-replication-token-file=/vault/secrets/replication-token"* ]]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
+  [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: both replication and bootstrap tokens can be provided together" {
@@ -993,35 +994,39 @@ load _helpers
     --set 'global.acls.bootstrapToken.secretName=/vault/bootstrap' \
     --set 'global.acls.bootstrapToken.secretKey=token' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
   [ "${actual}" = "acl-role" ]
 
   # Check Vault secret annotations.
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-replication-token"')
   [ "${actual}" = "/vault/replication" ]
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-replication-token"')
   local expected=$'{{- with secret \"/vault/replication\" -}}\n{{- .Data.data.token -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
-  [[ "$object" == *"-secrets-backend=vault"* ]]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-secrets-backend=vault"))')
+  [ "${actual}" = "true" ]
 
-  [[ "$object" == *"-bootstrap-token-secret-name=/vault/bootstrap"* ]]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-name=/vault/bootstrap"))')
+  [ "${actual}" = "true" ]
 
-  [[ "$object" == *"-bootstrap-token-secret-key=token"* ]]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-key=token"))')
+  [ "${actual}" = "true" ]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$object" | jq -r '.spec.volumes')
+  [ "${actual}" = "null" ]
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts == null')
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  [ "${actual}" = "null" ]
 
   # Replication token file is passed.
-  [[ "$object" == *"-acl-replication-token-file=/vault/secrets/replication-token"* ]]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-acl-replication-token-file=/vault/secrets/replication-token"))')
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -1046,29 +1051,30 @@ load _helpers
     --set "global.adminPartitions.name=default" \
     --set 'global.enableConsulNamespaces=true' \
     . | tee /dev/stderr |
-      yq -r '.spec.template' | tee /dev/stderr)
+      yq '.spec.template' | tee /dev/stderr)
 
   # Check that the role is set.
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/role"')
   [ "${actual}" = "acl-role" ]
 
   # Check Vault secret annotations.
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-partition-token"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-secret-partition-token"')
   [ "${actual}" = "/vault/secret" ]
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-partition-token"')
+  local actual=$(echo "$object" | yq -r '.metadata.annotations."vault.hashicorp.com/agent-inject-template-partition-token"')
   local expected=$'{{- with secret \"/vault/secret\" -}}\n{{- .Data.data.token -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   # Check that replication token Kubernetes secret volumes and volumeMounts are not attached.
-  local actual=$(printf '%s\n' "$object" | yq -r '.spec.volumes == null')
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$object" | jq -r '.spec.volumes')
+  [ "${actual}" = "null" ]
 
-  local actual=$(printf '%s\n' "$object" | yq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts == null')
-  [ "${actual}" = "true" ]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
+  [ "${actual}" = "null" ]
 
   # Check that the replication token flag is set to the path of the Vault secret.
-  [[ "$object" == *"-partition-token-file=/vault/secrets/partition-token"* ]]
+  local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-partition-token-file=/vault/secrets/partition-token"))')
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -1089,7 +1095,7 @@ load _helpers
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | @json' | tee /dev/stderr)
+      yq '.spec.template.metadata.annotations' | tee /dev/stderr)
 
   local expected=$(echo '{
     "consul.hashicorp.com/connect-inject": "false",
@@ -1140,35 +1146,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1187,35 +1193,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1230,35 +1236,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1274,35 +1280,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1319,35 +1325,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix=k8s-"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1366,35 +1372,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1409,35 +1415,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1453,35 +1459,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1498,35 +1504,35 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-namespaces=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-sync-destination-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-sync-k8s-namespace-mirroring=true"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("sync-k8s-namespace-mirroring-prefix=k8s-"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("connect-inject"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("consul-inject-destination-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-inject-k8s-namespace-mirroring"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("inject-k8s-namespace-mirroring-prefix"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1542,7 +1548,7 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-peering"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1559,7 +1565,7 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-peering"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1575,11 +1581,11 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("enable-partitions"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
     yq 'any(contains("partition"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
@@ -1594,19 +1600,19 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[7].name] | any(contains("CONSUL_PARTITION"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[7].value] | any(contains("default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[8].name] | any(contains("CONSUL_LOGIN_PARTITION"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[8].value] | any(contains("default"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1774,13 +1780,13 @@ load _helpers
       --set 'externalServers.enabled=true' \
       --set 'externalServers.hosts[0]=foo.com' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0]' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[2].name] | any(contains("CONSUL_ADDRESSES"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[2].value] | any(contains("foo.com"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1796,11 +1802,11 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[4].name] | any(contains("CONSUL_HTTP_PORT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[4].value] | any(contains("8501"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1817,11 +1823,11 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[4].name] | any(contains("CONSUL_HTTP_PORT"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[4].value] | any(contains("443"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1869,11 +1875,11 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1890,11 +1896,11 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[8].name] | any(contains("CONSUL_CACERT_FILE"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[8].value] | any(contains("/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1912,11 +1918,11 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[9].name] | any(contains("CONSUL_TLS_SERVER_NAME"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $object |
+  local actual=$(echo "$object" |
       yq '[.env[9].value] | any(contains("foo"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
@@ -1951,7 +1957,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.bootstrapToken.secretName=name' \
       --set 'global.acls.bootstrapToken.secretKey=key' \
-      . | yq .spec.template | tee /dev/stderr)
+      . | yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-name=name"))')
   [ "${actual}" = "true" ]
@@ -1969,7 +1975,7 @@ load _helpers
       --set 'global.acls.bootstrapToken.secretKey=key' \
       --set 'global.acls.replicationToken.secretName=replication' \
       --set 'global.acls.replicationToken.secretKey=token' \
-      . | yq .spec.template | tee /dev/stderr)
+      . | yq '.spec.template' | tee /dev/stderr)
 
   local actual=$(echo "$object" | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").command | any(contains("-bootstrap-token-secret-name=name"))')
   [ "${actual}" = "true" ]
@@ -2178,7 +2184,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+      yq -c '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
   [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
 }
 
