@@ -27,10 +27,13 @@ Pygments==2.21.0
 pymdown-extensions==11.0.1
 PyYAML==6.0
 six==1.16.0
-# soupsieve 2.8.4 fixes CVE-2026-49476 (unbounded memory on large comma-separated
-# selector lists) and CVE-2026-49477 (catastrophic backtracking ReDoS on
-# unterminated quoted attribute values).
-soupsieve==2.8.4
+# soupsieve 2.10 is the latest stable release; 2.9.0+ fixes CVE-2026-49476
+# (unbounded memory on large comma-separated selector lists), CVE-2026-49477
+# (catastrophic backtracking ReDoS on unterminated quoted attribute values),
+# GHSA-gjv8-xp57-g29c (polynomial-time ReDoS in IDENTIFIER/VALUE selector
+# sub-patterns), and GHSA-j934-xhv5-fg8f (polynomial-time ReDoS in RE_WS_END
+# whitespace/comment trimming regex).
+soupsieve==2.10
 # tornado 6.5.9 fixes CVE-2026-103262: unbounded memory accumulation in
 # CurlAsyncHTTPClient decompression bomb via gzip-encoded responses.
 # Also fixes GHSA-mgf9-4vpg-hj56 (CVE-2026-49855) gzip-bomb,
