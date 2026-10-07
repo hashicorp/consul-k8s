@@ -1,0 +1,399 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Full InferencePoolConfig sample — exercises every optional field.
+#
+# ── Consul AI Gateway rate-limit field reference ─────────────────────────────
+#
+#  enforcement  : deny (default — HTTP 429) | shadow (dry-run only)
+#  mode         : soft (default — V1, per-instance) | strict (V2, global)
+#  countMode    : total (default) | input | output
+#  degradeMode  : fail_closed (default — HTTP 503) | fail_open_unlimited
+#  dimensions   : subset of { agent, tier, global, model }
+#
+#  window (Unit in Consul structs):
+#    second | minute | hour | day
+#    ↑ THESE ARE THE ONLY VALID VALUES. Do NOT use Go-duration strings
+#    like "1m", "1h", "1s" — Consul rejects them with HTTP 500.
+#
+#    When window is OMITTED entirely the Consul processor defaults to
+#    "minute" — NOT "second". Empty = minute is intentional by design
+#    (see agent/structs/config_entry_ai_gateway.go:validateAIGatewayLimitUnit).
+#
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Lifecycle behaviour:
+#   • Controller resolves every parentRef every reconcile.
+#   • While ANY parentRef is not found the controller sets:
+#       ParentResolved=False  (reason: ParentNotFound)
+#       Ready=False
+#     and requeues after 10 s — so the pool self-heals automatically
+#     once the parent InferenceGateway is created, with no manual
+#     intervention required.
+#   • Once all parentRefs exist AND spec.enabled=true all three conditions
+#     flip to True and reconciliation stops requeuing.
+#
+# Quick commands:
+#   Apply:
+#     kubectl apply -f inferencepoolconfig-full.yaml
+#
+#   Watch status (live):
+#     kubectl get ipc test-pool-full -n default -w
+#
+#   Query conditions:
+#     kubectl get ipc test-pool-full -n default \
+#       -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
+#
+#   Force reconcile (touch):
+#     kubectl annotate ipc test-pool-full -n default trigger/reconcile="$(date +%s)" --overwrite
+#
+#   Delete:
+#     kubectl delete ipc test-pool-full -n default
+#
+# Expected happy-path conditions (once my-inference-gateway exists):
+#   Accepted=True
+#   ParentResolved=True (reason: Reconciled)
+#   Ready=True          (reason: Reconciled)
+#
+# While parent is missing (requeues every 10s):
+#   Accepted=True
+#   ParentResolved=False (reason: ParentNotFound)
+#   Ready=False
+# ---------------------------------------------------------------------------
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: InferencePoolConfig
+metadata:
+  # name: test-pool-full
+  # namespace: default
+  name: travel-inference-pool
+  namespace: consul
+  labels:
+    app: test
+    env: kind
+spec:
+  # ---------------------------------------------------------------------------
+  # enabled — master switch for this pool.
+  # false → pool is parked; Ready=False, Consul entry is still written.
+  # ---------------------------------------------------------------------------
+  enabled: true
+
+  # ---------------------------------------------------------------------------
+  # parentRefs — attach this pool to one or more InferenceGateway resources.
+  # ---------------------------------------------------------------------------
+  parentRefs:
+    - kind: InferenceGateway
+      name: my-inference-gateway-full  # must exist in namespace below
+      namespace: default
+
+  # ---------------------------------------------------------------------------
+  # stateStore — REQUIRED when rateLimit.enabled=true.
+  # Identifies the Consul mesh service that holds rate-limit counters.
+  # Consul rejects the config entry with HTTP 500 if rateLimit.enabled=true
+  # and stateStore is missing or has an empty service name.
+  #
+  # service       : Consul catalog service name of the counter store.
+  #                 The service must be registered and reachable via mTLS.
+  #                 Common choices: "valkey" (recommended), "redis".
+  # localBindPort : Loopback port the gateway's Envoy binds so the rate-limit
+  #                 processor can dial 127.0.0.1:<localBindPort> using RESP.
+  #                 Choose any free port not used by the gateway process.
+  # ---------------------------------------------------------------------------
+  stateStore:
+    service: valkey          # must match a Consul service catalog entry
+    localBindPort: 6379      # loopback port for the rate-limit processor
+
+  # ---------------------------------------------------------------------------
+  # rateLimit
+  # ---------------------------------------------------------------------------
+  rateLimit:
+    enabled: true
+
+    # soft   = V1 per-instance counters (Consul default)
+    # strict = V2 strongly-consistent global counters
+    mode: soft
+
+    # deny   = reject over-limit requests HTTP 429 (Consul default)
+    # shadow = track but never enforce (dry-run)
+    enforcement: deny
+
+    # total  = count every request (Consul default)
+    # input  = count only prompt tokens
+    # output = count only completion tokens
+    countMode: total
+
+    # fail_closed         = HTTP 503 when StateStore unavailable (Consul default)
+    # fail_open_unlimited = admit all + audit log
+    degradeMode: fail_closed
+
+    # Valid entries: agent | tier | global | model
+    # Omit → processor defaults to [tier, global]
+    dimensions:
+      - tier
+      - global
+
+    # default — fallback budget for identities that match no tier.
+    # window values: second | minute (Consul default when omitted) | hour | day
+    default:
+      requests:
+        count: 200
+        window: minute
+      tokens:
+        count: 100000
+        window: hour
+
+    # global — aggregate cap across ALL callers.
+    global:
+      requests:
+        count: 2000
+        window: minute
+      tokens:
+        count: 5000000
+        window: hour
+
+    # tierLimits — per-tier allocations.
+    tierLimits:
+      - tier: gold
+        maxCompletionTokensCap: 8192
+        requests:
+          count: 500
+          window: minute
+        tokens:
+          count: 500000
+          window: hour
+      - tier: silver
+        maxCompletionTokensCap: 4096
+        requests:
+          count: 100
+          window: minute
+        tokens:
+          count: 100000
+          window: hour
+
+    # tierBindings — map SPIFFE identities to tiers.
+    tierBindings:
+      - tier: gold
+        spiffeIDs:
+          - spiffe://cluster.local/ns/prod/sa/frontend
+        namespace: prod
+        partition: default
+      - tier: silver
+        spiffeIDs:
+          - spiffe://cluster.local/ns/staging/sa/frontend
+        namespace: staging
+
+    # modelLimits — per-model overrides.
+    modelLimits:
+      - model: gpt-4o
+        requests:
+          count: 50
+          window: minute
+        tokens:
+          count: 200000
+          window: hour
+      - model: claude-3-sonnet
+        requests:
+          count: 30
+          window: minute
+        tokens:
+          count: 150000
+          window: hour
+
+  # ---------------------------------------------------------------------------
+  # routing
+  # ---------------------------------------------------------------------------
+  routing:
+    configValidation: strict
+
+    fallbackChain:
+      - backend-us-east
+      - backend-eu-west
+
+    fallback:
+      retryOn:
+        - 5xx
+        - reset
+        - connect-failure
+      maxTiers: 3
+      perTryTimeout: 30s
+
+    retry:
+      maxAttempts: 3
+      retryOn:
+        - 5xx
+        - reset
+
+    timeout:
+      connect: 5s
+      request: 120s
+
+    scoring:
+      scorers:
+        - latency-aware
+        - round-robin
+      weightedSplit:
+        - cluster: backend-us-east
+          weight: 70
+        - cluster: backend-eu-west
+          weight: 30
+
+    matchRules:
+      - when:
+          path: /v1/chat/completions
+          bodyHas:
+            - /model
+            - /messages
+          identity:
+            service: frontend
+            namespace: prod
+            partition: default
+        candidates:
+          - backend-us-east
+        fallbackChain:
+          - backend-eu-west
+        requireCapabilities:
+          - vision
+          - function-calling
+      - when:
+          path: /v1/embeddings
+        candidates:
+          - backend-embeddings
+        requireCapabilities:
+          - embeddings
+
+    complianceMap:
+      gdpr:
+        allowedRegions:
+          - eu-west-1
+          - eu-central-1
+        denyModels:
+          - gpt-4
+      hipaa:
+        allowedRegions:
+          - us-east-1
+        denyModels: []
+
+    budget:
+      maxDailyUSD: 50.00
+      alertThresholdPct: 80
+
+    cache:
+      enabled: true
+      ttlSeconds: 300
+      similarityThreshold: 0.95
+
+    mirror:
+      enabled: false
+      destination: backend-shadow
+      percentage: 5
+
+  # ---------------------------------------------------------------------------
+  # processor — ext_proc binding between Envoy and the co-located
+  # consul-inference-gateway process. The socket path is host-local, per-
+  # instance state derived by consul-dataplane; it is not stored here.
+  # ---------------------------------------------------------------------------
+  processor:
+    # failureMode: what Envoy does when the ext_proc server is unreachable.
+    #   closed — reject the request with HTTP 500 (default; safe for production).
+    #   open   — pass the request through without ext_proc processing.
+    failureMode: closed
+
+    # bodyModelRouting: route on the request body's "model" field instead of
+    # a caller-supplied capability header. Consul renders a per-model route.
+    bodyModelRouting: false
+
+  # ---------------------------------------------------------------------------
+  # policy — cross-cutting request/response enforcement (PII detection).
+  # Consul carries this block verbatim to the co-located policy processor.
+  # ---------------------------------------------------------------------------
+  policy:
+    pii:
+      # scope: which conversation parts are scanned.
+      #   request  — scan the user prompt only.
+      #   response — scan the model completion only.
+      #   both     — scan prompt and completion (default).
+      scope: both
+
+      # defaultAction: fallback when a detector fires with no per-rule action.
+      #   block       — reject with HTTP 422.
+      #   mask        — replace detected span using the mask pattern.
+      #   placeholder — replace detected span with a labelled token (e.g. <CREDIT_CARD>).
+      #   off         — pass through unchanged (audit only).
+      # Note: "redact" and "log" are accepted by the CRD admission webhook
+      # but are not valid values understood by the processor; use "placeholder"
+      # or "off" instead.
+      defaultAction: mask
+
+      # streamHoldbackBytes: trailing bytes buffered from a streaming response
+      # before PII scanning begins. Higher = better accuracy, more latency.
+      streamHoldbackBytes: 128
+
+      mask:
+        char: "*"       # replacement character for each masked rune
+        keepLast: 4     # leave last N chars visible (e.g. credit-card last 4)
+
+      detectors:
+        # Built-in detectors — use the underscore form: credit_card, api_key, ssn, email.
+        # Hyphenated aliases (e.g. "credit-card") are accepted by the controller
+        # and normalised to underscore form before the Consul API write.
+        # Regex is optional for built-ins; omitting it uses the processor's built-in
+        # pattern (credit_card also runs a Luhn digit check when no regex is set).
+        - name: credit_card
+          action: mask               # overrides defaultAction for this rule
+        - name: ssn
+          action: block
+        - name: email
+          action: mask
+        - name: api_key
+          action: mask
+        # Custom detector: name is a free-form label; regex is REQUIRED.
+        # Without a regex the Consul API rejects the entry with HTTP 500.
+        - name: internal_secret
+          regex: '(?i)(secret[_\-]?key\s*[=:]\s*)[A-Za-z0-9\-_]{20,}'
+          action: mask
+
+  # ---------------------------------------------------------------------------
+  # observability — processor telemetry: metrics and tracing.
+  # Each pillar is independent: a degraded sink never affects request outcomes.
+  # ---------------------------------------------------------------------------
+  observability:
+    # ── Metrics ────────────────────────────────────────────────────────────
+    # OTel metrics export. Enabled by default; set enabled: false to disable.
+    metrics:
+      enabled: true
+
+      # Prometheus pull-based scrape endpoint.
+      prometheus:
+        port: 9090
+        path: /metrics
+
+      # OTLP push-based exporter (mutually usable with Prometheus).
+      # The controller automatically strips any http:// or https:// scheme before
+      # writing to the Consul API — Consul requires bare host:port only.
+      # Both forms are accepted here:
+      #   endpoint: http://otel-collector.observability.svc:4318   ← scheme stripped by controller
+      #   endpoint: otel-collector.observability.svc:4318          ← used verbatim
+      otlp:
+        endpoint: otel-collector.observability.svc:4318
+        insecure: false          # set true only in dev/test environments
+
+      # Pins the OTel semantic-convention schema version added to every exported
+      # metric resource. Omit to use the processor default.
+      semconvSchema: "1.37.0"
+
+      # Extra label key names promoted onto every exported metric.
+      # Each entry must be a bare identifier (^[a-zA-Z_][a-zA-Z0-9_]*$).
+      # Maximum 8 entries. Do NOT use key=value pairs here.
+      customLabels:
+        - "env"
+        - "team"
+        - "cluster"
+
+    # ── Tracing ────────────────────────────────────────────────────────────
+    # OTel distributed tracing. Off by default.
+    tracing:
+      enabled: true
+      sampleRatio: 0.01          # trace 1 % of requests (tail-based sampling)
+      otlp:
+        # Same scheme-stripping applies: controller converts http(s)://host:port → host:port.
+        endpoint: otel-collector.observability.svc:4317
+        insecure: false

@@ -4,13 +4,16 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
 
+	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/nftables"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
@@ -101,6 +104,44 @@ func (w *MeshWebhook) nftablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 			}
 			idx++
 		}
+	}
+
+	// If this pod is an AI agent, exclude its loopback ports from iptables so
+	// that mcp-gateway and OBO ext_proc traffic is never redirected through Envoy.
+	// Port resolution mirrors the mesh webhook: annotations > AgentConfig CRD > built-in constants.
+	//   ExcludeInbound:  MCP port, HITL port, interceptor port, OBO inbound/outbound
+	//   ExcludeOutbound: MCP port, OBO inbound/outbound
+	if common.IsAIAgent(pod) {
+		var (
+			aiCfg *capi.AgentServiceAI
+			err   error
+		)
+		if w.Client != nil {
+			aiCfg, err = common.AIConfigFromAgentCRD(context.Background(), w.Client, pod)
+		}
+		if w.Client == nil || err != nil {
+			// Preserve pod overrides when falling back from unavailable CRD defaults.
+			if err != nil {
+				w.Log.Error(err, "failed to resolve AgentConfig for iptables exclusion; using built-in defaults")
+			}
+			defaults, resolveErr := common.ResolveAIAgentDefaults(pod, v1alpha1.AgentDefaults{})
+			if resolveErr != nil {
+				return "", resolveErr
+			}
+			aiCfg = common.AIConfigFromAgentDefaults(defaults)
+		}
+		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,
+			strconv.Itoa(aiCfg.Agent.MCP.Port),
+			strconv.Itoa(aiCfg.Agent.MCP.HITL.Port),
+			strconv.Itoa(aiCfg.Agent.Interceptor.Port),
+			strconv.Itoa(constants.DefaultOBOInboundPort),
+			strconv.Itoa(constants.DefaultOBOOutboundPort),
+		)
+		cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts,
+			strconv.Itoa(aiCfg.Agent.MCP.Port),
+			strconv.Itoa(constants.DefaultOBOInboundPort),
+			strconv.Itoa(constants.DefaultOBOOutboundPort),
+		)
 	}
 
 	// Inbound ports

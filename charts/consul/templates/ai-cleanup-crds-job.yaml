@@ -1,0 +1,72 @@
+{{- $aiEnabled := and .Values.ai .Values.ai.enabled -}}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Always rendered, but never executed on initial install:
+#   • helm upgrade with AI disabled or absent → pre-upgrade cleans CRs when disabling AI
+#   • helm upgrade with AI enabled → no cleanup
+#   • helm uninstall with any AI setting → pre-delete cleans CRs before controller pods are removed
+#
+# The subcommand is safe when no CRDs are installed: each resource type is
+# skipped (isCRDAbsent) and the command exits 0. Idempotent.
+#
+# Execution order (Helm hook-weight):
+#   -10 = SA + ClusterRole + ClusterRoleBinding created first
+#    -5 = this Job runs (deletes CRs + waits for controller cleanup)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-cleanup
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": pre-delete{{ if not $aiEnabled }},pre-upgrade{{ end }}
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation,hook-failed
+spec:
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-ai-cleanup
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: ai-cleanup
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-ai-cleanup
+      containers:
+        - name: ai-cleanup
+          image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - ai-cleanup
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+{{- end }}

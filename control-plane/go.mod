@@ -6,8 +6,6 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20260921130648-12d9521c6406
-
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.19.0-rc1
 
 replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260922143634-a221db5d588a
@@ -27,7 +25,7 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.9
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.12
-	github.com/hashicorp/consul/api v1.34.4
+	github.com/hashicorp/consul/api v1.35.0-rc1
 	github.com/hashicorp/consul/sdk v0.19.0-rc1
 	github.com/hashicorp/go-bexpr v0.1.16
 	github.com/hashicorp/go-discover v1.2.0

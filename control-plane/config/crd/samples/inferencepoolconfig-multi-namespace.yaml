@@ -1,0 +1,32 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Multi-namespace InferencePoolConfig — pool lives in "team-a", its parent
+# lives in the "infra" namespace (cross-namespace parentRef).
+# The controller defaults parentRef.namespace to "default" when omitted;
+# this sample shows an explicit cross-namespace reference.
+#
+# Apply (create namespace first):
+#   kubectl create namespace team-a
+#   kubectl apply -f inferencepoolconfig-multi-namespace.yaml
+# Watch status:
+#   kubectl get ipc team-pool -n team-a -w
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: InferencePoolConfig
+metadata:
+  name: team-pool
+  namespace: team-a
+spec:
+  enabled: true
+  parentRefs:
+    - kind: InferenceModelConfig
+      name: consul-ai-gateway
+      namespace: default   # explicit cross-namespace reference
+  routing:
+    timeout:
+      connect: 5s
+      request: 60s
+    retry:
+      maxAttempts: 2
+      retryOn:
+        - 5xx

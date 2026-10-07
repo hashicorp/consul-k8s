@@ -1,3 +1,53 @@
+## 2.1.0-rc1 (September 29, 2026)
+
+> NOTE: Consul K8s 2.1.x is compatible with Consul 2.1.x and Consul Dataplane 2.1.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+SECURITY:
+
+* security: update `api` submodule, and upgrade `google.golang.org/grpc` to v1.83.2, `golang.org/x/crypto` to v0.57.0, and `go-discover` to v1.5.0 to address CVEs reported in binary and container scans. [[GH-5690](https://github.com/hashicorp/consul-k8s/issues/5690)]
+* security: upgrade Python dependencies in the custom gateway-api 0.7.1 module: tornado 6.5.7 -> 6.5.8 to fix GHSA-mpf4-983q-p7j4 (CVE-2026-82397) urlencoded POST body DoS and GHSA-8423-8fgw-73vq multipart form-data memory amplification DoS; mkdocs-material 9.1.12 -> 9.7.7 to fix GHSA-xvg9-69gf-fjrf (CVE-2026-73295) DOM-based XSS in search.suggest; also bumps mkdocs-material-extensions 1.1.1 -> 1.3.1 and Pygments 2.15.1 -> 2.21.0 [[GH-5661](https://github.com/hashicorp/consul-k8s/issues/5661)]
+
+FEATURES:
+
+* api-gateway: Add `RouteUpstreamLimitsFilter` CRD and gateway-wide annotation defaults to configure per-service upstream circuit-breaker limits (`maxConnections`, `maxPendingRequests`, `maxConcurrentRequests`) and passive health checks (Envoy outlier detection) on API Gateway backends. [[GH-5596](https://github.com/hashicorp/consul-k8s/issues/5596)]
+* api-gateway: Add support for `http2` and `grpc` listener protocols via a per-section annotation on the Kubernetes `Gateway` object (`api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol`). Each listener can now independently select its Consul protocol, enabling Envoy `http2_protocol_options` and gRPC-specific filters (`grpc_stats`, `grpc_http1_bridge`) to be generated for the appropriate listeners. [[GH-5594](https://github.com/hashicorp/consul-k8s/issues/5594)]
+* api-gateway: Add support for zero-touch downstream TLS termination via the `consul.hashicorp.com/tls-enabled: "true"` annotation. When set on a `Gateway` resource, Consul automatically uses the gateway's Connect leaf certificate to terminate HTTPS — no `certificateRefs` or operator-managed `Secret` required. The leaf certificate carries `*.api-gateway.<domain>` wildcard DNS SANs. Combined with Consul DNS auto-registration (`<service>.api-gateway.consul`), clients inside the cluster can reach mesh-registered services over CA-verified HTTPS without any manual certificate management. [[GH-5597](https://github.com/hashicorp/consul-k8s/issues/5597)]
+* api-gateway: add `RouteHeaderMatchInvertFilter` CRD to support negated HTTP header match conditions (Invert=true) on API Gateway `HTTPRoute` rules, enabling "route when header is absent" and "route when header value does NOT match" patterns via an `ExtensionRef` filter. [[GH-5593](https://github.com/hashicorp/consul-k8s/issues/5593)]
+* api-gateway: upgrade the api-gateway operator to support tcproute under v1 under package version 1.6.0 of gateway-api [[GH-5532](https://github.com/hashicorp/consul-k8s/issues/5532)]
+* crd: Add `ECDHCurves` field and OpenAPI validation to `MeshDirectionalTLSConfig` in `Mesh` CRD for post-quantum hybrid key exchange (`X25519MLKEM768`). [[GH-5639](https://github.com/hashicorp/consul-k8s/issues/5639)]
+* helm: Add `global.globalRegistry` Helm values to configure Consul server integration with an external global registry service, including support for authenticating via a Kubernetes secret token. [[GH-5633](https://github.com/hashicorp/consul-k8s/issues/5633)]
+* helm: add `global.acls.authMethod.create` to allow using Kubernetes auth methods that were configured outside of the Helm release. When set to `false`, the `server-acl-init` job requires the auth methods to already exist and only manages the ACL policies, roles and binding rules. [[GH-5611](https://github.com/hashicorp/consul-k8s/issues/5611)]
+* helm: add `global.acls.authMethod.name` to configure the base name of the Kubernetes auth methods created by the `server-acl-init` job. Set this to a unique value per Kubernetes cluster when multiple clusters share a single Consul control plane, so that the clusters do not overwrite each other's auth methods. [[GH-5611](https://github.com/hashicorp/consul-k8s/issues/5611)]
+* metrics: add a new `consul.hashicorp.com/service-metrics-endpoints` annotation that accepts a comma-separated list of `port:path` pairs, allowing a single container to expose metrics on multiple ports for metrics merging. Takes precedence over `consul.hashicorp.com/service-metrics-port` and `consul.hashicorp.com/service-metrics-path`, which continue to work unchanged. [[GH-5664](https://github.com/hashicorp/consul-k8s/issues/5664)]
+
+IMPROVEMENTS:
+
+* helm: add `global.imageApplyManifests` value to allow overriding the container image used by the post-upgrade apply-manifests Job, enabling use of air-gapped or security-approved images in place of the default `bitnami/kubectl:latest` (non-OpenShift) or `registry.redhat.io/openshift4/ose-cli` (OpenShift). [[GH-5673](https://github.com/hashicorp/consul-k8s/issues/5673)]
+* control-plane: Migrate traffic redirection from `iptables`/`ip6tables` to `nftables`. This requires the `nft` binary and Linux kernel support for stateful NAT in `nftables` `inet` chains (Linux 5.2+ or distro backports); hosts without this support will fail to set up transparent-proxy traffic redirection. [[GH-5554](https://github.com/hashicorp/consul-k8s/issues/5554)]
+
+## 2.0.4 (September 10, 2026)
+BREAKING CHANGES:
+
+* helm: multi-port Consul service registration is now disabled by default via `connectInject.multiportServiceRegistration.enabled=false`. A Connect-injected Pod that selects more than one application port is rejected at admission. Set `connectInject.multiportServiceRegistration.enabled=true` to retain the previous behavior, or select a single port with `consul.hashicorp.com/connect-service-port`. [[GH-5625](https://github.com/hashicorp/consul-k8s/issues/5625)]
+
+SECURITY:
+
+* Upgrade `pymdown-extensions` from `10.0` to `11.0.1` to resolve [GHSA-gm37-52c6-37mw](https://github.com/advisories/GHSA-gm37-52c6-37mw): exponential backtracking ReDoS in the `caret`, `tilde`, `betterem`, and `magiclink` inline processors, where a crafted Markdown input under 50 bytes can pin the rendering thread at 100% CPU indefinitely (CWE-1333, CVSS 7.5 High). [[GH-5609](https://github.com/hashicorp/consul-k8s/issues/5609)]
+* Upgrade go version to 1.26.7 to address security vulnerabilities. [[GH-5627](https://github.com/hashicorp/consul-k8s/issues/5627)]
+* dockerfile: Remove unnecessary `root` group membership for the user in ubi-based consul-k8s-control-plane image. [[GH-5640](https://github.com/hashicorp/consul-k8s/issues/5640)]
+* security: upgrade `golang.org/x/crypto` to v0.57.0, `golang.org/x/net` to v0.59.0, and `google.golang.org/grpc` to v1.83.2 across the control-plane, CLI, acceptance, CNI, and custom gateway-api modules to resolve security vulnerabilities. [[GH-5648](https://github.com/hashicorp/consul-k8s/issues/5648)]
+
+IMPROVEMENTS:
+
+* Helm: Expose `connectInject.cni.tolerations` as a configurable Helm value to allow operators to override CNI DaemonSet tolerations. Defaults to tolerating `CriticalAddonsOnly` and `NoExecute` taints when not set. [[GH-5562](https://github.com/hashicorp/consul-k8s/issues/5562)]
+* helm: add `connectInject.multiportServiceRegistration.conversionStrategy` (`NONE`, `TRANSLATE`, `DECOMMISSION`) to control how existing Deployments, StatefulSets, and DaemonSets are treated by a post-upgrade Job when multi-port registration is disabled. `NONE` is the default and leaves existing workload specifications untouched. The Job also scans Pods and fails the upgrade with an explicit list of any multi-port workload it cannot rewrite, such as an Argo Rollout or a bare Pod, instead of letting it fail admission at its next Pod recreation. [[GH-5625](https://github.com/hashicorp/consul-k8s/issues/5625)]
+* security: build FIPS artifacts against the in-tree Go Cryptographic Module (FIPS 140-3, `GOFIPS140=v1.0.0`, CMVP Certificate #5247) instead of BoringCrypto/CNG. FIPS binaries now run in FIPS mode via a baked-in `//go:debug fips140=on`, are pure Go (no cgo), and the artifact/version label changes from `fips1402` to `fips1403`. [[GH-5492](https://github.com/hashicorp/consul-k8s/issues/5492)]
+
+BUG FIXES:
+
+* api-gateway: Fix generate-manifest to correctly generate GatewayPolicy manifests. [[GH-5604](https://github.com/hashicorp/consul-k8s/issues/5604)]
+
 ## 2.0.3 (August 11, 2026)
 
 SECURITY:
