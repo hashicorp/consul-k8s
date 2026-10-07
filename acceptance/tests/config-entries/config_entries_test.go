@@ -670,6 +670,17 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 	}
 	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
+	// feature-gate-set
+	featureGateSetRole := "feature-gate-set"
+	featureGateSetAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, featureGateSetRole),
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            featureGateSetRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, serverPKIConfig.PolicyName),
+	}
+	featureGateSetAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
 	// allow all components to access server ca
 	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
@@ -692,6 +703,7 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
 		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
 		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
+		"global.secretsBackend.vault.featureGateSetRole":   featureGateSetRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",

@@ -102,6 +102,10 @@ data:
         "tlsServerName": {{ .Values.externalServers.tlsServerName | default "" | quote }},
         "useSystemRoots": {{ .Values.externalServers.useSystemRoots | default false | toJson }},
         "skipServerWatch": {{ .Values.externalServers.skipServerWatch | default false | toJson }}
+      },
+
+      "ai": {
+        "enabled": {{ default false (and .Values.ai .Values.ai.enabled) | toJson }}
       }
     }
 {{- end }}

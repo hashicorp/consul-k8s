@@ -51,6 +51,7 @@
        CRD/controller validation), mirroring the controller-side checks. */ -}}
 {{- if and $ci $ci.enabled }}
 {{- if $root.Values.global.openshift.enabled }}{{ fail (printf "terminatingGateways[%s].credentialInjection is not supported on OpenShift (global.openshift.enabled=true)" .name) }}{{ end }}
+{{- if not (and $root.Values.ai $root.Values.ai.enabled) }}{{ fail (printf "terminatingGateways[%s].credentialInjection requires ai.enabled=true (credential injection is gated by the consul-ai feature gate)" .name) }}{{ end }}
 {{- include "consul.validateTerminatingGatewayCredentialInjection" (dict "ci" $ci "name" .name) }}
 {{- end }}
 apiVersion: apps/v1
