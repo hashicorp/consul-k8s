@@ -1472,7 +1472,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
       --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
@@ -1494,7 +1493,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
       --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
@@ -1516,7 +1514,6 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
       --set 'terminatingGateways.gateways[0].name=tgw' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.gateways[0].credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
       --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
@@ -1540,7 +1537,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
       --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
@@ -1559,7 +1555,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
       --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
@@ -1585,7 +1580,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
       --set 'terminatingGateways.defaults.credentialInjection.secretName=camp-egress-credentials' \
@@ -1603,7 +1597,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
       --set 'terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test' \
@@ -1619,7 +1612,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       .
   [ "$status" -eq 1 ]
@@ -1632,7 +1624,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
       --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
@@ -1651,7 +1642,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
       --set 'terminatingGateways.defaults.credentialInjection.secretName=creds' \
@@ -1669,7 +1659,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.source=kubernetesSecret' \
       --set 'terminatingGateways.defaults.credentialInjection.secretName=creds' \
@@ -1686,7 +1675,7 @@ key2: value2' \
   local ci="terminatingGateways.defaults.credentialInjection"
   local args="-s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true --set ${ci}.enabled=true --set ${ci}.processorImage=p:1 --set ${ci}.processorConfigMap=camp-proc \
+      --set ${ci}.enabled=true --set ${ci}.processorImage=p:1 --set ${ci}.processorConfigMap=camp-proc \
       --set ${ci}.vaultAgentImage=v:1 --set ${ci}.vaultAgentConfigMap=camp-agent --set ${ci}.tokenAudience=vault"
   for addr in 'https://vault:8200' 'https://[fd00::1]:8200' 'https://[fd00::1]' 'https://[fe80::1%25eth0]:8200/v1' 'https://10.0.0.5:8200'; do
     run helm template ${args} --set-string "${ci}.vaultAddress=${addr}" .
@@ -1705,7 +1694,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
       --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-shared' \
@@ -1724,7 +1712,6 @@ key2: value2' \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.enabled=true' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.defaults.credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.processorImage=p:1' \
       --set 'terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc' \
@@ -1752,7 +1739,6 @@ key2: value2' \
   cd `chart_dir`
   local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
@@ -1781,7 +1767,6 @@ key2: value2' \
   cd `chart_dir`
   local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
@@ -1801,7 +1786,6 @@ key2: value2' \
   run helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
       --set global.openshift.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
@@ -1821,7 +1805,6 @@ key2: value2' \
       --set global.openshift.enabled=true \
       --set 'terminatingGateways.gateways[0].name=plain' \
       --set 'terminatingGateways.gateways[1].name=ci' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.gateways[1].credentialInjection.enabled=true' \
       --set 'terminatingGateways.gateways[1].credentialInjection.source=kubernetesSecret' \
       --set 'terminatingGateways.gateways[1].credentialInjection.secretName=camp-creds' \
@@ -1860,7 +1843,7 @@ key2: value2' \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
       --set global.acls.manageSystemACLs=true \
       --set global.imagePullPolicy=IfNotPresent \
-      --set ai.enabled=true --set ${ci}.enabled=true \
+      --set ${ci}.enabled=true \
       --set ${ci}.processorImage=camp-auth-processor:parity \
       --set ${ci}.vaultAgentImage=hashicorp/vault:parity \
       --set ${ci}.processorConfigMap=camp-proc \
@@ -1881,7 +1864,6 @@ key2: value2' \
   cd `chart_dir`
   local vols=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
@@ -1911,7 +1893,6 @@ key2: value2' \
   cd `chart_dir`
   local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
       --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
@@ -1944,7 +1925,6 @@ key2: value2' \
   cd `chart_dir`
   local vols=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -1963,7 +1943,6 @@ key2: value2' \
   cd `chart_dir`
   local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -1982,7 +1961,6 @@ key2: value2' \
   cd `chart_dir`
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -1998,7 +1976,6 @@ key2: value2' \
   cd `chart_dir`
   local sc=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -2015,7 +1992,6 @@ key2: value2' \
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
       --set global.acls.manageSystemACLs=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
@@ -2040,7 +2016,6 @@ key2: value2' \
   cd `chart_dir`
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -2063,7 +2038,6 @@ key2: value2' \
       --set global.secretsBackend.vault.consulServerRole=server \
       --set global.secretsBackend.vault.consulClientRole=client \
       --set global.secretsBackend.vault.manageSystemACLsRole=acl \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -2091,7 +2065,6 @@ key2: value2' \
       --set global.secretsBackend.vault.consulServerRole=server \
       --set global.secretsBackend.vault.consulClientRole=client \
       --set global.secretsBackend.vault.manageSystemACLsRole=acl \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -2120,7 +2093,6 @@ key2: value2' \
   cd `chart_dir`
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -2149,7 +2121,6 @@ key2: value2' \
   cd `chart_dir`
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -2170,7 +2141,6 @@ key2: value2' \
   cd `chart_dir`
   local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.source=kubernetesSecret \
       --set terminatingGateways.defaults.credentialInjection.secretName=creds \
@@ -2188,7 +2158,7 @@ key2: value2' \
   local ci="terminatingGateways.defaults.credentialInjection"
   local args="-s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true --set ${ci}.enabled=true --set ${ci}.source=kubernetesSecret --set ${ci}.secretName=creds \
+      --set ${ci}.enabled=true --set ${ci}.source=kubernetesSecret --set ${ci}.secretName=creds \
       --set ${ci}.processorImage=camp-auth-processor:test --set ${ci}.processorConfigMap=camp-proc"
   # Inherited from global.logLevel and set directly on terminatingGateways.logLevel.
   for level in "--set global.logLevel=trace" "--set terminatingGateways.logLevel=trace"; do
@@ -2211,7 +2181,6 @@ key2: value2' \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
       --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
       --set 'terminatingGateways.gateways[0].name=tgw' \
-      --set ai.enabled=true \
       --set 'terminatingGateways.gateways[0].credentialInjection.enabled=true' \
       --set 'terminatingGateways.defaults.credentialInjection.tokenAudience=vault' \
       . | tee /dev/stderr)
@@ -2231,7 +2200,6 @@ key2: value2' \
   cd `chart_dir`
   local ann=$(helm template -s templates/terminating-gateways-deployment.yaml \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.enabled=true \
       --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
       --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
@@ -2249,66 +2217,4 @@ key2: value2' \
       --set connectInject.enabled=true --set terminatingGateways.enabled=true \
       . | tee /dev/stderr | yq -s -r '.[0].spec.template.metadata.annotations["consul.hashicorp.com/credential-config-checksum"]' | tee /dev/stderr)
   [ "$ann" = "null" ]
-}
-
-#--------------------------------------------------------------------
-# credentialInjection requires ai.enabled (consul-ai feature gate)
-
-@test "terminatingGateways/Deployment: credentialInjection fails without ai.enabled" {
-  cd `chart_dir`
-  run helm template -s templates/terminating-gateways-deployment.yaml \
-      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set terminatingGateways.defaults.credentialInjection.enabled=true \
-      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
-      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
-      --set terminatingGateways.defaults.credentialInjection.tokenAudience=vault \
-      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
-      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
-      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "terminatingGateways[terminating-gateway].credentialInjection requires ai.enabled=true" ]]
-}
-
-@test "terminatingGateways/Deployment: credentialInjection on a single gateway fails without ai.enabled" {
-  cd `chart_dir`
-  run helm template -s templates/terminating-gateways-deployment.yaml \
-      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=false \
-      --set 'terminatingGateways.gateways[0].name=plain' \
-      --set 'terminatingGateways.gateways[1].name=ci' \
-      --set 'terminatingGateways.gateways[1].credentialInjection.enabled=true' \
-      --set 'terminatingGateways.gateways[1].credentialInjection.source=kubernetesSecret' \
-      --set 'terminatingGateways.gateways[1].credentialInjection.secretName=camp-creds' \
-      --set 'terminatingGateways.gateways[1].credentialInjection.processorImage=camp-auth-processor:test' \
-      --set 'terminatingGateways.gateways[1].credentialInjection.processorConfigMap=camp-proc' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "terminatingGateways[ci].credentialInjection requires ai.enabled=true" ]]
-}
-
-@test "terminatingGateways/Deployment: gateways without credentialInjection render without ai.enabled" {
-  cd `chart_dir`
-  local actual=$(helm template -s templates/terminating-gateways-deployment.yaml \
-      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set 'terminatingGateways.gateways[0].name=plain' \
-      . | tee /dev/stderr | yq -s 'length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
-}
-
-@test "terminatingGateways/Deployment: a credentialInjection install bootstraps the consul-ai feature gate" {
-  cd `chart_dir`
-  # Credential injection requires ai.enabled, which must in turn enable the Consul
-  # consul-ai feature gate that gates credential injection on the servers.
-  local args="--set connectInject.enabled=true --set terminatingGateways.enabled=true \
-      --set ai.enabled=true \
-      --set terminatingGateways.defaults.credentialInjection.enabled=true \
-      --set terminatingGateways.defaults.credentialInjection.source=kubernetesSecret \
-      --set terminatingGateways.defaults.credentialInjection.secretName=camp-creds \
-      --set terminatingGateways.defaults.credentialInjection.processorImage=camp-auth-processor:test \
-      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc"
-  helm template -s templates/terminating-gateways-deployment.yaml ${args} . > /dev/null
-  local actual=$(helm template -s templates/server-config-configmap.yaml ${args} . | tee /dev/stderr |
-      yq -r '.data["feature-gates-config.json"]' | jq -r '.feature_gates.bootstrap["consul-ai"]' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
