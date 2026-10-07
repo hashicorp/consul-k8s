@@ -125,6 +125,23 @@ func consulTestServer(
 	return srv, cfg, watcher
 }
 
+// runCache starts c.Run in a goroutine and registers a cleanup that cancels it
+// and waits for it to exit, so it cannot log after the test has completed.
+func runCache(t *testing.T, ctx context.Context, c *Cache) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.Run(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+}
+
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 func TestCache_WaitSynced(t *testing.T) {
@@ -144,7 +161,7 @@ func TestCache_WaitSynced(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go c.Run(ctx)
+	runCache(t, ctx, c)
 	c.WaitSynced(ctx)
 	require.NoError(t, ctx.Err(), "WaitSynced timed out")
 }
@@ -166,7 +183,7 @@ func TestCache_Get(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go c.Run(ctx)
+	runCache(t, ctx, c)
 	c.WaitSynced(ctx)
 
 	got := c.Get("my-gw", "", "")
@@ -242,7 +259,7 @@ func TestCache_List(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go c.Run(ctx)
+	runCache(t, ctx, c)
 	c.WaitSynced(ctx)
 
 	list := c.List()
@@ -267,7 +284,7 @@ func TestCache_ForeignDatacenter_Filtered(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go c.Run(ctx)
+	runCache(t, ctx, c)
 	c.WaitSynced(ctx)
 
 	require.Nil(t, c.Get("foreign-gw", "", ""), "foreign-datacenter entry must be filtered out")
@@ -297,7 +314,7 @@ func TestCache_NoKubeName_Filtered(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go c.Run(ctx)
+	runCache(t, ctx, c)
 	c.WaitSynced(ctx)
 
 	require.Nil(t, c.Get("user-created", "", ""), "entry without k8s-name must be filtered out")
@@ -333,7 +350,7 @@ func TestCache_Subscribe_NotifiesOnChange(t *testing.T) {
 	sub := c.Subscribe(ctx, translator)
 	defer sub.Cancel()
 
-	go c.Run(ctx)
+	runCache(t, ctx, c)
 
 	// The first poll must deliver an event for "my-gw".
 	select {
@@ -369,7 +386,7 @@ func TestCache_Subscribe_Cancel(t *testing.T) {
 
 	sub := c.Subscribe(ctx, translator)
 
-	go c.Run(ctx)
+	runCache(t, ctx, c)
 
 	// Drain the first event then cancel the subscription.
 	select {

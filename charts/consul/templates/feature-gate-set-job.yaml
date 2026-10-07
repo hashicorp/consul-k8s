@@ -1,0 +1,239 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if (or (and $serverEnabled (eq (int .Values.server.updatePartition) 0)) .Values.externalServers.enabled) }}
+{{- $useReplicationToken := and .Values.global.acls.manageSystemACLs (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.replicationToken.secretName -}}
+{{- $useExternalSystemRoots := and .Values.externalServers.enabled .Values.externalServers.useSystemRoots -}}
+{{- $useVaultACLToken := and .Values.global.secretsBackend.vault.enabled (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) -}}
+{{- $useVaultCA := and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled (not $useExternalSystemRoots) -}}
+{{- if or (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) (and .Values.global.acls.bootstrapToken.secretKey (not .Values.global.acls.bootstrapToken.secretName)) }}{{ fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided" }}{{ end -}}
+{{- if and .Values.global.acls.manageSystemACLs (or (and .Values.global.acls.replicationToken.secretName (not .Values.global.acls.replicationToken.secretKey)) (and .Values.global.acls.replicationToken.secretKey (not .Values.global.acls.replicationToken.secretName))) }}{{ fail "both global.acls.replicationToken.secretKey and global.acls.replicationToken.secretName must be set if one of them is provided" }}{{ end -}}
+{{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.manageSystemACLs (not (or .Values.global.acls.bootstrapToken.secretName $useReplicationToken)) }}{{ fail "global.acls.bootstrapToken or global.acls.replicationToken must be provided when global.secretsBackend.vault.enabled and global.acls.manageSystemACLs are true" }}{{ end -}}
+{{- if and .Values.global.secretsBackend.vault.enabled (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) (not .Values.global.secretsBackend.vault.featureGateSetRole) }}{{ fail "global.secretsBackend.vault.featureGateSetRole is required when the feature-gate-set job reads a Vault ACL token." }}{{ end -}}
+{{- if and $useVaultCA (not $useVaultACLToken) (not .Values.global.secretsBackend.vault.consulCARole) }}{{ fail "global.secretsBackend.vault.consulCARole is required when the feature-gate-set job reads only a Vault CA certificate." }}{{ end -}}
+{{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+{{- if .Values.externalServers.enabled -}}
+{{- $externalServerHost := .Values.externalServers.hosts | first | toString -}}
+{{- $validExternalServerHost := or (regexMatch "^[A-Za-z0-9][A-Za-z0-9.-]*$" $externalServerHost) (regexMatch "^[0-9a-fA-F:.]+$" $externalServerHost) (regexMatch "^provider=[^[:space:]=]+([[:space:]][A-Za-z0-9_]+=[^[:space:]]+)*$" $externalServerHost) -}}
+{{- if not $validExternalServerHost }}{{ fail "The feature-gate-set job requires externalServers.hosts[0] to be a DNS name, IP address, or provider= auto-join string; exec= addresses are not supported." }}{{ end -}}
+{{- end -}}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-feature-gate-set
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: feature-gate-set
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-feature-gate-set
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: feature-gate-set
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        {{- if or $useVaultCA $useVaultACLToken }}
+        "vault.hashicorp.com/agent-pre-populate-only": "true"
+        "vault.hashicorp.com/agent-inject": "true"
+        {{- if (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) }}
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.featureGateSetRole }}
+        {{- if .Values.global.acls.bootstrapToken.secretName }}
+        {{- with .Values.global.acls.bootstrapToken }}
+        "vault.hashicorp.com/agent-inject-secret-bootstrap-token": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-bootstrap-token": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- else if $useReplicationToken }}
+        "vault.hashicorp.com/agent-inject-secret-replication-token": "{{ .Values.global.acls.replicationToken.secretName }}"
+        "vault.hashicorp.com/agent-inject-template-replication-token": {{ template "consul.vaultReplicationTokenTemplate" . }}
+        {{- end }}
+        {{- else }}
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        {{- end }}
+        {{- if $useVaultCA }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- end }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+        {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace"))) }}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
+        {{- end }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-feature-gate-set
+      {{- if (or (and .Values.global.tls.enabled (not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled))) (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.acls.bootstrapToken.secretName) (not $useReplicationToken))) }}
+      volumes:
+      {{- if and .Values.global.tls.enabled (not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled)) }}
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+                path: tls.crt
+      {{- end }}
+      {{- if (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.acls.bootstrapToken.secretName) (not $useReplicationToken)) }}
+        - name: bootstrap-acl-token
+          secret:
+            secretName: {{ printf "%s-bootstrap-acl-token" (include "consul.fullname" .) }}
+            items:
+              - key: token
+                path: token
+      {{- end }}
+      {{- end }}
+      containers:
+      - name: feature-gate-set
+        image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
+        {{ template "consul.imagePullPolicy" . }}
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+        env:
+        {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
+        {{- if (or .Values.global.acls.manageSystemACLs (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
+        {{- if and .Values.global.secretsBackend.vault.enabled $useReplicationToken }}
+        - name: CONSUL_HTTP_TOKEN_FILE
+          value: /vault/secrets/replication-token
+        {{- else if .Values.global.secretsBackend.vault.enabled }}
+        - name: CONSUL_HTTP_TOKEN_FILE
+          value: /vault/secrets/bootstrap-token
+        {{- else if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+        - name: CONSUL_HTTP_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.acls.bootstrapToken.secretName }}
+              key: {{ .Values.global.acls.bootstrapToken.secretKey }}
+        {{- else if $useReplicationToken }}
+        - name: CONSUL_HTTP_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.acls.replicationToken.secretName }}
+              key: {{ .Values.global.acls.replicationToken.secretKey }}
+        {{- else }}
+        - name: CONSUL_HTTP_TOKEN_FILE
+          value: /consul/acl/tokens/token
+        {{- end }}
+        {{- end }}
+        {{- if (or (and .Values.global.tls.enabled (not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled))) (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.acls.bootstrapToken.secretName) (not $useReplicationToken))) }}
+        volumeMounts:
+        {{- if and .Values.global.tls.enabled (not (or .Values.externalServers.useSystemRoots .Values.global.secretsBackend.vault.enabled)) }}
+          - name: consul-ca-cert
+            mountPath: /consul/tls/ca
+            readOnly: true
+        {{- end }}
+        {{- if (and .Values.global.acls.manageSystemACLs (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.acls.bootstrapToken.secretName) (not $useReplicationToken)) }}
+          - name: bootstrap-acl-token
+            mountPath: /consul/acl/tokens
+            readOnly: true
+        {{- end }}
+        {{- end }}
+        command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          case "$CONSUL_ADDRESSES" in
+            *:*) consul_host="[$CONSUL_ADDRESSES]" ;;
+            *) consul_host="$CONSUL_ADDRESSES" ;;
+          esac
+          {{- if .Values.global.tls.enabled }}
+          export CONSUL_HTTP_ADDR="https://${consul_host}:${CONSUL_HTTP_PORT}"
+          {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+          export CONSUL_TLS_SERVER_NAME={{ .Values.externalServers.tlsServerName | quote }}
+          export CONSUL_CURL_ADDR="https://${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}"
+          {{- end }}
+          {{- if not $useExternalSystemRoots }}
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          export CONSUL_CACERT=/vault/secrets/serverca.crt
+          {{- else }}
+          export CONSUL_CACERT=/consul/tls/ca/tls.crt
+          {{- end }}
+          {{- end }}
+          {{- else }}
+          export CONSUL_HTTP_ADDR="http://${consul_host}:${CONSUL_HTTP_PORT}"
+          {{- end }}
+
+          # Wait until a Consul leader is elected before setting feature gates.
+          # /v1/status/leader returns "" when no leader is elected, or "host:port" when one is.
+          while true; do
+            echo "Waiting for Consul leader..."
+            {{- if .Values.global.tls.enabled }}
+            {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+            {{- if $useExternalSystemRoots }}
+            leader=$(curl -s --connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}" "${CONSUL_CURL_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
+            {{- else }}
+            leader=$(curl -s --cacert "${CONSUL_CACERT}" --connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}" "${CONSUL_CURL_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
+            {{- end }}
+            {{- else if $useExternalSystemRoots }}
+            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
+            {{- else }}
+            leader=$(curl -s --cacert "${CONSUL_CACERT}" "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
+            {{- end }}
+            {{- else }}
+            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
+            {{- end }}
+            if echo "${leader}" | grep -qE '".+"'; then
+              echo "Consul leader is ready: ${leader}"
+              break
+            fi
+            sleep 2
+          done
+
+          # Each line: <gate-name> <enabled|disabled>
+          # To add a future gate, append a new line here.
+          GATES="
+          {{- if default false (and .Values.ai .Values.ai.enabled) }}
+          consul-ai enabled
+          {{- end }}
+          "
+
+          echo "$GATES" | while read -r name value; do
+            [ -z "$name" ] && continue
+            echo "Setting feature gate: $name=$value"
+            consul operator feature set "$name" "$value"
+          done
+        {{- if .Values.global.acls.resources }}
+        resources:
+          {{- toYaml .Values.global.acls.resources | nindent 10 }}
+        {{- else }}
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "50m"
+          limits:
+            memory: "50Mi"
+            cpu: "50m"
+        {{- end }}
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.global.acls.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.global.acls.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+{{- end }}
