@@ -4006,7 +4006,7 @@ ai:
   # OBO sidecars are not affected by this setting. They are injected into
   # any pod with the consul.hashicorp.com/ai-role=ai-agent annotation.
   # @type: boolean
-  enabled: false
+  enabled: true
 
   inferenceModel:
     defaults:
@@ -4042,7 +4042,7 @@ ai:
     # @default: ""
     # @type: string
     # TODO: this is yet to be implemented
-    image: "hashicorp/consul-mcp-gateway:2.1.0-rc1"
+    image: "public.ecr.aws/n9h4m6z2/ajay/consul-mcp-gateway:acceptance-test-0001"
 
     defaults:
       # The port the MCP server container listens on inside the pod.
