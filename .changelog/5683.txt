@@ -1,0 +1,3 @@
+```release-note:bug
+server-acl-init: Fix ACL Role not being updated on re-run. `updateOrCreateACLRole` was writing back the stale object read from Consul instead of the desired state, causing policy assignments to never be updated after the initial install.
+```
