@@ -1,0 +1,84 @@
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled .Values.ai.inferenceGateway.enabled }}
+{{- if .Values.ai.inferenceGateway.gateways }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Job applies InferenceGateway CRs via `kubectl apply` using the manifest
+# rendered into the ai-inference-gateways-manifests ConfigMap.
+# Using a Job (rather than a raw CR hook) means the CR is never deleted by Helm
+# on upgrade — kubectl apply is idempotent: create on first run, patch thereafter.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-inference-gateways-apply
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: inference-gateway
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-inference-gateways-apply
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: inference-gateway
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-inference-gateways-apply
+      {{- if not .Values.global.openshift.enabled }}
+      containers:
+      - name: apply
+        image: bitnami/kubectl:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Applying InferenceGateway CRs"
+            kubectl apply -f /manifests/manifests.yaml
+            echo "Done"
+        volumeMounts:
+          - name: manifests
+            mountPath: /manifests
+      {{- else }}
+      containers:
+      - name: apply
+        image: registry.redhat.io/openshift4/ose-cli
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Applying InferenceGateway CRs"
+            oc apply -f /manifests/manifests.yaml
+            echo "Done"
+        volumeMounts:
+          - name: manifests
+            mountPath: /manifests
+      {{- end }}
+      volumes:
+        - name: manifests
+          configMap:
+            name: {{ template "consul.fullname" . }}-inference-gateways-manifests
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+{{- end }}
+{{- end }}

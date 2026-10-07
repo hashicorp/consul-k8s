@@ -1,0 +1,80 @@
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# This post-install/post-upgrade Job runs the "agent-resources" subcommand.
+# It reads ai.agent defaults from values.yaml (passed as CLI flags below)
+# and upserts the AgentConfig CR in the cluster so that
+# AgentConfigController always has an up-to-date CR to reconcile.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-agent-resources
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-agent
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-ai-agent-resources
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: ai-agent
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-ai-agent-resources
+      containers:
+        - name: ai-agent-resources
+          image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - agent-resources
+            - -config-name=consul-ai-agent
+            - -app={{ template "consul.name" . }}
+            - -chart={{ template "consul.chart" . }}
+            - -heritage={{ .Release.Service }}
+            - -release-name={{ .Release.Name }}
+            - -component=ai-agent
+            - -enabled={{ .Values.ai.enabled }}
+            - -interceptor-port={{ .Values.ai.agent.defaults.interceptorPort }}
+            - -mcp-port={{ .Values.ai.agent.defaults.mcpPort }}
+            - -hitl-port={{ .Values.ai.agent.defaults.hitl.port }}
+            - -approval-timeout={{ .Values.ai.agent.defaults.hitl.approvalTimeout }}
+            - -requests-memory={{ .Values.ai.agent.defaults.resources.requests.memory }}
+            - -requests-cpu={{ .Values.ai.agent.defaults.resources.requests.cpu }}
+            - -limits-memory={{ .Values.ai.agent.defaults.resources.limits.memory }}
+            - -limits-cpu={{ .Values.ai.agent.defaults.resources.limits.cpu }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+{{- end }}

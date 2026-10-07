@@ -1,0 +1,1 @@
+terminating-gateway: Add opt-in credential injection (Vault Agent or Kubernetes Secret source) for external LLM/MCP calls in consul agentic mesh platform. Not supported on OpenShift.
