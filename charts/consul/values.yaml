@@ -165,6 +165,17 @@ global:
       # and check the name of `metadata.name`.
       manageSystemACLsRole: ""
 
+      # The Vault role for the feature-gate-set job when it reads an ACL token.
+      # Bind this role to the feature-gate-set ServiceAccount and grant it read access to
+      # `global.acls.bootstrapToken.secretName`, or `global.acls.replicationToken.secretName`
+      # in a secondary datacenter that does not configure a bootstrap token.
+      # If TLS is enabled, also grant read access
+      # to `global.tls.caCert.secretName`.
+      # To discover the service account name, run:
+      # $ helm template --show-only templates/feature-gate-set-serviceaccount.yaml <release-name> hashicorp/consul
+      # and check `metadata.name`.
+      featureGateSetRole: ""
+
       # [Enterprise Only] A Vault role that allows the Consul `partition-init` job to read a Vault secret for the partition ACL token.
       #  The `partition-init` job bootstraps Admin Partitions on Consul servers.
       # .
@@ -1633,6 +1644,8 @@ externalServers:
   # An array of external Consul server hosts that are used to make
   # HTTPS connections from the components in this Helm chart.
   # Valid values include an IP, a DNS name, or an [exec=](https://github.com/hashicorp/go-netaddrs) string.
+  # The feature-gate-set job uses the Consul CLI and requires the first host to be
+  # a DNS name or IP address; it rejects exec= strings when external servers are enabled.
   # The port must be provided separately below.
   # Note: This slice can only contain a single element.
   # Note: If enabling clients, `client.join` must also be set to the hosts that should be
@@ -3750,6 +3763,9 @@ terminatingGateways:
       # sidecars are added to the terminating gateway deployment.
       # Credential injection is not supported on OpenShift: rendering fails if
       # this is true while `global.openshift.enabled` is true.
+      # Credential injection is part of Consul AI and requires `ai.enabled=true`,
+      # which enables the Consul `consul-ai` feature gate: rendering fails if this
+      # is true while `ai.enabled` is false.
       enabled: false
 
       # Source selects the credential delivery mechanism: "vault" (default) runs
