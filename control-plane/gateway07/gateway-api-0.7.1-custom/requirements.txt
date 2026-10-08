@@ -30,4 +30,4 @@ six==1.16.0
 # GHSA-pw6j-qg29-8w7f CurlAsyncHTTPClient credential leak on handle reuse, and
 # GHSA-mpf4-983q-p7j4 (CVE-2026-82397): urlencoded body DoS via unbounded
 # field count (max_num_fields not passed to parse_qs).
-tornado==6.5.8
+tornado==6.5.9
