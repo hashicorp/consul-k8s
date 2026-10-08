@@ -148,8 +148,8 @@ func TestAppMetrics(t *testing.T) {
 		require.NoError(r, err)
 		// This assertion represents the metrics from the envoy sidecar.
 		require.Contains(r, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server"`)
-		// This assertion represents the metrics from the application.
-		require.Contains(r, metricsOutput, `service_started_total 1`)
+		// This metric is served only on the non-default legacy metrics port and path.
+		require.Contains(r, metricsOutput, `legacy_service_requests_total{endpoint="custom"} 42`)
 	})
 }
 
@@ -196,6 +196,9 @@ func TestAppMetricsMultiplePorts(t *testing.T) {
 	require.Len(t, serviceMetricsURLs, 2, "expected one flag per configured metrics endpoint, got %v", serviceMetricsURLs)
 	require.Contains(t, serviceMetricsURLs[0], ":8080/metrics")
 	require.Contains(t, serviceMetricsURLs[1], ":9090/alt-metrics")
+	for _, serviceMetricsURL := range serviceMetricsURLs {
+		require.NotContains(t, serviceMetricsURL, ":7070/legacy-metrics", "legacy annotations must not override service-metrics-endpoints")
+	}
 
 	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
 	// to start.
