@@ -359,6 +359,40 @@ spec:
           - name: extra-config
             mountPath: /consul/extra-config
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+      {{- if (and .Values.server.exposeServicePerReplica.enabled .Values.server.exposeServicePerReplica.advertise) }}
+      - name: lb-advertise-addr-init
+        image: {{ default "bitnami/kubectl:latest" .Values.global.imageApplyManifests }}
+        {{ template "consul.imagePullPolicy" . }}
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            SVC="${POD_NAME}-lb"
+            for i in $(seq 1 60); do
+              ADDR=$(kubectl get svc "$SVC" -n "$NAMESPACE" \
+                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}')
+              if [ -n "$ADDR" ]; then
+                echo "{\"advertise_addr\": \"$ADDR\"}" > /consul/extra-config/advertise-addr.json
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "timed out waiting for LoadBalancer address for $SVC" >&2
+            exit 1
+        volumeMounts:
+          - name: extra-config
+            mountPath: /consul/extra-config
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
@@ -460,7 +494,9 @@ spec:
               {{ template "consul.extraconfig" }}
 
               exec /usr/local/bin/docker-entrypoint.sh consul agent \
+                {{- if not (and .Values.server.exposeServicePerReplica.enabled .Values.server.exposeServicePerReplica.advertise) }}
                 -advertise="${ADVERTISE_IP}" \
+                {{- end }}
                 -config-dir=/consul/config \
                 {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
                 -encrypt="${GOSSIP_KEY}" \
