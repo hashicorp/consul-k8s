@@ -10,7 +10,7 @@ on:
 
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: "release/2.0.x"
+  BRANCH: "release/2.1.x"
   CONTEXT: "weekly"
 
 jobs:
