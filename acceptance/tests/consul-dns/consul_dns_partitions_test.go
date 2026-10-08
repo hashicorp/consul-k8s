@@ -4,7 +4,9 @@
 package consuldns
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"testing"
 	"time"
@@ -132,6 +134,203 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 			}
 		})
 	}
+}
+
+// privateServerExposureValues returns the Helm values that make the Consul
+// servers reachable by the other cluster without making them reachable from
+// anywhere else.
+//
+// There are three ways this deployment can put the servers on the internet, and
+// all three have to be closed, because an unauthenticated Consul on 8500 is
+// what the insecure test cases serve:
+//
+//  1. server.exposeService is switched on automatically by admin partitions and
+//     defaults to type LoadBalancer, so a managed cloud hands it a public IP.
+//  2. A NodePort binds the port on every node's interfaces. On a cloud node
+//     pool with public node IPs that is exposed just as directly as a load
+//     balancer, so it is not a safe substitute -- it is only safe on Kind,
+//     where the "nodes" are containers on a local docker bridge.
+//  3. server.exposeGossipAndRPCPorts adds hostPort bindings for 8300, 8301,
+//     8302 and 8502 straight onto the node. That is the same node-level
+//     exposure as (2) and it bypasses Services entirely.
+//
+// On a cloud the load balancer already carries every port the other cluster
+// needs, so the host ports in (3) buy nothing and are left off. This matches
+// what the peering and sameness tests already do -- they set that value only
+// under UseKind -- and partitions_connect_test.go runs the same admin-partition
+// setup on cloud without it at all.
+func privateServerExposureValues(t *testing.T, cfg *config.TestConfig) map[string]string {
+	values, err := privateServerExposure(cfg)
+	require.NoError(t, err)
+	return values
+}
+
+// privateServerExposure is the decision itself, split out from the assertion so
+// that the refusal is reachable from a test. Returning an error rather than
+// falling back is the point: there is no safe default here.
+func privateServerExposure(cfg *config.TestConfig) (map[string]string, error) {
+	// On Kind there are no load balancers, but every cluster shares the docker
+	// bridge network, so a node address is reachable from the other cluster and
+	// is not reachable from outside the host running them.
+	if cfg.UseKind {
+		return map[string]string{
+			"server.exposeService.type":           "NodePort",
+			"server.exposeService.nodePort.https": "30000",
+			"server.exposeGossipAndRPCPorts":      "true",
+		}, nil
+	}
+
+	// Anywhere else the servers go behind a load balancer pinned to the private
+	// network. If the platform is not one we have an annotation for, stop.
+	// Letting the chart's own default through would publish the servers, and a
+	// NodePort would be both exposed and useless, because ServiceHost resolves
+	// this Service through its load balancer ingress on everything except Kind.
+	annotation := internalLoadBalancerAnnotation(cfg)
+	if annotation == "" {
+		return nil, fmt.Errorf("refusing to install: this platform has no known private load balancer " +
+			"annotation, so the Consul servers would be published to the internet on a public IP; add the " +
+			"platform's internal load balancer annotation to internalLoadBalancerAnnotation first")
+	}
+
+	return map[string]string{"server.exposeService.annotations": annotation}, nil
+}
+
+// internalLoadBalancerAnnotation returns the provider annotations that keep a
+// Service of type LoadBalancer on the cluster's private network, or "" when the
+// platform is unknown and there is no safe configuration to install.
+//
+// Both spellings are emitted where a provider has two, because which one is
+// read depends on which controller reconciles the Service, not on the cloud:
+// EKS running the AWS Load Balancer Controller reads -scheme and ignores
+// -internal, while the in-tree provider reads -internal; GKE moved from
+// cloud.google.com to networking.gke.io. An annotation the controller does not
+// recognise is silently discarded, so emitting the one that is wrong for the
+// cluster would hand the servers a public IP with nothing to say so. Sending
+// both costs nothing and removes that guess.
+func internalLoadBalancerAnnotation(cfg *config.TestConfig) string {
+	switch {
+	case cfg.UseAKS:
+		return `service.beta.kubernetes.io/azure-load-balancer-internal: "true"`
+	case cfg.UseEKS:
+		return "service.beta.kubernetes.io/aws-load-balancer-internal: \"true\"\n" +
+			"service.beta.kubernetes.io/aws-load-balancer-scheme: internal"
+	case cfg.UseGKE, cfg.UseGKEAutopilot:
+		return "networking.gke.io/load-balancer-type: \"Internal\"\n" +
+			"cloud.google.com/load-balancer-type: \"Internal\""
+	default:
+		return ""
+	}
+}
+
+// waitForPrivateAddress retries DNS readiness while preserving the private-address check.
+// The caller must provide a context with a deadline. This function will:
+//   1. Accept IP address literals directly
+//   2. Retry DNS resolution with exponential backoff
+//   3. Validate that all resolved IPs are private
+//   4. Respect the context deadline
+//
+// This is secure by design: it never bypasses the privacy check, it only
+// adds retry logic to handle transient DNS resolution delays.
+func waitForPrivateAddress(ctx context.Context, host string) error {
+	check := func(ips []net.IP) error {
+		for _, ip := range ips {
+			if !isPrivateAddress(ip) {
+				return fmt.Errorf(
+					"Consul server address %q resolved to non-private IP %s",
+					host, ip,
+				)
+			}
+		}
+		return nil
+	}
+
+	// If the host is already an IP literal, validate it immediately.
+	if ip := net.ParseIP(host); ip != nil {
+		return check([]net.IP{ip})
+	}
+
+	// For hostnames, retry DNS resolution with a deadline.
+	var lastErr error
+	for {
+		queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		answers, err := net.DefaultResolver.LookupIPAddr(queryCtx, host)
+		cancel()
+
+		if err == nil && len(answers) > 0 {
+			ips := make([]net.IP, len(answers))
+			for i, answer := range answers {
+				ips[i] = answer.IP
+			}
+			return check(ips)
+		}
+
+		lastErr = err
+		if lastErr == nil {
+			lastErr = fmt.Errorf("DNS returned no addresses")
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf(
+				"could not resolve Consul server address %q: %w; last lookup: %v",
+				host, ctx.Err(), lastErr,
+			)
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+// requirePrivateServerAddress fails the test unless the address the other
+// cluster is about to dial is on a private network.
+//
+// This is the control that actually holds. The annotations above are a request,
+// not a guarantee: a provider silently drops an annotation it does not
+// recognise, so if the spelling is wrong for this cluster's controller the
+// Service still comes up, the test still passes, and the Consul servers sit on
+// a public IP -- serving, in the non-secure cases, an unauthenticated HTTP API
+// on 8500. Nothing in the Helm values can detect that. Only the address that
+// was actually assigned can.
+//
+// This detects rather than prevents: the load balancer has to exist before its
+// address is known. Failing here keeps the window to the length of one failed
+// install instead of a full test run, and the cluster is torn down on the way
+// out.
+//
+// It uses waitForPrivateAddress with a reasonable timeout (3 minutes) to handle
+// DNS resolution delays on cloud providers where the load balancer hostname
+// propagates through DNS asynchronously.
+func requirePrivateServerAddress(t *testing.T, cfg *config.TestConfig, address string) {
+	t.Helper()
+
+	// Kind's node addresses are on a local docker bridge, unreachable from off
+	// the machine running the test.
+	if cfg.UseKind {
+		return
+	}
+
+	// Create a context with a 3-minute deadline for DNS resolution and validation.
+	// This gives the cloud provider's load balancer time to propagate through DNS
+	// while still failing fast if the address is public when resolved.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	err := waitForPrivateAddress(ctx, address)
+	require.NoErrorf(t, err, "Consul server address validation failed for %q", address)
+}
+
+// isPrivateAddress reports whether ip is on a network that is not routable from
+// the internet.
+func isPrivateAddress(ip net.IP) bool {
+	if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+		return true
+	}
+	// Carrier-grade NAT, 100.64.0.0/10. Some managed clusters allocate internal
+	// load balancers and node addresses from it, and it is not internet
+	// routable, but net.IP.IsPrivate does not cover it.
+	if v4 := ip.To4(); v4 != nil {
+		return v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127
+	}
+	return false
 }
 
 func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
@@ -318,14 +517,10 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	}
 
 	serverHelmValues := map[string]string{
-		"server.exposeGossipAndRPCPorts": "true",
-		"server.extraConfig":             `"{\"log_level\": \"TRACE\"}"`,
+		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
 	}
 
-	if cfg.UseKind {
-		serverHelmValues["server.exposeService.type"] = "NodePort"
-		serverHelmValues["server.exposeService.nodePort.https"] = "30000"
-	}
+	helpers.MergeMaps(serverHelmValues, privateServerExposureValues(t, cfg))
 
 	releaseName := helpers.RandomName()
 
@@ -357,6 +552,7 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, defaultClusterContext, partitionServiceName)
+	requirePrivateServerAddress(t, cfg, partitionSvcAddress)
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryClusterContext)
 
