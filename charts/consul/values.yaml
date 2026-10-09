@@ -3112,8 +3112,8 @@ connectInject:
     # This will control the `--concurrency` flag to Envoy.
     # For additional information, refer to https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310
     #
-    # This setting can be overridden on a per-pod basis (including API Gateway pods)
-    # via this annotation:
+    # This setting can be overridden on each injected pod. For API Gateway pods,
+    #  place this annotation on the Gateway resource to override all pods managed by it:
     # - `consul.hashicorp.com/consul-envoy-proxy-concurrency`
     # @type: string
     concurrency: 2
