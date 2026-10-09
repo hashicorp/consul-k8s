@@ -42,7 +42,7 @@ spec:
       {{- if not .Values.global.openshift.enabled }}
       containers:
       - name: apply
-        image: bitnami/kubectl:latest
+        image: {{ default "bitnami/kubectl:latest" .Values.global.imageApplyManifests }}
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c"]
         args:
@@ -60,7 +60,7 @@ spec:
       {{- else }}
       containers:
       - name: apply
-        image: registry.redhat.io/openshift4/ose-cli
+        image: {{ default "registry.redhat.io/openshift4/ose-cli" .Values.global.imageApplyManifests }}
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c"]
         args:
