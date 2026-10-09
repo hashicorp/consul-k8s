@@ -9,6 +9,15 @@ on:
       # Push events to branches matching refs/heads/release/**
       - "release/**"
 
+# The coverage job calls reusable-coverage-report.yml (via coverage.yml), which
+# requests contents/pull-requests/id-token write. A called workflow cannot be
+# granted more permissions than the caller, so these must be declared here or
+# the run fails at startup. Mirrors the permissions block on pr.yml.
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
