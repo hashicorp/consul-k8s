@@ -2266,6 +2266,7 @@ rollingUpdate:
   run helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'server.enabled=false' \
       --set 'global.secretsBackend.vault.enabled=true'  \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       .
@@ -2325,6 +2326,7 @@ rollingUpdate:
   run helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
+      --set 'server.enabled=false' \
       --set 'global.secretsBackend.vault.enabled=true'  \
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
@@ -2722,7 +2724,7 @@ rollingUpdate:
 
 @test "client/DaemonSet: vault adds consul envvars CONSUL_CACERT on acl-init init container when ACLs are enabled and tls is enabled" {
   cd `chart_dir`
-  local env=$(helm template \
+  local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -2734,6 +2736,7 @@ rollingUpdate:
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.featureGateSetRole=feature-gate-role' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \

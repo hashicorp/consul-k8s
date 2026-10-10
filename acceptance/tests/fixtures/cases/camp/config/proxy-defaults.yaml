@@ -1,0 +1,32 @@
+# ProxyDefaults (global) — emit Envoy access logs on all sidecars.
+#
+# Consul CRD equivalent of the local proxy-defaults.hcl.
+# Applies to every sidecar Envoy in the mesh. The JSON access log format
+# surfaces %RESPONSE_CODE% + %RESPONSE_FLAGS% so mcp_gateway 504s and
+# ext_proc timeouts are visible in `kubectl logs`.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ProxyDefaults
+metadata:
+  name: global
+  namespace: default
+spec:
+  accessLogs:
+    enabled: true
+    jsonFormat: |
+      {
+        "start_time":            "%START_TIME%",
+        "method":                "%REQ(:METHOD)%",
+        "path":                  "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%",
+        "protocol":              "%PROTOCOL%",
+        "response_code":         "%RESPONSE_CODE%",
+        "response_flags":        "%RESPONSE_FLAGS%",
+        "response_code_details": "%RESPONSE_CODE_DETAILS%",
+        "duration_ms":           "%DURATION%",
+        "upstream_cluster":      "%UPSTREAM_CLUSTER%",
+        "upstream_host":         "%UPSTREAM_HOST%",
+        "bytes_received":        "%BYTES_RECEIVED%",
+        "bytes_sent":            "%BYTES_SENT%",
+        "x_request_id":          "%REQ(X-REQUEST-ID)%",
+        "authority":             "%REQ(:AUTHORITY)%",
+        "user_agent":            "%REQ(USER-AGENT)%"
+      }

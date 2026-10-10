@@ -114,6 +114,10 @@ const (
 	// binds to for inbound MCP traffic inspection (ai.agent.interceptor.port).
 	DefaultAIInterceptorPort = 21101
 
+	// DefaultGatewayBinary is the path to the consul-mcp-gateway binary inside the
+	// consul-mcp-gateway image, used as the -gateway-binary argument.
+	DefaultGatewayBinary = "/app/consul-mcp-gateway"
+
 	// ConsulOBOInboundContainerName is the injected container name for consul-obo-inbound.
 	ConsulOBOInboundContainerName = "consul-obo-inbound"
 

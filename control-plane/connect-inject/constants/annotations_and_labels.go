@@ -243,8 +243,8 @@ const (
 	// This is only meant to be used by Deployment/consul-telemetry-collector.
 	LabelTelemetryCollector = "consul.hashicorp.com/telemetry-collector"
 
-	// AnnotationAIRole is the key of the annotation that identifies the AI role of a pod.
-	// When set to "mcp-server", the webhook injects the MCP server sidecar container.
+	// AnnotationAIRole identifies the AI role of a pod, such as "mcp-server",
+	// "ai-agent", or "inference-model".
 	AnnotationAIRole = "consul.hashicorp.com/ai-role"
 
 	// AnnotationAIAgentConfig selects the AgentConfig resource used for pod defaults.
