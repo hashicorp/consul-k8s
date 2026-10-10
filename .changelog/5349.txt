@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: fix `delete endpoint` log firing for services outside the catalog-sync allow list
+```
