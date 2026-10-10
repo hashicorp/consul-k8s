@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Add configurable lifecycle hooks and extra environment variables for ingress gateway dataplane containers, with defaults and per-gateway overrides.
+```

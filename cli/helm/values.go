@@ -537,21 +537,26 @@ type DefaultsService struct {
 }
 
 type IngressGatewayDefaults struct {
-	Replicas                      int             `yaml:"replicas"`
-	Service                       DefaultsService `yaml:"service"`
-	ServiceAccount                ServiceAccount  `yaml:"serviceAccount"`
-	Resources                     Resources       `yaml:"resources"`
-	Affinity                      string          `yaml:"affinity"`
-	Tolerations                   interface{}     `yaml:"tolerations"`
-	NodeSelector                  interface{}     `yaml:"nodeSelector"`
-	PriorityClassName             string          `yaml:"priorityClassName"`
-	TerminationGracePeriodSeconds int             `yaml:"terminationGracePeriodSeconds"`
-	Annotations                   interface{}     `yaml:"annotations"`
-	ConsulNamespace               string          `yaml:"consulNamespace"`
+	Replicas                      int                    `yaml:"replicas"`
+	Service                       DefaultsService        `yaml:"service"`
+	ServiceAccount                ServiceAccount         `yaml:"serviceAccount"`
+	Resources                     Resources              `yaml:"resources"`
+	Affinity                      string                 `yaml:"affinity"`
+	Tolerations                   interface{}            `yaml:"tolerations"`
+	NodeSelector                  interface{}            `yaml:"nodeSelector"`
+	PriorityClassName             string                 `yaml:"priorityClassName"`
+	TerminationGracePeriodSeconds int                    `yaml:"terminationGracePeriodSeconds"`
+	Lifecycle                     map[string]interface{} `yaml:"lifecycle"`
+	ExtraEnvironmentVars          map[string]string      `yaml:"extraEnvironmentVars"`
+	Annotations                   interface{}            `yaml:"annotations"`
+	ConsulNamespace               string                 `yaml:"consulNamespace"`
 }
 
 type Gateways struct {
 	Name string `yaml:"name"`
+	// Lifecycle and ExtraEnvironmentVars configure ingress gateway containers.
+	Lifecycle            *map[string]interface{} `yaml:"lifecycle,omitempty"`
+	ExtraEnvironmentVars *map[string]string      `yaml:"extraEnvironmentVars,omitempty"`
 }
 
 type IngressGateways struct {
