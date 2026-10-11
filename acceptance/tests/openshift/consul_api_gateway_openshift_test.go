@@ -36,6 +36,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	frameworkk8s "github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	consulgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 )
 
@@ -453,6 +454,7 @@ func consulGatewayRuntimeClient(t *testing.T, ctx environment.TestContext) clien
 	require.NoError(t, clientgoscheme.AddToScheme(s))
 	require.NoError(t, gwv1beta1.Install(s))
 	require.NoError(t, consulgwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	c, err := client.New(restConfig, client.Options{Scheme: s})
 	require.NoError(t, err)
