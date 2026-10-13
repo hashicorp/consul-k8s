@@ -59,6 +59,7 @@ jobs:
       go-version: ${{ needs.get-go-version.outputs.go-version }}
       pr-number: ${{ github.event_name == 'pull_request' && toJson(github.event.pull_request.number) || '' }}
 
+      
   test:
     name: test
     needs: [ conditional-skip, check-release-only ]
