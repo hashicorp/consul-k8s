@@ -318,9 +318,6 @@ spec:
       #   mask        — replace detected span using the mask pattern.
       #   placeholder — replace detected span with a labelled token (e.g. <CREDIT_CARD>).
       #   off         — pass through unchanged (audit only).
-      # Note: "redact" and "log" are accepted by the CRD admission webhook
-      # but are not valid values understood by the processor; use "placeholder"
-      # or "off" instead.
       defaultAction: mask
 
       # streamHoldbackBytes: trailing bytes buffered from a streaming response
