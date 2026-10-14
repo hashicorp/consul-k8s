@@ -247,6 +247,12 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	}
 
 	for i, container := range a.Spec.Template.Spec.Containers {
+		// Args carry managed settings such as -envoy-concurrency, so a change
+		// must trigger a template update.
+		if !cmp.Equal(container.Args, b.Spec.Template.Spec.Containers[i].Args) {
+			return false
+		}
+
 		otherPorts := b.Spec.Template.Spec.Containers[i].Ports
 		if len(container.Ports) != len(otherPorts) {
 			return false

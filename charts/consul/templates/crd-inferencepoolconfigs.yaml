@@ -547,9 +547,9 @@ spec:
                           description: >-
                             DefaultAction is the fallback action applied when a detector
                             fires and no per-detector action is set.
-                            Allowed values: block, mask, redact, log.
+                            Allowed values: placeholder, mask, block, off.
                           type: string
-                          enum: [block, mask, redact, log]
+                          enum: [placeholder, mask, block, off]
                         streamHoldbackBytes:
                           description: >-
                             StreamHoldbackBytes is the number of bytes buffered from a
@@ -597,9 +597,9 @@ spec:
                                 description: >-
                                   Action overrides the policy defaultAction for this
                                   specific detector.
-                                  Allowed values: block, mask, redact, log.
+                                  Allowed values: placeholder, mask, block, off.
                                 type: string
-                                enum: [block, mask, redact, log]
+                                enum: [placeholder, mask, block, off]
                 processor:
                   description: >-
                     Processor configures the ext_proc binding between Envoy and the
