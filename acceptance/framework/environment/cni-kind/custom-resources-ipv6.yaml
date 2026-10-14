@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 # This section includes base Calico installation configuration for IPv6.
 apiVersion: operator.tigera.io/v1
 kind: Installation
