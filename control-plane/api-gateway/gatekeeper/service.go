@@ -104,10 +104,26 @@ func (g *Gatekeeper) service(gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConf
 			Annotations: annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: common.LabelsForGateway(&gateway),
-			Type:     *gcc.Spec.ServiceType,
-			Ports:    ports,
+			Selector:              common.LabelsForGateway(&gateway),
+			Type:                  *gcc.Spec.ServiceType,
+			Ports:                 ports,
+			ExternalTrafficPolicy: externalTrafficPolicy(gcc),
 		},
+	}
+}
+
+// externalTrafficPolicy is only valid on NodePort and LoadBalancer services;
+// Kubernetes rejects it on ClusterIP services, so it's omitted there even if
+// configured.
+func externalTrafficPolicy(gcc v1alpha1.GatewayClassConfig) corev1.ServiceExternalTrafficPolicy {
+	if gcc.Spec.ExternalTrafficPolicy == nil {
+		return ""
+	}
+	switch *gcc.Spec.ServiceType {
+	case corev1.ServiceTypeNodePort, corev1.ServiceTypeLoadBalancer:
+		return *gcc.Spec.ExternalTrafficPolicy
+	default:
+		return ""
 	}
 }
 
@@ -125,6 +141,14 @@ func mergeServiceInto(existing, desired *corev1.Service) {
 	// we don't want to override that, so reset it to what exists in the store.
 	if hasEqualPorts(duplicate, desired) {
 		existing.Spec.Ports = duplicate.Spec.Ports
+	}
+
+	// Kubernetes auto-assigns HealthCheckNodePort when ExternalTrafficPolicy is
+	// Local, and the field cannot be changed once set. Preserve it while the
+	// service still needs it; otherwise let it be wiped, which Kubernetes
+	// requires when a service transitions away from needing it.
+	if desired.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyLocal {
+		existing.Spec.HealthCheckNodePort = duplicate.Spec.HealthCheckNodePort
 	}
 
 	// If the Service already exists, add any desired annotations + labels to existing set
