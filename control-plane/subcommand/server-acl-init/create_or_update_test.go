@@ -147,3 +147,99 @@ func TestCreateOrUpdateACLPolicy(t *testing.T) {
 		})
 	}
 }
+
+// TestUpdateOrCreateACLRole_UpdatesPoliciesOnRerun verifies that when
+// updateOrCreateACLRole is called a second time with a different policy list
+// (simulating an upgrade where policy rules change), the role in Consul is
+// actually updated to reflect the new policies — not silently written back
+// with the stale data that was read from Consul.
+func TestUpdateOrCreateACLRole_UpdatesPoliciesOnRerun(t *testing.T) {
+	require := require.New(t)
+	ui := cli.NewMockUi()
+	k8s := fake.NewSimpleClientset()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+		log:       hclog.NewNullLogger(),
+	}
+	cmd.init()
+
+	// Start Consul with ACLs enabled.
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.Tokens.InitialManagement = bootToken
+	})
+	require.NoError(err)
+	defer svr.Stop()
+	svr.WaitForLeader(t)
+
+	client, err := consul.NewDynamicClient(&api.Config{
+		Address: svr.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+
+	// Wait for the ACL system to be ready.
+	require.Eventually(func() bool {
+		_, _, err := client.ConsulClient.ACL().PolicyList(nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
+
+	roleName := "test-acl-role"
+	policyV1Name := "policy-v1"
+	policyV2Name := "policy-v2"
+	policyDescription := func(name string) string {
+		return name + " Token Policy"
+	}
+
+	// Create both policies in Consul upfront.
+	_, _, err = client.ConsulClient.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:        policyV1Name,
+		Description: policyDescription(policyV1Name),
+		Rules:       `node_prefix "" { policy = "read" }`,
+	}, nil)
+	require.NoError(err)
+
+	_, _, err = client.ConsulClient.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:        policyV2Name,
+		Description: policyDescription(policyV2Name),
+		Rules:       `service_prefix "" { policy = "write" }`,
+	}, nil)
+	require.NoError(err)
+
+	// --- Run 1: create the role linked to policy-v1 ---
+	roleV1 := &api.ACLRole{
+		Name:        roleName,
+		Description: "test role",
+		Policies:    []*api.ACLRolePolicyLink{{Name: policyV1Name}},
+	}
+	err = cmd.updateOrCreateACLRole(client, roleV1)
+	require.NoError(err)
+
+	// Verify: role exists and links to policy-v1.
+	role, _, err := client.ConsulClient.ACL().RoleReadByName(roleName, nil)
+	require.NoError(err)
+	require.NotNil(role)
+	require.Len(role.Policies, 1)
+	require.Equal(policyV1Name, role.Policies[0].Name, "after first run role should link to policy-v1")
+
+	// --- Run 2: simulate upgrade — call again with policy-v2 ---
+	roleV2 := &api.ACLRole{
+		Name:        roleName,
+		Description: "test role",
+		Policies:    []*api.ACLRolePolicyLink{{Name: policyV2Name}},
+	}
+	err = cmd.updateOrCreateACLRole(client, roleV2)
+	require.NoError(err)
+
+	// Verify: role must now link to policy-v2, not the old policy-v1.
+	// Before the fix, this assertion FAILS because RoleUpdate(aclRole) writes
+	// back the stale read object, so the role still points to policy-v1.
+	role, _, err = client.ConsulClient.ACL().RoleReadByName(roleName, nil)
+	require.NoError(err)
+	require.NotNil(role)
+	require.Len(role.Policies, 1)
+	require.Equal(policyV2Name, role.Policies[0].Name,
+		"after second run role should link to policy-v2 (updated), not the old policy-v1")
+}
