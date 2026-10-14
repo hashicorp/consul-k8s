@@ -42,7 +42,7 @@ const (
 type Controller interface {
 	// AddFinalizersPatch creates a patch with the original finalizers with new ones appended to the end.
 	AddFinalizersPatch(obj client.Object, finalizers ...string) *FinalizerPatch
-	// RemoveFinalizersPatch creates a patch to remove a set of finalizers, while preserving the order.
+	// RemoveFinalizersPatch creates a patch to remove a set of finalizers, while preserving the order. Dummy commit
 	RemoveFinalizersPatch(obj client.Object, finalizers ...string) *FinalizerPatch
 	// Patch patches the object. This should only ever be used for updating the metadata of an object, and not object
 	// spec or status. Updating the spec could have unintended consequences such as defaulting zero values.
