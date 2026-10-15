@@ -57,7 +57,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables zlib
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
