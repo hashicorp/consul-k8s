@@ -20,7 +20,7 @@ env:
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
-  # TEMP: compatibility testing of 2.1.0-rc1 on EKS. Do not merge.
+  # TEMP: compatibility testing of 2.1.0-rc2 on AKS/EKS/GKE. Do not merge.
   cloud-acceptance:
     name: cloud-acceptance
     runs-on: ubuntu-24.04
@@ -30,6 +30,6 @@ jobs:
         with:
           workflow: cloud.yml
           repo: hashicorp/consul-k8s-workflows
-          ref: paras/compatibility-2.1.x-rc1
+          ref: paras/compatibility-2.1.x-rc2-1.37
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
           inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}"}'

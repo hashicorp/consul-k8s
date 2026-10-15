@@ -21,6 +21,6 @@ jobs:
       with:
         workflow: cleanup.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: paras/compatibility-2.1.x-rc1
+        ref: paras/compatibility-2.1.x-rc2-1.37
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}" }'
