@@ -218,6 +218,14 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				// Pods in a terminal phase (e.g. evicted by the kubelet) never serve traffic again but remain in the
+				// API server until garbage collected, so deregister them as if they were deleted.
+				if isPodTerminal(pod) {
+					r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
+					deregisterEndpointAddress[address.IP] = true
+					continue
+				}
+
 				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
 				if ok && serviceEndpoints.Name != svcName {
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
@@ -1099,6 +1107,11 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 		return 0, nil
 	}
 
+	// A pod in a terminal phase (e.g. evicted) has no containers left to drain, so skip graceful shutdown.
+	if isPodTerminal(pod) {
+		return 0, nil
+	}
+
 	shutdownSeconds, err := r.getGracefulShutdownPeriodSecondsForPod(pod)
 	if err != nil {
 		r.Log.Error(err, "failed to get graceful shutdown period for pod", "name", pod, "k8sNamespace", k8sNamespace)
@@ -1679,6 +1692,12 @@ func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
 		}
 	}
 	return -1
+}
+
+// isPodTerminal returns true if the pod has finished running and will never be restarted (Failed or Succeeded),
+// which includes pods evicted by the kubelet.
+func isPodTerminal(pod corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded
 }
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
