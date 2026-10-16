@@ -235,7 +235,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
 						// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
 						if k8serrors.IsNotFound(err) {
-							deregisterEndpointAddress[address.IP] = true
+							markForDeregistration(deregisterEndpointAddress, address.IP)
 							r.Log.Info("pod not found", "name", address.TargetRef.Name)
 						} else {
 							// If there was a different error fetching the pod, then log the error but don't deregister it
@@ -247,11 +247,25 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						continue
 					}
 
+					// Pods in a terminal phase (e.g. evicted by the kubelet) never serve traffic again but remain in the
+					// API server until garbage collected, so deregister them as if they were deleted.
+					if isPodTerminal(pod) {
+						if hasBeenInjected(pod) && !isGateway(pod) && !isConsulDataplaneSupported(pod) {
+							// Legacy pods are registered on node-local Consul clients, which deregisterService can't remove,
+							// so mark the health check critical through the legacy path below.
+							healthStatus = api.HealthCritical
+						} else {
+							r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
+							markForDeregistration(deregisterEndpointAddress, address.IP)
+							continue
+						}
+					}
+
 					svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
 					if ok && serviceName != svcName {
 						r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceName, "ns", serviceNamespace)
 						// Set up the deregisterEndpointAddress to deregister service instances that don't match the annotation.
-						deregisterEndpointAddress[address.IP] = true
+						markForDeregistration(deregisterEndpointAddress, address.IP)
 						continue
 					}
 
@@ -389,6 +403,8 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 			// Container readiness inside a credential-injection gateway pod can
 			// change without changing the pod's EndpointSlice readiness.
 			Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForCredentialGatewayPod)).
+			// Pods evicted by the kubelet move to the Failed phase without necessarily changing their EndpointSlice.
+			Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForTerminalPod)).
 			Complete(r)
 }
 
@@ -1282,6 +1298,11 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 	// the node changed, since newer service instances should exist for the new node. In that case, it's not the old pod
 	// that is gracefully shutting down; the old pod is gone and we should deregister that old instance from Consul.
 	if string(pod.UID) != svc.ServiceMeta[constants.MetaKeyPodUID] || common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName) != svc.Node {
+		return 0, nil
+	}
+
+	// A pod in a terminal phase (e.g. evicted) has no containers left to drain, so skip graceful shutdown.
+	if isPodTerminal(pod) {
 		return 0, nil
 	}
 
@@ -2401,6 +2422,22 @@ func servicePortNameForConsul(serviceEndpoints corev1.Endpoints, token string, p
 
 	seenNames[portName]++
 	return fmt.Sprintf("%s-%d", portName, seenNames[portName])
+}
+
+// isPodTerminal returns true if the pod has finished running and will never be restarted (Failed or Succeeded),
+// which includes pods evicted by the kubelet.
+func isPodTerminal(pod corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded
+}
+
+// markForDeregistration flags an address for deregistration unless another endpoint sharing the same IP (e.g. a
+// replacement pod that reused the IP of a terminal pod) already marked it to be kept, so the outcome doesn't
+// depend on the order the endpoints are processed.
+func markForDeregistration(deregisterEndpointAddress map[string]bool, ip string) {
+	if shouldDeregister, ok := deregisterEndpointAddress[ip]; ok && !shouldDeregister {
+		return
+	}
+	deregisterEndpointAddress[ip] = true
 }
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
