@@ -1,3 +1,21 @@
+## 2.1.0-rc2 (October 15, 2026)
+
+> NOTE: Consul K8s 2.1.x is compatible with Consul 2.1.x and Consul Dataplane 2.1.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+FEATURES:
+
+* Add a feature-gate-set Job that applies feature gates configured through Helm values to Consul servers. [[GH-5701](https://github.com/hashicorp/consul-k8s/issues/5701)]
+* api-gateway: support overriding Envoy proxy concurrency on API Gateway pods via the
+`consul.hashicorp.com/consul-envoy-proxy-concurrency` annotation. [[GH-5695](https://github.com/hashicorp/consul-k8s/issues/5695)]
+* connect-inject: Support for ai-crds, ai agent and inference gtw
+connect-inject: For ai-role=ai-agent pods, inject consul-obo-inbound/outbound with envelope+broker UDS and enable dataplane -credential-broker-bind-addr. Gated on ai.role (not oauth_client). from pr 5662 [[GH-5663](https://github.com/hashicorp/consul-k8s/issues/5663)]
+
+BUG FIXES:
+
+* crd: Fix InferencePoolConfig PII action validation to accept `placeholder`, `mask`, `block`, and `off`, matching the actions supported by the inference policy processor. [[GH-5723](https://github.com/hashicorp/consul-k8s/issues/5723)]
+* helm: Fix terminating gateway Services selecting pods of all terminating gateways in a release by adding the `terminating-gateway-name` label to the Service selector. [[GH-5717](https://github.com/hashicorp/consul-k8s/issues/5717)]
+
 ## 2.1.0-rc1 (September 29, 2026)
 
 > NOTE: Consul K8s 2.1.x is compatible with Consul 2.1.x and Consul Dataplane 2.1.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
