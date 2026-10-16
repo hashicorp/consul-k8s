@@ -186,3 +186,55 @@ func TestRequestsForTerminalPod(t *testing.T) {
 		require.Empty(t, controller.requestsForTerminalPod(context.Background(), &corev1.Service{}))
 	})
 }
+
+func TestMarkForDeregistration(t *testing.T) {
+	cases := map[string]struct {
+		initial  map[string]bool
+		expected map[string]bool
+	}{
+		"unseen IP is marked for deregistration": {
+			initial:  map[string]bool{},
+			expected: map[string]bool{"1.2.3.4": true},
+		},
+		"IP already marked for deregistration stays marked": {
+			initial:  map[string]bool{"1.2.3.4": true},
+			expected: map[string]bool{"1.2.3.4": true},
+		},
+		"IP marked to keep is not overwritten": {
+			initial:  map[string]bool{"1.2.3.4": false},
+			expected: map[string]bool{"1.2.3.4": false},
+		},
+		"other IPs are unaffected": {
+			initial:  map[string]bool{"5.6.7.8": false},
+			expected: map[string]bool{"5.6.7.8": false, "1.2.3.4": true},
+		},
+	}
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			markForDeregistration(tt.initial, "1.2.3.4")
+			require.Equal(t, tt.expected, tt.initial)
+		})
+	}
+}
+
+func TestMarkForDeregistrationWithSharedIP(t *testing.T) {
+	for name, registerFirst := range map[string]bool{"terminal pod first": false, "replacement first": true} {
+		t.Run(name, func(t *testing.T) {
+			addresses := map[string]bool{}
+			if registerFirst {
+				addresses["1.2.3.4"] = false
+				markForDeregistration(addresses, "1.2.3.4")
+			} else {
+				markForDeregistration(addresses, "1.2.3.4")
+				addresses["1.2.3.4"] = false
+			}
+			require.False(t, addresses["1.2.3.4"])
+		})
+	}
+
+	t.Run("lookup error is not overridden", func(t *testing.T) {
+		addresses := map[string]bool{"1.2.3.4": false}
+		markForDeregistration(addresses, "1.2.3.4")
+		require.False(t, addresses["1.2.3.4"])
+	})
+}
