@@ -59,6 +59,7 @@ jobs:
       go-version: ${{ needs.get-go-version.outputs.go-version }}
       pr-number: ${{ github.event_name == 'pull_request' && toJson(github.event.pull_request.number) || '' }}
 
+      
   test:
     name: test
     needs: [ conditional-skip, check-release-only ]
@@ -72,7 +73,7 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: pajay.rao/leader-election-issue
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
 
