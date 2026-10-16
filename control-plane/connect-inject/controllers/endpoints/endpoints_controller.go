@@ -594,6 +594,7 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 			}
 		}
 	}
+
 	tags := consulTags(pod)
 
 	// If this pod carries an AI role annotation, build the api.AgentServiceAI
