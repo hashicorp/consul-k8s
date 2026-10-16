@@ -226,10 +226,18 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				// Pods in a terminal phase (e.g. evicted by the kubelet) never serve traffic again but remain in the
+				// API server until garbage collected, so deregister them as if they were deleted.
 				if isPodTerminal(pod) {
-					r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
-					deregisterEndpointAddress[address.IP] = true
-					continue
+					if hasBeenInjected(pod) && !isGateway(pod) && !isConsulDataplaneSupported(pod) {
+						// Legacy pods are registered on node-local Consul clients, which deregisterService can't remove,
+						// so mark the health check critical through the legacy path below.
+						healthStatus = api.HealthCritical
+					} else {
+						r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
+						deregisterEndpointAddress[address.IP] = true
+						continue
+					}
 				}
 
 				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
@@ -1180,6 +1188,10 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 	if err != nil {
 		r.Log.Error(err, "failed to get terminating pod", "name", podName, "k8sNamespace", k8sNamespace)
 		return 0, fmt.Errorf("failed to get terminating pod %s/%s: %w", k8sNamespace, podName, err)
+	}
+
+	if isPodTerminal(pod) {
+		return 0, nil
 	}
 
 	// In a statefulset rollout, pods can go down and a new pod will come back up with the same name but a different uid
