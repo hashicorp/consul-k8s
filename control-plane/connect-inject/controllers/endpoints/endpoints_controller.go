@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -224,6 +226,12 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				if isPodTerminal(pod) {
+					r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
+					deregisterEndpointAddress[address.IP] = true
+					continue
+				}
+
 				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
 				if ok && serviceEndpoints.Name != svcName {
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
@@ -329,7 +337,48 @@ func (r *Controller) Logger(name types.NamespacedName) logr.Logger {
 func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Endpoints{}).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForTerminalPod)).
 		Complete(r)
+}
+
+func (r *Controller) requestsForTerminalPod(ctx context.Context, obj client.Object) []reconcile.Request {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok || !isPodTerminal(*pod) {
+		return nil
+	}
+
+	var endpoints corev1.EndpointsList
+	if err := r.Client.List(ctx, &endpoints, client.InNamespace(pod.Namespace)); err != nil {
+		r.Log.Error(err, "failed to list Endpoints for terminal pod", "name", pod.Name, "ns", pod.Namespace)
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, serviceEndpoints := range endpoints.Items {
+		referencesPod := false
+		for _, subset := range serviceEndpoints.Subsets {
+			for _, addresses := range [][]corev1.EndpointAddress{subset.Addresses, subset.NotReadyAddresses} {
+				for _, address := range addresses {
+					if address.TargetRef != nil && address.TargetRef.Kind == "Pod" && address.TargetRef.Name == pod.Name {
+						referencesPod = true
+						break
+					}
+				}
+				if referencesPod {
+					break
+				}
+			}
+			if referencesPod {
+				break
+			}
+		}
+		if referencesPod {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: serviceEndpoints.Name, Namespace: serviceEndpoints.Namespace},
+			})
+		}
+	}
+	return requests
 }
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
@@ -2257,6 +2306,10 @@ func servicePortNameForConsul(serviceEndpoints corev1.Endpoints, token string, p
 
 	seenNames[portName]++
 	return fmt.Sprintf("%s-%d", portName, seenNames[portName])
+}
+
+func isPodTerminal(pod corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded
 }
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
