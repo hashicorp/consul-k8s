@@ -6,6 +6,7 @@ package endpoints
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
@@ -64,84 +65,95 @@ func TestReconcile_TerminalPodIsDeregistered(t *testing.T) {
 		"Running pod stays registered with graceful shutdown (control)": {phase: corev1.PodRunning, shutdownGraceSecs: 30, expectedNumSvcInst: 1},
 	}
 
-	for name, tt := range cases {
-		t.Run(name, func(t *testing.T) {
-			endpoint := &discoveryv1.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      svcName,
-					Namespace: namespace,
-					Labels:    map[string]string{discoveryv1.LabelServiceName: svcName},
-				},
-				AddressType: discoveryv1.AddressTypeIPv4,
-				Endpoints: []discoveryv1.Endpoint{{
-					Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(tt.phase == corev1.PodRunning)},
-					Addresses:  []string{"1.2.3.4"},
-					TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: namespace},
-				}},
+	// The pod object always remains. The EndpointSlice either still references it or has already dropped it.
+	for _, sliceRetained := range []bool{true, false} {
+		for name, tt := range cases {
+			if !sliceRetained && tt.phase == corev1.PodRunning {
+				// A running pod missing from the slice is a plain removal, not what is being tested here.
+				continue
 			}
-			pod1 := createServicePod("pod1", "1.2.3.4", true, true)
-			pod1.Status.Phase = tt.phase
-			pod1.Status.Reason = tt.reason
-			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-			k8sObjects := []runtime.Object{endpoint, pod1, &ns, &node}
-			fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(k8sObjects...).Build()
-
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			consulClient := testClient.APIClient
-
-			for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
-				_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
-					Node:     consulNodeName,
-					Address:  consulNodeAddress,
-					NodeMeta: map[string]string{metaKeySyntheticNode: "true"},
-					Service: &api.AgentService{
-						ID:      "pod1-" + svc,
-						Service: svc,
-						Address: "1.2.3.4",
-						Meta: map[string]string{
-							constants.MetaKeyKubeNS:  namespace,
-							metaKeyKubeServiceName:   svcName,
-							metaKeyManagedBy:         constants.ManagedByValue,
-							metaKeySyntheticNode:     "true",
-							constants.MetaKeyPodName: "pod1",
-							constants.MetaKeyPodUID:  "",
-						},
+			name := fmt.Sprintf("%s (slice retained: %t)", name, sliceRetained)
+			t.Run(name, func(t *testing.T) {
+				endpoint := &discoveryv1.EndpointSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      svcName,
+						Namespace: namespace,
+						Labels:    map[string]string{discoveryv1.LabelServiceName: svcName},
 					},
-				}, nil)
+					AddressType: discoveryv1.AddressTypeIPv4,
+					Endpoints: []discoveryv1.Endpoint{{
+						Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(tt.phase == corev1.PodRunning)},
+						Addresses:  []string{"1.2.3.4"},
+						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: namespace},
+					}},
+				}
+				if !sliceRetained {
+					endpoint.Endpoints = nil
+				}
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Status.Phase = tt.phase
+				pod1.Status.Reason = tt.reason
+				ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+				node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+				k8sObjects := []runtime.Object{endpoint, pod1, &ns, &node}
+				fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(k8sObjects...).Build()
+
+				testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+				consulClient := testClient.APIClient
+
+				for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+					_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
+						Node:     consulNodeName,
+						Address:  consulNodeAddress,
+						NodeMeta: map[string]string{metaKeySyntheticNode: "true"},
+						Service: &api.AgentService{
+							ID:      "pod1-" + svc,
+							Service: svc,
+							Address: "1.2.3.4",
+							Meta: map[string]string{
+								constants.MetaKeyKubeNS:  namespace,
+								metaKeyKubeServiceName:   svcName,
+								metaKeyManagedBy:         constants.ManagedByValue,
+								metaKeySyntheticNode:     "true",
+								constants.MetaKeyPodName: "pod1",
+								constants.MetaKeyPodUID:  "",
+							},
+						},
+					}, nil)
+					require.NoError(t, err)
+				}
+
+				ep := &Controller{
+					Client:                fakeClient,
+					Log:                   logrtest.New(t),
+					ConsulClientConfig:    testClient.Cfg,
+					ConsulServerConnMgr:   testClient.Watcher,
+					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:  mapset.NewSetWith(),
+					ReleaseName:           "consul",
+					ReleaseNamespace:      namespace,
+					LifecycleConfig: lifecycle.Config{
+						DefaultEnableProxyLifecycle:       tt.shutdownGraceSecs > 0,
+						DefaultShutdownGracePeriodSeconds: tt.shutdownGraceSecs,
+					},
+				}
+
+				namespacedName := types.NamespacedName{Namespace: namespace, Name: svcName}
+				resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
 				require.NoError(t, err)
-			}
+				require.False(t, resp.Requeue)
+				if tt.phase != corev1.PodRunning {
+					// Nothing should be waiting on a graceful shutdown for a pod that already exited.
+					require.Zero(t, resp.RequeueAfter)
+				}
 
-			ep := &Controller{
-				Client:                fakeClient,
-				Log:                   logrtest.New(t),
-				ConsulClientConfig:    testClient.Cfg,
-				ConsulServerConnMgr:   testClient.Watcher,
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSetWith(),
-				ReleaseName:           "consul",
-				ReleaseNamespace:      namespace,
-				LifecycleConfig: lifecycle.Config{
-					DefaultEnableProxyLifecycle:       tt.shutdownGraceSecs > 0,
-					DefaultShutdownGracePeriodSeconds: tt.shutdownGraceSecs,
-				},
-			}
-
-			namespacedName := types.NamespacedName{Namespace: namespace, Name: svcName}
-			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
-			require.NoError(t, err)
-			require.False(t, resp.Requeue)
-			if tt.phase != corev1.PodRunning {
-				// Nothing should be waiting on a graceful shutdown for a pod that already exited.
-				require.Zero(t, resp.RequeueAfter)
-			}
-
-			for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
-				instances, _, err := consulClient.Catalog().Service(svc, "", nil)
-				require.NoError(t, err)
-				require.Len(t, instances, tt.expectedNumSvcInst, svc)
-			}
-		})
+				for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+					instances, _, err := consulClient.Catalog().Service(svc, "", nil)
+					require.NoError(t, err)
+					require.Len(t, instances, tt.expectedNumSvcInst, svc)
+				}
+			})
+		}
 	}
 }
 
