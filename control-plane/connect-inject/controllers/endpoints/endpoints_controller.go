@@ -221,9 +221,15 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				// Pods in a terminal phase (e.g. evicted by the kubelet) never serve traffic again but remain in the
 				// API server until garbage collected, so deregister them as if they were deleted.
 				if isPodTerminal(pod) {
-					r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
-					deregisterEndpointAddress[address.IP] = true
-					continue
+					if hasBeenInjected(pod) && !isGateway(pod) && !isConsulDataplaneSupported(pod) {
+						// Legacy pods are registered on node-local Consul clients, which deregisterService can't remove,
+						// so mark the health check critical through the legacy path below.
+						healthStatus = api.HealthCritical
+					} else {
+						r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
+						deregisterEndpointAddress[address.IP] = true
+						continue
+					}
 				}
 
 				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
