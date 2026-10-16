@@ -24,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -217,6 +219,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				// Terminal pods never serve traffic again, even if the Endpoints object still references them.
+				if isPodTerminal(pod) {
+					r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
+					deregisterEndpointAddress[address.IP] = true
+					continue
+				}
+
 				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
 				if ok && serviceEndpoints.Name != svcName {
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
@@ -322,7 +331,49 @@ func (r *Controller) Logger(name types.NamespacedName) logr.Logger {
 func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Endpoints{}).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForTerminalPod)).
 		Complete(r)
+}
+
+func (r *Controller) requestsForTerminalPod(ctx context.Context, obj client.Object) []reconcile.Request {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok || !isPodTerminal(*pod) {
+		return nil
+	}
+
+	var endpointsList corev1.EndpointsList
+	if err := r.Client.List(ctx, &endpointsList, client.InNamespace(pod.Namespace)); err != nil {
+		r.Log.Error(err, "failed to list Endpoints for terminal pod", "name", pod.Name, "ns", pod.Namespace)
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, serviceEndpoints := range endpointsList.Items {
+		found := false
+		for _, subset := range serviceEndpoints.Subsets {
+			for _, addresses := range [][]corev1.EndpointAddress{subset.Addresses, subset.NotReadyAddresses} {
+				for _, address := range addresses {
+					if address.TargetRef != nil && address.TargetRef.Kind == "Pod" && address.TargetRef.Name == pod.Name {
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if found {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{Namespace: serviceEndpoints.Namespace, Name: serviceEndpoints.Name},
+			})
+		}
+	}
+
+	return requests
 }
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
@@ -1097,6 +1148,11 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 		return 0, nil
 	}
 
+	// A pod in a terminal phase (e.g. evicted) has no containers left to drain, so skip graceful shutdown.
+	if isPodTerminal(pod) {
+		return 0, nil
+	}
+
 	shutdownSeconds, err := r.getGracefulShutdownPeriodSecondsForPod(pod)
 	if err != nil {
 		r.Log.Error(err, "failed to get graceful shutdown period for pod", "name", pod, "k8sNamespace", k8sNamespace)
@@ -1677,6 +1733,12 @@ func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
 		}
 	}
 	return -1
+}
+
+// isPodTerminal returns true if the pod has finished running and will never be restarted (Failed or Succeeded),
+// which includes pods evicted by the kubelet.
+func isPodTerminal(pod corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded
 }
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
