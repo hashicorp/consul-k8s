@@ -99,6 +99,21 @@ func (r *Controller) requestsForCredentialGatewayPod(ctx context.Context, obj cl
 	if !ok || !isCredentialInjectionGateway(*pod) {
 		return nil
 	}
+	return r.requestsForPodServices(ctx, pod)
+}
+
+// requestsForTerminalPod maps a pod in a terminal phase (e.g. evicted by the kubelet) to the Services whose
+// EndpointSlices still reference it, so its Consul service instances are deregistered even if the
+// EndpointSlice itself does not change.
+func (r *Controller) requestsForTerminalPod(ctx context.Context, obj client.Object) []reconcile.Request {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok || !isPodTerminal(*pod) {
+		return nil
+	}
+	return r.requestsForPodServices(ctx, pod)
+}
+
+func (r *Controller) requestsForPodServices(ctx context.Context, pod *corev1.Pod) []reconcile.Request {
 	var slices discoveryv1.EndpointSliceList
 	if err := r.Client.List(ctx, &slices, client.InNamespace(pod.Namespace)); err != nil {
 		r.Log.Error(err, "failed to list EndpointSlices for credential-injection gateway pod", "name", pod.Name, "ns", pod.Namespace)
