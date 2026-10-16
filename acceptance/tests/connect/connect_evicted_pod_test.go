@@ -27,6 +27,11 @@ import (
 // and keep receiving (or failing over) traffic.
 func TestConnectInject_EvictedPodIsDeregistered(t *testing.T) {
 	cfg := suite.Config()
+
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
 	cfg.SkipWhenOpenshiftAndCNI(t)
 
 	for _, tc := range []struct {
