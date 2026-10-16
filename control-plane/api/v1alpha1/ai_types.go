@@ -932,11 +932,11 @@ type InferencePoolPII struct {
 
 	// DefaultAction is the fallback action applied when a detector fires and
 	// no per-detector action is set.
-	//   block  — reject the request/response (HTTP 422).
-	//   mask   — replace the detected span with the Mask pattern.
-	//   redact — remove the detected span entirely.
-	//   log    — emit an audit log entry and pass through unchanged.
-	// +kubebuilder:validation:Enum=block;mask;redact;log
+	//   placeholder — replace the detected span with a labelled token.
+	//   mask        — replace the detected span with the Mask pattern.
+	//   block       — reject the request/response (HTTP 422).
+	//   off         — pass through unchanged.
+	// +kubebuilder:validation:Enum=placeholder;mask;block;off
 	// +optional
 	DefaultAction string `json:"defaultAction,omitempty"`
 
@@ -993,7 +993,7 @@ type InferencePoolPIIDetector struct {
 	Regex string `json:"regex,omitempty"`
 
 	// Action overrides the policy DefaultAction for this specific detector.
-	// +kubebuilder:validation:Enum=block;mask;redact;log
+	// +kubebuilder:validation:Enum=placeholder;mask;block;off
 	// +optional
 	Action string `json:"action,omitempty"`
 }

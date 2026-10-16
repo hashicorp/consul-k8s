@@ -508,6 +508,22 @@ func (in *TerminatingGateway) CredentialRoutingEnabled() bool {
 	return ci != nil && ci.Enabled
 }
 
+// UsesCredentialInjection reports whether the gateway configures any part of
+// credential injection: routing, the credential-injection workload, or a
+// per-service credential. It mirrors the fields Consul gates behind the
+// consul-ai feature gate.
+func (in *TerminatingGateway) UsesCredentialInjection() bool {
+	if in.CredentialRoutingEnabled() {
+		return true
+	}
+	for _, svc := range in.Spec.Services {
+		if svc.Credential != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (in *TerminatingGateway) consulCredentialInjection() *capi.GatewayCredentialInjection {
 	if !in.CredentialRoutingEnabled() {
 		return nil

@@ -349,3 +349,84 @@ func TestTerminatingGatewayController_terminatingGatewayConsulNamespace(t *testi
 		})
 	}
 }
+
+func TestCredentialInjectionAIGateError(t *testing.T) {
+	t.Parallel()
+
+	plain := &consulv1alpha1.TerminatingGateway{
+		Spec: consulv1alpha1.TerminatingGatewaySpec{Services: []consulv1alpha1.LinkedService{{Name: "web"}}},
+	}
+	credentialed := &consulv1alpha1.TerminatingGateway{
+		Spec: consulv1alpha1.TerminatingGatewaySpec{
+			CredentialInjection: &consulv1alpha1.TerminatingGatewayCredentialRouting{},
+			Services: []consulv1alpha1.LinkedService{{
+				Name:       "openai",
+				Credential: &consulv1alpha1.LinkedServiceCredential{Mode: consulv1alpha1.CredentialModeInject, BindingID: "openai-a"},
+			}},
+		},
+	}
+	deleting := credentialed.DeepCopy()
+	now := metav1.Now()
+	deleting.DeletionTimestamp = &now
+
+	aiOff := &helmvalues.HelmValues{}
+	aiOn := &helmvalues.HelmValues{AI: helmvalues.AIConfig{Enabled: true}}
+
+	require.NoError(t, credentialInjectionAIGateError(plain, aiOff), "gateways without credential injection never depend on ai.enabled")
+	require.ErrorContains(t, credentialInjectionAIGateError(credentialed, aiOff), "requires ai.enabled=true")
+	require.NoError(t, credentialInjectionAIGateError(credentialed, aiOn))
+	require.NoError(t, credentialInjectionAIGateError(deleting, aiOff), "deleting a gateway must never be blocked")
+}
+
+// TestTerminatingGatewayController_ReconcileRejectsCredentialInjectionWithoutAI
+// verifies a credential-injection gateway is rejected with a status condition
+// before anything is written to Consul when ai.enabled is false.
+func TestTerminatingGatewayController_ReconcileRejectsCredentialInjectionWithoutAI(t *testing.T) {
+	t.Parallel()
+
+	s := runtime.NewScheme()
+	require.NoError(t, consulv1alpha1.AddToScheme(s))
+	require.NoError(t, corev1.AddToScheme(s))
+
+	kubeNS := "default"
+	termGW := &consulv1alpha1.TerminatingGateway{
+		ObjectMeta: metav1.ObjectMeta{Name: "camp-egress", Namespace: kubeNS},
+		Spec: consulv1alpha1.TerminatingGatewaySpec{
+			CredentialInjection: &consulv1alpha1.TerminatingGatewayCredentialRouting{},
+			Services: []consulv1alpha1.LinkedService{{
+				Name:       "openai",
+				CAFile:     "/etc/ssl/ca.pem",
+				SNI:        "api.openai.com",
+				Credential: &consulv1alpha1.LinkedServiceCredential{Mode: consulv1alpha1.CredentialModeInject, BindingID: "openai-a"},
+			}},
+		},
+	}
+
+	// The helm-values ConfigMap omits ai, so ai.enabled is false.
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(termGW, terminatingGatewayHelmValuesConfigMap(kubeNS)).
+		WithStatusSubresource(termGW).
+		Build()
+
+	// No Consul client is configured: reaching Consul would panic, proving the
+	// gateway is rejected before any config entry or ACL write.
+	reconciler := &TerminatingGatewayController{
+		Client:                fakeClient,
+		ReleaseName:           "consul",
+		ReleaseNamespace:      kubeNS,
+		ConfigEntryController: &ConfigEntryController{},
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: termGW.Name, Namespace: kubeNS},
+	})
+	require.ErrorContains(t, err, "requires ai.enabled=true")
+
+	updated := &consulv1alpha1.TerminatingGateway{}
+	require.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{Name: termGW.Name, Namespace: kubeNS}, updated))
+	status, reason, message := updated.SyncedCondition()
+	require.Equal(t, corev1.ConditionFalse, status)
+	require.Equal(t, "CredentialInjectionRequiresAI", reason)
+	require.Contains(t, message, "consul-ai feature gate")
+}

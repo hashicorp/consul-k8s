@@ -235,4 +235,14 @@ data:
       "global_registry": {{ $globalRegistry | toJson }}
     }
   {{- end }}
+  feature-gates-config.json: |-
+    {
+      "feature_gates": {
+        "bootstrap": {
+          {{- if and .Values.ai .Values.ai.enabled }}
+          "consul-ai": true
+          {{- end }}
+        }
+      }
+    }
 {{- end }}

@@ -12,6 +12,13 @@ type HelmValues struct {
 	TerminatingGateways TerminatingGatewaysConfig `json:"terminatingGateways"`
 	ConnectInject       ConnectInjectConfig       `json:"connectInject"`
 	ExternalServers     ExternalServersConfig     `json:"externalServers"`
+	AI                  AIConfig                  `json:"ai"`
+}
+
+// AIConfig mirrors the chart's ai values. ai.enabled also drives the Consul
+// consul-ai feature gate, which credential injection requires.
+type AIConfig struct {
+	Enabled bool `json:"enabled"`
 }
 
 type ReleaseConfig struct {
