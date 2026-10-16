@@ -19,12 +19,12 @@
 ARG GOLANG_VERSION
 FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
 # Build go-discover in a synthetic module so we can pin patched versions of
-# golang.org/x/crypto (>=v0.57.0) and golang.org/x/net (>=v0.59.0) via MVS,
-# overriding the older versions bundled with go-discover v1.2.0.
+# golang.org/x/crypto (>=v0.52.0) and golang.org/x/net (>=v0.60.0) via MVS,
+# overriding the older versions bundled with go-discover v1.5.0.
 RUN mkdir /build && cd /build && \
     go mod init godisc_builder && \
-    go get github.com/hashicorp/go-discover/cmd/discover@v1.2.0 && \
-    go get golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.59.0 google.golang.org/grpc@v1.83.2 && \
+    go get github.com/hashicorp/go-discover/cmd/discover@v1.5.0 && \
+    go get golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.60.0 google.golang.org/grpc@v1.84.0 && \
     CGO_ENABLED=0 GOFLAGS=-mod=mod go build -o /go/bin/discover github.com/hashicorp/go-discover/cmd/discover
 
 # dev copies the binary from a local build
@@ -57,7 +57,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables zlib
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -110,7 +110,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ nftables zlib
 
 # for FIPS CGO glibc compatibility in alpine
 # see https://github.com/golang/go/issues/59305
