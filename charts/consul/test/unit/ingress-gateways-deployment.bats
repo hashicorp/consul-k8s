@@ -1251,6 +1251,92 @@ key2: value2' \
 }
 
 #--------------------------------------------------------------------
+# lifecycle and extraEnvironmentVars
+
+@test "ingressGateways/Deployment: lifecycle and extra environment variables are absent by default" {
+  cd `chart_dir`
+  local object=$(helm template -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr | yq -s '.[0]')
+  [ "$(echo "$object" | jq '.spec.template.spec.containers[0] | has("lifecycle")')" = "false" ]
+  [ "$(echo "$object" | jq '[.spec.template.spec.containers[0].env[] | select(.name | startswith("DP_SHUTDOWN"))] | length')" = "0" ]
+}
+
+@test "ingressGateways/Deployment: lifecycle and extra environment variables can be set through defaults" {
+  cd `chart_dir`
+  local object=$(helm template -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.defaults.lifecycle.preStop.exec.command[0]=/bin/sleep' \
+      --set-string 'ingressGateways.defaults.lifecycle.preStop.exec.command[1]=20' \
+      --set 'ingressGateways.defaults.extraEnvironmentVars.DP_SHUTDOWN_DRAIN_LISTENERS=true' \
+      --set 'ingressGateways.defaults.extraEnvironmentVars.DP_SHUTDOWN_GRACE_PERIOD_SECONDS=60' \
+      . | tee /dev/stderr | yq -s '.[0]')
+  [ "$(echo "$object" | jq -c '.spec.template.spec.containers[0].lifecycle.preStop.exec.command')" = '["/bin/sleep","20"]' ]
+  [ "$(echo "$object" | jq -c '[.spec.template.spec.containers[0].env[] | select(.name | startswith("DP_SHUTDOWN"))]')" = '[{"name":"DP_SHUTDOWN_DRAIN_LISTENERS","value":"true"},{"name":"DP_SHUTDOWN_GRACE_PERIOD_SECONDS","value":"60"}]' ]
+  [ "$(echo "$object" | jq '[.spec.template.spec.initContainers[] | select(has("lifecycle"))] | length')" = "0" ]
+  [ "$(echo "$object" | jq '[.spec.template.spec.initContainers[].env[] | select(.name | startswith("DP_SHUTDOWN"))] | length')" = "0" ]
+}
+
+@test "ingressGateways/Deployment: gateway lifecycle and extra environment variables replace defaults" {
+  cd `chart_dir`
+  local object=$(helm template -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.defaults.lifecycle.postStart.exec.command[0]=/bin/true' \
+      --set 'ingressGateways.defaults.extraEnvironmentVars.DEFAULT_ONLY=default' \
+      --set 'ingressGateways.gateways[0].name=custom' \
+      --set 'ingressGateways.gateways[0].lifecycle.preStop.httpGet.path=/shutdown' \
+      --set 'ingressGateways.gateways[0].lifecycle.preStop.httpGet.port=20600' \
+      --set 'ingressGateways.gateways[0].extraEnvironmentVars.CUSTOM_ONLY=custom' \
+      . | tee /dev/stderr | yq -s '.[0]')
+  [ "$(echo "$object" | jq -c '.spec.template.spec.containers[0].lifecycle')" = '{"preStop":{"httpGet":{"path":"/shutdown","port":20600}}}' ]
+  [ "$(echo "$object" | jq '[.spec.template.spec.containers[0].env[] | select(.name == "DEFAULT_ONLY")] | length')" = "0" ]
+  [ "$(echo "$object" | jq -r '.spec.template.spec.containers[0].env[] | select(.name == "CUSTOM_ONLY") | .value')" = "custom" ]
+}
+
+@test "ingressGateways/Deployment: an explicit empty map disables inherited lifecycle and environment variables" {
+  cd `chart_dir`
+  local object=$(helm template -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' --set 'connectInject.enabled=true' \
+      -f - . <<'EOF'
+ingressGateways:
+  defaults:
+    lifecycle:
+      preStop:
+        exec:
+          command: ["/bin/sleep", "20"]
+    extraEnvironmentVars:
+      DEFAULT_ONLY: default
+  gateways:
+    - name: disabled
+      lifecycle: {}
+      extraEnvironmentVars: {}
+EOF
+  )
+  object=$(echo "$object" | tee /dev/stderr | yq -s '.[0]')
+  [ "$(echo "$object" | jq '.spec.template.spec.containers[0] | has("lifecycle")')" = "false" ]
+  [ "$(echo "$object" | jq '[.spec.template.spec.containers[0].env[] | select(.name == "DEFAULT_ONLY")] | length')" = "0" ]
+}
+
+@test "ingressGateways/Deployment: lifecycle and extra environment variables do not leak between gateways" {
+  cd `chart_dir`
+  local objects=$(helm template -s templates/ingress-gateways-deployment.yaml \
+      --set 'ingressGateways.enabled=true' --set 'connectInject.enabled=true' \
+      --set 'ingressGateways.defaults.lifecycle.preStop.httpGet.path=/default' \
+      --set 'ingressGateways.defaults.lifecycle.preStop.httpGet.port=20600' \
+      --set 'ingressGateways.defaults.extraEnvironmentVars.VALUE=default' \
+      --set 'ingressGateways.gateways[0].name=custom' \
+      --set 'ingressGateways.gateways[0].lifecycle.preStop.httpGet.path=/custom' \
+      --set 'ingressGateways.gateways[0].lifecycle.preStop.httpGet.port=20601' \
+      --set 'ingressGateways.gateways[0].extraEnvironmentVars.VALUE=custom' \
+      --set 'ingressGateways.gateways[1].name=inherited' \
+      . | tee /dev/stderr | yq -s '.')
+  [ "$(echo "$objects" | jq -r '.[0].spec.template.spec.containers[0].lifecycle.preStop.httpGet.path')" = "/custom" ]
+  [ "$(echo "$objects" | jq -r '.[1].spec.template.spec.containers[0].lifecycle.preStop.httpGet.path')" = "/default" ]
+  [ "$(echo "$objects" | jq -r '.[0].spec.template.spec.containers[0].env[] | select(.name == "VALUE") | .value')" = "custom" ]
+  [ "$(echo "$objects" | jq -r '.[1].spec.template.spec.containers[0].env[] | select(.name == "VALUE") | .value')" = "default" ]
+}
+
+#--------------------------------------------------------------------
 # extraLabels
 
 @test "ingressGateways/Deployment: no extra labels defined by default" {

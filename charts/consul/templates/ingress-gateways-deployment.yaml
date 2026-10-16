@@ -24,6 +24,14 @@
 
 {{- $service := .service }}
 {{- $needsPrivilegedPorts := eq "true" (include "consul.ingressGatewayHasPrivilegedPorts" (dict "service" $service "defaults" $defaults)) }}
+{{- $lifecycle := $defaults.lifecycle }}
+{{- if hasKey . "lifecycle" }}
+{{- $lifecycle = .lifecycle }}
+{{- end }}
+{{- $extraEnvironmentVars := $defaults.extraEnvironmentVars }}
+{{- if hasKey . "extraEnvironmentVars" }}
+{{- $extraEnvironmentVars = .extraEnvironmentVars }}
+{{- end }}
 
 {{- if empty .name }}
 # Check that the gateway name is provided
@@ -248,6 +256,9 @@ spec:
       - name: ingress-gateway
         image: {{ $root.Values.global.imageConsulDataplane | quote }}
         {{ template "consul.imagePullPolicy" $root }}
+        {{- if $lifecycle }}
+        lifecycle: {{ toYaml $lifecycle | nindent 10 }}
+        {{- end }}
         {{- if $needsPrivilegedPorts }}
         {{- include "consul.restrictedSecurityContextWithNetBindService" $ | nindent 8 }}
         {{- else }}
@@ -296,6 +307,7 @@ spec:
           value: component=ingress-gateway
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
+        {{- include "consul.extraEnvironmentVars" (dict "extraEnvironmentVars" $extraEnvironmentVars) | nindent 8 }}
         {{- if $needsPrivilegedPorts }}
         command:
         - privileged-consul-dataplane
