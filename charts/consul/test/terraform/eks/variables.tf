@@ -70,3 +70,46 @@ variable "uptycs_webhook_tls_key" {
   description = "Base64-encoded TLS private key for kubequery webhook server."
   sensitive   = true
 }
+
+# ----------------------------------------------------------------------------
+# HC-COMPUTE-010 / SECVULN-44200 host baseline package
+#
+# The Wiz/Uptycs compliance scanner checks the node's host package database
+# (`dpkg --list | grep hc-security-base`). The Uptycs EDR DaemonSet above
+# covers the Kubernetes posture control but does NOT register the hc-security-base
+# package in the host package DB. The default EKS-optimized node image is Amazon
+# Linux, which cannot carry that Debian package. When enable_security_baseline is
+# true the worker nodes are launched from a Canonical Ubuntu EKS-optimized AMI and
+# hc-security-base is installed at boot from HashiCorp internal Artifactory,
+# mirroring ami-builder/scripts/packer-install_meta_deb.sh.
+# ----------------------------------------------------------------------------
+
+variable "enable_security_baseline" {
+  type        = bool
+  default     = false
+  description = "When true, run worker nodes on a Canonical Ubuntu EKS AMI and install hc-security-base at boot to satisfy HC-COMPUTE-010. Requires afy_user/afy_password. Validate in a single cluster before enabling in shared CI."
+}
+
+variable "ubuntu_eks_ami_owner" {
+  default     = "099720109477"
+  description = "AWS account id that owns the Ubuntu EKS AMIs (Canonical)."
+}
+
+variable "ubuntu_eks_ami_name_filter" {
+  default     = "ubuntu-eks/k8s_%s/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
+  description = "Name filter for the Canonical Ubuntu EKS AMI. %s is replaced with kubernetes_version."
+}
+
+variable "afy_user" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "HashiCorp Artifactory username used to fetch hc-security-base. Provide via TF_VAR_afy_user from CI secrets; never commit."
+}
+
+variable "afy_password" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "HashiCorp Artifactory password/token used to fetch hc-security-base. Provide via TF_VAR_afy_password from CI secrets; never commit."
+}
