@@ -3,7 +3,8 @@
 
 # Reusable workflow: merges per-module coverage profiles, computes the total,
 # posts/edits a PR comment, uploads an HTML artifact, uploads to Codecov, and
-# (on main) pushes a coverage badge SVG to the `badges` branch for the README.
+# (on main) pushes a coverage badge SVG to the `badges` branch for the README
+# and commits an updated per-package baseline used by the regression gate.
 
 name: reusable-coverage-report
 
@@ -136,6 +137,17 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           go tool cover -html=merged-coverage.out -o coverage.html
+
+
+      - name: Upload pkg-summary artifact
+        # Upload pkg-summary.txt so the regression gate job can download it
+        # without having to re-parse the output variable encoding.
+        if: steps.coverage.outputs.total != 'N/A'
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: pkg-summary
+          path: pkg-summary.txt
+          if-no-files-found: ignore
 
       - name: Compute patch coverage
         id: patch
@@ -357,4 +369,32 @@ jobs:
           else
             git -C /tmp/badges-wt commit -m "chore: update coverage badge [skip ci]"
             git -C /tmp/badges-wt push origin HEAD:badges
+          fi
+
+      - name: Commit coverage baseline to main
+        # On every merge to main, commit the updated pkg-summary.txt as the
+        # authoritative per-package baseline for the regression gate.
+        # PRs compare their per-package averages against this file to detect
+        # regressions before they can be merged.
+        if: github.ref == 'refs/heads/main' && steps.coverage.outputs.total != 'N/A'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          # Pull latest main to avoid conflicts with concurrent badge commits.
+          git fetch origin main --depth=1
+          git pull --ff-only origin main
+
+          mkdir -p .github
+          cp pkg-summary.txt .github/coverage-baseline.txt
+          git add .github/coverage-baseline.txt
+          if git diff --staged --quiet; then
+            echo "Coverage baseline unchanged, skipping commit"
+          else
+            git commit -m "chore: update coverage baseline [skip ci]"
+            git push origin HEAD:main
           fi
