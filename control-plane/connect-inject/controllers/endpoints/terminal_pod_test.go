@@ -200,8 +200,9 @@ func TestRequestsForTerminalPod(t *testing.T) {
 	})
 }
 
-// Test that a terminal pod sharing its IP with a healthy replacement doesn't cause the replacement to be
-// deregistered, regardless of the order the endpoints are listed in.
+// Test that a pod that no longer exists, whose stale slice entry shares its IP with a healthy replacement, doesn't
+// cause the replacement to be deregistered, and that its own registrations are removed, regardless of the order the
+// endpoints are listed in. Terminal pods sharing an IP are covered by TestReconcile_TerminalPodIdentityMatching.
 func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 	t.Parallel()
 	svcName := "service-ip-reuse"
@@ -230,15 +231,12 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 					NotReadyAddresses: notReadyAddresses,
 				}},
 			}
-			oldPod := createServicePod("old", "1.2.3.4", true, true)
-			oldPod.Status.Phase = corev1.PodFailed
-			oldPod.Status.Reason = "Evicted"
 			newPod := createServicePod("new", "1.2.3.4", true, true)
 			newPod.Status.Phase = corev1.PodRunning
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 			fakeClient := fake.NewClientBuilder().
-				WithObjects(endpoints, oldPod, newPod, &ns, &node).Build()
+				WithObjects(endpoints, newPod, &ns, &node).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
@@ -259,7 +257,7 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "old",
-							constants.MetaKeyPodUID:  string(oldPod.UID),
+							constants.MetaKeyPodUID:  "uid-old",
 						},
 					},
 				}, nil)
@@ -446,7 +444,7 @@ func TestIsTerminalPodInstance(t *testing.T) {
 	require.True(t, check(instance("failed", "")), "instances without a UID match by name")
 	require.False(t, check(instance("failed", "uid-other")), "same name, different pod")
 	require.False(t, check(instance("running", "uid-running")))
-	require.False(t, check(instance("missing", "uid-missing")), "pod no longer exists")
+	require.True(t, check(instance("missing", "uid-missing")), "pod no longer exists; its registration is stale")
 	require.False(t, check(&api.CatalogService{ServiceMeta: map[string]string{}}), "instance without pod metadata")
 }
 
@@ -846,18 +844,14 @@ func TestReconcile_TerminalPodLookupErrorIsReturnedForRetry(t *testing.T) {
 	svcName := "service-lookup-error"
 	namespace := "default"
 
-	// Only the replacement is in the slice; the old pod is found solely through the instance metadata.
-	slice := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      svcName,
-			Namespace: namespace,
-			Labels:    map[string]string{discoveryv1.LabelServiceName: svcName},
-		},
-		AddressType: discoveryv1.AddressTypeIPv4,
-		Endpoints: []discoveryv1.Endpoint{{
-			Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
-			Addresses:  []string{"1.2.3.4"},
-			TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "new", Namespace: namespace},
+	// Only the replacement remains in Endpoints; the old pod is found solely through the instance metadata.
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: svcName, Namespace: namespace},
+		Subsets: []corev1.EndpointSubset{{
+			Addresses: []corev1.EndpointAddress{{
+				IP:        "1.2.3.4",
+				TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "new", Namespace: namespace},
+			}},
 		}},
 	}
 	oldPod := createServicePod("old", "1.2.3.4", true, true)
@@ -869,8 +863,8 @@ func TestReconcile_TerminalPodLookupErrorIsReturnedForRetry(t *testing.T) {
 	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 
 	failOldPodLookup := true
-	fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).
-		WithRuntimeObjects(slice, oldPod, newPod, &ns, &node).
+	fakeClient := fake.NewClientBuilder().
+		WithObjects(endpoints, oldPod, newPod, &ns, &node).
 		WithInterceptorFuncs(interceptor.Funcs{
 			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 				if failOldPodLookup && key.Name == "old" {
