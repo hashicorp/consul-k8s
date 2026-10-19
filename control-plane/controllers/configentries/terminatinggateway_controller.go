@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
@@ -43,6 +44,11 @@ type TerminatingGatewayController struct {
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
 	ConfigEntryController *ConfigEntryController
+
+	// ReleaseName and ReleaseNamespace identify the Consul Helm release. The release
+	// namespace is used to scope the terminating gateway ACL binding rule.
+	ReleaseName      string
+	ReleaseNamespace string
 }
 
 func init() {
@@ -123,6 +129,21 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if enabled {
+		// The binding rule can only be scoped to the release namespace when it is known.
+		if r.ReleaseNamespace != "" {
+			helmValues, err := helmvalues.GetHelmValues(ctx, r.Client, r.ReleaseName, r.ReleaseNamespace)
+			if err != nil {
+				log.Error(err, "failed to get Helm values")
+				r.UpdateStatusFailedToSetACLs(ctx, termGW, err)
+				return ctrl.Result{}, err
+			}
+			if err := r.ensureTerminatingGatewayACLBootstrap(log, termGW, helmValues); err != nil {
+				log.Error(err, "error bootstrapping terminating-gateway ACLs")
+				r.UpdateStatusFailedToSetACLs(ctx, termGW, err)
+				return ctrl.Result{}, err
+			}
+		}
+
 		err = r.updateACls(log, termGW)
 		if err != nil {
 			log.Error(err, "error updating terminating-gateway roles")
@@ -398,4 +419,240 @@ func serviceNameFromPolicy(policyName string) string {
 
 	// remove the write policy suffix
 	return strings.TrimSuffix(n, "-write-policy")
+}
+
+// ensureTerminatingGatewayACLBootstrap creates or updates the ACL policy, role and binding rule
+// for a terminating gateway. The binding rule is restricted to the Consul release namespace so
+// that a same-named ServiceAccount in another namespace cannot log in and receive the role.
+func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
+	log logr.Logger,
+	termGW *consulv1alpha1.TerminatingGateway,
+	helmValues *helmvalues.HelmValues,
+) error {
+	if helmValues == nil {
+		return fmt.Errorf("helm values are nil")
+	}
+	if !helmValues.Global.ACLs.ManageSystemACLs {
+		return nil
+	}
+
+	consulClient, err := consul.NewClientFromConnMgr(
+		r.ConfigEntryController.ConsulClientConfig,
+		r.ConfigEntryController.ConsulServerConnMgr,
+	)
+	if err != nil {
+		return fmt.Errorf("create consul client: %w", err)
+	}
+
+	fullName := helmvalues.ConsulFullName(helmValues)
+	gatewayName := termGW.Name
+	serviceAccountName := fmt.Sprintf("%s-%s", fullName, gatewayName)
+	authMethodName := helmvalues.LocalComponentAuthMethodName(helmValues)
+
+	consulNamespace := r.terminatingGatewayConsulNamespace(termGW, helmValues)
+
+	rules, err := r.renderTerminatingGatewayACLRules(gatewayName, consulNamespace)
+	if err != nil {
+		return fmt.Errorf("render terminating gateway ACL rules: %w", err)
+	}
+
+	policyName := fmt.Sprintf("%s-policy", gatewayName)
+
+	var datacenters []string
+	if r.ConfigEntryController != nil && r.ConfigEntryController.DatacenterName != "" {
+		datacenters = []string{r.ConfigEntryController.DatacenterName}
+	}
+
+	desiredPolicy := &capi.ACLPolicy{
+		Name:        policyName,
+		Description: fmt.Sprintf("%s Token Policy", policyName),
+		Rules:       rules,
+		Datacenters: datacenters,
+	}
+
+	existingPolicy, _, err := consulClient.ACL().PolicyReadByName(policyName, nil)
+	if err != nil {
+		return fmt.Errorf("read ACL policy %q: %w", policyName, err)
+	}
+
+	if existingPolicy == nil {
+		log.Info("creating terminating gateway ACL policy", "policy", policyName)
+		if _, _, err := consulClient.ACL().PolicyCreate(desiredPolicy, nil); err != nil {
+			return fmt.Errorf("create ACL policy %q: %w", policyName, err)
+		}
+	} else {
+		existingPolicy.Description = desiredPolicy.Description
+		existingPolicy.Rules = desiredPolicy.Rules
+		existingPolicy.Datacenters = desiredPolicy.Datacenters
+		log.Info("updating terminating gateway ACL policy", "policy", policyName)
+		if _, _, err := consulClient.ACL().PolicyUpdate(existingPolicy, nil); err != nil {
+			return fmt.Errorf("update ACL policy %q: %w", policyName, err)
+		}
+	}
+
+	roleName := fmt.Sprintf("%s-%s-acl-role", fullName, gatewayName)
+	rolePolicyLink := &capi.ACLRolePolicyLink{Name: policyName}
+
+	existingRole, _, err := consulClient.ACL().RoleReadByName(roleName, nil)
+	if err != nil {
+		return fmt.Errorf("read ACL role %q: %w", roleName, err)
+	}
+
+	if existingRole == nil {
+		role := &capi.ACLRole{
+			Name:        roleName,
+			Description: fmt.Sprintf("ACL Role for %s", serviceAccountName),
+			Policies:    []*capi.ACLRolePolicyLink{rolePolicyLink},
+		}
+		log.Info("creating terminating gateway ACL role", "role", roleName)
+		if _, _, err := consulClient.ACL().RoleCreate(role, nil); err != nil {
+			return fmt.Errorf("create ACL role %q: %w", roleName, err)
+		}
+	} else {
+		found := false
+		for _, p := range existingRole.Policies {
+			if p != nil && p.Name == policyName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			existingRole.Policies = append(existingRole.Policies, rolePolicyLink)
+		}
+		existingRole.Description = fmt.Sprintf("ACL Role for %s", serviceAccountName)
+		log.Info("updating terminating gateway ACL role", "role", roleName)
+		if _, _, err := consulClient.ACL().RoleUpdate(existingRole, nil); err != nil {
+			return fmt.Errorf("update ACL role %q: %w", roleName, err)
+		}
+	}
+
+	bindingRule := &capi.ACLBindingRule{
+		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
+		AuthMethod:  authMethodName,
+		Selector: fmt.Sprintf(
+			"serviceaccount.name==%q and serviceaccount.namespace==%q",
+			serviceAccountName,
+			r.ReleaseNamespace,
+		),
+		BindType: capi.BindingRuleBindTypeRole,
+		BindName: roleName,
+	}
+
+	existingRules, _, err := consulClient.ACL().BindingRuleList(authMethodName, &capi.QueryOptions{})
+	if err != nil {
+		return fmt.Errorf("list binding rules for auth method %q: %w", authMethodName, err)
+	}
+
+	var matchingRule *capi.ACLBindingRule
+	for _, rule := range existingRules {
+		if rule.BindName == bindingRule.BindName && rule.Description == bindingRule.Description {
+			matchingRule = rule
+			break
+		}
+	}
+
+	if matchingRule == nil {
+		log.Info("creating terminating gateway ACL binding rule", "authMethod", authMethodName, "serviceAccount", serviceAccountName)
+		if _, _, err := consulClient.ACL().BindingRuleCreate(bindingRule, nil); err != nil {
+			return fmt.Errorf("create binding rule for auth method %q: %w", authMethodName, err)
+		}
+	} else {
+		bindingRule.ID = matchingRule.ID
+		log.Info("updating terminating gateway ACL binding rule", "authMethod", authMethodName, "serviceAccount", serviceAccountName)
+		if _, _, err := consulClient.ACL().BindingRuleUpdate(bindingRule, nil); err != nil {
+			return fmt.Errorf("update binding rule for auth method %q: %w", authMethodName, err)
+		}
+	}
+
+	return nil
+}
+
+// renderTerminatingGatewayACLRules renders the ACL policy rules for a terminating gateway service.
+func (r *TerminatingGatewayController) renderTerminatingGatewayACLRules(gatewayName, consulNamespace string) (string, error) {
+	const tpl = `
+{{- if .EnablePartitions }}
+partition "{{ .Partition }}" {
+{{- end }}
+{{- if .EnableNamespaces }}
+  namespace "{{ .Namespace }}" {
+{{- end }}
+    service "{{ .GatewayName }}" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
+}
+{{- end }}
+`
+
+	data := struct {
+		GatewayName      string
+		Namespace        string
+		Partition        string
+		EnableNamespaces bool
+		EnablePartitions bool
+	}{
+		GatewayName:      gatewayName,
+		Namespace:        defaultIfEmpty(consulNamespace),
+		Partition:        r.adminPartition(),
+		EnableNamespaces: r.NamespacesEnabled,
+		EnablePartitions: r.PartitionsEnabled,
+	}
+
+	var out bytes.Buffer
+	t, err := template.New("terminating-gateway-acl-rules").Parse(strings.TrimSpace(tpl))
+	if err != nil {
+		return "", err
+	}
+	if err := t.Execute(&out, data); err != nil {
+		return "", err
+	}
+	return out.String(), nil
+}
+
+// terminatingGatewayConsulNamespace resolves the Consul namespace of the terminating gateway
+// service. Resolution order:
+//  1. Per-gateway consulNamespace from Helm values.
+//  2. terminatingGateways.defaults.consulNamespace from Helm values (a bare "default" is
+//     treated as unset when Consul namespaces are enabled so mirroring can take precedence).
+//  3. The mirrored namespace derived from the gateway's K8s namespace, when mirroring is enabled.
+//  4. "default".
+func (r *TerminatingGatewayController) terminatingGatewayConsulNamespace(
+	termGW *consulv1alpha1.TerminatingGateway,
+	helmValues *helmvalues.HelmValues,
+) string {
+	if termGW == nil || helmValues == nil {
+		return defaultIfEmpty("")
+	}
+
+	for _, gw := range helmValues.TerminatingGateways.Gateways {
+		if gw.Name == termGW.Name && gw.ConsulNamespace != "" {
+			return gw.ConsulNamespace
+		}
+	}
+
+	namespacesEnabled := helmValues.Global.EnableConsulNamespaces
+	mirroring := false
+	mirroringPrefix := ""
+	if r != nil && r.ConfigEntryController != nil {
+		namespacesEnabled = r.ConfigEntryController.EnableConsulNamespaces
+		mirroring = r.ConfigEntryController.EnableNSMirroring
+		mirroringPrefix = r.ConfigEntryController.NSMirroringPrefix
+	}
+
+	defaultsNS := helmValues.TerminatingGateways.Defaults.ConsulNamespace
+	if defaultsNS != "" && !(defaultsNS == "default" && namespacesEnabled) {
+		return defaultsNS
+	}
+
+	if namespacesEnabled && mirroring {
+		return mirroringPrefix + termGW.Namespace
+	}
+
+	return defaultIfEmpty(defaultsNS)
 }
