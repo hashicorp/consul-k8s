@@ -60,15 +60,24 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			Flags: []string{
+				"-addresses=localhost",
+				"-resource-prefix=prefix",
+			},
+			ExpErr: "-k8s-namespace must be set",
+		},
+		{
+			Flags: []string{
 				"-acl-replication-token-file=/notexist",
 				"-addresses=localhost",
-				"-resource-prefix=prefix"},
+				"-resource-prefix=prefix",
+				"-k8s-namespace=default"},
 			ExpErr: "unable to read token from file \"/notexist\": open /notexist: no such file or directory",
 		},
 		{
 			Flags: []string{
 				"-addresses=localhost",
 				"-resource-prefix=prefix",
+				"-k8s-namespace=default",
 				"-sync-consul-node-name=Speci@l_Chars",
 			},
 			ExpErr: "-sync-consul-node-name=Speci@l_Chars is invalid: node name will not be discoverable " +
@@ -78,6 +87,7 @@ func TestRun_FlagValidation(t *testing.T) {
 			Flags: []string{
 				"-addresses=localhost",
 				"-resource-prefix=prefix",
+				"-k8s-namespace=default",
 				"-sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long",
 			},
 			ExpErr: "-sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long is invalid: node name will not be discoverable " +
@@ -803,9 +813,10 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 	responseCode := cmd.Run(firstRunArgs)
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
+	queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
+
 	// Validate the binding rule.
 	{
-		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
 		authMethodName := resourcePrefix + "-k8s-auth-method"
 		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
 		require.NoError(t, err)
@@ -819,6 +830,23 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		require.Equal(t, "serviceaccount.name!=default", aclRule.Selector)
 	}
 
+	// Simulate upgrading an existing installation with the old name-only
+	// component binding rule.
+	componentAuthMethodName := resourcePrefix + "-k8s-component-auth-method"
+	componentRules, _, err := consul.ACL().BindingRuleList(componentAuthMethodName, queryOpts)
+	require.NoError(t, err)
+	var componentRule *api.ACLBindingRule
+	for _, rule := range componentRules {
+		if rule.BindName == resourcePrefix+"-connect-inject-acl-role" {
+			componentRule = rule
+			break
+		}
+	}
+	require.NotNil(t, componentRule)
+	componentRule.Selector = fmt.Sprintf("serviceaccount.name==%q", resourcePrefix+"-connect-injector")
+	_, _, err = consul.ACL().BindingRuleUpdate(componentRule, &api.WriteOptions{Token: queryOpts.Token})
+	require.NoError(t, err)
+
 	// Re-run the command with namespace flags. The policies should be updated.
 	// NOTE: We're redefining the command so that the old flag values are
 	// reset.
@@ -831,7 +859,6 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 
 	// Check the binding rule is changed expected.
 	{
-		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
 		authMethodName := resourcePrefix + "-k8s-auth-method"
 		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
 		require.NoError(t, err)
@@ -844,6 +871,24 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
 		require.Equal(t, "serviceaccount.name!=changed", aclRule.Selector)
 	}
+
+	componentRules, _, err = consul.ACL().BindingRuleList(componentAuthMethodName, queryOpts)
+	require.NoError(t, err)
+	for _, rule := range componentRules {
+		if rule.BindName == resourcePrefix+"-connect-inject-acl-role" {
+			require.Equal(
+				t,
+				fmt.Sprintf(
+					"serviceaccount.name==%q and serviceaccount.namespace==%q",
+					resourcePrefix+"-connect-injector",
+					ns,
+				),
+				rule.Selector,
+			)
+			return
+		}
+	}
+	require.Fail(t, "connect-inject component binding rule not found")
 }
 
 // Test that the catalog sync policy is updated if the Consul node name changes.
@@ -2078,6 +2123,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 				found = false
 				for j := range rb {
 					if rb[j].BindName == c.Roles[i] {
+						require.Contains(t, rb[j].Selector, fmt.Sprintf("serviceaccount.namespace==%q", ns))
 						found = true
 						break
 					}
@@ -2238,6 +2284,7 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 					found = false
 					for j := range rb {
 						if rb[j].BindName == c.Roles[i] {
+							require.Contains(r, rb[j].Selector, fmt.Sprintf("serviceaccount.namespace==%q", ns))
 							found = true
 							break
 						}

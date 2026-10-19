@@ -1081,6 +1081,10 @@ func (c *Command) validateFlags() error {
 		return errors.New("-resource-prefix must be set")
 	}
 
+	if c.flagK8sNamespace == "" {
+		return errors.New("-k8s-namespace must be set")
+	}
+
 	// For the Consul node name to be discoverable via DNS, it must contain only
 	// dashes and alphanumeric characters. Length is also constrained.
 	// These restrictions match those defined in Consul's agent definition.
