@@ -175,7 +175,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if k8serrors.IsNotFound(err) {
 		// Deregister all instances in Consul for this service. The function deregisterService handles
 		// the case where the Consul service name is different from the Kubernetes service name.
-		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil)
+		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil, nil)
 		return ctrl.Result{RequeueAfter: requeueAfter}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Endpoints", "name", req.Name, "ns", req.Namespace)
@@ -189,13 +189,16 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if isLabeledIgnore(serviceEndpoints.Labels) {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
 		r.Log.Info("ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", req.Name, "namespace", req.Namespace)
-		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil)
+		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil, nil)
 		return ctrl.Result{RequeueAfter: requeueAfter}, err
 	}
 
 	// deregisterEndpointAddress stores every IP that corresponds to a Pod in the Endpoints object. It is used to compare
 	// against service instances in Consul to deregister them if they are not in the map.
 	deregisterEndpointAddress := map[string]bool{}
+	// terminalPods maps the name to the UID of pods in a terminal phase. Their instances are removed by pod
+	// identity so that a replacement pod reusing the same IP is not affected.
+	terminalPods := map[string]string{}
 
 	// Register all addresses of this Endpoints object as service instances in Consul.
 	for _, subset := range serviceEndpoints.Subsets {
@@ -206,7 +209,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
 					// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
 					if k8serrors.IsNotFound(err) {
-						deregisterEndpointAddress[address.IP] = true
+						markForDeregistration(deregisterEndpointAddress, address.IP)
 						r.Log.Info("pod not found", "name", address.TargetRef.Name)
 					} else {
 						// If there was a different error fetching the pod, then log the error but don't deregister it
@@ -226,8 +229,9 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						// so mark the health check critical through the legacy path below.
 						healthStatus = api.HealthCritical
 					} else {
+						terminalPods[pod.Name] = string(pod.UID)
 						r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
-						deregisterEndpointAddress[address.IP] = true
+						markForDeregistration(deregisterEndpointAddress, address.IP)
 						continue
 					}
 				}
@@ -312,7 +316,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
 	// from Consul. This uses deregisterEndpointAddress which is populated with the addresses in the Endpoints object to
 	// either deregister or keep during the registration codepath.
-	requeueAfter, err := r.deregisterService(ctx, apiClient, serviceEndpoints.Name, serviceEndpoints.Namespace, deregisterEndpointAddress)
+	requeueAfter, err := r.deregisterService(ctx, apiClient, serviceEndpoints.Name, serviceEndpoints.Namespace, deregisterEndpointAddress, terminalPods)
 	if err != nil {
 		r.Log.Error(err, "failed to deregister endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 		errs = multierror.Append(errs, err)
@@ -995,6 +999,8 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // "k8s-service-name". So, we query Consul services by "k8s-service-name" metadata.
 // When querying by the k8s service name and namespace, the request will return service instances and
 // associated proxy service instances.
+// The argument terminalPods (pod name to UID) additionally forces deregistration of instances that belong to those
+// pods, even when their address is kept because a healthy replacement pod reuses the same IP.
 // The argument deregisterEndpointAddress decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in deregisterEndpointAddress. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
@@ -1007,7 +1013,8 @@ func (r *Controller) deregisterService(
 	apiClient *api.Client,
 	k8sSvcName string,
 	k8sSvcNamespace string,
-	deregisterEndpointAddress map[string]bool) (time.Duration, error) {
+	deregisterEndpointAddress map[string]bool,
+	terminalPods map[string]string) (time.Duration, error) {
 
 	// Get services matching metadata from Consul
 	serviceInstances, err := r.serviceInstances(apiClient, k8sSvcName, k8sSvcNamespace)
@@ -1024,7 +1031,7 @@ func (r *Controller) deregisterService(
 		// every service instance.
 		var serviceDeregistered bool
 
-		if deregister(svc.ServiceAddress, deregisterEndpointAddress) {
+		if deregister(svc.ServiceAddress, deregisterEndpointAddress) || isTerminalPodInstance(svc, terminalPods) {
 			// If graceful shutdown is enabled, continue to the next service instance and
 			// mark that an event requeue is needed. We should requeue at the longest time interval
 			// to prevent excessive re-queues. Also, updating the health status in Consul to Critical
@@ -1704,6 +1711,27 @@ func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
 // which includes pods evicted by the kubelet.
 func isPodTerminal(pod corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded
+}
+
+// isTerminalPodInstance returns true if the service instance was registered for one of the given terminal pods.
+// Instances registered without a pod UID are matched by pod name only.
+func isTerminalPodInstance(svc *api.CatalogService, terminalPods map[string]string) bool {
+	uid, ok := terminalPods[svc.ServiceMeta[constants.MetaKeyPodName]]
+	if !ok {
+		return false
+	}
+	instanceUID := svc.ServiceMeta[constants.MetaKeyPodUID]
+	return instanceUID == "" || instanceUID == uid
+}
+
+// markForDeregistration flags an address for deregistration unless another endpoint sharing the same IP (e.g. a
+// replacement pod that reused the IP of a terminal pod) already marked it to be kept, so the outcome doesn't
+// depend on the order the endpoints are processed.
+func markForDeregistration(deregisterEndpointAddress map[string]bool, ip string) {
+	if shouldDeregister, ok := deregisterEndpointAddress[ip]; ok && !shouldDeregister {
+		return
+	}
+	deregisterEndpointAddress[ip] = true
 }
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
