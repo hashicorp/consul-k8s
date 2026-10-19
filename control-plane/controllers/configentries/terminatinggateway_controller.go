@@ -1105,8 +1105,9 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 
 	// Add the Vault-only credential-injection sidecars/volumes when enabled.
 	// Match the Helm chart: the global Vault Agent Injector is only active when
-	// both the Vault secrets backend and TLS are enabled, so credential-injection
-	// pods only need the injector-discoverable token in that case.
+	// both the Vault secrets backend and TLS are enabled. This gates the Vault
+	// annotations below and whether credential-injection pods need the
+	// injector-discoverable token, so the two always agree.
 	vaultInjectorEnabled := helmConfigValues.Global.SecretsBackend.Vault.Enabled && helmConfigValues.Global.TLS.Enabled
 
 	// This mirrors the Helm chart projection so both deployment paths agree.
@@ -1130,7 +1131,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		annotations["consul.hashicorp.com/gateway-namespace"] = consulNamespace
 	}
 
-	if helmConfigValues.Global.SecretsBackend.Vault.Enabled {
+	if vaultInjectorEnabled {
 		annotations["vault.hashicorp.com/agent-init-first"] = "true"
 		annotations["vault.hashicorp.com/agent-inject"] = "true"
 		annotations["vault.hashicorp.com/role"] = helmConfigValues.Global.SecretsBackend.Vault.ConsulCARole

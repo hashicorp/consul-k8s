@@ -2655,6 +2655,7 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 			helmValues: func() *helmvalues.HelmValues {
 				hv := baseHelmValues()
 				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.TLS.Enabled = true
 				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
 				hv.Global.SecretsBackend.Vault.AgentAnnotations = map[string]string{"vault.hashicorp.com/agent-pre-populate-only": "true"}
 				return hv
@@ -2671,6 +2672,7 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 			helmValues: func() *helmvalues.HelmValues {
 				hv := baseHelmValues()
 				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.TLS.Enabled = true
 				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
 				hv.Global.SecretsBackend.Vault.AgentAnnotations = map[string]string{"vault.hashicorp.com/namespace": "team-b"}
 				return hv
@@ -2686,10 +2688,12 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 			helmValues: func() *helmvalues.HelmValues {
 				hv := baseHelmValues()
 				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.TLS.Enabled = true
 				return hv
 			},
 			validate: func(t *testing.T, deployment *appsv1.Deployment) {
 				require.NotNil(t, deployment)
+				require.Equal(t, "true", deployment.Spec.Template.Annotations["vault.hashicorp.com/agent-inject"])
 				require.NotContains(t, deployment.Spec.Template.Annotations, "vault.hashicorp.com/namespace")
 			},
 		},
@@ -2698,12 +2702,74 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 			termGW: baseTermGW,
 			helmValues: func() *helmvalues.HelmValues {
 				hv := baseHelmValues()
+				hv.Global.TLS.Enabled = true
 				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
 				return hv
 			},
 			validate: func(t *testing.T, deployment *appsv1.Deployment) {
 				require.NotNil(t, deployment)
 				require.NotContains(t, deployment.Spec.Template.Annotations, "vault.hashicorp.com/namespace")
+			},
+		},
+		{
+			// Matches terminating-gateways-deployment.yaml, which only adds Vault Agent
+			// Injector annotations when both Vault and TLS are enabled.
+			name:   "no vault annotations when vault is enabled and TLS is disabled",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
+				hv.Global.SecretsBackend.Vault.ConsulCARole = "consul-ca"
+				hv.Global.SecretsBackend.Vault.AgentAnnotations = map[string]string{"vault.hashicorp.com/agent-pre-populate-only": "true"}
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				for k := range deployment.Spec.Template.Annotations {
+					require.NotContains(t, k, "vault.hashicorp.com/", "unexpected Vault annotation %q", k)
+				}
+			},
+		},
+		{
+			// Credential injection disables the default ServiceAccount token automount.
+			// With TLS off the injector isn't requested, so no injector token volume is
+			// needed; requesting injection here would fail in vault-k8s with
+			// "failed to find service account volume mount".
+			name: "credentialInjection with vault enabled and TLS disabled does not request vault agent injection",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.EnableDeployment = ptr.To(true)
+				gw.Spec.Services = []v1alpha1.LinkedService{{
+					Name:       "external-api",
+					CAFile:     "/etc/ssl/certs/ca-certificates.crt",
+					SNI:        "api.example.com",
+					Credential: &v1alpha1.LinkedServiceCredential{Mode: v1alpha1.CredentialModeInject, BindingID: "external-api"},
+				}}
+				gw.Spec.Deployment.CredentialInjection = &v1alpha1.TerminatingGatewayCredentialInjection{
+					Enabled:             true,
+					ProcessorImage:      "camp-auth-processor:test",
+					ProcessorConfigMap:  "camp-proc",
+					VaultAgentImage:     "hashicorp/vault:test",
+					VaultAgentConfigMap: "camp-agent",
+					VaultAddress:        "https://vault:8200",
+					TokenAudience:       "vault",
+				}
+				return gw
+			},
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				annotations := deployment.Spec.Template.Annotations
+				require.NotContains(t, annotations, "vault.hashicorp.com/agent-inject")
+				require.NotContains(t, annotations, "vault.hashicorp.com/agent-service-account-token-volume-name")
+				for _, v := range deployment.Spec.Template.Spec.Volumes {
+					require.NotEqual(t, "consul-auth-method-sa-token", v.Name)
+				}
 			},
 		},
 		{
