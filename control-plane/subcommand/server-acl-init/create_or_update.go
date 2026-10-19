@@ -180,16 +180,13 @@ func (c *Command) createOrUpdateBindingRule(client *consul.DynamicClient, authMe
 				matchingIDs = append(matchingIDs, existingRule.ID)
 			}
 		}
-		if len(matchingIDs) > 0 {
-			abr.ID = matchingIDs[len(matchingIDs)-1]
-		}
 
 		// This will only happen if there are existing policies
 		// for this auth method, but none that match the binding
 		// rule set up here in the bootstrap method. Hence the
 		// new binding rule must be created as it belongs to the
 		// same auth method.
-		if abr.ID == "" {
+		if len(matchingIDs) == 0 {
 			c.log.Info("unable to find a matching ACL binding rule to update. creating ACL binding rule.")
 			err = c.untilSucceeds(fmt.Sprintf("creating acl binding rule for %s", authMethodName),
 				func() error {
