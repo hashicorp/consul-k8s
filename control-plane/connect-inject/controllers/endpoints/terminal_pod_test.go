@@ -259,13 +259,18 @@ func TestIsTerminalPodInstance(t *testing.T) {
 			constants.MetaKeyKubeNS:  namespace,
 		}}
 	}
+	check := func(svc *api.CatalogService) bool {
+		terminal, err := controller.isTerminalPodInstance(context.Background(), svc, namespace)
+		require.NoError(t, err)
+		return terminal
+	}
 
-	require.True(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("failed", "uid-failed"), namespace))
-	require.True(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("failed", ""), namespace))
-	require.False(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("failed", "uid-replaced"), namespace))
-	require.False(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("running", "uid-running"), namespace))
-	require.False(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("missing", "uid-missing"), namespace))
-	require.False(t, controller.isTerminalPodInstance(context.Background(), &api.CatalogService{}, namespace))
+	require.True(t, check(serviceInstance("failed", "uid-failed")))
+	require.True(t, check(serviceInstance("failed", "")))
+	require.False(t, check(serviceInstance("failed", "uid-replaced")))
+	require.False(t, check(serviceInstance("running", "uid-running")))
+	require.False(t, check(serviceInstance("missing", "uid-missing")))
+	require.False(t, check(&api.CatalogService{}))
 }
 
 func TestRequestsForTerminalPod_ServiceSelector(t *testing.T) {
