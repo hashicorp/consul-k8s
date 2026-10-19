@@ -69,9 +69,9 @@ type Command struct {
 
 	flagSnapshotAgent bool
 
-	flagMeshGateway              bool
-	flagIngressGatewayNames      []string
-	flagTerminatingGatewayNames  []string
+	flagMeshGateway             bool
+	flagIngressGatewayNames     []string
+	flagTerminatingGatewayNames []string
 	// Flags to configure Consul connection.
 	flagServerPort uint
 
@@ -1092,6 +1092,10 @@ func (c *Command) validateFlags() error {
 
 	if c.flagResourcePrefix == "" {
 		return errors.New("-resource-prefix must be set")
+	}
+
+	if c.flagK8sNamespace == "" {
+		return errors.New("-k8s-namespace must be set")
 	}
 
 	// For the Consul node name to be discoverable via DNS, it must contain only
