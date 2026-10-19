@@ -239,6 +239,80 @@ func TestMarkForDeregistrationWithSharedIP(t *testing.T) {
 	})
 }
 
+func TestIsTerminalPodInstance(t *testing.T) {
+	const namespace = "default"
+	pods := []runtime.Object{
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "failed", Namespace: namespace, UID: "uid-failed"},
+			Status:     corev1.PodStatus{Phase: corev1.PodFailed},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "running", Namespace: namespace, UID: "uid-running"},
+			Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+		},
+	}
+	controller := &Controller{Client: fake.NewClientBuilder().WithRuntimeObjects(pods...).Build()}
+	serviceInstance := func(podName, podUID string) *api.CatalogService {
+		return &api.CatalogService{ServiceMeta: map[string]string{
+			constants.MetaKeyPodName: podName,
+			constants.MetaKeyPodUID:  podUID,
+			constants.MetaKeyKubeNS:  namespace,
+		}}
+	}
+
+	require.True(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("failed", "uid-failed"), namespace))
+	require.True(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("failed", ""), namespace))
+	require.False(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("failed", "uid-replaced"), namespace))
+	require.False(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("running", "uid-running"), namespace))
+	require.False(t, controller.isTerminalPodInstance(context.Background(), serviceInstance("missing", "uid-missing"), namespace))
+	require.False(t, controller.isTerminalPodInstance(context.Background(), &api.CatalogService{}, namespace))
+}
+
+func TestRequestsForTerminalPod_ServiceSelector(t *testing.T) {
+	const namespace = "default"
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "svc-slice", Namespace: namespace},
+		Subsets: []corev1.EndpointSubset{{
+			Addresses: []corev1.EndpointAddress{{
+				TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: namespace},
+			}},
+		}},
+	}
+	services := []runtime.Object{
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "svc-slice", Namespace: namespace},
+			Spec:       corev1.ServiceSpec{Selector: map[string]string{"app": "web"}},
+		},
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "svc-selector", Namespace: namespace},
+			Spec:       corev1.ServiceSpec{Selector: map[string]string{"app": "web"}},
+		},
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "svc-other", Namespace: namespace},
+			Spec:       corev1.ServiceSpec{Selector: map[string]string{"app": "other"}},
+		},
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "svc-no-selector", Namespace: namespace},
+		},
+	}
+	controller := &Controller{
+		Client: fake.NewClientBuilder().WithRuntimeObjects(append([]runtime.Object{endpoints}, services...)...).Build(),
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod1",
+			Namespace: namespace,
+			Labels:    map[string]string{"app": "web"},
+		},
+		Status: corev1.PodStatus{Phase: corev1.PodFailed},
+	}
+
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-slice"}},
+		{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-selector"}},
+	}, controller.requestsForTerminalPod(context.Background(), pod))
+}
+
 func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 	t.Parallel()
 
@@ -247,7 +321,14 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 		namespace   = "default"
 	)
 
-	for name, terminalFirst := range map[string]bool{"terminal pod first": true, "terminal pod last": false} {
+	for name, tc := range map[string]struct {
+		terminalFirst    bool
+		terminalIncluded bool
+	}{
+		"terminal pod first":                 {terminalFirst: true, terminalIncluded: true},
+		"terminal pod last":                  {terminalFirst: false, terminalIncluded: true},
+		"terminal pod absent from Endpoints": {terminalIncluded: false},
+	} {
 		t.Run(name, func(t *testing.T) {
 			terminalAddress := corev1.EndpointAddress{
 				IP:        "1.2.3.4",
@@ -257,8 +338,11 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 				IP:        "1.2.3.4",
 				TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "new", Namespace: namespace},
 			}
-			addresses := []corev1.EndpointAddress{terminalAddress, replacementAddress}
-			if !terminalFirst {
+			addresses := []corev1.EndpointAddress{replacementAddress}
+			if tc.terminalIncluded {
+				addresses = append(addresses, terminalAddress)
+			}
+			if tc.terminalIncluded && !tc.terminalFirst {
 				addresses[0], addresses[1] = addresses[1], addresses[0]
 			}
 			endpoints := &corev1.Endpoints{
