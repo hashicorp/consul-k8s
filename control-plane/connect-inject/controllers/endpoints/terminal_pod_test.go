@@ -211,8 +211,9 @@ func TestRequestsForTerminalPod(t *testing.T) {
 	})
 }
 
-// Test that a terminal pod sharing its IP with a healthy replacement doesn't cause the replacement to be
-// deregistered, regardless of the order the endpoints are listed in.
+// Test that a pod that no longer exists, whose stale slice entry shares its IP with a healthy replacement, doesn't
+// cause the replacement to be deregistered, and that its own registrations are removed, regardless of the order the
+// endpoints are listed in. Terminal pods sharing an IP are covered by TestReconcile_TerminalPodIdentityMatching.
 func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 	t.Parallel()
 	svcName := "service-ip-reuse"
@@ -240,15 +241,12 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 				AddressType: discoveryv1.AddressTypeIPv4,
 				Endpoints:   endpoints,
 			}
-			oldPod := createServicePod("old", "1.2.3.4", true, true)
-			oldPod.Status.Phase = corev1.PodFailed
-			oldPod.Status.Reason = "Evicted"
 			newPod := createServicePod("new", "1.2.3.4", true, true)
 			newPod.Status.Phase = corev1.PodRunning
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 			fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).
-				WithRuntimeObjects(slice, oldPod, newPod, &ns, &node).Build()
+				WithRuntimeObjects(slice, newPod, &ns, &node).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
@@ -269,7 +267,7 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "old",
-							constants.MetaKeyPodUID:  string(oldPod.UID),
+							constants.MetaKeyPodUID:  "uid-old",
 						},
 					},
 				}, nil)
@@ -457,7 +455,7 @@ func TestIsTerminalPodInstance(t *testing.T) {
 	require.True(t, check(instance("failed", "")), "instances without a UID match by name")
 	require.False(t, check(instance("failed", "uid-other")), "same name, different pod")
 	require.False(t, check(instance("running", "uid-running")))
-	require.False(t, check(instance("missing", "uid-missing")), "pod no longer exists")
+	require.True(t, check(instance("missing", "uid-missing")), "pod no longer exists; its registration is stale")
 	require.False(t, check(&api.CatalogService{ServiceMeta: map[string]string{}}), "instance without pod metadata")
 }
 
