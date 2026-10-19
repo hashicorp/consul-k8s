@@ -415,15 +415,37 @@ func TestReconcile_PodGetErrorIsNotOverriddenByTerminalPodAtSameIP(t *testing.T)
 }
 
 func TestIsTerminalPodInstance(t *testing.T) {
-	terminal := map[string]string{"old": "uid-old"}
-	instance := func(name, uid string) *api.CatalogService {
-		return &api.CatalogService{ServiceMeta: map[string]string{constants.MetaKeyPodName: name, constants.MetaKeyPodUID: uid}}
+	namespace := "default"
+	podWithPhase := func(name string, uid types.UID, phase corev1.PodPhase) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, UID: uid},
+			Status:     corev1.PodStatus{Phase: phase},
+		}
 	}
-	require.True(t, isTerminalPodInstance(instance("old", "uid-old"), terminal))
-	require.True(t, isTerminalPodInstance(instance("old", ""), terminal), "instances without a UID match by name")
-	require.False(t, isTerminalPodInstance(instance("old", "uid-other"), terminal), "same name, different pod")
-	require.False(t, isTerminalPodInstance(instance("new", "uid-new"), terminal))
-	require.False(t, isTerminalPodInstance(instance("old", "uid-old"), nil))
+	instance := func(name, uid string) *api.CatalogService {
+		return &api.CatalogService{ServiceMeta: map[string]string{
+			constants.MetaKeyPodName: name, constants.MetaKeyPodUID: uid, constants.MetaKeyKubeNS: namespace,
+		}}
+	}
+	controller := &Controller{
+		Client: fake.NewClientBuilder().WithObjects(
+			podWithPhase("failed", "uid-failed", corev1.PodFailed),
+			podWithPhase("succeeded", "uid-succeeded", corev1.PodSucceeded),
+			podWithPhase("running", "uid-running", corev1.PodRunning),
+		).Build(),
+		Log: logrtest.New(t),
+	}
+	check := func(svc *api.CatalogService) bool {
+		return controller.isTerminalPodInstance(context.Background(), svc, namespace)
+	}
+
+	require.True(t, check(instance("failed", "uid-failed")))
+	require.True(t, check(instance("succeeded", "uid-succeeded")))
+	require.True(t, check(instance("failed", "")), "instances without a UID match by name")
+	require.False(t, check(instance("failed", "uid-other")), "same name, different pod")
+	require.False(t, check(instance("running", "uid-running")))
+	require.False(t, check(instance("missing", "uid-missing")), "pod no longer exists")
+	require.False(t, check(&api.CatalogService{ServiceMeta: map[string]string{}}), "instance without pod metadata")
 }
 
 // seedInstances registers a service and proxy instance for a pod at the given address.
@@ -698,4 +720,119 @@ func TestReconcile_TerminalLegacyPodHealthCheckIsCritical(t *testing.T) {
 			})
 		}
 	}
+}
+
+// Test that a terminal pod is cleaned up even when Kubernetes has already dropped it from Endpoints and a
+// healthy replacement has reused its IP, so reconciliation has no slice entry to learn the old pod's identity from.
+func TestReconcile_TerminalPodAbsentFromSliceWithReplacementAtSameIP(t *testing.T) {
+	t.Parallel()
+	svcName := "service-absent-from-slice"
+	namespace := "default"
+
+	for _, graceSecs := range []int{0, 30} {
+		t.Run(fmt.Sprintf("grace period: %d", graceSecs), func(t *testing.T) {
+			// Only the replacement remains in Endpoints, at the IP the old pod used to have.
+			endpoints := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: svcName, Namespace: namespace},
+				Subsets: []corev1.EndpointSubset{{
+					Addresses: []corev1.EndpointAddress{{
+						IP:        "1.2.3.4",
+						TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "new", Namespace: namespace},
+					}},
+				}},
+			}
+			oldPod := createServicePod("old", "1.2.3.4", true, true)
+			oldPod.UID = "uid-old"
+			oldPod.Status.Phase = corev1.PodFailed
+			oldPod.Status.Reason = "Evicted"
+			newPod := createServicePod("new", "1.2.3.4", true, true)
+			newPod.UID = "uid-new"
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+			fakeClient := fake.NewClientBuilder().
+				WithObjects(endpoints, oldPod, newPod, &ns, &node).Build()
+
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
+			seedInstances(t, consulClient, svcName, namespace, "old", "uid-old", "1.2.3.4")
+
+			ep := &Controller{
+				Client:                fakeClient,
+				Log:                   logrtest.New(t),
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      namespace,
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle:       graceSecs > 0,
+					DefaultShutdownGracePeriodSeconds: graceSecs,
+				},
+			}
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: svcName}})
+			require.NoError(t, err)
+			require.Zero(t, resp.RequeueAfter)
+
+			for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+				ids := instanceIDs(t, consulClient, svc)
+				require.Contains(t, ids, "new-"+svc, "replacement must remain")
+				require.NotContains(t, ids, "old-"+svc, "terminal pod's registrations must be removed")
+			}
+		})
+	}
+}
+
+// Test that a terminal pod is mapped to its Services through Service selectors even when Endpoints no longer reference it.
+func TestRequestsForTerminalPod_ServiceSelector(t *testing.T) {
+	namespace := "default"
+	service := func(name string, selector map[string]string) *corev1.Service {
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+			Spec:       corev1.ServiceSpec{Selector: selector},
+		}
+	}
+	// svc-endpoints is already mapped through Endpoints and must not be enqueued twice.
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "svc-endpoints", Namespace: namespace},
+		Subsets: []corev1.EndpointSubset{{
+			Addresses: []corev1.EndpointAddress{{
+				IP:        "1.2.3.4",
+				TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: namespace},
+			}},
+		}},
+	}
+	controller := &Controller{
+		Client: fake.NewClientBuilder().WithObjects(
+			endpoints,
+			service("svc-endpoints", map[string]string{"app": "web"}),
+			service("svc-selector", map[string]string{"app": "web"}),
+			service("svc-other-app", map[string]string{"app": "other"}),
+			service("svc-no-selector", nil),
+		).Build(),
+		Log: logrtest.New(t),
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: namespace, Labels: map[string]string{"app": "web"}},
+		Status:     corev1.PodStatus{Phase: corev1.PodFailed},
+	}
+
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-endpoints"}},
+		{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-selector"}},
+	}, controller.requestsForTerminalPod(context.Background(), pod))
+
+	t.Run("pod not referenced by any Endpoints is still mapped by selector", func(t *testing.T) {
+		unreferenced := pod.DeepCopy()
+		unreferenced.Name = "unreferenced"
+		require.ElementsMatch(t, []reconcile.Request{
+			{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-endpoints"}},
+			{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-selector"}},
+		}, controller.requestsForTerminalPod(context.Background(), unreferenced))
+	})
+	t.Run("running pods are ignored", func(t *testing.T) {
+		running := pod.DeepCopy()
+		running.Status.Phase = corev1.PodRunning
+		require.Empty(t, controller.requestsForTerminalPod(context.Background(), running))
+	})
 }
