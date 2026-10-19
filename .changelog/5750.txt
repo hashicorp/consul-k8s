@@ -1,0 +1,7 @@
+```release-note:bug
+terminating-gateway: Fix CRD-managed terminating gateways failing to reconcile when `terminatingGateways.defaults.annotations` or `global.secretsBackend.vault.agentAnnotations` is set as a multi-line string, as documented.
+```
+
+```release-note:bug
+terminating-gateway: Fix CRD-managed terminating gateways ignoring `global.secretsBackend.vault.vaultNamespace`, which caused the Vault agent to authenticate against the root namespace.
+```
