@@ -261,6 +261,53 @@ func TestGetHelmValues(t *testing.T) {
 			errorContains: "failed to unmarshal helm values",
 		},
 		{
+			name:        "annotations rendered as YAML strings by older charts",
+			releaseName: "consul",
+			namespace:   "consul-ns",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "helm-values",
+					Namespace: "consul-ns",
+				},
+				Data: map[string]string{
+					"values.json": `{
+						"global": {"secretsBackend": {"vault": {
+							"enabled": true,
+							"vaultNamespace": "team-a",
+							"agentAnnotations": "\"vault.hashicorp.com/agent-pre-populate-only\": \"true\"\n"
+						}}},
+						"terminatingGateways": {"defaults": {"annotations": "\"foo\": \"bar\"\n"}}
+					}`,
+				},
+			},
+			validate: func(t *testing.T, hv *HelmValues) {
+				require.Equal(t, StringMap{"vault.hashicorp.com/agent-pre-populate-only": "true"}, hv.Global.SecretsBackend.Vault.AgentAnnotations)
+				require.Equal(t, StringMap{"foo": "bar"}, hv.TerminatingGateways.Defaults.Annotations)
+				require.Equal(t, "team-a", hv.Global.SecretsBackend.Vault.VaultNamespace)
+			},
+		},
+		{
+			name:        "annotations rendered as objects",
+			releaseName: "consul",
+			namespace:   "consul-ns",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "helm-values",
+					Namespace: "consul-ns",
+				},
+				Data: map[string]string{
+					"values.json": `{
+						"global": {"secretsBackend": {"vault": {"agentAnnotations": {"a": "b"}}}},
+						"terminatingGateways": {"defaults": {"annotations": {"foo": "bar"}}}
+					}`,
+				},
+			},
+			validate: func(t *testing.T, hv *HelmValues) {
+				require.Equal(t, StringMap{"a": "b"}, hv.Global.SecretsBackend.Vault.AgentAnnotations)
+				require.Equal(t, StringMap{"foo": "bar"}, hv.TerminatingGateways.Defaults.Annotations)
+			},
+		},
+		{
 			name:        "custom release name",
 			releaseName: "my-consul",
 			namespace:   "default",

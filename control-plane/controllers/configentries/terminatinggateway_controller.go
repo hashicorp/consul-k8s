@@ -1144,6 +1144,13 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		for k, v := range helmConfigValues.Global.SecretsBackend.Vault.AgentAnnotations {
 			annotations[k] = v
 		}
+		// Mirror the Helm-deployed gateway: apply global.secretsBackend.vault.vaultNamespace
+		// unless agentAnnotations already sets the namespace explicitly.
+		if ns := helmConfigValues.Global.SecretsBackend.Vault.VaultNamespace; ns != "" {
+			if _, ok := annotations["vault.hashicorp.com/namespace"]; !ok {
+				annotations["vault.hashicorp.com/namespace"] = ns
+			}
+		}
 	}
 
 	if helmConfigValues.Global.Metrics.Enabled && helmConfigValues.Global.Metrics.EnableGatewayMetrics {

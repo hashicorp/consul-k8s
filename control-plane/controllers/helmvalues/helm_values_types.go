@@ -87,7 +87,7 @@ type TerminatingGatewaysConfig struct {
 type Defaults struct {
 	Replicas                  int                    `json:"replicas"`
 	ConsulNamespace           string                 `json:"consulNamespace"`
-	Annotations               map[string]string      `json:"annotations"`
+	Annotations               StringMap              `json:"annotations"`
 	Affinity                  string                 `json:"affinity"`
 	Tolerations               string                 `json:"tolerations"`
 	TopologySpreadConstraints string                 `json:"topologySpreadConstraints"`
@@ -110,11 +110,11 @@ type SecretsBackend struct {
 }
 
 type Vault struct {
-	Enabled          bool              `json:"enabled"`
-	ConsulCARole     string            `json:"consulCARole"`
-	CA               VaultCA           `json:"ca"`
-	AgentAnnotations map[string]string `json:"agentAnnotations,omitempty"`
-	VaultNamespace   string            `json:"vaultNamespace,omitempty"`
+	Enabled          bool      `json:"enabled"`
+	ConsulCARole     string    `json:"consulCARole"`
+	CA               VaultCA   `json:"ca"`
+	AgentAnnotations StringMap `json:"agentAnnotations,omitempty"`
+	VaultNamespace   string    `json:"vaultNamespace,omitempty"`
 }
 
 type VaultCA struct {

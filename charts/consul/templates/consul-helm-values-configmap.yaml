@@ -57,7 +57,8 @@ data:
               "secretName": {{ .Values.global.secretsBackend.vault.ca.secretName | default "" | quote }},
               "secretKey": {{ .Values.global.secretsBackend.vault.ca.secretKey | default "" | quote }}
             },
-            "agentAnnotations": {{ .Values.global.secretsBackend.vault.agentAnnotations | default dict | toJson }}
+            "vaultNamespace": {{ .Values.global.secretsBackend.vault.vaultNamespace | default "" | quote }},
+            "agentAnnotations": {{ template "consul.helmValuesAnnotationsJSON" (dict "root" $ "value" .Values.global.secretsBackend.vault.agentAnnotations "name" "global.secretsBackend.vault.agentAnnotations") }}
           }
         },
 
@@ -81,7 +82,7 @@ data:
               "defaults": {
                 "replicas": {{ .Values.terminatingGateways.defaults.replicas | default 1 }},
                 "consulNamespace": {{ .Values.terminatingGateways.defaults.consulNamespace | default "default" | quote }},
-                "annotations": {{ .Values.terminatingGateways.defaults.annotations | default dict | toJson }}
+                "annotations": {{ template "consul.helmValuesAnnotationsJSON" (dict "root" $ "value" .Values.terminatingGateways.defaults.annotations "name" "terminatingGateways.defaults.annotations") }}
               },
               "gateways": [
                 {{- range $index, $gateway := .Values.terminatingGateways.gateways }}

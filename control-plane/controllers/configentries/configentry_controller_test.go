@@ -2650,6 +2650,63 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 			},
 		},
 		{
+			name:   "vault namespace annotation is set from vaultNamespace",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
+				hv.Global.SecretsBackend.Vault.AgentAnnotations = map[string]string{"vault.hashicorp.com/agent-pre-populate-only": "true"}
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "team-a", deployment.Spec.Template.Annotations["vault.hashicorp.com/namespace"])
+				require.Equal(t, "true", deployment.Spec.Template.Annotations["vault.hashicorp.com/agent-pre-populate-only"])
+			},
+		},
+		{
+			name:   "vault namespace from agentAnnotations takes precedence over vaultNamespace",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
+				hv.Global.SecretsBackend.Vault.AgentAnnotations = map[string]string{"vault.hashicorp.com/namespace": "team-b"}
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "team-b", deployment.Spec.Template.Annotations["vault.hashicorp.com/namespace"])
+			},
+		},
+		{
+			name:   "vault namespace annotation is not set when vaultNamespace is empty",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.NotContains(t, deployment.Spec.Template.Annotations, "vault.hashicorp.com/namespace")
+			},
+		},
+		{
+			name:   "vault namespace annotation is not set when vault is disabled",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.NotContains(t, deployment.Spec.Template.Annotations, "vault.hashicorp.com/namespace")
+			},
+		},
+		{
 			name:       "init container has correct configuration",
 			termGW:     baseTermGW,
 			helmValues: baseHelmValues,
