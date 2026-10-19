@@ -397,15 +397,15 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 						Name:      svcName,
 						Namespace: obj.GetNamespace(),
 					},
-				}				}
+				}}
 			},
-			)).
-			// Container readiness inside a credential-injection gateway pod can
-			// change without changing the pod's EndpointSlice readiness.
-			Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForCredentialGatewayPod)).
-			// Pods evicted by the kubelet move to the Failed phase without necessarily changing their EndpointSlice.
-			Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForTerminalPod)).
-			Complete(r)
+		)).
+		// Container readiness inside a credential-injection gateway pod can
+		// change without changing the pod's EndpointSlice readiness.
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForCredentialGatewayPod)).
+		// Pods evicted by the kubelet move to the Failed phase without necessarily changing their EndpointSlice.
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForTerminalPod)).
+		Complete(r)
 }
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
@@ -2442,9 +2442,9 @@ func isPodTerminal(pod corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded
 }
 
-// isTerminalPodInstance returns true if the service instance was registered for a pod that is in a terminal phase.
-// The pod is looked up from the instance's metadata rather than from the EndpointSlices, which may no longer
-// reference it. Instances registered without a pod UID are matched by pod name only. A failed lookup returns an
+// isTerminalPodInstance returns true if the service instance was registered for a pod that is in a terminal phase
+// or no longer exists, i.e. the registration is stale. The pod is looked up from the instance's metadata rather than
+// from the EndpointSlices, which may no longer reference it. Instances registered without a pod UID are matched by pod name only. A failed lookup returns an
 // error and false so the instance is kept and the reconcile is retried.
 func (r *Controller) isTerminalPodInstance(ctx context.Context, svc *api.CatalogService, k8sNamespace string) (bool, error) {
 	podName := svc.ServiceMeta[constants.MetaKeyPodName]
@@ -2458,7 +2458,8 @@ func (r *Controller) isTerminalPodInstance(ctx context.Context, svc *api.Catalog
 	var pod corev1.Pod
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: podName, Namespace: k8sNamespace}, &pod); err != nil {
 		if k8serrors.IsNotFound(err) {
-			return false, nil
+			// A registration outlived its pod; do not preserve it just because a replacement reuses its address.
+			return true, nil
 		}
 		r.Log.Error(err, "failed to get pod for service instance", "name", podName, "ns", k8sNamespace)
 		return false, fmt.Errorf("failed to get pod %s/%s for service instance %s: %w", k8sNamespace, podName, svc.ServiceID, err)
