@@ -447,7 +447,9 @@ func TestIsTerminalPodInstance(t *testing.T) {
 		Log: logrtest.New(t),
 	}
 	check := func(svc *api.CatalogService) bool {
-		return controller.isTerminalPodInstance(context.Background(), svc, namespace)
+		terminal, err := controller.isTerminalPodInstance(context.Background(), svc, namespace)
+		require.NoError(t, err)
+		return terminal
 	}
 
 	require.True(t, check(instance("failed", "uid-failed")))
@@ -862,4 +864,81 @@ func TestRequestsForTerminalPod_ServiceSelector(t *testing.T) {
 		running.Status.Phase = corev1.PodRunning
 		require.Empty(t, controller.requestsForTerminalPod(context.Background(), running))
 	})
+}
+
+// Test that a failed pod lookup during metadata-based cleanup keeps the registrations and returns an error, so the
+// reconcile is retried instead of leaving the stale instances behind with no further trigger.
+func TestReconcile_TerminalPodLookupErrorIsReturnedForRetry(t *testing.T) {
+	t.Parallel()
+	svcName := "service-lookup-error"
+	namespace := "default"
+
+	// Only the replacement is in the slice; the old pod is found solely through the instance metadata.
+	slice := &discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespace,
+			Labels:    map[string]string{discoveryv1.LabelServiceName: svcName},
+		},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+			Addresses:  []string{"1.2.3.4"},
+			TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "new", Namespace: namespace},
+		}},
+	}
+	oldPod := createServicePod("old", "1.2.3.4", true, true)
+	oldPod.UID = "uid-old"
+	oldPod.Status.Phase = corev1.PodFailed
+	newPod := createServicePod("new", "1.2.3.4", true, true)
+	newPod.UID = "uid-new"
+	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+
+	failOldPodLookup := true
+	fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).
+		WithRuntimeObjects(slice, oldPod, newPod, &ns, &node).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if failOldPodLookup && key.Name == "old" {
+					return errors.New("API blip")
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		}).Build()
+
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	consulClient := testClient.APIClient
+	seedInstances(t, consulClient, svcName, namespace, "old", "uid-old", "1.2.3.4")
+
+	ep := &Controller{
+		Client:                fakeClient,
+		Log:                   logrtest.New(t),
+		ConsulClientConfig:    testClient.Cfg,
+		ConsulServerConnMgr:   testClient.Watcher,
+		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+		DenyK8sNamespacesSet:  mapset.NewSetWith(),
+		ReleaseName:           "consul",
+		ReleaseNamespace:      namespace,
+	}
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: svcName}}
+
+	_, err := ep.Reconcile(context.Background(), req)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "API blip")
+	for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+		ids := instanceIDs(t, consulClient, svc)
+		require.Contains(t, ids, "old-"+svc, "registrations are preserved while the lookup fails")
+		require.Contains(t, ids, "new-"+svc)
+	}
+
+	// The retry succeeds once the lookup recovers.
+	failOldPodLookup = false
+	_, err = ep.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+		ids := instanceIDs(t, consulClient, svc)
+		require.NotContains(t, ids, "old-"+svc)
+		require.Contains(t, ids, "new-"+svc)
+	}
 }
