@@ -80,15 +80,24 @@ func (c *Command) addRoleAndBindingRule(client *consul.DynamicClient, componentN
 	abr := &api.ACLBindingRule{
 		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
 		AuthMethod:  authMethodName,
-		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
-		BindType:    api.BindingRuleBindTypeRole,
-		BindName:    aclRoleName,
+		Selector: fmt.Sprintf(
+			"serviceaccount.name==%q and serviceaccount.namespace==%q",
+			serviceAccountName,
+			c.flagK8sNamespace,
+		),
+		BindType: api.BindingRuleBindTypeRole,
+		BindName: aclRoleName,
 	}
 	writeOptions := &api.WriteOptions{}
+	queryOptions := &api.QueryOptions{}
 	if global && dc != primaryDC {
 		writeOptions.Datacenter = primaryDC
+		// Binding rules are not replicated to secondary datacenters, so existing rules
+		// must be listed from the datacenter they are written to. Otherwise a stale
+		// rule on the primary is never found and updated.
+		queryOptions.Datacenter = primaryDC
 	}
-	return c.createOrUpdateBindingRule(client, authMethodName, abr, &api.QueryOptions{}, writeOptions)
+	return c.createOrUpdateBindingRule(client, authMethodName, abr, queryOptions, writeOptions)
 }
 
 // updateOrCreateACLRole will query to see if existing role is in place and update them
@@ -166,12 +175,17 @@ func (c *Command) createOrUpdateBindingRule(client *consul.DynamicClient, authMe
 	// command is rerun, which is a bit of extra overhead, but is
 	// necessary to pick up any potential config changes.
 	if len(existingRules) > 0 {
-		// Find the policy that matches our name and description
-		// and that's the ID we need
+		// Find the rules that match our name and description. There can be more than
+		// one if earlier runs created duplicates; all of them are updated so that no
+		// stale rule (e.g. with an outdated selector) is left behind.
+		var matchingIDs []string
 		for _, existingRule := range existingRules {
 			if existingRule.BindName == abr.BindName && existingRule.Description == abr.Description {
-				abr.ID = existingRule.ID
+				matchingIDs = append(matchingIDs, existingRule.ID)
 			}
+		}
+		if len(matchingIDs) > 0 {
+			abr.ID = matchingIDs[len(matchingIDs)-1]
 		}
 
 		// This will only happen if there are existing policies
@@ -197,8 +211,14 @@ func (c *Command) createOrUpdateBindingRule(client *consul.DynamicClient, authMe
 					if err != nil {
 						c.log.Error("could not refresh client", err)
 					}
-					_, _, err := client.ConsulClient.ACL().BindingRuleUpdate(abr, writeOptions)
-					return err
+					for _, id := range matchingIDs {
+						rule := *abr
+						rule.ID = id
+						if _, _, err := client.ConsulClient.ACL().BindingRuleUpdate(&rule, writeOptions); err != nil {
+							return err
+						}
+					}
+					return nil
 				})
 		}
 	} else {
