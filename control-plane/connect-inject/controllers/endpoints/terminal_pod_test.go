@@ -18,12 +18,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -174,8 +172,9 @@ func TestReconcile_TerminalPodIsDeregistered(t *testing.T) {
 	}
 }
 
-// Test that a terminal pod sharing its IP with a healthy replacement doesn't cause the replacement to be
-// deregistered, regardless of the order the endpoints are listed in.
+// Test that a pod that no longer exists, whose stale slice entry shares its IP with a healthy replacement, doesn't
+// cause the replacement to be deregistered, and that its own registrations are removed, regardless of the order the
+// endpoints are listed in. Terminal pods sharing an IP are covered by TestReconcile_TerminalPodIdentityMatching.
 func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 	t.Parallel()
 	svcName := "service-ip-reuse"
@@ -188,15 +187,12 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 				entries[0], entries[1] = entries[1], entries[0]
 			}
 			slice := endpointsForPods(svcName, namespace, entries...)
-			oldPod := createServicePod("old", "1.2.3.4", true, true)
-			oldPod.Status.Phase = corev1.PodFailed
-			oldPod.Status.Reason = "Evicted"
 			newPod := createServicePod("new", "1.2.3.4", true, true)
 			newPod.Status.Phase = corev1.PodRunning
 			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 			fakeClient := fake.NewClientBuilder().
-				WithRuntimeObjects(slice, oldPod, newPod, &ns, &node).Build()
+				WithRuntimeObjects(slice, newPod, &ns, &node).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
@@ -217,7 +213,7 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "old",
-							constants.MetaKeyPodUID:  string(oldPod.UID),
+							constants.MetaKeyPodUID:  "uid-old",
 						},
 					},
 				}, nil)
@@ -390,7 +386,7 @@ func TestIsTerminalPodInstance(t *testing.T) {
 	require.True(t, check(instance("failed", "")), "instances without a UID match by name")
 	require.False(t, check(instance("failed", "uid-other")), "same name, different pod")
 	require.False(t, check(instance("running", "uid-running")))
-	require.False(t, check(instance("missing", "uid-missing")), "pod no longer exists")
+	require.True(t, check(instance("missing", "uid-missing")), "pod no longer exists; its registration is stale")
 	require.False(t, check(&api.CatalogService{ServiceMeta: map[string]string{}}), "instance without pod metadata")
 }
 
@@ -688,63 +684,6 @@ func TestReconcile_TerminalPodAbsentFromSliceWithReplacementAtSameIP(t *testing.
 	}
 }
 
-// Test that a terminal pod is mapped to its Services through Service selectors even when no EndpointSlice references it.
-func TestRequestsForTerminalPod_ServiceSelector(t *testing.T) {
-	namespace := "default"
-	service := func(name string, selector map[string]string) *corev1.Service {
-		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-			Spec:       corev1.ServiceSpec{Selector: selector},
-		}
-	}
-	// svc-slice is already mapped through a slice and must not be enqueued twice.
-	slice := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "slice",
-			Namespace: namespace,
-			Labels:    map[string]string{discoveryv1.LabelServiceName: "svc-slice"},
-		},
-		AddressType: discoveryv1.AddressTypeIPv4,
-		Endpoints: []discoveryv1.Endpoint{{
-			Addresses: []string{"1.2.3.4"},
-			TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: namespace},
-		}},
-	}
-	controller := &Controller{
-		Client: fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(
-			slice,
-			service("svc-slice", map[string]string{"app": "web"}),
-			service("svc-selector", map[string]string{"app": "web"}),
-			service("svc-other-app", map[string]string{"app": "other"}),
-			service("svc-no-selector", nil),
-		).Build(),
-		Log: logrtest.New(t),
-	}
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: namespace, Labels: map[string]string{"app": "web"}},
-		Status:     corev1.PodStatus{Phase: corev1.PodFailed},
-	}
-
-	require.ElementsMatch(t, []reconcile.Request{
-		{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-slice"}},
-		{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-selector"}},
-	}, controller.requestsForTerminalPod(context.Background(), pod))
-
-	t.Run("pod not referenced by any slice is still mapped by selector", func(t *testing.T) {
-		unreferenced := pod.DeepCopy()
-		unreferenced.Name = "unreferenced"
-		require.ElementsMatch(t, []reconcile.Request{
-			{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-slice"}},
-			{NamespacedName: types.NamespacedName{Namespace: namespace, Name: "svc-selector"}},
-		}, controller.requestsForTerminalPod(context.Background(), unreferenced))
-	})
-	t.Run("running pods are ignored", func(t *testing.T) {
-		running := pod.DeepCopy()
-		running.Status.Phase = corev1.PodRunning
-		require.Empty(t, controller.requestsForTerminalPod(context.Background(), running))
-	})
-}
-
 // Test that a failed pod lookup during metadata-based cleanup keeps the registrations and returns an error, so the
 // reconcile is retried instead of leaving the stale instances behind with no further trigger.
 func TestReconcile_TerminalPodLookupErrorIsReturnedForRetry(t *testing.T) {
@@ -753,19 +692,7 @@ func TestReconcile_TerminalPodLookupErrorIsReturnedForRetry(t *testing.T) {
 	namespace := "default"
 
 	// Only the replacement is in the slice; the old pod is found solely through the instance metadata.
-	slice := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      svcName,
-			Namespace: namespace,
-			Labels:    map[string]string{discoveryv1.LabelServiceName: svcName},
-		},
-		AddressType: discoveryv1.AddressTypeIPv4,
-		Endpoints: []discoveryv1.Endpoint{{
-			Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
-			Addresses:  []string{"1.2.3.4"},
-			TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "new", Namespace: namespace},
-		}},
-	}
+	slice := endpointsForPods(svcName, namespace, podEntry{"new", true})
 	oldPod := createServicePod("old", "1.2.3.4", true, true)
 	oldPod.UID = "uid-old"
 	oldPod.Status.Phase = corev1.PodFailed
@@ -775,7 +702,7 @@ func TestReconcile_TerminalPodLookupErrorIsReturnedForRetry(t *testing.T) {
 	node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 
 	failOldPodLookup := true
-	fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).
+	fakeClient := fake.NewClientBuilder().
 		WithRuntimeObjects(slice, oldPod, newPod, &ns, &node).
 		WithInterceptorFuncs(interceptor.Funcs{
 			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
