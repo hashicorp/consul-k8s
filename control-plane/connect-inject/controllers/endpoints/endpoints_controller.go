@@ -1089,7 +1089,17 @@ func (r *Controller) deregisterService(
 		// every service instance.
 		var serviceDeregistered bool
 
-		if deregister(svc.ServiceAddress, deregisterEndpointAddress) || r.isTerminalPodInstance(ctx, svc, k8sSvcNamespace) {
+		shouldDeregister := deregister(svc.ServiceAddress, deregisterEndpointAddress)
+		if !shouldDeregister {
+			terminal, err := r.isTerminalPodInstance(ctx, svc, k8sSvcNamespace)
+			if err != nil {
+				// Keep the registration and surface the error so the reconcile is retried.
+				errs = multierror.Append(errs, err)
+			}
+			shouldDeregister = terminal
+		}
+
+		if shouldDeregister {
 			// If graceful shutdown is enabled, continue to the next service instance and
 			// mark that an event requeue is needed. We should requeue at the longest time interval
 			// to prevent excessive re-queues. Also, updating the health status in Consul to Critical
@@ -1773,11 +1783,12 @@ func isPodTerminal(pod corev1.Pod) bool {
 
 // isTerminalPodInstance returns true if the service instance was registered for a pod that is in a terminal phase.
 // The pod is looked up from the instance's metadata rather than from the EndpointSlices, which may no longer
-// reference it. Instances registered without a pod UID are matched by pod name only.
-func (r *Controller) isTerminalPodInstance(ctx context.Context, svc *api.CatalogService, k8sNamespace string) bool {
+// reference it. Instances registered without a pod UID are matched by pod name only. A failed lookup returns an
+// error and false so the instance is kept and the reconcile is retried.
+func (r *Controller) isTerminalPodInstance(ctx context.Context, svc *api.CatalogService, k8sNamespace string) (bool, error) {
 	podName := svc.ServiceMeta[constants.MetaKeyPodName]
 	if podName == "" {
-		return false
+		return false, nil
 	}
 	if ns := svc.ServiceMeta[constants.MetaKeyKubeNS]; ns != "" {
 		k8sNamespace = ns
@@ -1785,17 +1796,17 @@ func (r *Controller) isTerminalPodInstance(ctx context.Context, svc *api.Catalog
 
 	var pod corev1.Pod
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: podName, Namespace: k8sNamespace}, &pod); err != nil {
-		if !k8serrors.IsNotFound(err) {
-			// Don't deregister on a transient error; the next reconcile will retry.
-			r.Log.Error(err, "failed to get pod for service instance", "name", podName, "ns", k8sNamespace)
+		if k8serrors.IsNotFound(err) {
+			return false, nil
 		}
-		return false
+		r.Log.Error(err, "failed to get pod for service instance", "name", podName, "ns", k8sNamespace)
+		return false, fmt.Errorf("failed to get pod %s/%s for service instance %s: %w", k8sNamespace, podName, svc.ServiceID, err)
 	}
 	if !isPodTerminal(pod) {
-		return false
+		return false, nil
 	}
 	instanceUID := svc.ServiceMeta[constants.MetaKeyPodUID]
-	return instanceUID == "" || instanceUID == string(pod.UID)
+	return instanceUID == "" || instanceUID == string(pod.UID), nil
 }
 
 // markForDeregistration flags an address for deregistration unless another endpoint sharing the same IP (e.g. a
