@@ -12,6 +12,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -252,6 +253,29 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
 
+			// The terminal pod's instances were registered while it was still running, at the IP the replacement now has.
+			for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+				_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
+					Node:     consulNodeName,
+					Address:  consulNodeAddress,
+					NodeMeta: map[string]string{metaKeySyntheticNode: "true"},
+					Service: &api.AgentService{
+						ID:      "old-" + svc,
+						Service: svc,
+						Address: "1.2.3.4",
+						Meta: map[string]string{
+							constants.MetaKeyKubeNS:  namespace,
+							metaKeyKubeServiceName:   svcName,
+							metaKeyManagedBy:         constants.ManagedByValue,
+							metaKeySyntheticNode:     "true",
+							constants.MetaKeyPodName: "old",
+							constants.MetaKeyPodUID:  string(oldPod.UID),
+						},
+					},
+				}, nil)
+				require.NoError(t, err)
+			}
+
 			ep := &Controller{
 				Client:                fakeClient,
 				Log:                   logrtest.New(t),
@@ -275,6 +299,8 @@ func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
 					ids = append(ids, instance.ServiceID)
 				}
 				require.Contains(t, ids, "new-"+svc)
+				// The terminal pod's instance is removed by pod identity even though its address is kept for the replacement.
+				require.NotContains(t, ids, "old-"+svc)
 			}
 		})
 	}
@@ -396,5 +422,300 @@ func TestReconcile_PodGetErrorIsNotOverriddenByTerminalPodAtSameIP(t *testing.T)
 			require.Len(t, instances, 1)
 			require.Equal(t, "flaky-"+svcName, instances[0].ServiceID)
 		})
+	}
+}
+
+func TestIsTerminalPodInstance(t *testing.T) {
+	terminal := map[string]string{"old": "uid-old"}
+	instance := func(name, uid string) *api.CatalogService {
+		return &api.CatalogService{ServiceMeta: map[string]string{constants.MetaKeyPodName: name, constants.MetaKeyPodUID: uid}}
+	}
+	require.True(t, isTerminalPodInstance(instance("old", "uid-old"), terminal))
+	require.True(t, isTerminalPodInstance(instance("old", ""), terminal), "instances without a UID match by name")
+	require.False(t, isTerminalPodInstance(instance("old", "uid-other"), terminal), "same name, different pod")
+	require.False(t, isTerminalPodInstance(instance("new", "uid-new"), terminal))
+	require.False(t, isTerminalPodInstance(instance("old", "uid-old"), nil))
+}
+
+// seedInstances registers a service and proxy instance for a pod at the given address.
+func seedInstances(t *testing.T, consulClient *api.Client, svcName, namespace, podName, podUID, address string) {
+	t.Helper()
+	for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+		_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
+			Node:     consulNodeName,
+			Address:  consulNodeAddress,
+			NodeMeta: map[string]string{metaKeySyntheticNode: "true"},
+			Service: &api.AgentService{
+				ID:      podName + "-" + svc,
+				Service: svc,
+				Address: address,
+				Meta: map[string]string{
+					constants.MetaKeyKubeNS:  namespace,
+					metaKeyKubeServiceName:   svcName,
+					metaKeyManagedBy:         constants.ManagedByValue,
+					metaKeySyntheticNode:     "true",
+					constants.MetaKeyPodName: podName,
+					constants.MetaKeyPodUID:  podUID,
+				},
+			},
+		}, nil)
+		require.NoError(t, err)
+	}
+}
+
+func instanceIDs(t *testing.T, consulClient *api.Client, svc string) []string {
+	t.Helper()
+	instances, _, err := consulClient.Catalog().Service(svc, "", nil)
+	require.NoError(t, err)
+	var ids []string
+	for _, instance := range instances {
+		ids = append(ids, instance.ServiceID)
+	}
+	return ids
+}
+
+// Test how instances of a terminal pod that shares its IP with a healthy replacement are matched by pod identity.
+func TestReconcile_TerminalPodIdentityMatching(t *testing.T) {
+	t.Parallel()
+	svcName := "service-identity"
+	namespace := "default"
+
+	cases := map[string]struct {
+		instanceUID   string
+		expectOldGone bool
+	}{
+		"instance UID matches the terminal pod":                    {instanceUID: "uid-old", expectOldGone: true},
+		"instance registered without a UID is matched by pod name": {instanceUID: "", expectOldGone: true},
+		"instance with a different UID is not the terminal pod's":  {instanceUID: "uid-reborn", expectOldGone: false},
+	}
+
+	for name, tt := range cases {
+		for _, terminalFirst := range []bool{true, false} {
+			for _, graceSecs := range []int{0, 30} {
+				testName := fmt.Sprintf("%s (terminal first: %t, grace period: %d)", name, terminalFirst, graceSecs)
+				t.Run(testName, func(t *testing.T) {
+					endpointFor := func(pod string, ready bool) discoveryv1.Endpoint {
+						return discoveryv1.Endpoint{
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(ready)},
+							Addresses:  []string{"1.2.3.4"},
+							TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: pod, Namespace: namespace},
+						}
+					}
+					endpoints := []discoveryv1.Endpoint{endpointFor("old", false), endpointFor("new", true)}
+					if !terminalFirst {
+						endpoints[0], endpoints[1] = endpoints[1], endpoints[0]
+					}
+					slice := &discoveryv1.EndpointSlice{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      svcName,
+							Namespace: namespace,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: svcName},
+						},
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints:   endpoints,
+					}
+					oldPod := createServicePod("old", "1.2.3.4", true, true)
+					oldPod.UID = "uid-old"
+					oldPod.Status.Phase = corev1.PodFailed
+					oldPod.Status.Reason = "Evicted"
+					newPod := createServicePod("new", "1.2.3.4", true, true)
+					newPod.UID = "uid-new"
+					newPod.Status.Phase = corev1.PodRunning
+					ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+					node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+					fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).
+						WithRuntimeObjects(slice, oldPod, newPod, &ns, &node).Build()
+
+					testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+					consulClient := testClient.APIClient
+					seedInstances(t, consulClient, svcName, namespace, "old", tt.instanceUID, "1.2.3.4")
+
+					ep := &Controller{
+						Client:                fakeClient,
+						Log:                   logrtest.New(t),
+						ConsulClientConfig:    testClient.Cfg,
+						ConsulServerConnMgr:   testClient.Watcher,
+						AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+						DenyK8sNamespacesSet:  mapset.NewSetWith(),
+						ReleaseName:           "consul",
+						ReleaseNamespace:      namespace,
+						LifecycleConfig: lifecycle.Config{
+							DefaultEnableProxyLifecycle:       graceSecs > 0,
+							DefaultShutdownGracePeriodSeconds: graceSecs,
+						},
+					}
+					resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: svcName}})
+					require.NoError(t, err)
+					require.Zero(t, resp.RequeueAfter, "no graceful shutdown wait for a terminal pod or its replacement")
+
+					for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+						ids := instanceIDs(t, consulClient, svc)
+						require.Contains(t, ids, "new-"+svc, "replacement must always remain")
+						if tt.expectOldGone {
+							require.NotContains(t, ids, "old-"+svc)
+						} else {
+							require.Contains(t, ids, "old-"+svc)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+// A stale entry for a pod that no longer exists must not cause a live pod that reuses its IP to be deregistered.
+func TestReconcile_DeletedPodEntrySharingIPWithLivePod(t *testing.T) {
+	t.Parallel()
+	svcName := "service-deleted-ip"
+	namespace := "default"
+
+	for name, deletedFirst := range map[string]bool{"deleted pod first": true, "deleted pod last": false} {
+		t.Run(name, func(t *testing.T) {
+			endpointFor := func(pod string) discoveryv1.Endpoint {
+				return discoveryv1.Endpoint{
+					Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+					Addresses:  []string{"1.2.3.4"},
+					TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: pod, Namespace: namespace},
+				}
+			}
+			endpoints := []discoveryv1.Endpoint{endpointFor("gone"), endpointFor("live")}
+			if !deletedFirst {
+				endpoints[0], endpoints[1] = endpoints[1], endpoints[0]
+			}
+			slice := &discoveryv1.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      svcName,
+					Namespace: namespace,
+					Labels:    map[string]string{discoveryv1.LabelServiceName: svcName},
+				},
+				AddressType: discoveryv1.AddressTypeIPv4,
+				Endpoints:   endpoints,
+			}
+			livePod := createServicePod("live", "1.2.3.4", true, true)
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+			fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).
+				WithRuntimeObjects(slice, livePod, &ns, &node).Build()
+
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
+
+			ep := &Controller{
+				Client:                fakeClient,
+				Log:                   logrtest.New(t),
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      namespace,
+			}
+			_, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: svcName}})
+			require.NoError(t, err)
+
+			for _, svc := range []string{svcName, svcName + "-sidecar-proxy"} {
+				require.Contains(t, instanceIDs(t, consulClient, svc), "live-"+svc)
+			}
+		})
+	}
+}
+
+// Test that a terminal pod without consul-dataplane, registered on a node-local Consul client, is not deregistered
+// (the catalog cleanup can't reach it) but has its health check marked critical, even if its endpoint is still ready.
+func TestReconcile_TerminalLegacyPodHealthCheckIsCritical(t *testing.T) {
+	t.Parallel()
+	svcName := "service-legacy-terminal"
+	namespace := "default"
+
+	for _, phase := range []corev1.PodPhase{corev1.PodFailed, corev1.PodSucceeded} {
+		for _, endpointReady := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s pod, endpoint ready: %t", phase, endpointReady), func(t *testing.T) {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Status.HostIP = "127.0.0.1"
+				pod1.Status.Phase = phase
+				pod1.Annotations[constants.LegacyAnnotationConsulK8sVersion] = "0.99.0" // Less than 1.0.0, so no consul-dataplane.
+				endpoint := &discoveryv1.EndpointSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      svcName,
+						Namespace: namespace,
+						Labels:    map[string]string{discoveryv1.LabelServiceName: svcName},
+					},
+					AddressType: discoveryv1.AddressTypeIPv4,
+					Endpoints: []discoveryv1.Endpoint{{
+						Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(endpointReady)},
+						Addresses:  []string{"1.2.3.4"},
+						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: namespace},
+					}},
+				}
+				ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+				fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(pod1, endpoint, &ns).Build()
+
+				testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+
+				var consulClientHttpPort int
+				consulClientAgent, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+					c.Server = false
+					c.Bootstrap = false
+					consulClientHttpPort = c.Ports.HTTP
+				})
+				require.NoError(t, err)
+				consulClientAgent.JoinLAN(t, testClient.TestServer.LANAddr)
+				consulClientAgent.WaitForSerfCheck(t)
+
+				consulClient, err := api.NewClient(&api.Config{Address: consulClientAgent.HTTPAddr})
+				require.NoError(t, err)
+
+				serviceID := "pod1-" + svcName
+				require.NoError(t, consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
+					ID:      serviceID,
+					Name:    svcName,
+					Port:    80,
+					Address: "1.2.3.4",
+					Check: &api.AgentServiceCheck{
+						CheckID: "default/" + serviceID + "/kubernetes-health-check",
+						TTL:     "100000h",
+						Name:    "Kubernetes Health Check",
+						Status:  api.HealthPassing,
+					},
+				}))
+				require.NoError(t, consulClient.Agent().ServiceRegister(&api.AgentServiceRegistration{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      serviceID + "-sidecar-proxy",
+					Name:    svcName + "-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: svcName,
+						DestinationServiceID:   serviceID,
+					},
+				}))
+
+				ep := &Controller{
+					Client:                fakeClient,
+					Log:                   logrtest.New(t),
+					ConsulClientConfig:    testClient.Cfg,
+					ConsulServerConnMgr:   testClient.Watcher,
+					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:  mapset.NewSetWith(),
+					ReleaseName:           "consul",
+					ReleaseNamespace:      namespace,
+					consulClientHttpPort:  consulClientHttpPort,
+				}
+				_, err = ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: svcName}})
+				require.NoError(t, err)
+
+				checks, err := consulClient.Agent().ChecksWithFilter(fmt.Sprintf("ServiceID == %q", serviceID))
+				require.NoError(t, err)
+				require.Len(t, checks, 1)
+				for _, check := range checks {
+					require.Equal(t, api.HealthCritical, check.Status)
+				}
+
+				// The registration on the node-local client is not removed.
+				services, err := consulClient.Agent().Services()
+				require.NoError(t, err)
+				require.Contains(t, services, serviceID)
+			})
+		}
 	}
 }
