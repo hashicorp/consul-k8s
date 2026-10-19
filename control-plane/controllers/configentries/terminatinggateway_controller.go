@@ -1693,9 +1693,13 @@ func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
 	bindingRule := &capi.ACLBindingRule{
 		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
 		AuthMethod:  authMethodName,
-		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
-		BindType:    capi.BindingRuleBindTypeRole,
-		BindName:    roleName,
+		Selector: fmt.Sprintf(
+			"serviceaccount.name==%q and serviceaccount.namespace==%q",
+			serviceAccountName,
+			r.ReleaseNamespace,
+		),
+		BindType: capi.BindingRuleBindTypeRole,
+		BindName: roleName,
 	}
 
 	existingRules, _, err := consulClient.ACL().BindingRuleList(authMethodName, &capi.QueryOptions{})
