@@ -238,3 +238,98 @@ func TestMarkForDeregistrationWithSharedIP(t *testing.T) {
 		require.False(t, addresses["1.2.3.4"])
 	})
 }
+
+func TestReconcile_TerminalPodSharingIPWithReplacement(t *testing.T) {
+	t.Parallel()
+
+	const (
+		serviceName = "service-ip-reuse"
+		namespace   = "default"
+	)
+
+	for name, terminalFirst := range map[string]bool{"terminal pod first": true, "terminal pod last": false} {
+		t.Run(name, func(t *testing.T) {
+			terminalAddress := corev1.EndpointAddress{
+				IP:        "1.2.3.4",
+				TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "old", Namespace: namespace},
+			}
+			replacementAddress := corev1.EndpointAddress{
+				IP:        "1.2.3.4",
+				TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "new", Namespace: namespace},
+			}
+			addresses := []corev1.EndpointAddress{terminalAddress, replacementAddress}
+			if !terminalFirst {
+				addresses[0], addresses[1] = addresses[1], addresses[0]
+			}
+			endpoints := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Subsets: []corev1.EndpointSubset{{
+					Addresses: addresses,
+				}},
+			}
+			oldPod := createServicePod("old", "1.2.3.4", true, true)
+			oldPod.UID = "old-uid"
+			oldPod.Status.Phase = corev1.PodFailed
+			newPod := createServicePod("new", "1.2.3.4", true, true)
+			newPod.UID = "new-uid"
+
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(
+				endpoints,
+				oldPod,
+				newPod,
+				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
+				&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}},
+			).Build()
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
+
+			for _, svc := range []string{serviceName, serviceName + "-sidecar-proxy"} {
+				_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
+					Node:     consulNodeName,
+					Address:  consulNodeAddress,
+					NodeMeta: map[string]string{metaKeySyntheticNode: "true"},
+					Service: &api.AgentService{
+						ID:      "old-" + svc,
+						Service: svc,
+						Address: "1.2.3.4",
+						Meta: map[string]string{
+							constants.MetaKeyKubeNS:  namespace,
+							metaKeyKubeServiceName:   serviceName,
+							metaKeyManagedBy:         constants.ManagedByValue,
+							metaKeySyntheticNode:     "true",
+							constants.MetaKeyPodName: "old",
+							constants.MetaKeyPodUID:  string(oldPod.UID),
+						},
+					},
+				}, nil)
+				require.NoError(t, err)
+			}
+
+			controller := &Controller{
+				Client:                fakeClient,
+				Log:                   logrtest.New(t),
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      namespace,
+			}
+			_, err := controller.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: types.NamespacedName{Namespace: namespace, Name: serviceName},
+			})
+			require.NoError(t, err)
+
+			for _, svc := range []string{serviceName, serviceName + "-sidecar-proxy"} {
+				instances, _, err := consulClient.Catalog().Service(svc, "", nil)
+				require.NoError(t, err)
+				var ids []string
+				for _, instance := range instances {
+					ids = append(ids, instance.ServiceID)
+				}
+				require.Contains(t, ids, "new-"+svc)
+				require.NotContains(t, ids, "old-"+svc)
+			}
+		})
+	}
+}
