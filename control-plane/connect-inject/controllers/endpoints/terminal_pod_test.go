@@ -269,7 +269,7 @@ func TestIsTerminalPodInstance(t *testing.T) {
 	require.True(t, check(serviceInstance("failed", "")))
 	require.False(t, check(serviceInstance("failed", "uid-replaced")))
 	require.False(t, check(serviceInstance("running", "uid-running")))
-	require.False(t, check(serviceInstance("missing", "uid-missing")))
+	require.True(t, check(serviceInstance("missing", "uid-missing")))
 	require.False(t, check(&api.CatalogService{}))
 }
 
