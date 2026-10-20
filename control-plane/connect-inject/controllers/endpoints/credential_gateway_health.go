@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -99,6 +100,44 @@ func (r *Controller) requestsForCredentialGatewayPod(ctx context.Context, obj cl
 	if !ok || !isCredentialInjectionGateway(*pod) {
 		return nil
 	}
+	return r.requestsForPodServices(ctx, pod)
+}
+
+// requestsForTerminalPod maps a pod in a terminal phase (e.g. evicted by the kubelet) to the Services it belongs
+// to, so its Consul service instances are deregistered even if the EndpointSlice itself does not change. Services are
+// found both through EndpointSlices that still reference the pod and through Service selectors, since Kubernetes may
+// already have dropped the pod from its EndpointSlice by the time the pod is observed as terminal.
+func (r *Controller) requestsForTerminalPod(ctx context.Context, obj client.Object) []reconcile.Request {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok || !isPodTerminal(*pod) {
+		return nil
+	}
+	requests := r.requestsForPodServices(ctx, pod)
+	seen := make(map[string]bool, len(requests))
+	for _, req := range requests {
+		seen[req.Name] = true
+	}
+
+	var services corev1.ServiceList
+	if err := r.Client.List(ctx, &services, client.InNamespace(pod.Namespace)); err != nil {
+		r.Log.Error(err, "failed to list Services for terminal pod", "name", pod.Name, "ns", pod.Namespace)
+		return requests
+	}
+	for _, svc := range services.Items {
+		if len(svc.Spec.Selector) == 0 || seen[svc.Name] {
+			continue
+		}
+		if labels.SelectorFromSet(svc.Spec.Selector).Matches(labels.Set(pod.Labels)) {
+			seen[svc.Name] = true
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: svc.Name},
+			})
+		}
+	}
+	return requests
+}
+
+func (r *Controller) requestsForPodServices(ctx context.Context, pod *corev1.Pod) []reconcile.Request {
 	var slices discoveryv1.EndpointSliceList
 	if err := r.Client.List(ctx, &slices, client.InNamespace(pod.Namespace)); err != nil {
 		r.Log.Error(err, "failed to list EndpointSlices for credential-injection gateway pod", "name", pod.Name, "ns", pod.Namespace)
