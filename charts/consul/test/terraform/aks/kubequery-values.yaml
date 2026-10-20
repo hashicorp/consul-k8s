@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 cloudProvider: AKS
 # Default values file for Uptycs Kubequery.
 # This is a YAML-formatted file.
