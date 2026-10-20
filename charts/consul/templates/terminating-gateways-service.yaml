@@ -22,6 +22,7 @@ spec:
     app: {{ template "consul.name" $root }}
     release: "{{ $root.Release.Name }}"
     component: terminating-gateway
+    terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
   type: ClusterIP
   ports:
     - port: 80

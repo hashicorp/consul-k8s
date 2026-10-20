@@ -455,6 +455,26 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
     [ "$actual" = "true" ]
 }
 
+@test "ai/CRD/InferencePoolConfig: PII defaultAction supports processor actions" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s templates/crd-inferencepoolconfigs.yaml \
+        "${base_flags[@]}" \
+        . | tee /dev/stderr |
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.policy.properties.pii.properties.defaultAction.enum | join(",")' | tee /dev/stderr)
+    [ "$actual" = "placeholder,mask,block,off" ]
+}
+
+@test "ai/CRD/InferencePoolConfig: PII detector action supports processor actions" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s templates/crd-inferencepoolconfigs.yaml \
+        "${base_flags[@]}" \
+        . | tee /dev/stderr |
+        yq -r '.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.policy.properties.pii.properties.detectors.items.properties.action.enum | join(",")' | tee /dev/stderr)
+    [ "$actual" = "placeholder,mask,block,off" ]
+}
+
 @test "ai/CRD/InferencePoolConfig: status.conditions is a map list keyed by type" {
     cd `chart_dir`
     local actual=$(helm template \

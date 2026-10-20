@@ -1,0 +1,3 @@
+```release-note:security
+Upgrade `golang.org/x/net` to v0.60.0, Go to 1.26.9, and `zlib` to fix ALPINE-CVE-2026-85091.
+```

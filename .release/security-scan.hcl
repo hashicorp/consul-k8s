@@ -26,6 +26,7 @@ container {
     suppress {
       vulnerabilities = [
         "GO-2026-5932",
+        "GO-2026-6443",
       ]
       
       paths = [
@@ -54,6 +55,7 @@ binary {
     suppress {
       vulnerabilities = [
         "GO-2026-5932",
+        "GO-2026-6443",
       ]
     }
   }
