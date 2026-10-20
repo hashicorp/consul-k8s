@@ -1,0 +1,11 @@
+```release-note:bug
+terminating-gateway: Fix CRD-managed terminating gateways failing to reconcile when `terminatingGateways.defaults.annotations` or `global.secretsBackend.vault.agentAnnotations` is set as a multi-line string, as documented.
+```
+
+```release-note:bug
+terminating-gateway: Fix CRD-managed terminating gateways ignoring `global.secretsBackend.vault.vaultNamespace`, which caused the Vault agent to authenticate against the root namespace.
+```
+
+```release-note:bug
+terminating-gateway: CRD-managed terminating gateways now add Vault Agent Injector annotations only when both `global.secretsBackend.vault.enabled` and `global.tls.enabled` are true, matching Helm-deployed gateways. Previously they were added whenever Vault was enabled, which caused credential-injection pods with TLS disabled to fail Vault agent injection.
+```
