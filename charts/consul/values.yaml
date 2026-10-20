@@ -2059,6 +2059,35 @@ dns:
 
     port: 53
 
+    # This value references an existing
+    # Kubernetes [`priorityClassName`](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
+    # that can be assigned to DNS proxy pods.
+    priorityClassName: ""
+
+    # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for DNS proxy pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   node/role: system
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
+
+    # Affinity Settings
+    # This should be a multi-line string matching the affinity object
+    # @type: string
+    affinity: null
+
+    # Toleration Settings
+    # This should be a multi-line string matching the Toleration array
+    # in a PodSpec.
+    # @type: string
+    tolerations: null
+
     # Refers to an existing Kubernetes secret that contains an ACL token
     # for your Consul cluster. This token provides permissions for the DNS
     # proxy. This field is required when `global.acls.manageSystemACLs` 
