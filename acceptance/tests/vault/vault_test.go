@@ -50,8 +50,20 @@ func TestVault(t *testing.T) {
 	for name, c := range cases {
 		c := c
 		t.Run(name, func(t *testing.T) {
-			testVault(t, c.autoBootstrap)
+			testVault(t, c.autoBootstrap, "")
 		})
+	}
+}
+
+// TestVault_ExternalServers provisions Vault, a server release, and an external
+// sync-catalog release independently for each discovery and bootstrap case.
+func TestVault_ExternalServers(t *testing.T) {
+	for _, autoBootstrap := range []bool{false, true} {
+		for _, host := range []string{"dns", "ip", "exec"} {
+			t.Run(fmt.Sprintf("auto-bootstrap=%t/hosts=%s", autoBootstrap, host), func(t *testing.T) {
+				testVault(t, autoBootstrap, host)
+			})
+		}
 	}
 }
 
@@ -61,7 +73,9 @@ func TestVault(t *testing.T) {
 //     The test pre-populates a Vault secret with the bootstrap token.
 //   - testAutoBootstrap = true. Test that server-acl-init automatically ACL bootstraps
 //     consul and writes the bootstrap token to Vault.
-func testVault(t *testing.T, testAutoBootstrap bool) {
+//   - externalHost selects an external-server discovery case instead of the
+//     general Vault integration checks; an empty value runs the general checks.
+func testVault(t *testing.T, testAutoBootstrap bool, externalHost string) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
@@ -288,6 +302,17 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 		// Enable clients to make sure vault integration still works.
 		"client.enabled": "true",
 	}
+	if externalHost != "" {
+		consulHelmValues["connectInject.enabled"] = "false"
+		consulHelmValues["connectInject.cni.enabled"] = "false"
+		consulHelmValues["client.enabled"] = "false"
+		consulHelmValues["ingressGateways.enabled"] = "false"
+		consulHelmValues["terminatingGateways.enabled"] = "false"
+		consulHelmValues["syncCatalog.enabled"] = "false"
+		if externalHost == "exec" {
+			consulHelmValues["server.replicas"] = "3"
+		}
+	}
 
 	if cfg.EnableEnterprise {
 		consulHelmValues["global.enterpriseLicense.secretName"] = licenseSecret.Path
@@ -297,6 +322,22 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, consulHelmValues, ctx, cfg, consulReleaseName)
 	consulCluster.Create(t)
+
+	if externalHost != "" {
+		testExternalVaultFeatureGate(t, cfg, ctx, vaultClient, consulReleaseName, KubernetesAuthMethodPath,
+			fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, serverPKIConfig.PolicyName),
+			externalHost,
+			map[string]string{
+				"global.tls.caCert.secretName":              serverPKIConfig.CAPath,
+				"global.secretsBackend.vault.consulCARole":  serverPKIConfig.RoleName,
+				"global.secretsBackend.vault.ca.secretName": vaultCASecret,
+				"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
+				"global.acls.bootstrapToken.secretName":     bootstrapTokenSecret.Path,
+				"global.acls.bootstrapToken.secretKey":      bootstrapTokenSecret.Key,
+				"externalServers.tlsServerName":             "server.dc1.consul",
+			})
+		return
+	}
 
 	// Portforward to connect injector pod and get cert
 	client := environment.KubernetesClientFromOptions(t, kubectlOptions)
@@ -388,21 +429,10 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	// verify that a previous cert expired and that a new one has been issued
 	// by comparing the NotAfter on the two certs.
 	require.NotEqual(t, connectInjectorCert.NotAfter, connectInjectorCert2.NotAfter)
-
-	testExternalVaultFeatureGate(t, cfg, ctx, vaultClient, consulReleaseName, KubernetesAuthMethodPath,
-		fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, serverPKIConfig.PolicyName),
-		map[string]string{
-			"global.tls.caCert.secretName":              serverPKIConfig.CAPath,
-			"global.secretsBackend.vault.ca.secretName": vaultCASecret,
-			"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
-			"global.acls.bootstrapToken.secretName":     bootstrapTokenSecret.Path,
-			"global.acls.bootstrapToken.secretKey":      bootstrapTokenSecret.Key,
-			"externalServers.tlsServerName":             "server.dc1.consul",
-		})
 }
 
 func testExternalVaultFeatureGate(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext,
-	vaultClient *vaultapi.Client, serverRelease, authPath, policyNames string, baseValues map[string]string) {
+	vaultClient *vaultapi.Client, serverRelease, authPath, policyNames, host string, baseValues map[string]string) {
 	t.Helper()
 	ns := ctx.KubectlOptions(t).Namespace
 	serverPods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{
@@ -415,41 +445,49 @@ func testExternalVaultFeatureGate(t *testing.T, cfg *config.TestConfig, ctx envi
 		require.NotEmpty(t, pod.Status.PodIP)
 		serverIPs = append(serverIPs, pod.Status.PodIP)
 	}
-	for _, host := range []struct{ name, address string }{
-		{"dns", serverRelease + "-consul-server"},
-		{"ip", serverIPs[0]},
-		{"exec", "exec=echo " + strings.Join(serverIPs, " ")},
-	} {
-		t.Run("external-hosts="+host.name, func(t *testing.T) {
-			externalRelease := helpers.RandomName()
-			role := externalRelease + "-feature-gate"
-			(&vault.KubernetesAuthRoleConfiguration{
-				ServiceAccountName:  externalRelease + "-consul-feature-gate-set," + externalRelease + "-consul-server-acl-init",
-				KubernetesNamespace: ns,
-				AuthMethodPath:      authPath,
-				RoleName:            role,
-				PolicyNames:         policyNames,
-			}).ConfigureK8SAuthRole(t, vaultClient)
-			values := map[string]string{
-				"global.enabled":                                   "false",
-				"server.enabled":                                   "false",
-				"connectInject.enabled":                            "false",
-				"global.tls.enabled":                               "true",
-				"global.secretsBackend.vault.enabled":              "true",
-				"global.secretsBackend.vault.featureGateSetRole":   role,
-				"global.secretsBackend.vault.manageSystemACLsRole": role,
-				"externalServers.enabled":                          "true",
-				"externalServers.hosts[0]":                         host.address,
-				"externalServers.httpsPort":                        "8501",
-				"externalServers.skipServerWatch":                  "true",
-			}
-			for key, value := range baseValues {
-				values[key] = value
-			}
-			external := consul.NewHelmCluster(t, values, ctx, cfg, externalRelease)
-			external.SkipCheckForPreviousInstallations = true
-			external.Create(t)
-			external.Upgrade(t, values)
-		})
+	address := serverRelease + "-consul-server"
+	switch host {
+	case "dns":
+	case "ip":
+		address = serverIPs[0]
+	case "exec":
+		address = "exec=echo " + strings.Join(serverIPs, " ")
+	default:
+		t.Fatalf("unsupported external server discovery mode %q", host)
 	}
+	externalRelease := helpers.RandomName()
+	role := externalRelease + "-feature-gate"
+	(&vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  externalRelease + "-consul-feature-gate-set," + externalRelease + "-consul-server-acl-init",
+		KubernetesNamespace: ns,
+		AuthMethodPath:      authPath,
+		RoleName:            role,
+		PolicyNames:         policyNames,
+	}).ConfigureK8SAuthRole(t, vaultClient)
+	// Keep a real workload in this release so install and upgrade validate Pod readiness.
+	values := map[string]string{
+		"global.enabled":                                   "false",
+		"server.enabled":                                   "false",
+		"connectInject.enabled":                            "false",
+		"connectInject.cni.enabled":                        "false",
+		"syncCatalog.enabled":                              "true",
+		"syncCatalog.toConsul":                             "false",
+		"syncCatalog.toK8S":                                "false",
+		"global.acls.manageSystemACLs":                     "true",
+		"global.tls.enabled":                               "true",
+		"global.secretsBackend.vault.enabled":              "true",
+		"global.secretsBackend.vault.featureGateSetRole":   role,
+		"global.secretsBackend.vault.manageSystemACLsRole": role,
+		"externalServers.enabled":                          "true",
+		"externalServers.hosts[0]":                         address,
+		"externalServers.httpsPort":                        "8501",
+		"externalServers.skipServerWatch":                  "true",
+	}
+	for key, value := range baseValues {
+		values[key] = value
+	}
+	external := consul.NewHelmCluster(t, values, ctx, cfg, externalRelease)
+	external.SkipCheckForPreviousInstallations = true
+	external.Create(t)
+	external.Upgrade(t, values)
 }
