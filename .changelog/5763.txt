@@ -1,3 +1,0 @@
-```release-note:bug
-control-plane: Run feature-gate-set through the control-plane image and resolve external server discovery addresses consistently with support for exec= hosts.
-```
