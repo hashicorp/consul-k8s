@@ -27,16 +27,17 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags         *flag.FlagSet
-	consul        *flags.ConsulFlags
-	gates         flags.FlagMapValue
-	flagLogLevel  string
-	flagLogJSON   bool
-	flagTimeout   time.Duration
-	retryDuration time.Duration
-	log           hclog.Logger
-	once          sync.Once
-	help          string
+	flags           *flag.FlagSet
+	consul          *flags.ConsulFlags
+	gates           flags.FlagMapValue
+	flagLogLevel    string
+	flagLogJSON     bool
+	flagTimeout     time.Duration
+	retryDuration   time.Duration
+	log             hclog.Logger
+	once            sync.Once
+	help            string
+	discoverServers func(string) ([]string, error)
 }
 
 func (c *Command) init() {
@@ -104,7 +105,29 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) serverAddresses(ctx context.Context) ([]string, error) {
 	if !strings.HasPrefix(c.consul.Addresses, "exec=") && strings.Contains(c.consul.Addresses, "provider=") {
-		return godiscover.ConsulServerAddresses(c.consul.Addresses, nil, c.log)
+		discover := c.discoverServers
+		if discover == nil {
+			discover = func(addresses string) ([]string, error) {
+				return godiscover.ConsulServerAddresses(addresses, nil, c.log)
+			}
+		}
+		type discoveryResult struct {
+			addresses []string
+			err       error
+		}
+		results := make(chan discoveryResult, 1)
+		addresses := c.consul.Addresses
+		// go-discover has no context API; cancellation stops waiting, not the provider.
+		go func() {
+			hosts, err := discover(addresses)
+			results <- discoveryResult{addresses: hosts, err: err}
+		}()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case result := <-results:
+			return result.addresses, result.err
+		}
 	}
 	ipAddrs, err := netaddrs.IPAddrs(ctx, c.consul.Addresses, c.log)
 	if err != nil {
@@ -130,6 +153,11 @@ func (c *Command) waitForLeader(ctx context.Context) (*api.Client, error) {
 			for _, address := range addresses {
 				config := c.consul.ConsulClientConfig()
 				config.APIClientConfig.Address = net.JoinHostPort(address, strconv.Itoa(config.HTTPPort))
+				if c.consul.UseTLS && c.consul.TLSServerName == "" &&
+					(net.ParseIP(c.consul.Addresses) != nil ||
+						(!strings.HasPrefix(c.consul.Addresses, "exec=") && strings.Contains(c.consul.Addresses, "provider="))) {
+					config.APIClientConfig.TLSConfig.Address = config.APIClientConfig.Address
+				}
 				client, err := consul.NewClient(config.APIClientConfig, config.APITimeout)
 				if err != nil {
 					return nil, fmt.Errorf("error creating Consul client: %w", err)
@@ -139,6 +167,7 @@ func (c *Command) waitForLeader(ctx context.Context) (*api.Client, error) {
 					c.log.Info("Consul leader is ready", "leader", leader)
 					return client, nil
 				}
+				config.APIClientConfig.HttpClient.CloseIdleConnections()
 				if err != nil {
 					c.log.Error("Error checking Consul leader", "address", address, "error", err)
 				} else {
@@ -195,5 +224,10 @@ const help = `
 Usage: consul-k8s-control-plane feature-gate-set [options]
 
   Resolves Consul server addresses, waits for a leader, and sets feature gate intent.
-  Supports DNS names, IP addresses, and exec= server discovery.
+
+  Example:
+    consul-k8s-control-plane feature-gate-set \
+      -addresses="exec=echo 192.0.2.1 192.0.2.2" \
+      -http-port=8500 \
+      -feature-gate=consul-ai=true
 `
