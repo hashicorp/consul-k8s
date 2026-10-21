@@ -22,18 +22,20 @@ import (
 
 // TestConnectInject_ExternalServers tests that connect works when using external servers.
 // It sets up an external Consul server in the same cluster but a different Helm installation
-// and then treats this server as external, using DNS or exec= discovery.
+// and then treats this server as external, using DNS, IP, or exec= discovery.
 func TestConnectInject_ExternalServers(t *testing.T) {
 	for _, tc := range []struct {
 		secure bool
-		exec   bool
+		host   string
 	}{
-		{secure: false},
-		{secure: true},
-		{secure: false, exec: true},
-		{secure: true, exec: true},
+		{secure: false, host: "dns"},
+		{secure: true, host: "dns"},
+		{secure: false, host: "ip"},
+		{secure: true, host: "ip"},
+		{secure: false, host: "exec"},
+		{secure: true, host: "exec"},
 	} {
-		caseName := fmt.Sprintf("secure: %t, exec: %t", tc.secure, tc.exec)
+		caseName := fmt.Sprintf("secure=%t/hosts=%s", tc.secure, tc.host)
 		t.Run(caseName, func(t *testing.T) {
 			secure := tc.secure
 			cfg := suite.Config()
@@ -50,6 +52,9 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"connectInject.cni.enabled": "false",
 			}
 			serverReleaseName := helpers.RandomName()
+			if tc.host == "exec" {
+				serverHelmValues["server.replicas"] = "3"
+			}
 			consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
 
 			consulServerCluster.Create(t)
@@ -75,7 +80,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				helmValues["externalServers.httpsPort"] = "8501"
 			}
 
-			if tc.exec {
+			if tc.host != "dns" {
 				pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
 					LabelSelector: fmt.Sprintf("component=server,release=%s", serverReleaseName),
 				})
@@ -87,7 +92,12 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 					require.NotEmpty(t, pod.Status.PodIP)
 					serverIPs = append(serverIPs, pod.Status.PodIP)
 				}
-				helmValues["externalServers.hosts[0]"] = "exec=echo " + strings.Join(serverIPs, " ")
+				if tc.host == "exec" {
+					require.Len(t, serverIPs, 3)
+					helmValues["externalServers.hosts[0]"] = "exec=echo " + strings.Join(serverIPs, " ")
+				} else {
+					helmValues["externalServers.hosts[0]"] = serverIPs[0]
+				}
 				helmValues["externalServers.skipServerWatch"] = "true"
 				if secure {
 					helmValues["externalServers.tlsServerName"] = "server.dc1.consul"
@@ -145,6 +155,14 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			}
 
 			logger.Log(t, "checking that connection is successful")
+			if cfg.EnableTransparentProxy {
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://static-server")
+			} else {
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
+			}
+
+			logger.Log(t, "upgrading the external-server release with unchanged discovery and authentication")
+			consulCluster.Upgrade(t, helmValues)
 			if cfg.EnableTransparentProxy {
 				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://static-server")
 			} else {

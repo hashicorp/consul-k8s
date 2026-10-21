@@ -182,6 +182,101 @@ func TestRunTimeout(t *testing.T) {
 	}
 }
 
+func TestRunAuthMethod(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		env          bool
+		loginStatus  int
+		writeStatus  int
+		logoutStatus int
+	}{
+		{name: "flag"},
+		{name: "environment", env: true},
+		{name: "login failure", loginStatus: http.StatusForbidden},
+		{name: "write failure logs out", writeStatus: http.StatusForbidden},
+		{name: "logout failure", logoutStatus: http.StatusInternalServerError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bearerFile := filepath.Join(t.TempDir(), "bearer")
+			require.NoError(t, os.WriteFile(bearerFile, []byte(" bearer-token\n"), 0600))
+			var logins, writes, logouts atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/v1/status/leader":
+					fmt.Fprint(w, `"127.0.0.1:8300"`)
+				case "/v1/acl/login":
+					logins.Add(1)
+					var body struct {
+						AuthMethod, BearerToken string
+						Meta                    map[string]string
+					}
+					require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+					require.Equal(t, "test-auth", body.AuthMethod)
+					require.Equal(t, "bearer-token", body.BearerToken)
+					require.Equal(t, "feature-gate-set", body.Meta["component"])
+					require.Equal(t, "login-ns", r.URL.Query().Get("ns"))
+					require.Equal(t, "login-partition", r.URL.Query().Get("partition"))
+					require.Equal(t, "login-dc", r.URL.Query().Get("dc"))
+					if tc.loginStatus != 0 {
+						http.Error(w, "login denied", tc.loginStatus)
+						return
+					}
+					fmt.Fprint(w, `{"SecretID":"login-token"}`)
+				case "/v1/operator/feature/consul-ai":
+					writes.Add(1)
+					require.Equal(t, "login-token", r.Header.Get("X-Consul-Token"))
+					if tc.writeStatus != 0 {
+						http.Error(w, "write denied", tc.writeStatus)
+						return
+					}
+					fmt.Fprint(w, `{"Applied":true}`)
+				case "/v1/acl/logout":
+					logouts.Add(1)
+					require.Equal(t, "login-token", r.Header.Get("X-Consul-Token"))
+					require.Equal(t, "login-partition", r.URL.Query().Get("partition"))
+					if tc.logoutStatus != 0 {
+						http.Error(w, "logout failed", tc.logoutStatus)
+					}
+				default:
+					t.Errorf("unexpected path: %s", r.URL.Path)
+					http.NotFound(w, r)
+				}
+			}))
+			defer server.Close()
+			_, port, err := net.SplitHostPort(server.Listener.Addr().String())
+			require.NoError(t, err)
+			args := []string{
+				"-addresses=exec=echo 127.0.0.1", "-http-port=" + port,
+				"-consul-login-bearer-token-file=" + bearerFile,
+				"-consul-login-namespace=login-ns", "-consul-login-partition=login-partition",
+				"-consul-login-datacenter=login-dc", "-consul-login-meta=component=feature-gate-set",
+				"-token=static-token", "-feature-gate=consul-ai=true",
+			}
+			t.Setenv("CONSUL_LOGIN_AUTH_METHOD", "")
+			if tc.env {
+				t.Setenv("CONSUL_LOGIN_AUTH_METHOD", "test-auth")
+			} else {
+				args = append(args, "-auth-method-name=test-auth")
+			}
+			ui := cli.NewMockUi()
+			cmd := &Command{UI: ui}
+			wantExit := 0
+			if tc.loginStatus != 0 || tc.writeStatus != 0 || tc.logoutStatus != 0 {
+				wantExit = 1
+			}
+			require.Equal(t, wantExit, cmd.Run(args))
+			require.Equal(t, int32(1), logins.Load())
+			if tc.loginStatus != 0 {
+				require.Zero(t, writes.Load())
+				require.Zero(t, logouts.Load())
+			} else {
+				require.Equal(t, int32(1), writes.Load())
+				require.Equal(t, int32(1), logouts.Load())
+			}
+		})
+	}
+}
+
 func TestRunInvalidFlags(t *testing.T) {
 	for _, args := range [][]string{
 		{"-unknown"},
