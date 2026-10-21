@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -204,4 +205,117 @@ func TestRunInvalidFlags(t *testing.T) {
 			require.NotEmpty(t, ui.ErrorWriter.String())
 		})
 	}
+
+}
+
+func TestProviderDiscoveryCancellation(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	finished := make(chan struct{})
+	defer func() {
+		close(release)
+		<-finished
+	}()
+	cmd := &Command{
+		UI: cli.NewMockUi(),
+		discoverServers: func(string) ([]string, error) {
+			close(started)
+			<-release
+			close(finished)
+			return []string{"127.0.0.1"}, nil
+		},
+	}
+	cmd.once.Do(cmd.init)
+	cmd.consul.Addresses = "provider=blocked"
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		_, err := cmd.serverAddresses(ctx)
+		result <- err
+	}()
+	<-started
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(time.Second):
+		t.Fatal("provider discovery did not return on cancellation")
+	}
+}
+
+func TestProviderDiscoveryResult(t *testing.T) {
+	for _, discoveryErr := range []error{nil, errors.New("provider unavailable")} {
+		cmd := &Command{
+			UI: cli.NewMockUi(),
+			discoverServers: func(string) ([]string, error) {
+				return []string{"127.0.0.1"}, discoveryErr
+			},
+		}
+		cmd.once.Do(cmd.init)
+		cmd.consul.Addresses = "provider=test"
+		addresses, err := cmd.serverAddresses(context.Background())
+		require.ErrorIs(t, err, discoveryErr)
+		require.Equal(t, []string{"127.0.0.1"}, addresses)
+	}
+}
+
+func TestInferredTLSServerName(t *testing.T) {
+	for _, mode := range []string{"IP", "IPv6", "provider", "explicit"} {
+		t.Run(mode, func(t *testing.T) {
+			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprint(w, `"127.0.0.1:8300"`)
+			}))
+			if mode == "IPv6" {
+				listener, err := net.Listen("tcp", "[::1]:0")
+				if err != nil {
+					server.Close()
+					t.Skipf("IPv6 loopback unavailable: %s", err)
+				}
+				require.NoError(t, server.Listener.Close())
+				server.Listener = listener
+			}
+			server.StartTLS()
+			defer server.Close()
+			host, port, err := net.SplitHostPort(server.Listener.Addr().String())
+			require.NoError(t, err)
+			cmd := &Command{UI: cli.NewMockUi()}
+			cmd.once.Do(cmd.init)
+			cmd.consul.Addresses = host
+			if mode == "provider" || mode == "explicit" {
+				cmd.consul.Addresses = "provider=test"
+				cmd.discoverServers = func(string) ([]string, error) {
+					return []string{host}, nil
+				}
+			}
+			if mode == "explicit" {
+				cmd.consul.TLSServerName = "example.com"
+			}
+			cmd.consul.UseTLS = true
+			cmd.consul.CACertPEM = string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}))
+			args := []string{"-http-port=" + port, "-timeout=1s"}
+			require.Equal(t, 0, cmd.Run(args))
+		})
+	}
+}
+
+func TestLeaderPollingClosesIdleConnections(t *testing.T) {
+	var checks atomic.Int32
+	var closed atomic.Int32
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		checks.Add(1)
+		fmt.Fprint(w, `""`)
+	}))
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateClosed {
+			closed.Add(1)
+		}
+	}
+	server.Start()
+	defer server.Close()
+	_, port, err := net.SplitHostPort(server.Listener.Addr().String())
+	require.NoError(t, err)
+	cmd := &Command{UI: cli.NewMockUi(), retryDuration: time.Millisecond}
+	require.Equal(t, 1, cmd.Run([]string{"-addresses=127.0.0.1", "-http-port=" + port, "-timeout=100ms"}))
+	require.Greater(t, checks.Load(), int32(1))
+	require.Eventually(t, func() bool { return closed.Load() >= checks.Load() }, time.Second, time.Millisecond)
 }
