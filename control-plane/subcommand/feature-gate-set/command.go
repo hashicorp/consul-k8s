@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,7 +55,7 @@ func (c *Command) init() {
 	}
 }
 
-func (c *Command) Run(args []string) int {
+func (c *Command) Run(args []string) (exitCode int) {
 	c.once.Do(c.init)
 	if err := c.flags.Parse(args); err != nil {
 		c.UI.Error(err.Error())
@@ -78,6 +79,27 @@ func (c *Command) Run(args []string) int {
 		c.log.Error("Unable to connect to Consul with an elected leader", "error", err)
 		return 1
 	}
+	writeOptions := &api.WriteOptions{}
+	if c.consul.ConsulLogin.AuthMethod != "" {
+		token, err := c.login(ctx, client)
+		if err != nil {
+			c.log.Error("Unable to log in to Consul", "error", err)
+			return 1
+		}
+		writeOptions.Token = token
+		defer func() {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), c.consul.APITimeout)
+			defer cleanupCancel()
+			login := c.consul.ConsulLogin
+			_, err := client.ACL().Logout((&api.WriteOptions{
+				Token: token, Namespace: login.Namespace, Partition: login.Partition, Datacenter: login.Datacenter,
+			}).WithContext(cleanupCtx))
+			if err != nil {
+				c.log.Error("Unable to log out of Consul", "error", err)
+				exitCode = 1
+			}
+		}()
+	}
 	names := make([]string, 0, len(c.gates))
 	for name := range c.gates {
 		names = append(names, name)
@@ -90,7 +112,7 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 		c.log.Info("Setting feature gate", "name", name, "enabled", enabled)
-		result, err := client.Operator().FeatureGateSet(name, enabled, 0, (&api.WriteOptions{}).WithContext(ctx))
+		result, err := client.Operator().FeatureGateSet(name, enabled, 0, writeOptions.WithContext(ctx))
 		if err != nil {
 			c.log.Error("Error setting feature gate", "name", name, "error", err)
 			return 1
@@ -101,6 +123,30 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 	return 0
+}
+
+func (c *Command) login(ctx context.Context, client *api.Client) (string, error) {
+	login := c.consul.ConsulLogin
+	data, err := os.ReadFile(login.BearerTokenFile)
+	if err != nil {
+		return "", fmt.Errorf("unable to read bearer token file: %w", err)
+	}
+	bearerToken := strings.TrimSpace(string(data))
+	if bearerToken == "" {
+		return "", fmt.Errorf("bearer token file is empty")
+	}
+	token, _, err := client.ACL().Login(&api.ACLLoginParams{
+		AuthMethod: login.AuthMethod, BearerToken: bearerToken, Meta: login.Meta,
+	}, (&api.WriteOptions{
+		Namespace: login.Namespace, Partition: login.Partition, Datacenter: login.Datacenter,
+	}).WithContext(ctx))
+	if err != nil {
+		return "", err
+	}
+	if token == nil || token.SecretID == "" {
+		return "", fmt.Errorf("Consul login returned an empty ACL token")
+	}
+	return token.SecretID, nil
 }
 
 func (c *Command) serverAddresses(ctx context.Context) ([]string, error) {
@@ -224,6 +270,10 @@ const help = `
 Usage: consul-k8s-control-plane feature-gate-set [options]
 
   Resolves Consul server addresses, waits for a leader, and sets feature gate intent.
+  When ACLs are enabled, use -token or -token-file, or their CONSUL_ACL_TOKEN
+  and CONSUL_ACL_TOKEN_FILE environment variables. Alternatively, use
+  -auth-method-name and -consul-login-bearer-token-file to obtain a temporary
+  ACL token, which is logged out when the command finishes.
 
   Example:
     consul-k8s-control-plane feature-gate-set \

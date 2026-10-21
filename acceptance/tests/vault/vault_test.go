@@ -6,10 +6,12 @@ package vault
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -20,6 +22,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -385,4 +388,68 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	// verify that a previous cert expired and that a new one has been issued
 	// by comparing the NotAfter on the two certs.
 	require.NotEqual(t, connectInjectorCert.NotAfter, connectInjectorCert2.NotAfter)
+
+	testExternalVaultFeatureGate(t, cfg, ctx, vaultClient, consulReleaseName, KubernetesAuthMethodPath,
+		fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, serverPKIConfig.PolicyName),
+		map[string]string{
+			"global.tls.caCert.secretName":              serverPKIConfig.CAPath,
+			"global.secretsBackend.vault.ca.secretName": vaultCASecret,
+			"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
+			"global.acls.bootstrapToken.secretName":     bootstrapTokenSecret.Path,
+			"global.acls.bootstrapToken.secretKey":      bootstrapTokenSecret.Key,
+			"externalServers.tlsServerName":             "server.dc1.consul",
+		})
+}
+
+func testExternalVaultFeatureGate(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext,
+	vaultClient *vaultapi.Client, serverRelease, authPath, policyNames string, baseValues map[string]string) {
+	t.Helper()
+	ns := ctx.KubectlOptions(t).Namespace
+	serverPods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "component=server,release=" + serverRelease,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, serverPods.Items)
+	var serverIPs []string
+	for _, pod := range serverPods.Items {
+		require.NotEmpty(t, pod.Status.PodIP)
+		serverIPs = append(serverIPs, pod.Status.PodIP)
+	}
+	for _, host := range []struct{ name, address string }{
+		{"dns", serverRelease + "-consul-server"},
+		{"ip", serverIPs[0]},
+		{"exec", "exec=echo " + strings.Join(serverIPs, " ")},
+	} {
+		t.Run("external-hosts="+host.name, func(t *testing.T) {
+			externalRelease := helpers.RandomName()
+			role := externalRelease + "-feature-gate"
+			(&vault.KubernetesAuthRoleConfiguration{
+				ServiceAccountName:  externalRelease + "-consul-feature-gate-set," + externalRelease + "-consul-server-acl-init",
+				KubernetesNamespace: ns,
+				AuthMethodPath:      authPath,
+				RoleName:            role,
+				PolicyNames:         policyNames,
+			}).ConfigureK8SAuthRole(t, vaultClient)
+			values := map[string]string{
+				"global.enabled":                                   "false",
+				"server.enabled":                                   "false",
+				"connectInject.enabled":                            "false",
+				"global.tls.enabled":                               "true",
+				"global.secretsBackend.vault.enabled":              "true",
+				"global.secretsBackend.vault.featureGateSetRole":   role,
+				"global.secretsBackend.vault.manageSystemACLsRole": role,
+				"externalServers.enabled":                          "true",
+				"externalServers.hosts[0]":                         host.address,
+				"externalServers.httpsPort":                        "8501",
+				"externalServers.skipServerWatch":                  "true",
+			}
+			for key, value := range baseValues {
+				values[key] = value
+			}
+			external := consul.NewHelmCluster(t, values, ctx, cfg, externalRelease)
+			external.SkipCheckForPreviousInstallations = true
+			external.Create(t)
+			external.Upgrade(t, values)
+		})
+	}
 }
