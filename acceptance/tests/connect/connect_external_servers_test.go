@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
@@ -21,14 +22,20 @@ import (
 
 // TestConnectInject_ExternalServers tests that connect works when using external servers.
 // It sets up an external Consul server in the same cluster but a different Helm installation
-// and then treats this server as external.
+// and then treats this server as external, using DNS or exec= discovery.
 func TestConnectInject_ExternalServers(t *testing.T) {
-	for _, secure := range []bool{
-		false,
-		true,
+	for _, tc := range []struct {
+		secure bool
+		exec   bool
+	}{
+		{secure: false},
+		{secure: true},
+		{secure: false, exec: true},
+		{secure: true, exec: true},
 	} {
-		caseName := fmt.Sprintf("secure: %t", secure)
+		caseName := fmt.Sprintf("secure: %t, exec: %t", tc.secure, tc.exec)
 		t.Run(caseName, func(t *testing.T) {
+			secure := tc.secure
 			cfg := suite.Config()
 			cfg.SkipWhenOpenshiftAndCNI(t)
 
@@ -66,6 +73,25 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				helmValues["global.acls.bootstrapToken.secretName"] = fmt.Sprintf("%s-consul-bootstrap-acl-token", serverReleaseName)
 				helmValues["global.acls.bootstrapToken.secretKey"] = "token"
 				helmValues["externalServers.httpsPort"] = "8501"
+			}
+
+			if tc.exec {
+				pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("component=server,release=%s", serverReleaseName),
+				})
+				require.NoError(t, err)
+				require.NotEmpty(t, pods.Items)
+
+				var serverIPs []string
+				for _, pod := range pods.Items {
+					require.NotEmpty(t, pod.Status.PodIP)
+					serverIPs = append(serverIPs, pod.Status.PodIP)
+				}
+				helmValues["externalServers.hosts[0]"] = "exec=echo " + strings.Join(serverIPs, " ")
+				helmValues["externalServers.skipServerWatch"] = "true"
+				if secure {
+					helmValues["externalServers.tlsServerName"] = "server.dc1.consul"
+				}
 			}
 
 			releaseName := helpers.RandomName()
