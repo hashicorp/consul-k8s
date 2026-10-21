@@ -522,7 +522,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 				"global.acls.replicationToken.secretName":      replicationTokenSecret.Path,
 				"global.acls.replicationToken.secretKey":       replicationTokenSecret.Key,
 				"global.tls.caCert.secretName":                 serverPKIConfigSecondary.CAPath,
-				"global.secretsBackend.vault.consulCARole":     serverPKIConfigSecondary.RoleName,
+				"global.secretsBackend.vault.consulCARole":     serverPKIConfig.RoleName,
 				"global.secretsBackend.vault.ca.secretName":    vaultCASecretName,
 				"global.secretsBackend.vault.ca.secretKey":     "tls.crt",
 				"global.secretsBackend.vault.agentAnnotations": secondaryConsulHelmValues["global.secretsBackend.vault.agentAnnotations"],
