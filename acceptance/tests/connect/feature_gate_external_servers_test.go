@@ -71,29 +71,38 @@ func TestFeatureGate_ExternalServers(t *testing.T) {
 				ips = append(ips, pod.Status.PodIP)
 			}
 
-			serviceAccount := helpers.RandomName()
-			_, err = clientset.CoreV1().ServiceAccounts(namespace).Create(requestCtx, &corev1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{Name: serviceAccount},
-			}, metav1.CreateOptions{})
+			hookRelease := helpers.RandomName()
+			discoveryValues := map[string]string{
+				"server.enabled":           "false",
+				"externalServers.enabled":  "true",
+				"externalServers.hosts[0]": fmt.Sprintf("provider=k8s namespace=%s", namespace),
+			}
+			renderOptions := &helm.Options{SetValues: discoveryValues, KubectlOptions: options}
+			var account corev1.ServiceAccount
+			require.NoError(t, yaml.Unmarshal([]byte(helm.RenderTemplate(t, renderOptions,
+				config.HelmChartPath, hookRelease, []string{"templates/feature-gate-set-serviceaccount.yaml"})), &account))
+			account.Annotations = nil
+			serviceAccount := account.Name
+			_, err = clientset.CoreV1().ServiceAccounts(namespace).Create(requestCtx, &account, metav1.CreateOptions{})
 			require.NoError(t, err)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				require.NoError(t, clientset.CoreV1().ServiceAccounts(namespace).Delete(requestCtx, serviceAccount, metav1.DeleteOptions{}))
 			})
 
-			// The Kubernetes discovery provider lists server pods using this identity.
-			_, err = clientset.RbacV1().Roles(namespace).Create(requestCtx, &rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{Name: serviceAccount},
-				Rules:      []rbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"list"}}},
-			}, metav1.CreateOptions{})
+			var discoveryRole rbacv1.Role
+			require.NoError(t, yaml.Unmarshal([]byte(helm.RenderTemplate(t, renderOptions,
+				config.HelmChartPath, hookRelease, []string{"templates/feature-gate-set-role.yaml"})), &discoveryRole))
+			discoveryRole.Annotations = nil
+			_, err = clientset.RbacV1().Roles(namespace).Create(requestCtx, &discoveryRole, metav1.CreateOptions{})
 			require.NoError(t, err)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				require.NoError(t, clientset.RbacV1().Roles(namespace).Delete(requestCtx, serviceAccount, metav1.DeleteOptions{}))
 			})
-			_, err = clientset.RbacV1().RoleBindings(namespace).Create(requestCtx, &rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: serviceAccount},
-				Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: serviceAccount, Namespace: namespace}},
-				RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: serviceAccount},
-			}, metav1.CreateOptions{})
+			var discoveryBinding rbacv1.RoleBinding
+			require.NoError(t, yaml.Unmarshal([]byte(helm.RenderTemplate(t, renderOptions,
+				config.HelmChartPath, hookRelease, []string{"templates/feature-gate-set-rolebinding.yaml"})), &discoveryBinding))
+			discoveryBinding.Annotations = nil
+			_, err = clientset.RbacV1().RoleBindings(namespace).Create(requestCtx, &discoveryBinding, metav1.CreateOptions{})
 			require.NoError(t, err)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				require.NoError(t, clientset.RbacV1().RoleBindings(namespace).Delete(requestCtx, serviceAccount, metav1.DeleteOptions{}))
@@ -157,12 +166,12 @@ func TestFeatureGate_ExternalServers(t *testing.T) {
 						}
 						rendered := helm.RenderTemplate(t, &helm.Options{
 							SetValues: values, KubectlOptions: options,
-						}, config.HelmChartPath, helpers.RandomName(), []string{"templates/feature-gate-set-job.yaml"})
+						}, config.HelmChartPath, hookRelease, []string{"templates/feature-gate-set-job.yaml"})
 						var job batchv1.Job
 						require.NoError(t, yaml.Unmarshal([]byte(rendered), &job))
 						job.Name = helpers.RandomName()
 						job.Annotations = nil
-						job.Spec.Template.Spec.ServiceAccountName = serviceAccount
+						require.Equal(t, serviceAccount, job.Spec.Template.Spec.ServiceAccountName)
 						backoffLimit := int32(0)
 						deadline := int64(120)
 						job.Spec.BackoffLimit = &backoffLimit
