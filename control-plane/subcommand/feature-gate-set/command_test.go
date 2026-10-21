@@ -339,18 +339,37 @@ func TestProviderDiscoveryCancellation(t *testing.T) {
 }
 
 func TestProviderDiscoveryResult(t *testing.T) {
-	for _, discoveryErr := range []error{nil, errors.New("provider unavailable")} {
-		cmd := &Command{
-			UI: cli.NewMockUi(),
-			discoverServers: func(string) ([]string, error) {
-				return []string{"127.0.0.1"}, discoveryErr
-			},
-		}
-		cmd.once.Do(cmd.init)
-		cmd.consul.Addresses = "provider=test"
-		addresses, err := cmd.serverAddresses(context.Background())
-		require.ErrorIs(t, err, discoveryErr)
-		require.Equal(t, []string{"127.0.0.1"}, addresses)
+	discoveryErr := errors.New("provider unavailable")
+	for _, tt := range []struct {
+		name      string
+		addresses []string
+		err       error
+		wantEmpty bool
+	}{
+		{name: "addresses", addresses: []string{"127.0.0.1"}},
+		{name: "provider error", addresses: []string{"127.0.0.1"}, err: discoveryErr},
+		{name: "nil addresses", wantEmpty: true},
+		{name: "empty addresses", addresses: []string{}, wantEmpty: true},
+		{name: "provider error with no addresses", err: discoveryErr},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &Command{
+				UI: cli.NewMockUi(),
+				discoverServers: func(string) ([]string, error) {
+					return tt.addresses, tt.err
+				},
+			}
+			cmd.once.Do(cmd.init)
+			cmd.consul.Addresses = "provider=test"
+			addresses, err := cmd.serverAddresses(context.Background())
+			if tt.wantEmpty {
+				require.ErrorContains(t, err, "no Consul server addresses were resolved")
+				require.Nil(t, addresses)
+			} else {
+				require.ErrorIs(t, err, tt.err)
+				require.Equal(t, tt.addresses, addresses)
+			}
+		})
 	}
 }
 

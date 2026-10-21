@@ -172,6 +172,9 @@ func (c *Command) serverAddresses(ctx context.Context) ([]string, error) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case result := <-results:
+			if result.err == nil && len(result.addresses) == 0 {
+				return nil, fmt.Errorf("no Consul server addresses were resolved")
+			}
 			return result.addresses, result.err
 		}
 	}
@@ -186,7 +189,7 @@ func (c *Command) serverAddresses(ctx context.Context) ([]string, error) {
 	for _, addr := range ipAddrs {
 		addresses = append(addresses, addr.String())
 	}
-	c.log.Info("Refreshing server IP addresses", "addresses", addresses)
+	c.log.Debug("Refreshing server IP addresses", "addresses", addresses)
 	return addresses, nil
 }
 
