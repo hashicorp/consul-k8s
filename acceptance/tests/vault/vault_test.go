@@ -311,6 +311,7 @@ func testVault(t *testing.T, testAutoBootstrap bool, externalHost string) {
 		consulHelmValues["syncCatalog.enabled"] = "false"
 		if externalHost == "exec" {
 			consulHelmValues["server.replicas"] = "3"
+			consulHelmValues["server.affinity"] = "null"
 		}
 	}
 

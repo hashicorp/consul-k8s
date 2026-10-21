@@ -45,6 +45,7 @@ func TestFeatureGate_ExternalServers(t *testing.T) {
 				"connectInject.enabled":        "false",
 				"connectInject.cni.enabled":    "false",
 				"server.replicas":              "3",
+				"server.affinity":              "null",
 			}
 			cluster := consul.NewHelmCluster(t, serverValues, ctx, cfg, release)
 			cluster.Create(t)

@@ -54,6 +54,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			serverReleaseName := helpers.RandomName()
 			if tc.host == "exec" {
 				serverHelmValues["server.replicas"] = "3"
+				serverHelmValues["server.affinity"] = "null"
 			}
 			consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
 
