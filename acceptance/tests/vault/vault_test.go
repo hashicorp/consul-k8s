@@ -59,7 +59,11 @@ func TestVault(t *testing.T) {
 // sync-catalog release independently for each discovery and bootstrap case.
 func TestVault_ExternalServers(t *testing.T) {
 	for _, autoBootstrap := range []bool{false, true} {
-		for _, host := range []string{"dns", "ip", "exec"} {
+		for _, host := range []string{
+			"dns", "ip",
+			// Re-enable when the distroless consul-dataplane image supports exec=echo.
+			// "exec",
+		} {
 			t.Run(fmt.Sprintf("auto-bootstrap=%t/hosts=%s", autoBootstrap, host), func(t *testing.T) {
 				testVault(t, autoBootstrap, host)
 			})

@@ -137,7 +137,8 @@ func TestFeatureGate_ExternalServers(t *testing.T) {
 			hosts := []struct{ name, address string }{
 				{"dns", release + "-consul-server"},
 				{"ip", ips[0]},
-				{"exec", "exec=echo " + strings.Join(ips, " ")},
+				// Re-enable with the exec=echo acceptance cases after the consul-dataplane image fix.
+				// {"exec", "exec=echo " + strings.Join(ips, " ")},
 				{"provider-k8s", fmt.Sprintf("provider=k8s namespace=%s label_selector=release=%s,component=server", namespace, release)},
 			}
 			for _, address := range pods.Items[0].Status.PodIPs {

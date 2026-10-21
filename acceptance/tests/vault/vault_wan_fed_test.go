@@ -512,7 +512,11 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	secondaryClient, _ := secondaryConsulCluster.SetupConsulClient(t, true)
 	helpers.VerifyFederation(t, primaryClient, secondaryClient, consulReleaseName, true)
 
-	for _, host := range []string{"dns", "ip", "exec"} {
+	for _, host := range []string{
+		"dns", "ip",
+		// Re-enable when the distroless consul-dataplane image supports exec=echo.
+		// "exec",
+	} {
 		testExternalVaultFeatureGate(t, cfg, secondaryCtx, vaultClient, consulReleaseName, secondaryAuthMethodName,
 			fmt.Sprintf("%s,%s", replicationTokenSecret.PolicyName, serverPKIConfigSecondary.PolicyName),
 			host,

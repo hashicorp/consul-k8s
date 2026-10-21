@@ -32,8 +32,9 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 		{secure: true, host: "dns"},
 		{secure: false, host: "ip"},
 		{secure: true, host: "ip"},
-		{secure: false, host: "exec"},
-		{secure: true, host: "exec"},
+		// Re-enable when the distroless consul-dataplane image supports exec=echo.
+		// {secure: false, host: "exec"},
+		// {secure: true, host: "exec"},
 	} {
 		caseName := fmt.Sprintf("secure=%t/hosts=%s", tc.secure, tc.host)
 		t.Run(caseName, func(t *testing.T) {
