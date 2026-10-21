@@ -1644,8 +1644,6 @@ externalServers:
   # An array of external Consul server hosts that are used to make
   # HTTPS connections from the components in this Helm chart.
   # Valid values include an IP, a DNS name, or an [exec=](https://github.com/hashicorp/go-netaddrs) string.
-  # The feature-gate-set job uses the Consul CLI and requires the first host to be
-  # a DNS name or IP address; it rejects exec= strings when external servers are enabled.
   # The port must be provided separately below.
   # Note: This slice can only contain a single element.
   # Note: If enabling clients, `client.join` must also be set to the hosts that should be
