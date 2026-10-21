@@ -1,0 +1,60 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-server-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-server-2
+  template:
+    metadata:
+      name: static-server-2
+      labels:
+        app: static-server-2
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+    spec:
+      serviceAccountName: static-server-2
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: static-server
+          image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              add:
+                - "NET_BIND_SERVICE"
+              drop:
+                - ALL
+          args:
+            - -text="hello-s2"
+            - -listen=:8080
+          ports:
+            - containerPort: 8080
+              name: http
+          livenessProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
+          readinessProbe:
+            exec:
+              command: ['sh', '-c', 'test ! -f /tmp/unhealthy']
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1

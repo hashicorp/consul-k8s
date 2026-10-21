@@ -1,0 +1,68 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# http-server — plain HTTP/1.1 backend.  ServiceDefaults declares it as
+# "http" so the api-gateway can route http-listener traffic to it.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: http-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-server
+  template:
+    metadata:
+      name: http-server
+      labels:
+        app: http-server
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+    spec:
+      serviceAccountName: http-server
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: http-server
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          args:
+            - -text="http-server hello"
+            - -listen=:8080
+          ports:
+            - containerPort: 8080
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              add:
+                - NET_BIND_SERVICE
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            periodSeconds: 1
+            failureThreshold: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-server
+spec:
+  selector:
+    app: http-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

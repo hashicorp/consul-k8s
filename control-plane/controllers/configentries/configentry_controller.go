@@ -370,6 +370,12 @@ func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler recon
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(tgw.transformSecret),
 		)
+		// Watch the non-secret credential-injection ConfigMaps so editing one
+		// rolls the referencing gateway's workload.
+		builder.Watches(
+			&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(tgw.transformConfigMap),
+		)
 	}
 
 	// 4. THE FINAL STEP: Complete the builder.

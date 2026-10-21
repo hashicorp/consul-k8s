@@ -1,0 +1,19 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Hostname-pinned route: declares demo.example.com as a hostname so that
+# generateAPIGatewayDNSSANs() adds it as a literal SAN on the leaf cert.
+# In-mesh backend static-server-2 plays the s2 role.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ent-tls-termination-route-s2
+spec:
+  hostnames:
+  - "demo.example.com"
+  parentRefs:
+  - name: ent-tls-termination-gateway
+  rules:
+  - backendRefs:
+    - name: static-server-2
+      port: 80

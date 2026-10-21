@@ -1,0 +1,11 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: GatewayClassConfig
+metadata:
+  name: multi-listener-gwcc
+spec:
+  # Map privileged ports so the gateway pods run without elevated privileges
+  # under both default and restricted PodSecurity Admission policies.
+  mapPrivilegedContainerPorts: 8000

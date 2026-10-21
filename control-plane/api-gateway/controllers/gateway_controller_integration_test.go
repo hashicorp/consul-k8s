@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,8 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -42,9 +41,8 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	s := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(s))
-	require.NoError(t, gwv1alpha2.Install(s))
 	require.NoError(t, gwv1.Install(s))
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	testCases := map[string]struct {
@@ -52,7 +50,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 		certFn           func(*testing.T, context.Context, client.WithWatch, string) *corev1.Secret
 		gwFn             func(*testing.T, context.Context, client.WithWatch, string) *gwv1.Gateway
 		httpRouteFn      func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway, *v1alpha1.RouteAuthFilter) *gwv1.HTTPRoute
-		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway) *gwv1alpha2.TCPRoute
+		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway) *gwv1.TCPRoute
 		externalFilterFn func(*testing.T, context.Context, client.WithWatch, string) *v1alpha1.RouteAuthFilter
 		policyFn         func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway, string)
 	}{
@@ -109,6 +107,21 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			},
 			policyFn: createGWPolicy,
 		},
+		// Verifies that a gateway whose listener carries the grpc protocol annotation
+		// does not trigger infinite reconciliation once Consul (v2.1.0+) accepts it.
+		// Requires the consul binary on $PATH to be built from the local consul repo
+		// (main, post-PR-23784) which supports the grpc/http2 listener protocols.
+		"grpc listener protocol annotation does not cause infinite reconciliation": {
+			namespace:   "",
+			certFn:      createCert,
+			gwFn:        createGRPCProtocolAnnotationAPIGW,
+			httpRouteFn: minimalFieldsSetHTTPRoute,
+			tcpRouteFn:  minimalFieldsSetTCPRoute,
+			externalFilterFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ string) *v1alpha1.RouteAuthFilter {
+				return nil
+			},
+			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1.Gateway, _ string) {},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -117,12 +130,20 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 				WithStatusSubresource(
 					&gwv1.Gateway{},
 					&gwv1.HTTPRoute{},
-					&gwv1alpha2.TCPRoute{},
+					&gwv1.TCPRoute{},
 					&v1alpha1.RouteAuthFilter{},
 				)
 			fclient := registerFieldIndexersForTest(fakeClient)
 			k8sClient := fclient.Build()
 			consulTestServerClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+
+			// The grpc/http2 listener protocol sub-case requires Consul ≥ 2.1.0
+			// (post-PR-23784).  CI typically runs against the latest released
+			// binary (≥ 2.0.x, < 2.1.0) which rejects those protocols in the
+			// config entry API and exits with code 1.  Skip rather than fail.
+			if strings.Contains(name, "grpc listener protocol") {
+				skipIfConsulLacksGRPCListenerSupport(t, consulTestServerClient.APIClient)
+			}
 			ctx, cancel := context.WithCancel(context.Background())
 
 			t.Cleanup(func() {
@@ -218,7 +239,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			// ✅ Wait for routes to be created before reconciling
 			require.Eventually(t, func() bool {
 				httpRoute := &gwv1.HTTPRoute{}
-				tcpRoute := &gwv1alpha2.TCPRoute{}
+				tcpRoute := &gwv1.TCPRoute{}
 				httpErr := k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: httpRouteObj.Namespace,
 					Name:      httpRouteObj.Name,
@@ -340,7 +361,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			require.Eventually(t, func() bool {
 				gwObj := &gwv1.Gateway{}
 				httpRouteObjCheck := &gwv1.HTTPRoute{}
-				tcpRouteObjCheck := &gwv1alpha2.TCPRoute{}
+				tcpRouteObjCheck := &gwv1.TCPRoute{}
 				certCheck := &corev1.Secret{}
 
 				gwErr := k8sClient.Get(ctx, gwNamespaceName, gwObj)
@@ -760,16 +781,16 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 	return route
 }
 
-func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
-	route := &gwv1alpha2.TCPRoute{
+func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1.TCPRoute {
+	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
 		},
-		Spec: gwv1alpha2.TCPRouteSpec{
+		Spec: gwv1.TCPRouteSpec{
 			CommonRouteSpec: gwv1.CommonRouteSpec{
 				ParentRefs: []gwv1.ParentReference{
 					{
@@ -781,7 +802,7 @@ func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient cli
 					},
 				},
 			},
-			Rules: []gwv1alpha2.TCPRouteRule{
+			Rules: []gwv1.TCPRouteRule{
 				{
 					BackendRefs: []gwv1.BackendRef{
 						{
@@ -1071,16 +1092,16 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 	return route
 }
 
-func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
-	route := &gwv1alpha2.TCPRoute{
+func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1.TCPRoute {
+	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
 		},
-		Spec: gwv1alpha2.TCPRouteSpec{
+		Spec: gwv1.TCPRouteSpec{
 			CommonRouteSpec: gwv1.CommonRouteSpec{
 				ParentRefs: []gwv1.ParentReference{
 					{
@@ -1092,7 +1113,7 @@ func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient clien
 					},
 				},
 			},
-			Rules: []gwv1alpha2.TCPRouteRule{
+			Rules: []gwv1.TCPRouteRule{
 				{
 					BackendRefs: []gwv1.BackendRef{
 						{
@@ -1434,16 +1455,16 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 	return route
 }
 
-func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
-	route := &gwv1alpha2.TCPRoute{
+func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1.TCPRoute {
+	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
 		},
-		Spec: gwv1alpha2.TCPRouteSpec{
+		Spec: gwv1.TCPRouteSpec{
 			CommonRouteSpec: gwv1.CommonRouteSpec{
 				ParentRefs: []gwv1.ParentReference{
 					{
@@ -1454,7 +1475,7 @@ func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClien
 					},
 				},
 			},
-			Rules: []gwv1alpha2.TCPRouteRule{
+			Rules: []gwv1.TCPRouteRule{
 				{
 					BackendRefs: []gwv1.BackendRef{
 						{
@@ -1742,4 +1763,266 @@ func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatc
 
 	err := k8sClient.Create(ctx, policy)
 	require.NoError(t, err)
+}
+
+// TestListenerProtocolAnnotation_TranslatorProducesCorrectProtocol verifies that
+// when a Gateway carries the listener-protocol annotation, the ResourceTranslator
+// produces a Consul api-gateway config entry with the annotated listener protocol
+// (RFC-0002, consul-k8s annotation-based protocol selection).
+//
+// Note: this test uses the ResourceTranslator directly (the same code path used
+// during reconciliation). The Consul server-side validation of the new protocol
+// values is exercised in the consul-core tests.
+// skipIfConsulLacksGRPCListenerSupport skips the test if the Consul agent
+// binary on $PATH does not support grpc/http2 as APIGateway listener protocols.
+// Support was added in Consul 2.1.0 (consul-core PR #23784).  Running this
+// sub-case against an older binary causes the test server to reject the config
+// entry and exit with code 1, making the test fail for the wrong reason.
+func skipIfConsulLacksGRPCListenerSupport(t *testing.T, client *api.Client) {
+	t.Helper()
+	info, err := client.Agent().Self()
+	if err != nil {
+		t.Skipf("could not query Consul agent version (agent may not be ready): %v — skipping grpc listener test", err)
+	}
+	versionStr, _ := info["Config"]["Version"].(string)
+	// Version strings look like "2.1.0" or "2.1.0-dev". We need ≥ 2.1.0.
+	// A simple prefix check suffices: anything starting with "2.0" or "1." is too old.
+	if strings.HasPrefix(versionStr, "1.") || strings.HasPrefix(versionStr, "2.0") {
+		t.Skipf("skipping grpc listener protocol test: Consul %q does not support grpc/http2 listener protocols (requires ≥ 2.1.0)", versionStr)
+	}
+}
+
+func TestListenerProtocolAnnotation_TranslatorProducesCorrectProtocol(t *testing.T) {
+	for _, tc := range []struct {
+		annotation   string
+		wantProtocol string
+	}{
+		{"grpc", "grpc"},
+		{"http2", "http2"},
+	} {
+		tc := tc
+		t.Run(tc.annotation, func(t *testing.T) {
+			t.Parallel()
+
+			translator := common.ResourceTranslator{}
+			listenerName := "grpc-listener"
+			annotationKey := common.ListenerProtocolAnnotationPrefix + listenerName + common.ListenerProtocolAnnotationSuffix
+
+			gw := gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gw-" + tc.annotation,
+					Namespace: "default",
+					Annotations: map[string]string{
+						annotationKey: tc.annotation,
+					},
+				},
+				Spec: gwv1.GatewaySpec{
+					GatewayClassName: "gwclass",
+					Listeners: []gwv1.Listener{
+						{
+							Name:     gwv1.SectionName(listenerName),
+							Port:     9080,
+							Protocol: gwv1.HTTPProtocolType,
+						},
+					},
+				},
+			}
+
+			// ToAPIGateway drives the same translation path used during reconciliation.
+			consulEntry := translator.ToAPIGateway(gw, common.NewResourceMap(
+				translator,
+				common.NoopReferenceValidator,
+				logrtest.New(t),
+			), nil)
+
+			require.Len(t, consulEntry.Listeners, 1,
+				"expected exactly one listener in the translated config entry")
+			require.Equal(t, tc.wantProtocol, consulEntry.Listeners[0].Protocol,
+				"Consul listener Protocol should be %q from annotation %q", tc.wantProtocol, tc.annotation)
+		})
+	}
+}
+
+// createGRPCProtocolAnnotationAPIGW creates a Gateway with an HTTP listener
+// upgraded to Consul protocol "grpc" via the per-section annotation.
+// Listener layout (mirrors minimalFieldsSet*Route index expectations):
+//
+//	[0] grpc-listener  HTTP/9080  (annotated as grpc)
+//	[1] listener-three TCP/8081   (used by minimalFieldsSetTCPRoute)
+func createGRPCProtocolAnnotationAPIGW(t *testing.T, ctx context.Context, k8sClient client.WithWatch, namespace string) *gwv1.Gateway {
+	t.Helper()
+
+	listenerName := "grpc-listener"
+	annotationKey := common.ListenerProtocolAnnotationPrefix + listenerName + common.ListenerProtocolAnnotationSuffix
+
+	gwClassCfg := &v1alpha1.GatewayClassConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "GatewayClassConfig",
+			APIVersion: "gateway.networking.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gateway-class-config",
+		},
+		Spec: v1alpha1.GatewayClassConfigSpec{},
+	}
+	gwClass := &gwv1.GatewayClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "GatewayClass",
+			APIVersion: "gateway.networking.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gatewayclass",
+		},
+		Spec: gwv1.GatewayClassSpec{
+			ControllerName: "consul.hashicorp.com/gateway-controller",
+			ParametersRef: &gwv1.ParametersReference{
+				Group: "consul.hashicorp.com",
+				Kind:  "GatewayClassConfig",
+				Name:  "gateway-class-config",
+			},
+			Description: new(string),
+		},
+	}
+
+	if namespace == "" {
+		namespace = "default"
+	}
+	gw := &gwv1.Gateway{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Gateway",
+			APIVersion: "gateway.networking.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gw",
+			Namespace: namespace,
+			Annotations: map[string]string{
+				annotationKey: "grpc",
+			},
+		},
+		Spec: gwv1.GatewaySpec{
+			GatewayClassName: gwv1.ObjectName(gwClass.Name),
+			Listeners: []gwv1.Listener{
+				// [0] grpc listener — referenced by minimalFieldsSetHTTPRoute via Listeners[0]
+				{
+					Name:     gwv1.SectionName(listenerName),
+					Port:     gwv1.PortNumber(9080),
+					Protocol: gwv1.HTTPProtocolType,
+					AllowedRoutes: &gwv1.AllowedRoutes{
+						Namespaces: &gwv1.RouteNamespaces{
+							From: common.PointerTo(gwv1.FromNamespaces("All")),
+						},
+					},
+				},
+				// [1] TCP listener — referenced by minimalFieldsSetTCPRoute via Listeners[1]
+				{
+					Name:     gwv1.SectionName("listener-three"),
+					Port:     gwv1.PortNumber(8081),
+					Protocol: gwv1.TCPProtocolType,
+					AllowedRoutes: &gwv1.AllowedRoutes{
+						Namespaces: &gwv1.RouteNamespaces{
+							From: common.PointerTo(gwv1.FromNamespaces("All")),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, k8sClient.Create(ctx, gwClassCfg))
+	require.NoError(t, k8sClient.Create(ctx, gwClass))
+	require.NoError(t, k8sClient.Create(ctx, gw))
+	return gw
+}
+
+// TestListenerProtocolAnnotation_Day2Update verifies that when a Gateway's
+// listener-protocol annotation changes (day-2 operation), EntriesEqual detects
+// the difference so the reconciler writes the updated config entry to Consul,
+// and that a subsequent reconcile with no further changes is stable (no
+// infinite reconciliation).
+//
+// This test exercises the full translation → diff path without requiring a
+// live Consul server.
+func TestListenerProtocolAnnotation_Day2Update(t *testing.T) {
+	t.Parallel()
+
+	translator := common.ResourceTranslator{}
+	logger := logrtest.New(t)
+	listenerName := "app-listener"
+	annotationKey := common.ListenerProtocolAnnotationPrefix + listenerName + common.ListenerProtocolAnnotationSuffix
+
+	makeGateway := func(annotationValue string) gwv1.Gateway {
+		annotations := map[string]string{}
+		if annotationValue != "" {
+			annotations[annotationKey] = annotationValue
+		}
+		return gwv1.Gateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "edge",
+				Namespace:   "default",
+				Annotations: annotations,
+			},
+			Spec: gwv1.GatewaySpec{
+				Listeners: []gwv1.Listener{
+					{
+						Name:     gwv1.SectionName(listenerName),
+						Port:     gwv1.PortNumber(9080),
+						Protocol: gwv1.HTTPProtocolType,
+					},
+				},
+			},
+		}
+	}
+
+	resourceMap := common.NewResourceMap(translator, common.NoopReferenceValidator, logger)
+
+	t.Run("day1 create: http annotation produces grpc protocol in Consul entry", func(t *testing.T) {
+		t.Parallel()
+		gw := makeGateway("grpc")
+		entry := translator.ToAPIGateway(gw, resourceMap, nil)
+		require.Equal(t, "grpc", entry.Listeners[0].Protocol,
+			"day-1: grpc annotation must produce protocol=grpc in the Consul config entry")
+	})
+
+	t.Run("day1 create: http2 annotation produces http2 protocol in Consul entry", func(t *testing.T) {
+		t.Parallel()
+		gw := makeGateway("http2")
+		entry := translator.ToAPIGateway(gw, resourceMap, nil)
+		require.Equal(t, "http2", entry.Listeners[0].Protocol,
+			"day-1: http2 annotation must produce protocol=http2 in the Consul config entry")
+	})
+
+	t.Run("day2 update: removing grpc annotation detected as change by diff (triggers Consul write)", func(t *testing.T) {
+		t.Parallel()
+
+		// Simulate what is stored in Consul after day-1 (grpc).
+		consulEntry := translator.ToAPIGateway(makeGateway("grpc"), resourceMap, nil)
+
+		// Day-2: operator removes the annotation (falls back to plain HTTP).
+		desiredEntry := translator.ToAPIGateway(makeGateway(""), resourceMap, nil)
+
+		require.False(t, common.EntriesEqual(consulEntry, desiredEntry),
+			"removing grpc annotation must be detected as unequal so the reconciler writes the update to Consul")
+	})
+
+	t.Run("day2 update: changing grpc annotation to http2 detected as change by diff", func(t *testing.T) {
+		t.Parallel()
+
+		consulEntry := translator.ToAPIGateway(makeGateway("grpc"), resourceMap, nil)
+		desiredEntry := translator.ToAPIGateway(makeGateway("http2"), resourceMap, nil)
+
+		require.False(t, common.EntriesEqual(consulEntry, desiredEntry),
+			"changing grpc→http2 annotation must be detected as unequal")
+	})
+
+	t.Run("day2 no-op: same grpc annotation reconciles without change (stable, no infinite loop)", func(t *testing.T) {
+		t.Parallel()
+
+		// Both sides produced from the same gateway spec — must be equal so the
+		// reconciler skips the Consul write (no infinite reconciliation).
+		consulEntry := translator.ToAPIGateway(makeGateway("grpc"), resourceMap, nil)
+		desiredEntry := translator.ToAPIGateway(makeGateway("grpc"), resourceMap, nil)
+
+		require.True(t, common.EntriesEqual(consulEntry, desiredEntry),
+			"identical grpc annotation must produce equal entries (no spurious Consul write)")
+	})
 }

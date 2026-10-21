@@ -60,15 +60,24 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			Flags: []string{
+				"-addresses=localhost",
+				"-resource-prefix=prefix",
+			},
+			ExpErr: "-k8s-namespace must be set",
+		},
+		{
+			Flags: []string{
 				"-acl-replication-token-file=/notexist",
 				"-addresses=localhost",
-				"-resource-prefix=prefix"},
+				"-resource-prefix=prefix",
+				"-k8s-namespace=default"},
 			ExpErr: "unable to read token from file \"/notexist\": open /notexist: no such file or directory",
 		},
 		{
 			Flags: []string{
 				"-addresses=localhost",
 				"-resource-prefix=prefix",
+				"-k8s-namespace=default",
 				"-sync-consul-node-name=Speci@l_Chars",
 			},
 			ExpErr: "-sync-consul-node-name=Speci@l_Chars is invalid: node name will not be discoverable " +
@@ -78,6 +87,7 @@ func TestRun_FlagValidation(t *testing.T) {
 			Flags: []string{
 				"-addresses=localhost",
 				"-resource-prefix=prefix",
+				"-k8s-namespace=default",
 				"-sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long",
 			},
 			ExpErr: "-sync-consul-node-name=5r9OPGfSRXUdGzNjBdAwmhCBrzHDNYs4XjZVR4wp7lSLIzqwS0ta51nBLIN0TMPV-too-long is invalid: node name will not be discoverable " +
@@ -803,9 +813,10 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 	responseCode := cmd.Run(firstRunArgs)
 	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
 
+	queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
+
 	// Validate the binding rule.
 	{
-		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
 		authMethodName := resourcePrefix + "-k8s-auth-method"
 		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
 		require.NoError(t, err)
@@ -819,6 +830,23 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		require.Equal(t, "serviceaccount.name!=default", aclRule.Selector)
 	}
 
+	// Simulate upgrading an existing installation with the old name-only
+	// component binding rule.
+	componentAuthMethodName := resourcePrefix + "-k8s-component-auth-method"
+	componentRules, _, err := consul.ACL().BindingRuleList(componentAuthMethodName, queryOpts)
+	require.NoError(t, err)
+	var componentRule *api.ACLBindingRule
+	for _, rule := range componentRules {
+		if rule.BindName == resourcePrefix+"-connect-inject-acl-role" {
+			componentRule = rule
+			break
+		}
+	}
+	require.NotNil(t, componentRule)
+	componentRule.Selector = fmt.Sprintf("serviceaccount.name==%q", resourcePrefix+"-connect-injector")
+	_, _, err = consul.ACL().BindingRuleUpdate(componentRule, &api.WriteOptions{Token: queryOpts.Token})
+	require.NoError(t, err)
+
 	// Re-run the command with namespace flags. The policies should be updated.
 	// NOTE: We're redefining the command so that the old flag values are
 	// reset.
@@ -831,7 +859,6 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 
 	// Check the binding rule is changed expected.
 	{
-		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
 		authMethodName := resourcePrefix + "-k8s-auth-method"
 		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
 		require.NoError(t, err)
@@ -844,6 +871,24 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
 		require.Equal(t, "serviceaccount.name!=changed", aclRule.Selector)
 	}
+
+	componentRules, _, err = consul.ACL().BindingRuleList(componentAuthMethodName, queryOpts)
+	require.NoError(t, err)
+	for _, rule := range componentRules {
+		if rule.BindName == resourcePrefix+"-connect-inject-acl-role" {
+			require.Equal(
+				t,
+				fmt.Sprintf(
+					"serviceaccount.name==%q and serviceaccount.namespace==%q",
+					resourcePrefix+"-connect-injector",
+					ns,
+				),
+				rule.Selector,
+			)
+			return
+		}
+	}
+	require.Fail(t, "connect-inject component binding rule not found")
 }
 
 // Test that the catalog sync policy is updated if the Consul node name changes.
@@ -2078,6 +2123,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 				found = false
 				for j := range rb {
 					if rb[j].BindName == c.Roles[i] {
+						require.Contains(t, rb[j].Selector, fmt.Sprintf("serviceaccount.namespace==%q", ns))
 						found = true
 						break
 					}
@@ -2238,6 +2284,7 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 					found = false
 					for j := range rb {
 						if rb[j].BindName == c.Roles[i] {
+							require.Contains(r, rb[j].Selector, fmt.Sprintf("serviceaccount.namespace==%q", ns))
 							found = true
 							break
 						}
@@ -2562,6 +2609,187 @@ func TestRun_PrimaryDatacenter_ComponentAuthMethod(t *testing.T) {
 	authMethod, _, err := consulClient.ACL().AuthMethodRead(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
 	require.NoError(t, err)
 	require.NotNil(t, authMethod)
+}
+
+// Test that when auth method creation is disabled and the auth method has not been
+// pre-created, the command fails fast with an actionable error rather than retrying
+// binding rule creation until the timeout.
+func TestRun_ComponentAuthMethod_CreateDisabled_MissingAuthMethod(t *testing.T) {
+	t.Parallel()
+
+	k8s, testClient := completeSetup(t)
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-addresses", strings.Split(testClient.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testClient.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testClient.TestServer.GRPCAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-create-auth-methods=false",
+	}
+
+	// The command must fail fast rather than retrying binding rule creation until
+	// the timeout, so assert it returns well inside the configured timeout.
+	start := time.Now()
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 1, responseCode)
+	require.Less(t, time.Since(start), 30*time.Second)
+
+	// The auth method must not have been created.
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+	consulConfig := testClient.Cfg
+	consulConfig.APIClientConfig.Token = bootToken
+	consulClient, err := api.NewClient(consulConfig.APIClientConfig)
+	require.NoError(t, err)
+	authMethod, _, err := consulClient.ACL().AuthMethodRead(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.Nil(t, authMethod)
+
+	// No binding rules should have been written either.
+	rules, _, err := consulClient.ACL().BindingRuleList(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.Empty(t, rules)
+}
+
+// Test that when auth method creation is disabled and the auth methods have been
+// pre-created, the command succeeds and still manages the binding rules.
+func TestRun_ComponentAuthMethod_CreateDisabled_PreCreatedAuthMethod(t *testing.T) {
+	t.Parallel()
+
+	bootToken := "bca50e6c-1a1f-4c9b-8b1f-5a2b6b8b0d0a"
+	k8s, testAgent := completeBootstrappedSetup(t, bootToken)
+	caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
+
+	consulClient, err := api.NewClient(&api.Config{
+		Address: testAgent.TestServer.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		_, _, err := consulClient.ACL().PolicyList(nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
+
+	// Pre-create the auth methods that the command is expected to consume.
+	componentAuthMethod := "preconfigured-k8s-component-auth-method"
+	connectAuthMethod := "preconfigured-k8s-auth-method"
+	for _, name := range []string{componentAuthMethod, connectAuthMethod} {
+		_, _, err = consulClient.ACL().AuthMethodCreate(&api.ACLAuthMethod{
+			Name: name,
+			Type: "kubernetes",
+			Config: map[string]interface{}{
+				"Host":              "https://kubernetes.default.svc",
+				"CACert":            caCert,
+				"ServiceAccountJWT": jwtToken,
+			},
+		}, &api.WriteOptions{})
+		require.NoError(t, err)
+	}
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+		backend:   &FakeSecretsBackend{bootstrapToken: bootToken},
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-addresses", strings.Split(testAgent.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testAgent.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testAgent.TestServer.GRPCAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-connect-inject",
+		"-create-auth-methods=false",
+		"-auth-method-name-prefix=preconfigured",
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	// Binding rules must still have been created against the pre-existing auth methods.
+	rules, _, err := consulClient.ACL().BindingRuleList(componentAuthMethod, &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, rules)
+
+	rules, _, err = consulClient.ACL().BindingRuleList(connectAuthMethod, &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, rules)
+}
+
+// Test that -auth-method-name-prefix renames the auth methods while keeping the
+// component and connect inject auth methods distinct from one another.
+func TestRun_AuthMethodNamePrefix(t *testing.T) {
+	t.Parallel()
+
+	k8s, testClient := completeSetup(t)
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-addresses", strings.Split(testClient.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testClient.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testClient.TestServer.GRPCAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-connect-inject",
+		"-auth-method-name-prefix=cluster-b",
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+	consulConfig := testClient.Cfg
+	consulConfig.APIClientConfig.Token = bootToken
+	consulClient, err := api.NewClient(consulConfig.APIClientConfig)
+	require.NoError(t, err)
+
+	// The component and connect inject auth methods must remain distinct so that
+	// the connect inject binding rule is not applied to Consul components.
+	componentAuthMethod, _, err := consulClient.ACL().AuthMethodRead("cluster-b-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, componentAuthMethod)
+
+	connectAuthMethod, _, err := consulClient.ACL().AuthMethodRead("cluster-b-k8s-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, connectAuthMethod)
+
+	// The default names must not have been created.
+	defaultAuthMethod, _, err := consulClient.ACL().AuthMethodRead(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.Nil(t, defaultAuthMethod)
+
+	// The connect inject auth method binds a service identity, the component auth
+	// method binds roles. They must not be mixed.
+	connectRules, _, err := consulClient.ACL().BindingRuleList("cluster-b-k8s-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.Len(t, connectRules, 1)
+	require.Equal(t, api.BindingRuleBindTypeService, connectRules[0].BindType)
+
+	componentRules, _, err := consulClient.ACL().BindingRuleList("cluster-b-k8s-component-auth-method", &api.QueryOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, componentRules)
+	for _, rule := range componentRules {
+		require.Equal(t, api.BindingRuleBindTypeRole, rule.BindType)
+	}
 }
 
 // Test that the local and global component auth methods gets created when run in the

@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/hashicorp/consul/api"
 
@@ -240,7 +239,7 @@ func routeAllowedByProtocol(listener gwv1.Listener, route client.Object) bool {
 		return listener.Protocol == gwv1.HTTPProtocolType ||
 			listener.Protocol == gwv1.HTTPSProtocolType
 
-	case *gwv1alpha2.TCPRoute:
+	case *gwv1.TCPRoute:
 		return listener.Protocol == gwv1.TCPProtocolType
 
 	default:
@@ -307,7 +306,7 @@ func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object,
 			})
 			return entry
 		})
-	case *gwv1alpha2.TCPRoute:
+	case *gwv1.TCPRoute:
 		resources.MutateTCPRoute(client.ObjectKeyFromObject(object), r.handleRouteSyncStatus(snapshot, object), func(entry api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
 			entry.Parents = common.Filter(entry.Parents, func(parent api.ResourceReference) bool {
 				return consulParentMatches(entry.Namespace, gateway, parent)
@@ -367,7 +366,7 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 
 			return new
 		})
-	case *gwv1alpha2.TCPRoute:
+	case *gwv1.TCPRoute:
 		resources.TranslateAndMutateTCPRoute(key, r.handleRouteSyncStatus(snapshot, object), func(old *api.TCPRouteConfigEntry, new api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
 			if old != nil {
 				for _, parent := range old.Parents {
@@ -397,7 +396,7 @@ func entryKind(object client.Object) string {
 	switch object.(type) {
 	case *gwv1.HTTPRoute:
 		return api.HTTPRoute
-	case *gwv1alpha2.TCPRoute:
+	case *gwv1.TCPRoute:
 		return api.TCPRoute
 	}
 	return ""
@@ -425,7 +424,7 @@ func getRouteParents(object client.Object) []gwv1.ParentReference {
 	switch v := object.(type) {
 	case *gwv1.HTTPRoute:
 		return v.Spec.ParentRefs
-	case *gwv1alpha2.TCPRoute:
+	case *gwv1.TCPRoute:
 		return v.Spec.ParentRefs
 	}
 	return nil
@@ -435,7 +434,7 @@ func getRouteParentsStatus(object client.Object) []gwv1.RouteParentStatus {
 	switch v := object.(type) {
 	case *gwv1.HTTPRoute:
 		return v.Status.RouteStatus.Parents
-	case *gwv1alpha2.TCPRoute:
+	case *gwv1.TCPRoute:
 		return v.Status.RouteStatus.Parents
 	}
 	return nil
@@ -445,7 +444,7 @@ func setRouteParentsStatus(object client.Object, parents []gwv1.RouteParentStatu
 	switch v := object.(type) {
 	case *gwv1.HTTPRoute:
 		v.Status.RouteStatus.Parents = parents
-	case *gwv1alpha2.TCPRoute:
+	case *gwv1.TCPRoute:
 		v.Status.RouteStatus.Parents = parents
 	}
 }
@@ -458,8 +457,8 @@ func getRouteBackends(object client.Object) []gwv1.BackendRef {
 				return rule.BackendRef
 			})
 		}))
-	case *gwv1alpha2.TCPRoute:
-		return common.Flatten(common.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1.BackendRef {
+	case *gwv1.TCPRoute:
+		return common.Flatten(common.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1.TCPRouteRule) []gwv1.BackendRef {
 			return rule.BackendRefs
 		}))
 	}
@@ -470,7 +469,7 @@ func canReferenceBackend(object client.Object, ref gwv1.BackendRef, resources *c
 	switch v := object.(type) {
 	case *gwv1.HTTPRoute:
 		return resources.HTTPRouteCanReferenceBackend(*v, ref)
-	case *gwv1alpha2.TCPRoute:
+	case *gwv1.TCPRoute:
 		return resources.TCPRouteCanReferenceBackend(*v, ref)
 	}
 	return false

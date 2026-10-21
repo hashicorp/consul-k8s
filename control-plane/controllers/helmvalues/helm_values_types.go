@@ -12,6 +12,13 @@ type HelmValues struct {
 	TerminatingGateways TerminatingGatewaysConfig `json:"terminatingGateways"`
 	ConnectInject       ConnectInjectConfig       `json:"connectInject"`
 	ExternalServers     ExternalServersConfig     `json:"externalServers"`
+	AI                  AIConfig                  `json:"ai"`
+}
+
+// AIConfig mirrors the chart's ai values. ai.enabled also drives the Consul
+// consul-ai feature gate, which credential injection requires.
+type AIConfig struct {
+	Enabled bool `json:"enabled"`
 }
 
 type ReleaseConfig struct {
@@ -57,7 +64,12 @@ type CACert struct {
 }
 
 type ACLsConfig struct {
-	ManageSystemACLs bool `json:"manageSystemACLs"`
+	ManageSystemACLs bool             `json:"manageSystemACLs"`
+	AuthMethod       AuthMethodConfig `json:"authMethod"`
+}
+
+type AuthMethodConfig struct {
+	Name string `json:"name"`
 }
 
 type MetricsConfig struct {
@@ -75,7 +87,7 @@ type TerminatingGatewaysConfig struct {
 type Defaults struct {
 	Replicas                  int                    `json:"replicas"`
 	ConsulNamespace           string                 `json:"consulNamespace"`
-	Annotations               map[string]string      `json:"annotations"`
+	Annotations               StringMap              `json:"annotations"`
 	Affinity                  string                 `json:"affinity"`
 	Tolerations               string                 `json:"tolerations"`
 	TopologySpreadConstraints string                 `json:"topologySpreadConstraints"`
@@ -98,11 +110,11 @@ type SecretsBackend struct {
 }
 
 type Vault struct {
-	Enabled          bool              `json:"enabled"`
-	ConsulCARole     string            `json:"consulCARole"`
-	CA               VaultCA           `json:"ca"`
-	AgentAnnotations map[string]string `json:"agentAnnotations,omitempty"`
-	VaultNamespace   string            `json:"vaultNamespace,omitempty"`
+	Enabled          bool      `json:"enabled"`
+	ConsulCARole     string    `json:"consulCARole"`
+	CA               VaultCA   `json:"ca"`
+	AgentAnnotations StringMap `json:"agentAnnotations,omitempty"`
+	VaultNamespace   string    `json:"vaultNamespace,omitempty"`
 }
 
 type VaultCA struct {

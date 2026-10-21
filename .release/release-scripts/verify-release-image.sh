@@ -2,18 +2,26 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 #
-# Verifies that the released consul-k8s-control-plane Docker image is available
-# in the HashiCorp registry and reports its version and image digest (SHA).
+# Verifies that the released consul-k8s-control-plane container image is
+# available in the HashiCorp registry and reports its version and image digest
+# (SHA). Uses the Podman CLI.
 #
 # Workflow:
-#   1. Pull  hashicorp/consul-k8s-control-plane:<version>  (prints pull output)
+#   1. Pull  docker.io/hashicorp/consul-k8s-control-plane:<version>  (prints pull output)
 #   2. Print the image digest (sha256) and image ID
 #   3. Run   `consul-k8s-control-plane version` inside the image (prints output)
 #
-# Usage:
-#   ./verify-release-image.sh
-#   CONSUL_K8S_PRODUCT_VERSION=2.0.2 ./verify-release-image.sh
+# Requirements:
+#   - podman in PATH. On macOS/Windows, a running Podman machine
+#     (`podman machine start`).
+#   - For staging, be logged in to the Artifactory registry
+#     (`podman login crt-core-staging-docker-local.artifactory.hashicorp.engineering`).
 #
+# Usage:
+#   ./verify-release-image.sh [staging|production]
+#   CONSUL_K8S_PRODUCT_VERSION=2.0.2 ./verify-release-image.sh staging
+#
+# If no environment argument is provided, it defaults to production.
 # The version is prompted interactively with a [default]; press Enter to accept.
 # Setting CONSUL_K8S_PRODUCT_VERSION in the environment pre-fills the default.
 
@@ -24,8 +32,33 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 DEFAULT_CONSUL_K8S_PRODUCT_VERSION=2.0.2
 
-# The image repository to verify.
-IMAGE_REPO="hashicorp/consul-k8s-control-plane"
+# -----------------------------------------------------------------------------
+# Arguments
+# -----------------------------------------------------------------------------
+ENVIRONMENT=""
+for arg in "$@"; do
+  case "${arg}" in
+    staging | production) ENVIRONMENT="${arg}" ;;
+    -h | --help)
+      echo "Usage: ./verify-release-image.sh [staging|production]"
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: ${arg}" >&2
+      exit 1
+      ;;
+  esac
+done
+
+ENVIRONMENT="${ENVIRONMENT:-production}"
+
+# The image repository to verify (can be overridden via IMAGE_REPO).
+# Use fully qualified names so Podman does not rely on short-name resolution.
+if [[ "${ENVIRONMENT}" == "staging" ]]; then
+  IMAGE_REPO="${IMAGE_REPO:-crt-core-staging-docker-local.artifactory.hashicorp.engineering/docker.io/hashicorp/consul-k8s-control-plane}"
+else
+  IMAGE_REPO="${IMAGE_REPO:-docker.io/hashicorp/consul-k8s-control-plane}"
+fi
 
 # prompt_var VAR_NAME DEFAULT_VALUE
 # Prompts for a value, showing the default; an empty reply keeps the default.
@@ -41,13 +74,14 @@ prompt_var() {
 # -----------------------------------------------------------------------------
 # Prerequisite checks
 # -----------------------------------------------------------------------------
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Error: required command 'docker' not found in PATH." >&2
+if ! command -v podman >/dev/null 2>&1; then
+  echo "Error: required command 'podman' not found in PATH." >&2
   exit 1
 fi
 
-if ! docker info >/dev/null 2>&1; then
-  echo "Error: the Docker daemon is not running or not reachable." >&2
+if ! podman info >/dev/null 2>&1; then
+  echo "Error: Podman is not running or not reachable." >&2
+  echo "       On macOS/Windows, start it with: podman machine start" >&2
   exit 1
 fi
 
@@ -62,13 +96,16 @@ echo
 IMAGE_REF="${IMAGE_REPO}:${CONSUL_K8S_PRODUCT_VERSION}"
 
 # -----------------------------------------------------------------------------
-# 1. Pull the image (docker pull prints its own progress and final digest)
+# 1. Pull the image (podman pull prints its own progress and final image ID)
 # -----------------------------------------------------------------------------
-echo "==> docker pull ${IMAGE_REF}"
+echo "==> podman pull ${IMAGE_REF}"
 echo
-if ! docker pull "${IMAGE_REF}"; then
+if ! podman pull "${IMAGE_REF}"; then
   echo >&2
   echo "Error: failed to pull ${IMAGE_REF}. Is this version published in the registry?" >&2
+  if [[ "${ENVIRONMENT}" == "staging" ]]; then
+    echo "       For staging, ensure you are logged in: podman login ${IMAGE_REPO%%/*}" >&2
+  fi
   exit 1
 fi
 echo
@@ -77,14 +114,14 @@ echo
 # 2. Report the image digest (SHA) and image ID
 # -----------------------------------------------------------------------------
 echo "==> Image digest (SHA) for ${IMAGE_REF}:"
-DIGEST="$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${IMAGE_REF}" 2>/dev/null || true)"
+DIGEST="$(podman image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${IMAGE_REF}" 2>/dev/null || true)"
 if [[ -n "${DIGEST}" ]]; then
-  printf '%s' "${DIGEST}"
+  printf '%s\n' "${DIGEST}"
 else
   echo "  (no RepoDigests found for ${IMAGE_REF})"
 fi
 
-IMAGE_ID="$(docker inspect --format '{{.Id}}' "${IMAGE_REF}" 2>/dev/null || true)"
+IMAGE_ID="$(podman image inspect --format '{{.Id}}' "${IMAGE_REF}" 2>/dev/null || true)"
 echo "  Image ID: ${IMAGE_ID}"
 echo
 
@@ -98,9 +135,9 @@ if [[ -t 1 ]]; then
   run_flags+=(-t)
 fi
 
-echo "==> docker run --rm -ti ${IMAGE_REF} consul-k8s-control-plane version"
+echo "==> podman run --rm -ti ${IMAGE_REF} consul-k8s-control-plane version"
 echo
-docker run "${run_flags[@]}" "${IMAGE_REF}" consul-k8s-control-plane version
+podman run "${run_flags[@]}" "${IMAGE_REF}" consul-k8s-control-plane version
 echo
 
 echo "==> Verification complete for ${IMAGE_REF}."

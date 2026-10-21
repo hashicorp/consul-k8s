@@ -199,7 +199,7 @@ func (c *DebugCommand) init() {
 		Name:    flagCapture,
 		Target:  &c.capture,
 		Default: []string{"all"},
-		Usage:   "List of components to capture. Supported values are: all, helm, crds, sidecar, pods, proxy. (e.g. -capture pods -capture proxy).",
+		Usage:   "List of components to capture. Supported values are: all, helm, crds, sidecar, logs, proxy. (e.g. -capture logs -capture proxy).",
 		Aliases: []string{"c"},
 	})
 	f.StringVar(&flag.StringVar{

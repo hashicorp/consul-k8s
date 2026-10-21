@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -169,7 +170,7 @@ func TestHandlerContainerInit(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			w := tt.Webhook
 			pod := *tt.Pod(minimal())
-			container, err := w.containerInit(testNS, pod, multiPortInfo{})
+			container, err := w.containerInit(context.Background(), testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(t, actual, tt.ExpCmd)
@@ -373,7 +374,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			}
 
 			ns.Labels = c.namespaceLabel
-			container, err := w.containerInit(ns, *pod, multiPortInfo{})
+			container, err := w.containerInit(context.Background(), ns, *pod, multiPortInfo{})
 			require.NoError(t, err)
 
 			redirectTrafficEnvVarFound := false
@@ -780,7 +781,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			h := tt.Webhook
 			h.LogLevel = "info"
-			container, err := h.containerInit(testNS, *tt.Pod(minimal()), multiPortInfo{})
+			container, err := h.containerInit(context.Background(), testNS, *tt.Pod(minimal()), multiPortInfo{})
 			require.NoError(t, err)
 			actual := strings.Join(container.Command, " ")
 			require.Equal(t, tt.Cmd, actual)
@@ -937,7 +938,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			h := tt.Webhook
 			for i := 0; i < tt.NumInitContainers; i++ {
-				container, err := h.containerInit(testNS, *tt.Pod(minimal()), tt.MultiPortInfos[i])
+				container, err := h.containerInit(context.Background(), testNS, *tt.Pod(minimal()), tt.MultiPortInfos[i])
 				require.NoError(t, err)
 				actual := strings.Join(container.Command, " ")
 				require.Equal(t, tt.Cmd[i], actual)
@@ -981,7 +982,7 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 					},
 				},
 			}
-			container, err := w.containerInit(testNS, *pod, multiPortInfo{})
+			container, err := w.containerInit(context.Background(), testNS, *pod, multiPortInfo{})
 			require.NoError(t, err)
 			require.Equal(t, "CONSUL_ADDRESSES", container.Env[3].Name)
 			require.Equal(t, w.ConsulAddress, container.Env[3].Value)
@@ -1036,7 +1037,7 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 			},
 		},
 	}
-	container, err := w.containerInit(testNS, *pod, multiPortInfo{})
+	container, err := w.containerInit(context.Background(), testNS, *pod, multiPortInfo{})
 	require.NoError(t, err)
 	require.Equal(t, corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{

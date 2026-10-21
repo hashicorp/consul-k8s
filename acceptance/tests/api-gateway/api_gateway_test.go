@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 
@@ -254,7 +252,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 			})
 			// tcp route checks
-			var tcpRoute gwv1alpha2.TCPRoute
+			var tcpRoute gwv1.TCPRoute
 			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
 				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: "default"}, &tcpRoute)
 				require.NoError(r, err)

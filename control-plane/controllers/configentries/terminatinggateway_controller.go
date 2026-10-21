@@ -43,6 +43,12 @@ const terminatingGatewayByLinkedServiceName = "linkedServiceName"
 const (
 	secretOwnerKey      = ".metadata.secretOwner"
 	secretTriggerPrefix = "__secret_rotation__"
+
+	// configMapOwnerKey indexes TerminatingGateways by the credential-injection
+	// ConfigMaps they reference so a change to any referenced ConfigMap re-runs
+	// the owning gateway's reconcile (which recomputes the credential-config
+	// checksum annotation and rolls the workload).
+	configMapOwnerKey = ".metadata.configMapOwner"
 )
 
 // TerminatingGatewayController is the controller for TerminatingGateway resources.
@@ -168,6 +174,15 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		log.Info("Loaded TerminatingGateway", "termGW", string(termGWBytes))
 	}
 
+	if err := credentialInjectionAIGateError(termGW, helmValues); err != nil {
+		log.Error(err, "rejecting terminating gateway")
+		termGW.SetSyncedCondition(corev1.ConditionFalse, "CredentialInjectionRequiresAI", err.Error())
+		if statusErr := r.UpdateStatus(ctx, termGW); statusErr != nil {
+			return ctrl.Result{}, statusErr
+		}
+		return ctrl.Result{}, err
+	}
+
 	aclsEnabled, err := r.aclsEnabled()
 	if err != nil {
 		log.Error(err, "error checking if ACLs are enabled")
@@ -233,6 +248,18 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	return result, nil
 }
 
+// credentialInjectionAIGateError rejects a gateway that uses credential
+// injection while ai.enabled is false. Consul gates credential injection behind
+// the consul-ai feature gate, which ai.enabled controls, so Consul would reject
+// the config entry and the credential sidecars could never be used. Deleting a
+// gateway is never blocked.
+func credentialInjectionAIGateError(termGW *consulv1alpha1.TerminatingGateway, helmValues *helmvalues.HelmValues) error {
+	if !termGW.GetDeletionTimestamp().IsZero() || !termGW.UsesCredentialInjection() || helmValues.AI.Enabled {
+		return nil
+	}
+	return fmt.Errorf("credential injection requires ai.enabled=true (credential injection is gated by the consul-ai feature gate)")
+}
+
 func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("request", name)
 }
@@ -293,6 +320,12 @@ func (r *TerminatingGatewayController) SetupWithManager(ctx context.Context, mgr
 		return err
 	}
 
+	// 3. Indexer: Lookup by referenced credential-injection ConfigMap name so a
+	// change to any referenced ConfigMap rolls the owning gateway's workload.
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.TerminatingGateway{}, configMapOwnerKey, termGWConfigMapIndexer); err != nil {
+		return err
+	}
+
 	return setupWithManager(mgr, &consulv1alpha1.TerminatingGateway{}, r)
 }
 
@@ -340,6 +373,24 @@ func termGWSecretIndexer(o client.Object) []string {
 	}
 
 	return secrets
+}
+
+// termGWConfigMapIndexer indexes a TerminatingGateway by the non-secret
+// credential-injection ConfigMaps it references, so ConfigMap changes can be
+// mapped back to the gateways that must be re-reconciled.
+func termGWConfigMapIndexer(o client.Object) []string {
+	termGW := o.(*v1alpha1.TerminatingGateway)
+	ci := termGW.Spec.Deployment.CredentialInjection
+	if ci == nil || !ci.Enabled {
+		return nil
+	}
+	var configMaps []string
+	for _, name := range []string{ci.ProcessorConfigMap, ci.VaultAgentConfigMap, ci.VaultCAConfigMap} {
+		if name != "" {
+			configMaps = append(configMaps, name)
+		}
+	}
+	return configMaps
 }
 
 func (r *TerminatingGatewayController) UpdateStatusFailedToSetACLs(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway, err error) {
@@ -561,6 +612,27 @@ func (r *TerminatingGatewayController) transformSecret(ctx context.Context, obj 
 	for _, gw := range gateways.Items {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{Name: secretTriggerPrefix + gw.Name, Namespace: gw.Namespace},
+		})
+	}
+	return requests
+}
+
+// transformConfigMap maps a changed ConfigMap to reconcile requests for every
+// TerminatingGateway that references it for credential injection. A normal
+// reconcile recomputes the credential-config checksum annotation, so editing a
+// referenced ConfigMap rolls the workload.
+func (r *TerminatingGatewayController) transformConfigMap(ctx context.Context, obj client.Object) []reconcile.Request {
+	configMap := obj.(*corev1.ConfigMap)
+	var gateways v1alpha1.TerminatingGatewayList
+	_ = r.Client.List(ctx, &gateways,
+		client.InNamespace(configMap.Namespace),
+		client.MatchingFields{configMapOwnerKey: configMap.Name},
+	)
+
+	var requests []reconcile.Request
+	for _, gw := range gateways.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: gw.Name, Namespace: gw.Namespace},
 		})
 	}
 	return requests
@@ -828,7 +900,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		initEnv = setOrAppendEnv(
 			initEnv,
 			"CONSUL_LOGIN_AUTH_METHOD",
-			fmt.Sprintf("%s-k8s-component-auth-method", fullName),
+			helmvalues.LocalComponentAuthMethodName(helmConfigValues),
 		)
 	}
 
@@ -898,7 +970,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		dataplaneArgs = append(dataplaneArgs,
 			"-credential-type=login",
 			"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token",
-			fmt.Sprintf("-login-auth-method=%s-k8s-component-auth-method", fullName),
+			fmt.Sprintf("-login-auth-method=%s", helmvalues.LocalComponentAuthMethodName(helmConfigValues)),
 		)
 		if helmConfigValues.Global.AdminPartitions.Enabled {
 			dataplaneArgs = append(dataplaneArgs, fmt.Sprintf("-login-partition=%s", helmConfigValues.Global.AdminPartitions.Name))
@@ -1012,6 +1084,42 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		Containers:                    []corev1.Container{mainContainer},
 	}
 
+	// Credential injection is not supported on OpenShift; reject it before
+	// creating the workload rather than rendering an unsupported pod.
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled && helmConfigValues.Global.OpenShiftEnabled {
+		return nil, fmt.Errorf("credentialInjection is not supported on OpenShift (global.openshift.enabled=true)")
+	}
+
+	// Reject an incomplete credential-injection config before creating the
+	// workload; never infer a default credential.
+	if err := validateCredentialInjectionWorkload(termGW.Spec.Deployment.CredentialInjection, termGW.Spec.Services, termGW.Spec.Deployment.EnableDeployment); err != nil {
+		return nil, err
+	}
+	// The sidecars are only useful if Consul routes Envoy to the processor, so
+	// also refuse a workload whose credential routing Consul would reject.
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled {
+		if err := termGW.ValidateCredentialRouting(); err != nil {
+			return nil, fmt.Errorf("credentialInjection routing is invalid: %w", err)
+		}
+	}
+
+	// Add the Vault-only credential-injection sidecars/volumes when enabled.
+	// Match the Helm chart: the global Vault Agent Injector is only active when
+	// both the Vault secrets backend and TLS are enabled. This gates the Vault
+	// annotations below and whether credential-injection pods need the
+	// injector-discoverable token, so the two always agree.
+	vaultInjectorEnabled := helmConfigValues.Global.SecretsBackend.Vault.Enabled && helmConfigValues.Global.TLS.Enabled
+
+	// This mirrors the Helm chart projection so both deployment paths agree.
+	applyTerminatingGatewayCredentialInjection(
+		&podSpec,
+		termGW.Spec.Deployment.CredentialInjection,
+		imagePullPolicy,
+		logLevel,
+		helmConfigValues.Global.ACLs.ManageSystemACLs,
+		vaultInjectorEnabled,
+	)
+
 	annotations := map[string]string{
 		"consul.hashicorp.com/connect-inject":              "false",
 		"consul.hashicorp.com/mesh-inject":                 "false",
@@ -1023,7 +1131,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		annotations["consul.hashicorp.com/gateway-namespace"] = consulNamespace
 	}
 
-	if helmConfigValues.Global.SecretsBackend.Vault.Enabled {
+	if vaultInjectorEnabled {
 		annotations["vault.hashicorp.com/agent-init-first"] = "true"
 		annotations["vault.hashicorp.com/agent-inject"] = "true"
 		annotations["vault.hashicorp.com/role"] = helmConfigValues.Global.SecretsBackend.Vault.ConsulCARole
@@ -1036,6 +1144,13 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		}
 		for k, v := range helmConfigValues.Global.SecretsBackend.Vault.AgentAnnotations {
 			annotations[k] = v
+		}
+		// Mirror the Helm-deployed gateway: apply global.secretsBackend.vault.vaultNamespace
+		// unless agentAnnotations already sets the namespace explicitly.
+		if ns := helmConfigValues.Global.SecretsBackend.Vault.VaultNamespace; ns != "" {
+			if _, ok := annotations["vault.hashicorp.com/namespace"]; !ok {
+				annotations["vault.hashicorp.com/namespace"] = ns
+			}
 		}
 	}
 
@@ -1052,6 +1167,15 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 	}
 	for k, v := range termGW.Spec.Deployment.Annotations {
 		annotations[k] = v
+	}
+
+	// Reserved: set the Vault Agent Injector token-volume annotation AFTER the
+	// user-supplied default/per-gateway annotations so it cannot be overridden.
+	// Credential injection disables the default ServiceAccount-token automount, so
+	// an override to a missing volume would stop the injected agent, and an
+	// override to camp-vault-token would leak the CAMP Vault token to it.
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled && vaultInjectorEnabled {
+		annotations["vault.hashicorp.com/agent-service-account-token-volume-name"] = campConsulAuthTokenVolume
 	}
 
 	deployment := &appsv1.Deployment{
@@ -1169,6 +1293,19 @@ func (r *TerminatingGatewayController) deployTerminatingGatewayDeployment(
 	deployment, err := r.constructDeploymentFromCRD(termGW, helmValues)
 	if err != nil {
 		return fmt.Errorf("construct deployment from CRD: %w", err)
+	}
+
+	// Roll the workload when the non-secret credential ConfigMaps change (but not
+	// when the rendered credential files rotate, which live on a memory emptyDir).
+	if ci := termGW.Spec.Deployment.CredentialInjection; ci != nil && ci.Enabled {
+		checksum, err := r.credentialConfigChecksum(ctx, termGW.Namespace, ci)
+		if err != nil {
+			return fmt.Errorf("compute credential config checksum: %w", err)
+		}
+		if deployment.Spec.Template.Annotations == nil {
+			deployment.Spec.Template.Annotations = map[string]string{}
+		}
+		deployment.Spec.Template.Annotations[campCredentialConfigChecksumAnnotation] = checksum
 	}
 
 	// Ensure the referenced ServiceAccount exists before the Deployment is created/updated.
@@ -1394,7 +1531,7 @@ func (r *TerminatingGatewayController) consulK8sConsulServerEnvVars(
 		envVars = append(envVars,
 			corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_AUTH_METHOD",
-				Value: fmt.Sprintf("%s-k8s-component-auth-method", helmvalues.ConsulFullName(helmConfigValues)),
+				Value: helmvalues.LocalComponentAuthMethodName(helmConfigValues),
 			},
 			corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_DATACENTER",
@@ -1482,7 +1619,7 @@ func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
 	fullName := helmvalues.ConsulFullName(helmValues)
 	gatewayName := defaultIfEmpty(termGW.Spec.Deployment.GatewayName, termGW.Name)
 	serviceAccountName := fmt.Sprintf("%s-%s", fullName, gatewayName)
-	authMethodName := fmt.Sprintf("%s-k8s-component-auth-method", fullName)
+	authMethodName := helmvalues.LocalComponentAuthMethodName(helmValues)
 
 	consulNamespace := r.terminatingGatewayConsulNamespace(termGW, helmValues)
 
@@ -1564,9 +1701,13 @@ func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
 	bindingRule := &capi.ACLBindingRule{
 		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
 		AuthMethod:  authMethodName,
-		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
-		BindType:    capi.BindingRuleBindTypeRole,
-		BindName:    roleName,
+		Selector: fmt.Sprintf(
+			"serviceaccount.name==%q and serviceaccount.namespace==%q",
+			serviceAccountName,
+			r.ReleaseNamespace,
+		),
+		BindType: capi.BindingRuleBindTypeRole,
+		BindName: roleName,
 	}
 
 	existingRules, _, err := consulClient.ACL().BindingRuleList(authMethodName, &capi.QueryOptions{})
