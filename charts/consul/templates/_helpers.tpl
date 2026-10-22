@@ -1051,3 +1051,14 @@ Usage: {{ template "consul.helmValuesAnnotationsJSON" (dict "root" $ "value" .Va
 {{- $value | toJson -}}
 {{- end -}}
 {{- end -}}
+{{/*
+Whether external server discovery uses the Kubernetes provider.
+*/}}
+{{- define "consul.featureGateKubernetesDiscovery" -}}
+{{- if and .Values.externalServers.enabled .Values.externalServers.hosts -}}
+{{- $addresses := first .Values.externalServers.hosts -}}
+{{- if and (not (hasPrefix "exec=" $addresses)) (regexMatch `(^|[[:space:]])provider="?k8s"?([[:space:]]|$)` $addresses) -}}
+true
+{{- end -}}
+{{- end -}}
+{{- end -}}
