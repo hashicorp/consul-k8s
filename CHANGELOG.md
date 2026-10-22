@@ -1,3 +1,27 @@
+## 2.1.0 (October 23, 2026)
+
+> NOTE: Consul K8s 2.1.x is compatible with Consul 2.1.x and Consul Dataplane 2.1.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+SECURITY:
+
+* Upgrade `golang.org/x/net` to v0.60.0, Go to 1.26.9, and `zlib` to fix ALPINE-CVE-2026-85091. [[GH-5737](https://github.com/hashicorp/consul-k8s/issues/5737)]
+* server-acl-init: Binding rules of components that were disabled before upgrading are not rewritten. If you previously enabled and later disabled a component (for example sync-catalog, mesh-gateway or a gateway), delete its old binding rule on the component auth method (`consul acl binding-rule list -method <prefix>-k8s-component-auth-method`, then `consul acl binding-rule delete -id <id>`), or re-enable the component once and run the upgrade so its rule is updated. [[GH-5749](https://github.com/hashicorp/consul-k8s/issues/5749)]
+
+IMPROVEMENTS:
+
+* build: upgrade Go to 1.26.10 and bump `consul/envoyextensions` to v0.11.1 and `consul/troubleshoot` to v0.10.1 [[GH-5764](https://github.com/hashicorp/consul-k8s/issues/5764)]
+* Bump consul sub-packages to GA releases: `consul/api` v1.35.0, `consul/sdk` v0.19.0, `consul/proto-public` v0.9.0, `consul/envoyextensions` v0.11.1, `consul/troubleshoot` v0.10.1. [[GH-5752](https://github.com/hashicorp/consul-k8s/issues/5752)]
+
+BUG FIXES:
+
+* control-plane: Deregister service instances of pods in a terminal phase (e.g. evicted by the kubelet) from Consul so Envoy stops retaining their IPs and overflowing traffic to peer failover targets. [[GH-5745](https://github.com/hashicorp/consul-k8s/issues/5745)]
+* control-plane: Fix the TerminatingGateway controller overwriting the terminating-gateway ACL binding rule with a selector that matched only the ServiceAccount name. The rule is now restricted to the Consul release namespace, consistent with `server-acl-init`. [[GH-5749](https://github.com/hashicorp/consul-k8s/issues/5749)]
+* server-acl-init: Fix component ACL binding rules matching only the ServiceAccount name, which let a same-named ServiceAccount in any namespace log in and receive the component's ACL role. Rules now also require the Consul release namespace, and existing rules are updated on upgrade, including in federated secondary datacenters. Components running outside the release namespace must be moved into it. [[GH-5749](https://github.com/hashicorp/consul-k8s/issues/5749)]
+* terminating-gateway: CRD-managed terminating gateways now add Vault Agent Injector annotations only when both `global.secretsBackend.vault.enabled` and `global.tls.enabled` are true, matching Helm-deployed gateways. Previously they were added whenever Vault was enabled, which caused credential-injection pods with TLS disabled to fail Vault agent injection. [[GH-5750](https://github.com/hashicorp/consul-k8s/issues/5750)]
+* terminating-gateway: Fix CRD-managed terminating gateways failing to reconcile when `terminatingGateways.defaults.annotations` or `global.secretsBackend.vault.agentAnnotations` is set as a multi-line string, as documented. [[GH-5750](https://github.com/hashicorp/consul-k8s/issues/5750)]
+* terminating-gateway: Fix CRD-managed terminating gateways ignoring `global.secretsBackend.vault.vaultNamespace`, which caused the Vault agent to authenticate against the root namespace. [[GH-5750](https://github.com/hashicorp/consul-k8s/issues/5750)]
+
 ## 2.1.0-rc2 (October 15, 2026)
 
 > NOTE: Consul K8s 2.1.x is compatible with Consul 2.1.x and Consul Dataplane 2.1.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
