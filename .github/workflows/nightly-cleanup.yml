@@ -1,6 +1,10 @@
 # Dispatch to the consul-k8s-workflows with a nightly cron
 name: nightly-cleanup
 on:
+  # TODO: remove this push trigger after testing
+  push:
+    branches:
+      - shani/cloud-test
   schedule:
     # * is a special character in YAML so you have to quote this string
     # Run nightly at 12PM UTC/8AM EST/5AM PST

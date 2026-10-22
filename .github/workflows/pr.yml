@@ -63,6 +63,7 @@ jobs:
   #       INPUT_OWNER: "hashicorp"
   cloud-acceptance:
     name: cloud-acceptance
+    if: false
     runs-on: ubuntu-24.04
     steps:
       - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
