@@ -1105,8 +1105,9 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 
 	// Add the Vault-only credential-injection sidecars/volumes when enabled.
 	// Match the Helm chart: the global Vault Agent Injector is only active when
-	// both the Vault secrets backend and TLS are enabled, so credential-injection
-	// pods only need the injector-discoverable token in that case.
+	// both the Vault secrets backend and TLS are enabled. This gates the Vault
+	// annotations below and whether credential-injection pods need the
+	// injector-discoverable token, so the two always agree.
 	vaultInjectorEnabled := helmConfigValues.Global.SecretsBackend.Vault.Enabled && helmConfigValues.Global.TLS.Enabled
 
 	// This mirrors the Helm chart projection so both deployment paths agree.
@@ -1130,7 +1131,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		annotations["consul.hashicorp.com/gateway-namespace"] = consulNamespace
 	}
 
-	if helmConfigValues.Global.SecretsBackend.Vault.Enabled {
+	if vaultInjectorEnabled {
 		annotations["vault.hashicorp.com/agent-init-first"] = "true"
 		annotations["vault.hashicorp.com/agent-inject"] = "true"
 		annotations["vault.hashicorp.com/role"] = helmConfigValues.Global.SecretsBackend.Vault.ConsulCARole
@@ -1143,6 +1144,13 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		}
 		for k, v := range helmConfigValues.Global.SecretsBackend.Vault.AgentAnnotations {
 			annotations[k] = v
+		}
+		// Mirror the Helm-deployed gateway: apply global.secretsBackend.vault.vaultNamespace
+		// unless agentAnnotations already sets the namespace explicitly.
+		if ns := helmConfigValues.Global.SecretsBackend.Vault.VaultNamespace; ns != "" {
+			if _, ok := annotations["vault.hashicorp.com/namespace"]; !ok {
+				annotations["vault.hashicorp.com/namespace"] = ns
+			}
 		}
 	}
 
@@ -1693,9 +1701,13 @@ func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
 	bindingRule := &capi.ACLBindingRule{
 		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
 		AuthMethod:  authMethodName,
-		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
-		BindType:    capi.BindingRuleBindTypeRole,
-		BindName:    roleName,
+		Selector: fmt.Sprintf(
+			"serviceaccount.name==%q and serviceaccount.namespace==%q",
+			serviceAccountName,
+			r.ReleaseNamespace,
+		),
+		BindType: capi.BindingRuleBindTypeRole,
+		BindName: roleName,
 	}
 
 	existingRules, _, err := consulClient.ACL().BindingRuleList(authMethodName, &capi.QueryOptions{})

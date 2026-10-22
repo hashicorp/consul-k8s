@@ -40,7 +40,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
+	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name, gateway.Annotations)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -151,9 +151,18 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	return container, nil
 }
 
-func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
+func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string, annotations map[string]string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
+
+	// Check to see if the user has overridden concurrency via an annotation.
+	if envoyConcurrencyAnnotation, ok := annotations[constants.AnnotationEnvoyProxyConcurrency]; ok {
+		val, err := strconv.ParseUint(envoyConcurrencyAnnotation, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse annotation %q: %w", constants.AnnotationEnvoyProxyConcurrency, err)
+		}
+		envoyConcurrency = int(val)
+	}
 
 	envoyAdminBindAddress := "127.0.0.1"
 	consulDPBindAddress := "127.0.0.1"

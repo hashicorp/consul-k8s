@@ -1,3 +1,42 @@
+## 1.8.18 (October 19, 2026)
+
+SECURITY:
+
+* Upgrade `golang.org/x/net` to v0.60.0, Go to 1.26.9, and `zlib` to fix ALPINE-CVE-2026-85091. [[GH-5737](https://github.com/hashicorp/consul-k8s/issues/5737)]
+* server-acl-init: Binding rules of components that were disabled before upgrading are not rewritten. If you previously enabled and later disabled a component (for example sync-catalog, mesh-gateway or a gateway), delete its old binding rule on the component auth method (`consul acl binding-rule list -method <prefix>-k8s-component-auth-method`, then `consul acl binding-rule delete -id <id>`), or re-enable the component once and run the upgrade so its rule is updated. [[GH-5746](https://github.com/hashicorp/consul-k8s/issues/5746)]
+
+FEATURES:
+
+* helm: add `global.acls.authMethod.create` to allow using Kubernetes auth methods that were configured outside of the Helm release. When set to `false`, the `server-acl-init` job requires the auth methods to already exist and only manages the ACL policies, roles and binding rules. [[GH-5611](https://github.com/hashicorp/consul-k8s/issues/5611)]
+* helm: add `global.acls.authMethod.name` to configure the base name of the Kubernetes auth methods created by the `server-acl-init` job. Set this to a unique value per Kubernetes cluster when multiple clusters share a single Consul control plane, so that the clusters do not overwrite each other's auth methods. [[GH-5611](https://github.com/hashicorp/consul-k8s/issues/5611)]
+
+IMPROVEMENTS:
+
+* helm: add `global.imageApplyManifests` value to allow overriding the container image used by the post-upgrade apply-manifests Job, enabling use of air-gapped or security-approved images in place of the default `bitnami/kubectl:latest` (non-OpenShift) or `registry.redhat.io/openshift4/ose-cli` (OpenShift). [[GH-5673](https://github.com/hashicorp/consul-k8s/issues/5673)]
+
+BUG FIXES:
+
+* helm: Fix terminating gateway Services selecting pods of all terminating gateways in a release by adding the `terminating-gateway-name` label to the Service selector. [[GH-5717](https://github.com/hashicorp/consul-k8s/issues/5717)]
+* server-acl-init: Fix component ACL binding rules matching only the ServiceAccount name, which let a same-named ServiceAccount in any namespace log in and receive the component's ACL role. Rules now also require the Consul release namespace, and existing rules are updated on upgrade, including in federated secondary datacenters. Components running outside the release namespace must be moved into it. [[GH-5746](https://github.com/hashicorp/consul-k8s/issues/5746)]
+
+## 2.1.0-rc2 (October 15, 2026)
+
+> NOTE: Consul K8s 2.1.x is compatible with Consul 2.1.x and Consul Dataplane 2.1.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+FEATURES:
+
+* Add a feature-gate-set Job that applies feature gates configured through Helm values to Consul servers. [[GH-5701](https://github.com/hashicorp/consul-k8s/issues/5701)]
+* api-gateway: support overriding Envoy proxy concurrency on API Gateway pods via the
+`consul.hashicorp.com/consul-envoy-proxy-concurrency` annotation. [[GH-5695](https://github.com/hashicorp/consul-k8s/issues/5695)]
+* connect-inject: Support for ai-crds, ai agent and inference gtw
+connect-inject: For ai-role=ai-agent pods, inject consul-obo-inbound/outbound with envelope+broker UDS and enable dataplane -credential-broker-bind-addr. Gated on ai.role (not oauth_client). from pr 5662 [[GH-5663](https://github.com/hashicorp/consul-k8s/issues/5663)]
+
+BUG FIXES:
+
+* crd: Fix InferencePoolConfig PII action validation to accept `placeholder`, `mask`, `block`, and `off`, matching the actions supported by the inference policy processor. [[GH-5723](https://github.com/hashicorp/consul-k8s/issues/5723)]
+* helm: Fix terminating gateway Services selecting pods of all terminating gateways in a release by adding the `terminating-gateway-name` label to the Service selector. [[GH-5717](https://github.com/hashicorp/consul-k8s/issues/5717)]
+
 ## 2.1.0-rc1 (September 29, 2026)
 
 > NOTE: Consul K8s 2.1.x is compatible with Consul 2.1.x and Consul Dataplane 2.1.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.

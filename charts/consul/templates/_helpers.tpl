@@ -1028,3 +1028,26 @@ drainSeconds, root.
       memory: "50Mi"
       cpu: "50m"
 {{- end -}}
+
+{{/*
+Renders an annotations value as a JSON object for the helm-values ConfigMap
+read by the TerminatingGateway controller. Annotation values are documented as
+multi-line YAML strings (and may contain template expressions), so they are
+rendered with tpl and parsed with fromYaml. Map values are passed through.
+
+Usage: {{ template "consul.helmValuesAnnotationsJSON" (dict "root" $ "value" .Values.some.annotations "name" "some.annotations") }}
+*/}}
+{{- define "consul.helmValuesAnnotationsJSON" -}}
+{{- $value := .value -}}
+{{- if not $value -}}
+{}
+{{- else if kindIs "string" $value -}}
+{{- $parsed := tpl $value .root | fromYaml -}}
+{{- if hasKey $parsed "Error" -}}
+{{- fail (printf "%s must be a YAML map of annotations: %s" .name (get $parsed "Error")) -}}
+{{- end -}}
+{{- $parsed | toJson -}}
+{{- else -}}
+{{- $value | toJson -}}
+{{- end -}}
+{{- end -}}
