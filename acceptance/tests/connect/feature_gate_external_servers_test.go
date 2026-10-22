@@ -154,7 +154,7 @@ func TestFeatureGate_ExternalServers(t *testing.T) {
 						values["global.enabled"] = "false"
 						values["server.enabled"] = "false"
 						values["externalServers.enabled"] = "true"
-						values["externalServers.hosts[0]"] = host.address
+						values["externalServers.hosts[0]"] = strings.ReplaceAll(host.address, ",", `\,`)
 						values["externalServers.skipServerWatch"] = "true"
 						values["global.tls.enabled"] = fmt.Sprint(secure)
 						values["global.acls.bootstrapToken.secretName"] = bootstrapSecret
