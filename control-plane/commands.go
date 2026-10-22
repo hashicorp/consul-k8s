@@ -18,6 +18,7 @@ import (
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
+	cmdFeatureGateSet "github.com/hashicorp/consul-k8s/control-plane/subcommand/feature-gate-set"
 	cmdGatewayCleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup"
 	cmdGatewayCleanupCustom "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup-custom"
 	cmdGatewayResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources"
@@ -46,6 +47,10 @@ func init() {
 	Commands = map[string]cli.CommandFactory{
 		"acl-init": func() (cli.Command, error) {
 			return &cmdACLInit.Command{UI: ui}, nil
+		},
+
+		"feature-gate-set": func() (cli.Command, error) {
+			return &cmdFeatureGateSet.Command{UI: ui}, nil
 		},
 
 		"ai-cleanup": func() (cli.Command, error) {
