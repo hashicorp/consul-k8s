@@ -1,0 +1,84 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# AKS nodes can't boot from the hc-base gallery image, so install the
+# hc-security-base package on each node instead.
+{{- $source := required "repo.source is required" .Values.repo.source }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}
+stringData:
+  key.asc: {{ required "repo.key is required" .Values.repo.key | quote }}
+  {{- with .Values.repo.username }}
+  auth.conf: {{ printf "machine %s login %s password %s\n" (splitList " " $source | first | trimPrefix "https://") . $.Values.repo.password | quote }}
+  {{- end }}
+  install.sh: |
+    set -eu
+    # The repo and its credentials are only needed for the install.
+    trap 'rm -rf /run/hcsb /etc/apt/sources.list.d/hcsb.list /etc/apt/auth.conf.d/hcsb.conf' EXIT
+    dpkg-query -W -f='${Status}' hc-security-base 2>/dev/null | grep -q "ok installed" && exit 0
+    install -D -m 0644 /run/hcsb/key.asc /etc/apt/keyrings/hcsb.asc
+    [ ! -f /run/hcsb/auth.conf ] || install -D -m 0600 /run/hcsb/auth.conf /etc/apt/auth.conf.d/hcsb.conf
+    echo "deb [signed-by=/etc/apt/keyrings/hcsb.asc] $REPO_SOURCE" > /etc/apt/sources.list.d/hcsb.list
+    APT="apt-get -o DPkg::Lock::Timeout=300 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+    $APT update
+    DEBIAN_FRONTEND=noninteractive $APT install -y hc-security-base
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}
+    spec:
+      hostPID: true
+      automountServiceAccountToken: false
+      tolerations:
+        - operator: Exists
+      initContainers:
+        # Stages the files on the node's tmpfs and runs install.sh as root in
+        # the node's namespaces. Never use `set -x`: it would log the token.
+        - name: install
+          image: docker.io/library/busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+          command:
+            - sh
+            - -c
+            - install -d -m 0700 /proc/1/root/run/hcsb && cp /secret/* /proc/1/root/run/hcsb/ && exec nsenter -t 1 -m -u -i -n -p -- sh /run/hcsb/install.sh
+          env:
+            - name: REPO_SOURCE
+              value: {{ $source | quote }}
+          securityContext:
+            privileged: true
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - name: secret
+              mountPath: /secret
+              readOnly: true
+      containers:
+        # Unprivileged; keeps the pod Ready once the install has succeeded.
+        - name: pause
+          image: registry.k8s.io/pause:3.10@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65535
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+            seccompProfile: { type: RuntimeDefault }
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { cpu: 20m, memory: 16Mi }
+      volumes:
+        - name: secret
+          secret:
+            secretName: {{ .Release.Name }}
+            defaultMode: 0400

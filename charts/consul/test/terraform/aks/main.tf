@@ -213,3 +213,36 @@ resource "helm_release" "kubequery_1" {
     })
   ]
 }
+
+# AKS node pools can't use the hc-base gallery image, so install
+# hc-security-base on the nodes. Enabled when hc_security_base_repo is set.
+locals {
+  hc_security_base_values = [yamlencode({ repo = {
+    source   = var.hc_security_base_repo
+    key      = var.hc_security_base_repo_key
+    username = var.hc_security_base_repo_username
+    password = var.hc_security_base_repo_password
+  } })]
+}
+
+resource "helm_release" "hc_security_base_0" {
+  count            = var.hc_security_base_repo != "" ? 1 : 0
+  provider         = helm.cluster_0
+  name             = "hc-security-base"
+  chart            = "${path.module}/hc-security-base-installer"
+  namespace        = "hc-security-base"
+  create_namespace = true
+  timeout          = 600
+  values           = local.hc_security_base_values
+}
+
+resource "helm_release" "hc_security_base_1" {
+  count            = var.hc_security_base_repo != "" && var.cluster_count > 1 ? 1 : 0
+  provider         = helm.cluster_1
+  name             = "hc-security-base"
+  chart            = "${path.module}/hc-security-base-installer"
+  namespace        = "hc-security-base"
+  create_namespace = true
+  timeout          = 600
+  values           = local.hc_security_base_values
+}
