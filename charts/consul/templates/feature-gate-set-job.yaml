@@ -10,11 +10,6 @@
 {{- if and .Values.global.secretsBackend.vault.enabled (or .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) (not .Values.global.secretsBackend.vault.featureGateSetRole) }}{{ fail "global.secretsBackend.vault.featureGateSetRole is required when the feature-gate-set job reads a Vault ACL token." }}{{ end -}}
 {{- if and $useVaultCA (not $useVaultACLToken) (not .Values.global.secretsBackend.vault.consulCARole) }}{{ fail "global.secretsBackend.vault.consulCARole is required when the feature-gate-set job reads only a Vault CA certificate." }}{{ end -}}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
-{{- if .Values.externalServers.enabled -}}
-{{- $externalServerHost := .Values.externalServers.hosts | first | toString -}}
-{{- $validExternalServerHost := or (regexMatch "^[A-Za-z0-9][A-Za-z0-9.-]*$" $externalServerHost) (regexMatch "^[0-9a-fA-F:.]+$" $externalServerHost) (regexMatch "^provider=[^[:space:]=]+([[:space:]][A-Za-z0-9_]+=[^[:space:]]+)*$" $externalServerHost) -}}
-{{- if not $validExternalServerHost }}{{ fail "The feature-gate-set job requires externalServers.hosts[0] to be a DNS name, IP address, or provider= auto-join string; exec= addresses are not supported." }}{{ end -}}
-{{- end -}}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 apiVersion: batch/v1
@@ -110,32 +105,32 @@ spec:
       {{- end }}
       containers:
       - name: feature-gate-set
-        image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
+        image: "{{ .Values.global.imageK8S }}"
         {{ template "consul.imagePullPolicy" . }}
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
         env:
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         {{- if (or .Values.global.acls.manageSystemACLs (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey)) }}
         {{- if and .Values.global.secretsBackend.vault.enabled $useReplicationToken }}
-        - name: CONSUL_HTTP_TOKEN_FILE
+        - name: CONSUL_ACL_TOKEN_FILE
           value: /vault/secrets/replication-token
         {{- else if .Values.global.secretsBackend.vault.enabled }}
-        - name: CONSUL_HTTP_TOKEN_FILE
+        - name: CONSUL_ACL_TOKEN_FILE
           value: /vault/secrets/bootstrap-token
         {{- else if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
-        - name: CONSUL_HTTP_TOKEN
+        - name: CONSUL_ACL_TOKEN
           valueFrom:
             secretKeyRef:
               name: {{ .Values.global.acls.bootstrapToken.secretName }}
               key: {{ .Values.global.acls.bootstrapToken.secretKey }}
         {{- else if $useReplicationToken }}
-        - name: CONSUL_HTTP_TOKEN
+        - name: CONSUL_ACL_TOKEN
           valueFrom:
             secretKeyRef:
               name: {{ .Values.global.acls.replicationToken.secretName }}
               key: {{ .Values.global.acls.replicationToken.secretKey }}
         {{- else }}
-        - name: CONSUL_HTTP_TOKEN_FILE
+        - name: CONSUL_ACL_TOKEN_FILE
           value: /consul/acl/tokens/token
         {{- end }}
         {{- end }}
@@ -156,66 +151,12 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          case "$CONSUL_ADDRESSES" in
-            *:*) consul_host="[$CONSUL_ADDRESSES]" ;;
-            *) consul_host="$CONSUL_ADDRESSES" ;;
-          esac
-          {{- if .Values.global.tls.enabled }}
-          export CONSUL_HTTP_ADDR="https://${consul_host}:${CONSUL_HTTP_PORT}"
-          {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
-          export CONSUL_TLS_SERVER_NAME={{ .Values.externalServers.tlsServerName | quote }}
-          export CONSUL_CURL_ADDR="https://${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}"
-          {{- end }}
-          {{- if not $useExternalSystemRoots }}
-          {{- if .Values.global.secretsBackend.vault.enabled }}
-          export CONSUL_CACERT=/vault/secrets/serverca.crt
-          {{- else }}
-          export CONSUL_CACERT=/consul/tls/ca/tls.crt
-          {{- end }}
-          {{- end }}
-          {{- else }}
-          export CONSUL_HTTP_ADDR="http://${consul_host}:${CONSUL_HTTP_PORT}"
-          {{- end }}
-
-          # Wait until a Consul leader is elected before setting feature gates.
-          # /v1/status/leader returns "" when no leader is elected, or "host:port" when one is.
-          while true; do
-            echo "Waiting for Consul leader..."
-            {{- if .Values.global.tls.enabled }}
-            {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
-            {{- if $useExternalSystemRoots }}
-            leader=$(curl -s --connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}" "${CONSUL_CURL_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
-            {{- else }}
-            leader=$(curl -s --cacert "${CONSUL_CACERT}" --connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}" "${CONSUL_CURL_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
-            {{- end }}
-            {{- else if $useExternalSystemRoots }}
-            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
-            {{- else }}
-            leader=$(curl -s --cacert "${CONSUL_CACERT}" "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
-            {{- end }}
-            {{- else }}
-            leader=$(curl -s "${CONSUL_HTTP_ADDR}/v1/status/leader" 2>/dev/null) || leader=""
-            {{- end }}
-            if echo "${leader}" | grep -qE '".+"'; then
-              echo "Consul leader is ready: ${leader}"
-              break
-            fi
-            sleep 2
-          done
-
-          # Each line: <gate-name> <enabled|disabled>
-          # To add a future gate, append a new line here.
-          GATES="
+          exec consul-k8s-control-plane feature-gate-set \
+            -log-level={{ .Values.global.logLevel }} \
+            -log-json={{ .Values.global.logJSON }} \
           {{- if default false (and .Values.ai .Values.ai.enabled) }}
-          consul-ai enabled
+            -feature-gate=consul-ai=true \
           {{- end }}
-          "
-
-          echo "$GATES" | while read -r name value; do
-            [ -z "$name" ] && continue
-            echo "Setting feature gate: $name=$value"
-            consul operator feature set "$name" "$value"
-          done
         {{- if .Values.global.acls.resources }}
         resources:
           {{- toYaml .Values.global.acls.resources | nindent 10 }}
