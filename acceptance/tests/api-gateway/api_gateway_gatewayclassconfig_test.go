@@ -36,12 +36,12 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		maxInstances     = ptr.To(int32(3))
 		minInstances     = ptr.To(int32(1))
 
-		namespace        = "default"
 		gatewayClassName = "gateway-class"
 	)
 
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
+	namespace := ctx.KubectlOptions(t).Namespace
 	helmValues := map[string]string{
 		"global.logLevel":       "trace",
 		"connectInject.enabled": "true",
@@ -76,6 +76,9 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 				MinInstances:     minInstances,
 			},
 		},
+	}
+	if cfg.EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
 	}
 	logger.Log(t, "creating gateway class config")
 	err = k8sClient.Create(context.Background(), gatewayClassConfig)

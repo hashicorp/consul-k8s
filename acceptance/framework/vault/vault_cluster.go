@@ -26,6 +26,7 @@ import (
 	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -49,6 +50,7 @@ type VaultCluster struct {
 
 	noCleanupOnFailure bool
 	noCleanup          bool
+	openShift          bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 }
@@ -64,6 +66,16 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	entstr := "-ent"
 
 	values := defaultHelmValues(releaseName)
+	openShift := cfg.EnableOpenshift || cfg.UseOpenshift
+	if openShift {
+		// Let OpenShift's restricted SCC assign UIDs instead of the chart's fixed IDs.
+		values["global.openshift"] = "true"
+		// OpenShift short-name aliases resolve hashicorp/vault images to the
+		// Red Hat registry, which doesn't publish the chart's default tags.
+		values["server.image.repository"] = "docker.io/hashicorp/vault"
+		values["injector.image.repository"] = "docker.io/hashicorp/vault-k8s"
+		values["injector.agentImage.repository"] = "docker.io/hashicorp/vault"
+	}
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
@@ -120,6 +132,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
+		openShift:          openShift,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		releaseName:        releaseName,
@@ -195,7 +208,9 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 	retry.Run(t, func(r *retry.R) {
 		sa, err := v.kubernetesClient.CoreV1().ServiceAccounts(namespace).Get(context.Background(), vaultServerServiceAccountName, metav1.GetOptions{})
 		require.NoError(r, err)
-		if len(sa.Secrets) == 0 {
+		// OpenShift lists the image pull secret on every service account, so
+		// always create the token secret there.
+		if len(sa.Secrets) == 0 || v.openShift {
 			_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        vaultServerServiceAccountName,
@@ -203,6 +218,9 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 				},
 				Type: corev1.SecretTypeServiceAccountToken,
 			}, metav1.CreateOptions{})
+			if v.openShift && k8serrors.IsAlreadyExists(err) {
+				err = nil
+			}
 			require.NoError(r, err)
 		}
 	})
@@ -230,13 +248,25 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 		sa, err = v.kubernetesClient.CoreV1().ServiceAccounts(saNS).Get(context.Background(), saName, metav1.GetOptions{})
 		require.NoError(r, err)
 		// In Kubernetes <1.24 the serviceAccount will have a secret automatically generated.
-		if len(sa.Secrets) != 0 {
+		// On OpenShift the listed secret is an image pull secret, not a token.
+		if len(sa.Secrets) != 0 && !v.openShift {
 			secretName = sa.Secrets[0].Name
 		}
 	})
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
-	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
-	require.NoError(t, err)
+	var tokenSecret *corev1.Secret
+	if v.openShift {
+		// Wait for the token controller to populate the secret.
+		retry.Run(t, func(r *retry.R) {
+			tokenSecret, err = v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+			require.NoError(r, err)
+			require.NotEmpty(r, tokenSecret.Data["token"])
+			require.NotEmpty(r, tokenSecret.Data["ca.crt"])
+		})
+	} else {
+		tokenSecret, err = v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+		require.NoError(t, err)
+	}
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
 		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
 		"kubernetes_ca_cert": string(tokenSecret.Data["ca.crt"]),
@@ -368,6 +398,12 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 		vaultService,
 		fmt.Sprintf("%s.default", vaultService),
 		fmt.Sprintf("%s.default.svc", vaultService),
+	}
+	if v.openShift && namespace != metav1.NamespaceDefault {
+		// The injector reaches Vault at <service>.<namespace>.svc.
+		certSANs = append(certSANs,
+			fmt.Sprintf("%s.%s", vaultService, namespace),
+			fmt.Sprintf("%s.%s.svc", vaultService, namespace))
 	}
 	certPem, keyPem, err := cert.GenerateCert("Vault server", 24*time.Hour, caCertTmpl, signer, certSANs)
 	require.NoError(t, err)

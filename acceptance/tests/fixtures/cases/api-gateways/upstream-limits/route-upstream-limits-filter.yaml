@@ -7,7 +7,6 @@ apiVersion: consul.hashicorp.com/v1alpha1
 kind: RouteUpstreamLimitsFilter
 metadata:
   name: static-server-limits
-  namespace: default
 spec:
   # Circuit-breaker thresholds
   maxConnections: 25

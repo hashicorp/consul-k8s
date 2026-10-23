@@ -140,30 +140,11 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	c.SetupAppNamespace(t)
 
 	opts := c.KubectlOptsForApp(t)
-	if c.Cfg.EnableCNI && c.Cfg.EnableOpenshift {
-		// On OpenShift with the CNI, we need to create a network attachment definition in the namespace
-		// where the applications are running, and the app deployment configs need to reference that network
-		// attachment definition.
-
-		// TODO: A base fixture is the wrong place for these files
-		k8s.KubectlApply(t, opts, "../fixtures/bases/openshift/")
-		helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
-			k8s.KubectlDelete(t, opts, "../fixtures/bases/openshift/")
-		})
-
-		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
-		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
-		} else {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
-		}
+	k8s.DeployStaticWorkload(t, opts, c.Cfg, "../fixtures/cases/static-server-inject")
+	if c.Cfg.EnableTransparentProxy {
+		k8s.DeployStaticWorkload(t, opts, c.Cfg, "../fixtures/cases/static-client-tproxy")
 	} else {
-		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-		} else {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
-		}
+		k8s.DeployStaticWorkload(t, opts, c.Cfg, "../fixtures/cases/static-client-inject")
 	}
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
@@ -186,11 +167,17 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 func (c *ConnectHelper) CreateNamespace(t *testing.T, namespace string) {
 	opts := c.Ctx.KubectlOptions(t)
-	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
-	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
+	output, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
+	alreadyExists := err != nil && strings.Contains(err.Error(), "AlreadyExists")
+	if c.Cfg.EnableOpenshift || c.Cfg.UseOpenshift {
+		// kubectl reports AlreadyExists in its output, not in the exit error.
+		alreadyExists = alreadyExists || (err != nil && strings.Contains(output, "AlreadyExists"))
+	}
+	if alreadyExists {
 		return
 	}
 	require.NoError(t, err)
+	k8s.MarkAcceptanceNamespace(t, opts, c.Cfg, namespace)
 	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, opts, "delete", "ns", namespace)
 	})
@@ -351,6 +338,10 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts) {
 	destinationNamespace := c.KubectlOptsForApp(t).Namespace
 	if opts.DestinationNamespace != "" {
 		destinationNamespace = opts.DestinationNamespace
+	}
+	if (c.Cfg.EnableOpenshift || c.Cfg.UseOpenshift) && c.HelmValues["global.enableConsulNamespaces"] != "true" {
+		sourceNamespace = ""
+		destinationNamespace = ""
 	}
 
 	retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}

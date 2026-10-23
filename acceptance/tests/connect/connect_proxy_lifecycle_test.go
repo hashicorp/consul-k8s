@@ -175,6 +175,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			if gracePeriodSeconds > 0 {
 				// Ensure outbound requests are still successful during grace period.
 				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
+				podGoneEarly := false
 			gracePeriodLoop:
 				for {
 					select {
@@ -186,6 +187,11 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
+								// OpenShift can remove the pod before the grace period timer fires.
+								if (cfg.EnableOpenshift || cfg.UseOpenshift) && strings.Contains(output, "not found") {
+									podGoneEarly = true
+									return
+								}
 								r.Errorf("%v", err.Error())
 								return
 							}
@@ -193,6 +199,9 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 								return !strings.Contains(output, "curl: (7) Failed to connect")
 							}, fmt.Sprintf("Error: %s", output))
 						})
+						if podGoneEarly {
+							break gracePeriodLoop
+						}
 
 						// If listener draining is disabled, ensure inbound
 						// requests are accepted during grace period.
@@ -213,6 +222,10 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					require.Condition(r, func() bool {
 						exists := false
 						if strings.Contains(output, "curl: (7) Failed to connect") {
+							exists = true
+						}
+						// CRI-O rejects exec once the terminating container has stopped.
+						if (cfg.EnableOpenshift || cfg.UseOpenshift) && strings.Contains(output, "container is not created or running") {
 							exists = true
 						}
 						return exists

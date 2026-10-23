@@ -13,7 +13,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
-	"os/exec"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -93,7 +92,7 @@ func TestOpenshift_APIGateway_Tenancy(t *testing.T) {
 			routeNamespace, routeK8SOptions := createNamespace(t, ctx, cfg)
 
 			logger.Logf(t, "creating target server in %s namespace", serviceNamespace)
-			k8s.DeployKustomize(t, serviceK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployStaticWorkload(t, serviceK8SOptions, cfg, "../fixtures/cases/static-server-inject")
 
 			logger.Logf(t, "creating certificate resources in %s namespace", certificateNamespace)
 			applyFixture(t, cfg, certificateK8SOptions, "cases/api-gateways/certificate")
@@ -111,13 +110,13 @@ func TestOpenshift_APIGateway_Tenancy(t *testing.T) {
 
 			// patch the resources to reference each other
 			logger.Log(t, "patching gateway to certificate")
-			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateway", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
+			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateways.gateway.networking.k8s.io", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to target server")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproutes.gateway.networking.k8s.io", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to gateway")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproutes.gateway.networking.k8s.io", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
 
 			// Grab a kubernetes and consul client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.
@@ -262,7 +261,7 @@ func createReferenceGrant(t *testing.T, cfg *config.TestConfig, client client.Cl
 
 	// we just create a reference grant for all combinations in the given namespaces
 
-	require.NoError(t, client.Create(context.Background(), &gwv1.ReferenceGrant{
+	k8s.CreateReferenceGrant(t, client, cfg, &gwv1.ReferenceGrant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: to,
@@ -293,12 +292,12 @@ func createReferenceGrant(t *testing.T, cfg *config.TestConfig, client client.Cl
 				Kind: secretKind,
 			}},
 		},
-	}))
+	})
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		cmd := exec.Command("kubectl", "delete", "referencegrant", name, "-n", to)
-		output, err := cmd.CombinedOutput()
-		assert.NoErrorf(t, err, "failed to delete resources: %s", string(output))
+		ctx := suite.Environment().DefaultContext(t)
+		output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(to), "delete", "referencegrants.gateway.networking.k8s.io", name)
+		assert.NoErrorf(t, err, "failed to delete resources: %s", output)
 	})
 }
 
@@ -326,11 +325,10 @@ func createNamespace(t *testing.T, ctx environment.TestContext, cfg *config.Test
 
 	logger.Logf(t, "creating Kubernetes namespace %s", namespace)
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", namespace)
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "namespace", namespace, "consul.hashicorp.com/acceptance-namespace="+ctx.KubectlOptions(t).Namespace)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		cmd := exec.Command("kubectl", "delete", "namespace", namespace)
-		output, err := cmd.CombinedOutput()
-		assert.NoErrorf(t, err, "failed to delete resources: %s", string(output))
-		//k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", namespace)
+		output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "namespace", namespace)
+		assert.NoErrorf(t, err, "failed to delete resources: %s", output)
 	})
 
 	return namespace, &terratestk8s.KubectlOptions{

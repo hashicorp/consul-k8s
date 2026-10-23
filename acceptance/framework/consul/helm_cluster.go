@@ -70,6 +70,10 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *HelmCluster {
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		ensureNamespaceExists(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace)
+	}
+
 	if cfg.EnableRestrictedPSAEnforcement {
 		configureNamespace(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
@@ -78,7 +82,7 @@ func NewHelmCluster(
 		configurePSA(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
-	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
+	if (cfg.EnableOpenshift || cfg.UseOpenshift) && cfg.EnableTransparentProxy {
 		configureSCCs(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
@@ -93,6 +97,11 @@ func NewHelmCluster(
 
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		openShiftValues := openShiftHelmValues(t, ctx.KubernetesClient(t))
+		cfg.IsOpenshiftGreaterThan4_18 = openShiftValues["global.openshift.isOcpGreaterthan4_18"] == "true"
+		helpers.MergeMaps(values, openShiftValues)
+	}
 	helpers.MergeMaps(values, helmValues)
 
 	logger := terratestLogger.New(logger.TestLogger{})
@@ -104,6 +113,10 @@ func NewHelmCluster(
 		"install": {"--timeout", "15m", "--debug", "--skip-crds"},
 		"upgrade": {"--timeout", "15m", "--debug", "--skip-crds"},
 		"delete":  {"--timeout", "15m", "--debug"},
+	}
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		extraArgs["install"] = append(extraArgs["install"], "--disable-openapi-validation")
+		extraArgs["upgrade"] = append(extraArgs["upgrade"], "--disable-openapi-validation")
 	}
 
 	opts := &helm.Options{
@@ -206,7 +219,9 @@ func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
 
 	// check and remove any CRDs with finalizers
-	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+	if !h.cfg.EnableOpenshift && !h.cfg.UseOpenshift {
+		helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+	}
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
@@ -254,10 +269,17 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
-		require.NoError(r, err)
-	})
+	if h.cfg.EnableOpenshift || h.cfg.UseOpenshift {
+		err := installOpenShiftWithStorageRetry(t, h.helmOptions, h.releaseName, func() error {
+			return helm.UpgradeE(t, h.helmOptions, chartName, h.releaseName)
+		})
+		require.NoError(t, err)
+	} else {
+		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+			err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			require.NoError(r, err)
+		})
+	}
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -266,6 +288,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
+	if h.cfg.EnableOpenshift || h.cfg.UseOpenshift {
+		h.cleanupOpenShiftCustomGatewayClasses(t)
+	}
 
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be
@@ -274,8 +299,15 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	requirement, err := labels.NewRequirement("release", selection.Equals, []string{h.releaseName})
 	require.NoError(t, err)
 
+	var releaseLabels client.DeleteAllOfOption = client.HasLabels{"release=" + h.releaseName}
+	if h.cfg.EnableOpenshift || h.cfg.UseOpenshift {
+		// HasLabels drops the invalid "release=<name>" key and matches every gateway class, which
+		// would also delete gateway classes owned by OpenShift or other releases on a shared cluster.
+		releaseLabels = client.MatchingLabels{"release": h.releaseName}
+	}
+
 	// Forcibly delete all gateway classes and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, releaseLabels)
 
 	var gatewayClassList gwv1.GatewayClassList
 	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
@@ -288,7 +320,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 
 	// Forcibly delete all gateway class configs and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, releaseLabels)
 
 	var gatewayClassConfigList v1alpha1.GatewayClassConfigList
 	if h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
@@ -304,6 +336,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
 		require.NoError(r, err)
 	})
+	if h.cfg.EnableOpenshift || h.cfg.UseOpenshift {
+		h.waitForOpenShiftCRDDeletion(t)
+	}
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
@@ -705,7 +740,31 @@ func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestCon
 }
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		refreshOpenShiftLicenseSecret(t, client, cfg, namespace)
+	}
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
+}
+
+// refreshOpenShiftLicenseSecret replaces a stale license left in the reused OpenShift test namespace,
+// because CreateK8sSecret never updates an existing secret.
+func refreshOpenShiftLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	retry.Run(t, func(r *retry.R) {
+		secret, err := client.CoreV1().Secrets(namespace).Get(context.Background(), config.LicenseSecretName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return
+		}
+		require.NoError(r, err)
+		if string(secret.Data[config.LicenseSecretKey]) == cfg.EnterpriseLicense {
+			return
+		}
+		if secret.Data == nil {
+			secret.Data = make(map[string][]byte)
+		}
+		secret.Data[config.LicenseSecretKey] = []byte(cfg.EnterpriseLicense)
+		_, err = client.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+		require.NoError(r, err)
+	})
 }
 
 func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {

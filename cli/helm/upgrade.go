@@ -120,6 +120,10 @@ func UpgradeHelmRelease(options *UpgradeOptions) error {
 	upgrade.DryRun = options.DryRun
 	upgrade.Wait = options.Wait
 	upgrade.Timeout = options.Timeout
+	upgrade.DisableOpenAPIValidation, err = skipOpenAPIValidation()
+	if err != nil {
+		return err
+	}
 
 	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
 	_, err = options.HelmActionsRunner.Upgrade(upgrade, options.ReleaseName, chart, options.Values)
