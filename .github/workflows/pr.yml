@@ -30,6 +30,6 @@ jobs:
         with:
           workflow: cloud.yml
           repo: hashicorp/consul-k8s-workflows
-          ref: paras/compatibility-2.1.0-GA
+          ref: paras/compatibility-2.1.0-GA-Oct
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
           inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}"}'
