@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/flags"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 )
 
 type suite struct {
@@ -33,6 +34,9 @@ func NewSuite(m *testing.M) Suite {
 	flag.Parse()
 
 	testConfig := flags.TestConfigFromFlags()
+	if testConfig.EnableOpenshift || testConfig.UseOpenshift {
+		k8s.RetryOpenShiftKubeAPIConnectErrors()
+	}
 
 	return &suite{
 		m:     m,

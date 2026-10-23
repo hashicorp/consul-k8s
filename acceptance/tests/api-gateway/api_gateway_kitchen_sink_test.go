@@ -87,6 +87,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	logger.Log(t, "creating other namespace")
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "create", "namespace", "other")
 	require.NoError(t, err, out)
+	k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, "other")
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
@@ -100,6 +101,8 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	if runWithEnterpriseOnlyFeatures {
 		fixturePath += "-ent"
 	}
+	fixturePath = k8s.OpenShiftStaticServerOverlay(t, cfg, fixturePath, ctx.KubectlOptions(t).Namespace)
+	k8s.ApplyOpenShiftCNINetworkAttachment(t, ctx.KubectlOptions(t), cfg)
 
 	// Use more frequent retries for resource creation
 	applyCounter := &retry.Counter{Count: 30, Wait: 5 * time.Second}
@@ -110,6 +113,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	})
 
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
+	k8s.MarkAcceptanceResource(t, ctx.KubectlOptions(t), cfg, "gatewayclasses.gateway.networking.k8s.io", "gateway-class")
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
@@ -145,10 +149,10 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	logger.Log(t, "waiting for gateway and httproute to be ready")
 
 	// Wait for Gateway to be ready
-	gatewayAddress = waitForGatewayReady(t, ctx, k8sClient, "gateway", "default", fixturePath, applyCounter)
+	gatewayAddress = waitForGatewayReady(t, ctx, k8sClient, "gateway", ctx.KubectlOptions(t).Namespace, fixturePath, applyCounter)
 
 	// Wait for HTTPRoute to be ready
-	waitForHTTPRouteReady(t, ctx, k8sClient, "http-route", "default", fixturePath, applyCounter)
+	waitForHTTPRouteReady(t, ctx, k8sClient, "http-route", ctx.KubectlOptions(t).Namespace, fixturePath, applyCounter)
 
 	// GENERAL Asserts- test that assets were created as expected
 	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
@@ -300,7 +304,7 @@ func waitForGatewayReady(t *testing.T, ctx environment.TestContext, k8sClient cl
 			logger.Log(t, fmt.Sprintf("Attempt %d: Recreating Gateway resource", attempt+1))
 
 			// Delete the Gateway resource
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "gateway", gatewayName, "--ignore-not-found=true")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "gateways.gateway.networking.k8s.io", gatewayName, "--ignore-not-found=true")
 
 			// Wait for deletion
 			time.Sleep(10 * time.Second)
@@ -409,7 +413,7 @@ func waitForHTTPRouteReady(t *testing.T, ctx environment.TestContext, k8sClient 
 			logger.Log(t, fmt.Sprintf("Attempt %d: Recreating HTTPRoute resource", attempt+1))
 
 			// Delete the HTTPRoute resource
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "httproute", routeName, "--ignore-not-found=true")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "httproutes.gateway.networking.k8s.io", routeName, "--ignore-not-found=true")
 
 			// Wait for deletion
 			time.Sleep(10 * time.Second)

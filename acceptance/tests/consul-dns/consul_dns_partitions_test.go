@@ -61,6 +61,9 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
+	if (cfg.EnableOpenshift || cfg.UseOpenshift) && (!cfg.EnableMultiCluster || !cfg.IsExpectedClusterCount(2)) {
+		t.Skip("requires at least two clusters and -enable-multi-cluster")
+	}
 
 	cases := []dnsWithPartitionsTestCase{
 		{

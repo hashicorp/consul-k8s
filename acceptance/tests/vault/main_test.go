@@ -17,7 +17,10 @@ func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 
 	expectedNumberOfClusters := 2
-	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) {
+	cfg := suite.Config()
+	// TestVault and TestVault_TLSAutoReload need one cluster, and the multi-cluster tests skip
+	// themselves without -enable-multi-cluster, so OpenShift can run this package on one cluster.
+	if (cfg.EnableMultiCluster && cfg.IsExpectedClusterCount(expectedNumberOfClusters)) || cfg.EnableOpenshift || cfg.UseOpenshift {
 		os.Exit(suite.Run())
 	} else {
 		fmt.Println(fmt.Sprintf("Skipping vault tests because either -enable-multi-cluster is "+

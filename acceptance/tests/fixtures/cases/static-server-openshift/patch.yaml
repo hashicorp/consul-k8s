@@ -10,7 +10,6 @@ spec:
     metadata:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "k8s.v1.cni.cncf.io/networks": '[{ "name":"consul-cni" }]'
     spec:
       containers:
         - name: static-server
