@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Allow configure `priorityClassName`, `nodeSelector`, `affinity`and `tolerations` in `dns.config`
+```
