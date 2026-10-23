@@ -41,12 +41,12 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 
-	defaultNamespace := "default"
+	defaultNamespace := ctx.KubectlOptions(t).Namespace
 
 	// create a service to target
 	targetName := "static-server"
 	logger.Log(t, "creating target server")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployStaticWorkload(t, ctx.KubectlOptions(t), cfg, "../fixtures/cases/static-server-inject")
 
 	// create a basic GatewayClassConfig
 	gatewayClassConfigName := "controlled-gateway-class-config"
@@ -54,6 +54,9 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: gatewayClassConfigName,
 		},
+	}
+	if cfg.EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
 	}
 	logger.Log(t, "creating gateway class config")
 	err := k8sClient.Create(context.Background(), gatewayClassConfig)
@@ -460,6 +463,12 @@ func createGatewayClass(t *testing.T, client client.Client, name, controllerName
 			ControllerName: gwv1.GatewayController(controllerName),
 			ParametersRef:  parameters,
 		},
+	}
+	if cfg := suite.Config(); cfg.EnableOpenshift || cfg.UseOpenshift {
+		// Lets the OpenShift cleanup script find cluster-scoped classes left by this namespace.
+		gatewayClass.Labels = map[string]string{
+			"consul.hashicorp.com/acceptance-namespace": suite.Environment().DefaultContext(t).KubectlOptions(t).Namespace,
+		}
 	}
 
 	err := client.Create(context.Background(), gatewayClass)

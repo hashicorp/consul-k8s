@@ -100,7 +100,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			routeNamespace, routeK8SOptions := createNamespace(t, ctx, cfg)
 
 			logger.Logf(t, "creating target server in %s namespace", serviceNamespace)
-			k8s.DeployKustomize(t, serviceK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployStaticWorkload(t, serviceK8SOptions, cfg, "../fixtures/cases/static-server-inject")
 
 			logger.Logf(t, "creating certificate resources in %s namespace", certificateNamespace)
 			applyFixture(t, cfg, certificateK8SOptions, "cases/api-gateways/certificate")
@@ -118,13 +118,13 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// patch the resources to reference each other
 			logger.Log(t, "patching gateway to certificate")
-			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateway", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
+			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateways.gateway.networking.k8s.io", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to target server")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproutes.gateway.networking.k8s.io", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to gateway")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproutes.gateway.networking.k8s.io", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
 
 			// Grab a kubernetes and consul client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.
@@ -278,6 +278,7 @@ func createNamespace(t *testing.T, ctx environment.TestContext, cfg *config.Test
 
 	logger.Logf(t, "creating Kubernetes namespace %s", namespace)
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", namespace)
+	k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, namespace)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", namespace)
 	})
@@ -373,7 +374,7 @@ func createReferenceGrant(t *testing.T, client client.Client, name, from, to str
 
 	// we just create a reference grant for all combinations in the given namespaces
 
-	require.NoError(t, client.Create(context.Background(), &gwv1.ReferenceGrant{
+	k8s.CreateReferenceGrant(t, client, suite.Config(), &gwv1.ReferenceGrant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: to,
@@ -404,7 +405,7 @@ func createReferenceGrant(t *testing.T, client client.Client, name, from, to str
 				Kind: secretKind,
 			}},
 		},
-	}))
+	})
 }
 
 func namespaceForConsul(namespaceMirroringEnabled bool, namespace string) string {

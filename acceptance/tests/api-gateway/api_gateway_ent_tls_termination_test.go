@@ -185,6 +185,7 @@ func TestAPIGateway_EntTLSTermination(t *testing.T) {
 	// when the first connect-injected pod starts.
 	logger.Log(t, "creating K8s namespace payments")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "namespace", consulNS)
+	k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, consulNS)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "namespace", consulNS)
 	})

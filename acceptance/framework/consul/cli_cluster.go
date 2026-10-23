@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -49,6 +50,7 @@ type CLICluster struct {
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 	cli                cli.CLI
+	enableOpenshift    bool
 }
 
 // NewCLICluster creates a new Consul cluster struct which can be used to create
@@ -68,7 +70,7 @@ func NewCLICluster(
 		configurePSA(t, ctx.KubernetesClient(t), cfg, consulNS)
 	}
 
-	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
+	if (cfg.EnableOpenshift || cfg.UseOpenshift) && cfg.EnableTransparentProxy {
 		configureSCCs(t, ctx.KubernetesClient(t), cfg, consulNS)
 	}
 
@@ -83,6 +85,11 @@ func NewCLICluster(
 
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		openShiftValues := openShiftHelmValues(t, ctx.KubernetesClient(t))
+		cfg.IsOpenshiftGreaterThan4_18 = openShiftValues["global.openshift.isOcpGreaterthan4_18"] == "true"
+		helpers.MergeMaps(values, openShiftValues)
+	}
 	helpers.MergeMaps(values, helmValues)
 
 	logger := terratestLogger.New(logger.TestLogger{})
@@ -97,6 +104,7 @@ func NewCLICluster(
 
 	cli, err := cli.NewCLI()
 	require.NoError(t, err)
+	cli.OpenShift = cfg.EnableOpenshift || cfg.UseOpenshift
 
 	require.Greater(t, len(cfg.KubeEnvs), 0)
 	return &CLICluster{
@@ -114,6 +122,7 @@ func NewCLICluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		cli:                *cli,
+		enableOpenshift:    cfg.EnableOpenshift || cfg.UseOpenshift,
 	}
 }
 
@@ -139,12 +148,20 @@ func (c *CLICluster) Create(t *testing.T) {
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	out, err := c.cli.Run(t, c.kubectlOptions, args...)
-	if err != nil {
-		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
-		c.logger.Logf(t, "command stdout: %s", string(out))
+	install := func() error {
+		out, err := c.cli.Run(t, c.kubectlOptions, args...)
+		if err != nil {
+			c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
+			c.logger.Logf(t, "command stdout: %s", string(out))
+			return fmt.Errorf("consul-k8s install: %w\noutput: %s", err, out)
+		}
+		return nil
 	}
-	require.NoError(t, err)
+	if c.enableOpenshift {
+		require.NoError(t, installOpenShiftWithStorageRetry(t, c.helmOptions, c.releaseName, install))
+	} else {
+		require.NoError(t, install())
+	}
 
 	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
 }
@@ -254,24 +271,30 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...str
 	if releaseName == CLIReleaseName {
 		serverPod = "consul-server-0"
 	}
-	tunnel := terratestk8s.NewTunnelWithLogger(
-		c.kubectlOptions,
-		terratestk8s.ResourceTypePod,
-		serverPod,
-		localPort,
-		remotePort,
-		c.logger)
+	if c.enableOpenshift {
+		// OpenShift API server connections can drop long-lived port forwards,
+		// so use the reconnecting tunnel.
+		config.Address = portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, c.kubectlOptions, c.logger)
+	} else {
+		tunnel := terratestk8s.NewTunnelWithLogger(
+			c.kubectlOptions,
+			terratestk8s.ResourceTypePod,
+			serverPod,
+			localPort,
+			remotePort,
+			c.logger)
 
-	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 3 * time.Second, Count: 60}, t, func(r *retry.R) {
-		require.NoError(r, tunnel.ForwardPortE(r))
-	})
+		// Retry creating the port forward since it can fail occasionally.
+		retry.RunWith(&retry.Counter{Wait: 3 * time.Second, Count: 60}, t, func(r *retry.R) {
+			require.NoError(r, tunnel.ForwardPortE(r))
+		})
 
-	t.Cleanup(func() {
-		tunnel.Close()
-	})
+		t.Cleanup(func() {
+			tunnel.Close()
+		})
 
-	config.Address = fmt.Sprintf("localhost:%d", localPort)
+		config.Address = fmt.Sprintf("localhost:%d", localPort)
+	}
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 
