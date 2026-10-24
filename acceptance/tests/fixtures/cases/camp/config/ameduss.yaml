@@ -1,0 +1,99 @@
+# ameduss — MCP server (flight & hotel booking).
+#
+# Single-container Deployment + ClusterIP Service.
+# No consul.hashicorp.com/connect-inject annotation: Consul connect-inject
+# controller injects the Envoy sidecar and transparent proxy automatically
+# because the pod is annotated.  The sidecar terminates inbound mTLS and
+# forwards plaintext to the app on port 8080.  No explicit upstream upstreams
+# block is needed — ameduss only receives calls, it never initiates them.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ameduss
+  namespace: default
+  labels:
+    app: ameduss
+    camp-role: mcp-server
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ameduss
+  namespace: default
+  labels:
+    app: ameduss
+    camp-role: mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ameduss
+  template:
+    metadata:
+      labels:
+        app: ameduss
+        camp-role: mcp-server
+      annotations:
+        # Opt this pod into the Consul connect-inject sidecar.
+        consul.hashicorp.com/connect-inject: "true"
+        # Transparent proxy: iptables redirect captures all inbound traffic
+        # into the Envoy sidecar so ameduss is reachable only through the mesh.
+        consul.hashicorp.com/transparent-proxy: "true"
+        # Exclude the app port from the inbound redirect so k8s liveness/
+        # readiness probes (which originate outside the pod) still work.
+        consul.hashicorp.com/transparent-proxy-exclude-inbound-ports: "8080"
+    spec:
+      serviceAccountName: ameduss
+      containers:
+        - name: ameduss
+          # Uses the same image built from mcp-servers/ameduss/Dockerfile.mesh.
+          # Replace with your registry path after building + pushing.
+          image: camp-ameduss:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: mcp
+          env:
+            - name: MCP_TRANSPORT
+              value: "http"
+            - name: MCP_ADDR
+              value: ":8080"
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+---
+# ClusterIP Service: other mesh services resolve ameduss by this DNS name.
+# The Consul connect-inject controller also uses this to derive the registered
+# service name (matches the ServiceDefaults / ServiceIntentions CRDs below).
+apiVersion: v1
+kind: Service
+metadata:
+  name: ameduss
+  namespace: default
+  labels:
+    app: ameduss
+spec:
+  selector:
+    app: ameduss
+  ports:
+    - name: mcp
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
