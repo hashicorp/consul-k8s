@@ -166,7 +166,29 @@ func main() {
 		fmt.Printf("no Consul version marked isLatest=true in %s; cannot continue: \n", versionMetadataPath)
 		os.Exit(1)
 	}
-	helmReferenceFile := filepath.Join(docsRepoPath, "content/consul", latestVersion, "content/docs/reference/k8s/helm.mdx")
+
+	// Be able to select the specific version for which we want to generate the Helm reference docs.
+	// If the CONSUL_VERSION env var is not set, default to JSON file latest version.
+	var selectedVersion string
+	envVarVersion, envVarPresent := os.LookupEnv("CONSUL_VERSION")
+	if !envVarPresent {
+		selectedVersion = latestVersion
+	} else {
+		// Verify that the selected version is present in the versionMetadata.json file.
+		for _, pv := range consulList {
+			if pv.Version == envVarVersion {
+				selectedVersion = envVarVersion
+				break
+			}
+		}
+		// If the selected version is not found in the json file, exit with an error.
+		if selectedVersion == "" {
+			fmt.Printf("CONSUL_VERSION %q not found in %s\n", envVarVersion, versionMetadataPath)
+			os.Exit(1)
+		}
+	}
+
+	helmReferenceFile := filepath.Join(docsRepoPath, "content/consul", selectedVersion, "content/docs/reference/k8s/helm.mdx")
 	helmReferenceBytes, err := os.ReadFile(helmReferenceFile)
 	if err != nil {
 		fmt.Println(err.Error())
