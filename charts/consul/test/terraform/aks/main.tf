@@ -21,6 +21,21 @@ provider "azurerm" {
   features {}
 }
 
+provider "azurerm" {
+  alias           = "image_factory"
+  subscription_id = "338f0fa5-b5ae-4847-9821-1808613db6c5" # hashicorp02-image-factory-prod
+
+  features {}
+}
+
+data "azurerm_shared_image_version" "latest" {
+  provider            = azurerm.image_factory
+  name                = "latest"
+  image_name          = "hc-base-ubuntu-2404-amd64"
+  gallery_name        = "hcbaseGallery"
+  resource_group_name = "hc-base-rg-gallery"
+}
+
 provider "local" {}
 
 resource "random_id" "suffix" {
