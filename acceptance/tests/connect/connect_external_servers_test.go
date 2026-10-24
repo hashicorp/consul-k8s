@@ -52,6 +52,16 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"connectInject.enabled":     "false",
 				"connectInject.cni.enabled": "false",
 			}
+
+			// OpenShift: Override container security context to allow OpenShift SCCs to manage permissions
+			// We need to disable runAsNonRoot since the Consul image runs as root by default
+			// OpenShift SCCs will manage the actual user/group assignments
+			if cfg.EnableOpenshift {
+				// Must provide full security context when overriding to avoid using restrictedSecurityContext helper
+				serverHelmValues["server.containerSecurityContext.server.allowPrivilegeEscalation"] = "false"
+				serverHelmValues["server.containerSecurityContext.server.runAsNonRoot"] = "false"
+			}
+
 			serverReleaseName := helpers.RandomName()
 			if tc.host == "exec" {
 				serverHelmValues["server.replicas"] = "3"
@@ -72,6 +82,11 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"externalServers.enabled":   "true",
 				"externalServers.hosts[0]":  fmt.Sprintf("%s-consul-server", serverReleaseName),
 				"externalServers.httpsPort": "8500",
+			}
+
+			// On OpenShift, disable managing Gateway API CRDs since they already exist
+			if cfg.EnableOpenshift {
+				helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
 			}
 
 			if secure {
@@ -113,12 +128,34 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-			} else {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			// Use appropriate fixtures based on OpenShift and CNI flags
+			staticServerFixture := "../fixtures/cases/static-server-inject"
+			staticClientFixture := "../fixtures/cases/static-client-inject"
+			if cfg.EnableOpenshift {
+				// OpenShift-specific fixtures
+				if cfg.EnableCNI {
+					// OpenShift WITH CNI
+					staticServerFixture = "../fixtures/cases/static-server-openshift-cni"
+					if cfg.EnableTransparentProxy {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-tproxy-cni"
+					} else {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-inject-cni"
+					}
+				} else {
+					// OpenShift WITHOUT CNI
+					staticServerFixture = "../fixtures/cases/static-server-openshift"
+					if cfg.EnableTransparentProxy {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-tproxy"
+					} else {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-inject"
+					}
+				}
+			} else if cfg.EnableTransparentProxy {
+				staticClientFixture = "../fixtures/cases/static-client-tproxy"
 			}
+
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerFixture)
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticClientFixture)
 
 			// Check that both static-server and static-client have been injected and now have 2 containers.
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
