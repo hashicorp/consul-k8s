@@ -35,6 +35,9 @@ func TestConsulFlags_Flags(t *testing.T) {
 				constants.CACertPEMEnvVar:     "test-ca-pem",
 				constants.TLSServerNameEnvVar: "server.consul",
 
+				ClientCertFileEnvVar: "path/to/cert.pem",
+				ClientKeyFileEnvVar:  "path/to/key.pem",
+
 				ACLTokenEnvVar:             "test-token",
 				ACLTokenFileEnvVar:         "/path/to/token",
 				LoginAuthMethodEnvVar:      "test-auth-method",
@@ -54,10 +57,12 @@ func TestConsulFlags_Flags(t *testing.T) {
 				Datacenter: "test-dc",
 				APITimeout: 10 * time.Second,
 				ConsulTLSFlags: ConsulTLSFlags{
-					UseTLS:        true,
-					CACertFile:    "path/to/ca.pem",
-					CACertPEM:     "test-ca-pem",
-					TLSServerName: "server.consul",
+					UseTLS:         true,
+					CACertFile:     "path/to/ca.pem",
+					CACertPEM:      "test-ca-pem",
+					TLSServerName:  "server.consul",
+					ClientCertFile: "path/to/cert.pem",
+					ClientKeyFile:  "path/to/key.pem",
 				},
 				ConsulACLFlags: ConsulACLFlags{
 					Token:     "test-token",
@@ -261,11 +266,21 @@ func TestConsulFlags_ConsulServerConnMgrConfig(t *testing.T) {
 
 func TestConsulFlags_ConsulServerConnMgrConfig_TLS(t *testing.T) {
 	caFile, err := os.CreateTemp("", "")
-	t.Cleanup(func() {
-		_ = os.RemoveAll(caFile.Name())
-	})
+	t.Cleanup(func() { _ = os.RemoveAll(caFile.Name()) })
 	require.NoError(t, err)
 	_, err = caFile.WriteString(testCA)
+	require.NoError(t, err)
+
+	certFile, err := os.CreateTemp("", "")
+	t.Cleanup(func() { _ = os.RemoveAll(certFile.Name()) })
+	require.NoError(t, err)
+	_, err = certFile.WriteString(testClientCert)
+	require.NoError(t, err)
+
+	keyFile, err := os.CreateTemp("", "")
+	t.Cleanup(func() { _ = os.RemoveAll(keyFile.Name()) })
+	require.NoError(t, err)
+	_, err = keyFile.WriteString(testClientKey)
 	require.NoError(t, err)
 
 	cases := map[string]struct {
@@ -306,6 +321,16 @@ func TestConsulFlags_ConsulServerConnMgrConfig_TLS(t *testing.T) {
 				},
 			},
 		},
+		"mutual TLS": {
+			flags: ConsulFlags{
+				Addresses: "consul.address",
+				ConsulTLSFlags: ConsulTLSFlags{
+					UseTLS:         true,
+					ClientCertFile: certFile.Name(),
+					ClientKeyFile:  keyFile.Name(),
+				},
+			},
+		},
 	}
 
 	for name, c := range cases {
@@ -315,6 +340,9 @@ func TestConsulFlags_ConsulServerConnMgrConfig_TLS(t *testing.T) {
 			require.NotNil(t, cfg.TLS)
 			if c.flags.CACertFile != "" || c.flags.CACertPEM != "" {
 				require.NotNil(t, cfg.TLS.RootCAs)
+			}
+			if c.flags.ClientCertFile != "" {
+				require.Len(t, cfg.TLS.Certificates, 1)
 			}
 			require.Equal(t, c.flags.TLSServerName, cfg.TLS.ServerName)
 		})
@@ -402,6 +430,22 @@ func TestConsulFlags_ConsulAPIClientConfig(t *testing.T) {
 				},
 			},
 		},
+		"mutual TLS cert and key files provided": {
+			flags: ConsulFlags{
+				ConsulTLSFlags: ConsulTLSFlags{
+					UseTLS:         true,
+					ClientCertFile: "path/to/cert",
+					ClientKeyFile:  "path/to/key",
+				},
+			},
+			expConfig: &api.Config{
+				Scheme: "https",
+				TLSConfig: api.TLSConfig{
+					CertFile: "path/to/cert",
+					KeyFile:  "path/to/key",
+				},
+			},
+		},
 		"ACL token provided": {
 			flags: ConsulFlags{
 				ConsulACLFlags: ConsulACLFlags{
@@ -433,7 +477,8 @@ func TestConsulFlags_ConsulAPIClientConfig(t *testing.T) {
 	}
 }
 
-const testCA = `
+const (
+	testCA = `
 -----BEGIN CERTIFICATE-----
 MIIC7TCCApOgAwIBAgIQbHoocPoQq7qR3MTNUXdLVDAKBggqhkjOPQQDAjCBuTEL
 MAkGA1UEBhMCVVMxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1TYW4gRnJhbmNpc2Nv
@@ -452,3 +497,89 @@ BgNVHSMEJDAigCA9dZuoEX3yrbebyEEzsN4L2rr7FJd6FsjIioR6KbMIhTAKBggq
 hkjOPQQDAgNIADBFAiARhJR88w9EXLsq5A932auHvLFAw+uQ0a2TLSaJF54fyAIh
 APQczkCoIFiLlGp0GYeHEfjvrdm2g8Q3BUDjeAUfZPaW
 -----END CERTIFICATE-----`
+
+	testClientCert = `
+-----BEGIN CERTIFICATE-----
+MIIE/jCCAuYCAQEwDQYJKoZIhvcNAQELBQAwRTELMAkGA1UEBhMCQVUxEzARBgNV
+BAgMClNvbWUtU3RhdGUxITAfBgNVBAoMGEludGVybmV0IFdpZGdpdHMgUHR5IEx0
+ZDAeFw0yMzExMDYxNDQyNDVaFw0zMzExMDMxNDQyNDVaMEUxCzAJBgNVBAYTAkFV
+MRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRz
+IFB0eSBMdGQwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDQx4nDjDQx
+EOtKXGimThOnZtgUOCoyLfjQZEDE4XklVWhCEovnBNLt+u39+yDFIFxyDVvAGpEQ
+0f6Cl8C8A5+gX0Qj2PIJF7kmxeHKusmtliOi0VGBxlCQ48rTqDo44ixas3WAaMnY
+nG2GX6JlENQf5jMz4+d+wvcMA5vL7nJDzUXBGM5mQtqPCMC0b9a2ou8XL/I3NURT
+uAsrTyBQIBBVJhXIZjxAL8P339gY7r6KnvrWSpRaZGI3e4cISVs2A5fu0nPbeEKu
+P8bAgEsWP7sQ8GmB6oRsbTvKPV+7JEMhB7ZWik1xbAYzsY2mWQXeWVsfMf/vNb4v
+UZaboM/2R+PBXMRZRbGdraWe8aj6ClRDeQI3WXpqgZmoCi7Ui6LQkRHqzU2ogIAu
+UCCvz91jgQgmX3zhugy191wUcH8S3/3KFwtJxcFSKcXgtCmsWI9P7JLMFdobXkdA
+TZujlq+f3BJpgn+KE8ZTrPnkQCcZfd0iT6x4T7ygXWFK1VKsyXWY4whIuwD8P0FS
+6Kx9dcJ8V2lW/VkJ1acsSYYN5QNBqI0nY92uw49waKUs8XIJYD1Gbf0RPmy1U3kj
+d2vKPiOrOgGJiaRjMKPxhnr1h9YHt/pE+h/394168ongY3iOJsHPWffEI4jQK842
+6JmGYenf1EEPPWDKHucXW36CpbTquRHVIQIDAQABMA0GCSqGSIb3DQEBCwUAA4IC
+AQBgVAGEDSG0+NHav8fNroZH3G/tFidzdCOONS8ZGFuM4mNPEG1T9RDHDYkrfMmo
+tSP548G8XwhbjroLyAR5Td6z29YGzdVumjNxN15Srf4QHmGRJw3Ni+wCBj89eCAa
+Gkink4Fq6CfmN0VxtaIOUnfyQtT4FzoxT/6ccPhdJ8WXs1no/j0/ou49CH5Ujutw
+rT59NHWpJzEPdT6+i/q8zwmxmHwpOLmwrYx2iZ30KOAowD1mEZjZhjv7yukwTlf5
+NzKUjLaa714RsiDpyU1g8P+DwnjbQzRRrvQQRC43OgFj771UnhzBPIzc7YpN99Bc
+OZtevCRC2cuSd87MsVC/cjJ5xMKWvqJT0usAD3uhRHI6yqpuTNzcO2ID+YoYMvse
+DAv91MBAXygT0Z/A6l67pLKnEjQwv4rrfnTlfrWuGMVgI+xnPTwDFJbjgAfLs+RT
+tvQvGzdX/Vih2ElInQf0KqVQiGVhoQErQE0dh9yxGMHdAtIfFDYtbxALL16xmvnr
+173rxfzuAxpksqX43DmkZFo4WnkrV0ge/05c34ghISjet9HHkAWx2rR1sAPBRJLI
+g/BreGrTX0brt5JpmuDyxTGOgLkYCfcq3puuEYENXPgMG/CE4FUrPpzk7y/nid+z
+XyFVvUT1KsJ6Qe4XaPHUpEW+vw4FlC7tq+nnAOyDFjFmhw==
+-----END CERTIFICATE-----`
+
+	testClientKey = `
+-----BEGIN PRIVATE KEY-----
+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
+hP/L8Bb5JnGGmJL6EjWQ+53DrWzK2g==
+-----END PRIVATE KEY-----`
+)
