@@ -67,7 +67,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:2.1.0-rc1
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:3.0.0-dev
 
 
   # Array of objects containing image pull secret names that will be applied to each service account.
@@ -88,7 +88,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:2.1.0-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:3.0.0-dev
 
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -866,7 +866,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-rc1
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:3.0.0-dev
   # Disable this once the manifests are generated and subsequent helm upgrades
   
   generateManifests: false
@@ -4038,7 +4038,7 @@ ai:
     # @default: ""
     # @type: string
     # TODO: this is yet to be implemented
-    image: "hashicorp/consul-mcp-gateway:2.1.0-rc1"
+    image: "hashicorp/consul-mcp-gateway:3.0.0-dev"
 
     defaults:
       # The port the MCP server container listens on inside the pod.
@@ -4090,7 +4090,7 @@ ai:
     # ```
     # @default: hashicorp/consul-inference-gateway:<latest version>
     # @type: string
-    image: "hashicorp/consul-inference-gateway:2.1.0-rc1"
+    image: "hashicorp/consul-inference-gateway:3.0.0-dev"
 
     # Default values applied to every gateway in the gateways list below unless
     # overridden on the individual gateway entry.
@@ -4170,9 +4170,9 @@ ai:
     # image: "hashicorp/consul-mcp-sc:0.1.0"
     # image: "myregistry/consul-mcp-sc:latest"
     # ```
-    # @default: "hashicorp/consul-mcp-sc:2.1.0-rc1"
+    # @default: "hashicorp/consul-mcp-sc:3.0.0-dev"
     # @type: string
-    image: "hashicorp/consul-mcp-sc:2.1.0-rc1"
+    image: "hashicorp/consul-mcp-sc:3.0.0-dev"
 
     defaults:
       # The port the agent interceptor listens on inside the pod.
