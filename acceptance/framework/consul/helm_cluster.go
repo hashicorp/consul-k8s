@@ -61,6 +61,10 @@ type HelmCluster struct {
 	noCleanup          bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
+
+	// openShiftReleasedChartImages holds the image overrides that let a
+	// released chart pull on OpenShift. UpgradeToLocalChart drops them again.
+	openShiftReleasedChartImages map[string]string
 }
 
 func NewHelmCluster(
@@ -154,6 +158,9 @@ func NewHelmCluster(
 // The enterprise Consul image is the one override that is kept, because the
 // released chart defaults to the CE image and an enterprise run would otherwise
 // silently install CE and leave its license secret unused.
+//
+// On OpenShift the released chart's short image names are qualified with
+// docker.io, see openShiftReleasedChartImages.
 func NewHelmClusterFromReleasedChart(
 	t *testing.T,
 	helmValues map[string]string,
@@ -173,6 +180,10 @@ func NewHelmClusterFromReleasedChart(
 			cluster.helmOptions.SetValues["global.image"] = image
 		}
 	}
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		cluster.openShiftReleasedChartImages = openShiftReleasedChartImages(t, chartVersion, cluster.helmOptions.SetValues)
+		helpers.MergeMaps(cluster.helmOptions.SetValues, cluster.openShiftReleasedChartImages)
+	}
 	cluster.helmOptions.Version = chartVersion
 	cluster.helmOptions.ExtraArgs["upgrade"] = append(
 		cluster.helmOptions.ExtraArgs["upgrade"], "--version", chartVersion,
@@ -190,6 +201,14 @@ func NewHelmClusterFromReleasedChart(
 func (h *HelmCluster) UpgradeToLocalChart(t *testing.T, helmValues map[string]string) {
 	t.Helper()
 
+	if h.cfg.EnableOpenshift || h.cfg.UseOpenshift {
+		// The local chart must run the same images it runs on other platforms,
+		// not the released ones pinned for the OpenShift install.
+		for key := range h.openShiftReleasedChartImages {
+			delete(h.helmOptions.SetValues, key)
+		}
+		h.openShiftReleasedChartImages = nil
+	}
 	valuesFromConfig, err := h.cfg.HelmValuesFromConfig()
 	require.NoError(t, err)
 	for _, key := range []string{"global.image", "global.imageK8S", "global.imageEnvoy", "global.imageConsulDataplane"} {

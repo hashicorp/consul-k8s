@@ -195,6 +195,70 @@ func TestOpenShiftHelmValues(t *testing.T) {
 	}
 }
 
+func TestQualifyReleasedChartImages(t *testing.T) {
+	released := `
+global:
+  image: hashicorp/consul:2.0.3
+  imageK8S: hashicorp/consul-k8s-control-plane:2.0.3
+  imageEnvoy: null
+  imageConsulDataplane: hashicorp/consul-dataplane:2.0.3
+server:
+  image: null
+`
+	for _, tc := range []struct {
+		name        string
+		chartValues string
+		setValues   map[string]string
+		want        map[string]string
+	}{
+		{
+			name:        "short names",
+			chartValues: released,
+			want: map[string]string{
+				"global.image":                "docker.io/hashicorp/consul:2.0.3",
+				"global.imageK8S":             "docker.io/hashicorp/consul-k8s-control-plane:2.0.3",
+				"global.imageConsulDataplane": "docker.io/hashicorp/consul-dataplane:2.0.3",
+			},
+		},
+		{
+			name:        "enterprise image already set",
+			chartValues: released,
+			setValues:   map[string]string{"global.image": "hashicorp/consul-enterprise:2.0.3-ent"},
+			want: map[string]string{
+				"global.imageK8S":             "docker.io/hashicorp/consul-k8s-control-plane:2.0.3",
+				"global.imageConsulDataplane": "docker.io/hashicorp/consul-dataplane:2.0.3",
+			},
+		},
+		{
+			name:        "qualified names",
+			chartValues: "global:\n  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.22-dev\n  imageK8S: quay.io/hashicorp/consul-k8s-control-plane:2.0.3\n",
+			want:        map[string]string{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			images, err := qualifyReleasedChartImages([]byte(tc.chartValues), tc.setValues)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, images)
+		})
+	}
+
+	_, err := qualifyReleasedChartImages([]byte("global: ["), nil)
+	require.Error(t, err)
+}
+
+func TestIsShortImageName(t *testing.T) {
+	for image, want := range map[string]bool{
+		"hashicorp/consul:2.0.3":                         true,
+		"busybox":                                        true,
+		"docker.io/hashicorp/consul:2.0.3":               false,
+		"localhost/consul:dev":                           false,
+		"registry:5000/consul:dev":                       false,
+		"registry.connect.redhat.com/hashicorp/consul:1": false,
+	} {
+		require.Equal(t, want, isShortImageName(image), image)
+	}
+}
+
 func TestCreateOrUpdateLicenseSecret(t *testing.T) {
 	for _, tc := range []struct {
 		name        string

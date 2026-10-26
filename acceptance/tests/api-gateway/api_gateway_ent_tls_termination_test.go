@@ -212,6 +212,7 @@ func TestAPIGateway_EntTLSTermination(t *testing.T) {
 	fixturePath := "../fixtures/cases/api-gateways/ent-tls-termination"
 
 	logger.Log(t, "creating ent-tls-termination gateway resources in namespace payments")
+	k8s.GrantOpenShiftPrivilegedSCC(t, paymentsOpts, cfg, "static-server-2")
 	out, err := k8s.RunKubectlAndGetOutputE(t, paymentsOpts, "apply", "-k", fixturePath)
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {

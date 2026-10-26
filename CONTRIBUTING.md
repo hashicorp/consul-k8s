@@ -727,6 +727,13 @@ OpenShift runs opt out of Helm's client-side OpenAPI download with
 `CONSUL_K8S_SKIP_OPENAPI_VALIDATION=true`; Kubernetes still validates resources
 on admission. The CLI keeps client-side validation enabled by default.
 
+Tests that start from a published chart, such as
+`TestConnectInject_MultiportConversionFromPriorRelease`, pull that release's
+images by their `docker.io` names on OpenShift, because OpenShift resolves short
+names such as `hashicorp/consul` to the Red Hat registry. That test compares the
+upgraded control plane image with `-consul-k8s-image`, so set `CONSUL_K8S_IMAGE`
+when running it, for example to the local chart's `global.imageK8S`.
+
 To inspect cleanup without changing the cluster:
 
 ```shell
