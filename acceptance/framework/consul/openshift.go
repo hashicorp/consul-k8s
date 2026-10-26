@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
+	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -139,6 +141,59 @@ func openShiftHelmValues(t *testing.T, client kubernetes.Interface) map[string]s
 		"connectInject.apiGateway.manageNonStandardCRDs": "true",
 		"server.affinity":                                "null",
 	}
+}
+
+// openShiftReleasedChartImages returns overrides that pin a published chart's
+// default images by their fully qualified names.
+//
+// Published charts default to short names such as hashicorp/consul. OpenShift
+// resolves short names through registry aliases that send hashicorp/* to
+// registry.connect.redhat.com, which does not carry those tags, so the release
+// never becomes ready. Every other platform resolves the same names to
+// docker.io, so qualifying them keeps the released images unchanged. Values
+// that are already set, such as the enterprise Consul image, are left alone.
+func openShiftReleasedChartImages(t *testing.T, chartVersion string, setValues map[string]string) map[string]string {
+	t.Helper()
+
+	var chartValues string
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 3}, t, func(r *retry.R) {
+		var err error
+		chartValues, err = helm.RunHelmCommandAndGetStdOutE(r, &helm.Options{Logger: terratestLogger.Discard},
+			"show", "values", "consul", "--repo", "https://helm.releases.hashicorp.com", "--version", chartVersion)
+		require.NoError(r, err, "reading the default values of chart %s", chartVersion)
+	})
+	images, err := qualifyReleasedChartImages([]byte(chartValues), setValues)
+	require.NoError(t, err)
+	t.Logf("Qualified the short image names of chart %s for OpenShift: %v", chartVersion, images)
+	return images
+}
+
+// qualifyReleasedChartImages returns docker.io overrides for the global image
+// defaults in chartValues that are short names and not already in setValues.
+func qualifyReleasedChartImages(chartValues []byte, setValues map[string]string) (map[string]string, error) {
+	var values struct {
+		Global map[string]interface{} `yaml:"global"`
+	}
+	if err := yaml.Unmarshal(chartValues, &values); err != nil {
+		return nil, fmt.Errorf("parsing chart values: %w", err)
+	}
+	images := map[string]string{}
+	for _, key := range []string{"image", "imageK8S", "imageEnvoy", "imageConsulDataplane"} {
+		image, _ := values.Global[key].(string)
+		if _, set := setValues["global."+key]; set || image == "" || !isShortImageName(image) {
+			continue
+		}
+		images["global."+key] = "docker.io/" + image
+	}
+	return images, nil
+}
+
+// isShortImageName reports whether the container runtime has to choose the
+// registry for image. As in image reference parsing, the first path component
+// is a registry only if it contains "." or ":" or is "localhost".
+func isShortImageName(image string) bool {
+	registry, _, found := strings.Cut(image, "/")
+	return !found || (!strings.ContainsAny(registry, ".:") && registry != "localhost")
 }
 
 func ensureNamespaceExists(t *testing.T, client kubernetes.Interface, namespace string) {

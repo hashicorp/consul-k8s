@@ -50,6 +50,33 @@ func ApplyOpenShiftCNINetworkAttachment(t *testing.T, options *k8s.KubectlOption
 	})
 }
 
+// GrantOpenShiftPrivilegedSCC binds the privileged SCC to service accounts in
+// options.Namespace on OpenShift, like the privileged-scc-rolebinding.yaml that
+// the shared static-server and static-client bases include. Fixtures whose
+// workloads use their own service account need it because otherwise the pods
+// only get the restricted-v2 SCC, which rejects their fixed user ID and the
+// injected transparent proxy init container.
+func GrantOpenShiftPrivilegedSCC(t *testing.T, options *k8s.KubectlOptions, cfg *config.TestConfig, serviceAccounts ...string) {
+	t.Helper()
+	if !cfg.EnableOpenshift && !cfg.UseOpenshift {
+		return
+	}
+	require.NotEmpty(t, options.Namespace, "kubectl options must set the namespace of the service accounts")
+	for _, serviceAccount := range serviceAccounts {
+		name := serviceAccount + "-openshift-privileged"
+		output, err := RunKubectlAndGetOutputE(t, options, "get", "rolebinding", name, "--ignore-not-found", "-o", "name")
+		require.NoError(t, err, output)
+		if strings.TrimSpace(output) == "" {
+			RunKubectl(t, options, "create", "rolebinding", name,
+				"--clusterrole=system:openshift:scc:privileged",
+				"--serviceaccount="+options.Namespace+":"+serviceAccount)
+		}
+		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			RunKubectl(t, options, "delete", "rolebinding", name, "--ignore-not-found")
+		})
+	}
+}
+
 // DeployStaticWorkload deploys a static-server or static-client kustomize fixture
 // like DeployKustomize. On OpenShift it deploys the fixture's OpenShift variant,
 // which lets the restricted SCC assign the user ID, and with CNI attaches the
