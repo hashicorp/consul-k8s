@@ -43,7 +43,7 @@ jobs:
       with:
         workflow: cloud.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: binilvrgs/422_421_ocptest
+        ref: manisha/422_ocptest
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "gotestsum-version":"1.12.3" }'
 
