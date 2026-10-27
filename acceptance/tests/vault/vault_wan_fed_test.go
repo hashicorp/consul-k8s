@@ -512,6 +512,28 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	secondaryClient, _ := secondaryConsulCluster.SetupConsulClient(t, true)
 	helpers.VerifyFederation(t, primaryClient, secondaryClient, consulReleaseName, true)
 
+	for _, host := range []string{
+		"dns", "ip",
+		// Re-enable when the distroless consul-dataplane image supports exec=echo.
+		// "exec",
+	} {
+		testExternalVaultFeatureGate(t, cfg, secondaryCtx, vaultClient, consulReleaseName, secondaryAuthMethodName,
+			fmt.Sprintf("%s,%s", replicationTokenSecret.PolicyName, serverPKIConfigSecondary.PolicyName),
+			host,
+			map[string]string{
+				"global.datacenter":                            "dc2",
+				"global.acls.manageSystemACLs":                 "true",
+				"global.acls.replicationToken.secretName":      replicationTokenSecret.Path,
+				"global.acls.replicationToken.secretKey":       replicationTokenSecret.Key,
+				"global.tls.caCert.secretName":                 serverPKIConfigSecondary.CAPath,
+				"global.secretsBackend.vault.consulCARole":     serverPKIConfig.RoleName,
+				"global.secretsBackend.vault.ca.secretName":    vaultCASecretName,
+				"global.secretsBackend.vault.ca.secretKey":     "tls.crt",
+				"global.secretsBackend.vault.agentAnnotations": secondaryConsulHelmValues["global.secretsBackend.vault.agentAnnotations"],
+				"externalServers.tlsServerName":                "server.dc2.consul",
+			})
+	}
+
 	// Create a ProxyDefaults resource to configure services to use the mesh
 	// gateways.
 	logger.Log(t, "creating proxy-defaults config")

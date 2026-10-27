@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/acceptance
 
-go 1.26.9
+go 1.26.10
 
 // replace these so we always use the latest version of the control-plane types
 replace github.com/hashicorp/consul-k8s/version => ../version
@@ -12,8 +12,8 @@ require (
 	github.com/go-logr/logr v1.4.4
 	github.com/gruntwork-io/terratest v0.46.7
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240821160356-557f7c37e108
-	github.com/hashicorp/consul/api v1.35.0-rc1
-	github.com/hashicorp/consul/sdk v0.19.0-rc1
+	github.com/hashicorp/consul/api v1.35.0
+	github.com/hashicorp/consul/sdk v0.19.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/go-version v1.9.0
@@ -137,4 +137,4 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.35.0-rc1
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.35.0

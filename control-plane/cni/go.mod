@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/control-plane/cni
 
-go 1.26.9
+go 1.26.10
 
 replace github.com/hashicorp/consul-k8s/version => ../../version
 
@@ -8,7 +8,7 @@ require (
 	github.com/containernetworking/cni v1.3.0
 	github.com/containernetworking/plugins v1.2.0
 	github.com/hashicorp/consul-k8s/version v0.0.0
-	github.com/hashicorp/consul/sdk v0.19.0-rc1
+	github.com/hashicorp/consul/sdk v0.19.0
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.35.2

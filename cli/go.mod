@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/cli
 
-go 1.26.9
+go 1.26.10
 
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.13.4
@@ -14,7 +14,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/consul-k8s/version v0.0.0
-	github.com/hashicorp/consul/troubleshoot v0.9.4
+	github.com/hashicorp/consul/troubleshoot v0.10.1
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kr/text v0.2.0
@@ -80,8 +80,8 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
-	github.com/hashicorp/consul/api v1.35.0-rc1 // indirect
-	github.com/hashicorp/consul/envoyextensions v0.10.4 // indirect
+	github.com/hashicorp/consul/api v1.35.0 // indirect
+	github.com/hashicorp/consul/envoyextensions v0.11.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
