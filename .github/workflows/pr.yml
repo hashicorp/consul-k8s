@@ -72,9 +72,9 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: shashank/test-oct-ocp
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
+        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-openshift\":true}" }'
 
   pass-required-checks-on-skip:
     needs: [ conditional-skip, check-release-only ]
@@ -102,6 +102,7 @@ jobs:
           - check-name: acceptance-ce
           - check-name: acceptance-ce-cni
           - check-name: acceptance-ce-tproxy
+          - check-name: acceptance-openshift
           # Required patch-coverage gate. When CI is skipped there is no diff
           # to evaluate, so mark it success to keep skip-CI PRs mergeable.
           - check-name: coverage / coverage-gate

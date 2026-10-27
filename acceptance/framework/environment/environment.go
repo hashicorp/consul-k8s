@@ -62,7 +62,9 @@ func NewKubernetesEnvironmentFromConfig(config *config.TestConfig) *KubernetesEn
 	// Add additional contexts if multi cluster tests are enabled.
 	if config.EnableMultiCluster {
 		for _, v := range config.KubeEnvs[1:] {
-			kenv.contexts = append(kenv.contexts, NewContext(v.KubeNamespace, v.KubeConfig, v.KubeContext))
+			ctx := NewContext(v.KubeNamespace, v.KubeConfig, v.KubeContext)
+			ctx.openShift = config.EnableOpenshift || config.UseOpenshift
+			kenv.contexts = append(kenv.contexts, ctx)
 		}
 	}
 
