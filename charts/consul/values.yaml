@@ -4038,7 +4038,7 @@ ai:
     # @default: ""
     # @type: string
     # TODO: this is yet to be implemented
-    image: "hashicorp/consul-mcp-gateway:3.0.0-dev"
+    image: "hashicorp/csl-mcp-sc:3.0.0-dev"
 
     defaults:
       # The port the MCP server container listens on inside the pod.
@@ -4090,7 +4090,7 @@ ai:
     # ```
     # @default: hashicorp/consul-inference-gateway:<latest version>
     # @type: string
-    image: "hashicorp/consul-inference-gateway:3.0.0-dev"
+    image: "hashicorp/csl-inf-rt:3.0.0-dev"
 
     # Default values applied to every gateway in the gateways list below unless
     # overridden on the individual gateway entry.
@@ -4172,7 +4172,7 @@ ai:
     # ```
     # @default: "hashicorp/consul-mcp-sc:3.0.0-dev"
     # @type: string
-    image: "hashicorp/consul-mcp-sc:3.0.0-dev"
+    image: "hashicorp/csl-mcp-sc:3.0.0-dev"
 
     defaults:
       # The port the agent interceptor listens on inside the pod.
