@@ -112,7 +112,41 @@ func TestValidateMesh(t *testing.T) {
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_2",
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519", "P-256"},
+						},
+					},
+				},
+			},
+			expAllow: true,
+		},
+		"validation rejects ecdhCurves with TLSv1_2 without P-256": {
+			existingResources: nil,
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Mesh,
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_2",
 							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+			expAllow:      false,
+			expErrMessage: "mesh.consul.hashicorp.com \"mesh\" is invalid: spec.tls.incoming.ecdhCurves: Invalid value: [\"X25519MLKEM768\"]: ecdhCurves must include \"P-256\" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys. Add \"P-256\" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to \"TLSv1_3\"",
+		},
+		"validation accepts ecdhCurves without tlsMinVersion when P-256 is included": {
+			existingResources: nil,
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Mesh,
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							ECDHCurves: []string{"X25519MLKEM768", "X25519", "P-256"},
 						},
 					},
 				},

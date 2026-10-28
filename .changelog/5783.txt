@@ -1,0 +1,7 @@
+```release-note:bug
+crd: Fix the Mesh CRD validation rule so `ecdhCurves` can be set without `tlsMinVersion`. Previously such resources were rejected with `no such key: tlsMinVersion`.
+```
+
+```release-note:improvement
+control-plane: Mesh webhook validation rejects `ecdhCurves` without `P-256` when TLS 1.2 can be negotiated, matching Consul's mesh config entry validation.
+```
