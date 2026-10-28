@@ -420,7 +420,7 @@ func TestMesh_Validate(t *testing.T) {
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "",
-							ECDHCurves:    []string{"X25519MLKEM768"},
+							ECDHCurves:    []string{"X25519MLKEM768", "P-256"},
 						},
 					},
 				},
@@ -435,7 +435,7 @@ func TestMesh_Validate(t *testing.T) {
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_2",
-							ECDHCurves:    []string{"X25519MLKEM768"},
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519", "P-256"},
 						},
 					},
 				},
@@ -468,7 +468,7 @@ func TestMesh_Validate(t *testing.T) {
 					TLS: &MeshTLSConfig{
 						Outgoing: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLS_AUTO",
-							ECDHCurves:    []string{"X25519"},
+							ECDHCurves:    []string{"X25519", "P-256"},
 						},
 					},
 				},
@@ -490,6 +490,93 @@ func TestMesh_Validate(t *testing.T) {
 			},
 			expectedErrMsgs: []string{
 				`spec.tls.outgoing.ecdhCurves: Invalid value: ["X25519"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher`,
+			},
+		},
+		"tls.incoming.ecdhCurves with TLSv1_2 without P-256 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_2",
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.ecdhCurves: Invalid value: ["X25519MLKEM768","X25519"]: ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys. Add "P-256" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to "TLSv1_3"`,
+			},
+		},
+		"tls.incoming.ecdhCurves with unspecified TLS version without P-256 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "",
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.ecdhCurves: Invalid value: ["X25519MLKEM768","X25519"]: ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys. Add "P-256" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to "TLSv1_3"`,
+			},
+		},
+		"tls.outgoing.ecdhCurves with TLS_AUTO without P-256 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLS_AUTO",
+							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.outgoing.ecdhCurves: Invalid value: ["X25519MLKEM768"]: ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys. Add "P-256" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to "TLSv1_3"`,
+			},
+		},
+		"tls.outgoing.ecdhCurves with TLSv1_2 and other NIST curves without P-256 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_2",
+							ECDHCurves:    []string{"P-384", "P-521"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.outgoing.ecdhCurves: Invalid value: ["P-384","P-521"]: ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys. Add "P-256" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to "TLSv1_3"`,
+			},
+		},
+		"tls.outgoing.ecdhCurves with TLSv1_3 without P-256 valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_3",
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
+						},
+					},
+				},
 			},
 		},
 		"tls.outgoing.ecdhCurves invalid curve": {
