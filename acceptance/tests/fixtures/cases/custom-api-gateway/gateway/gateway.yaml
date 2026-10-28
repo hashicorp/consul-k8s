@@ -1,0 +1,22 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1beta1
+kind: Gateway
+metadata:
+  name: custom-gateway
+  labels:
+    component: api-gateway-consul
+spec:
+  gatewayClassName: custom-gateway-class
+  listeners:
+  - protocol: HTTPS
+    port: 8080
+    name: https
+    tls:
+      certificateRefs:
+      - name: "certificate"
+        namespace: "default"
+    allowedRoutes:
+      namespaces:
+        from: "All"

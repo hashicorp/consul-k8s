@@ -5,4 +5,5 @@ apiVersion: consul.hashicorp.com/v1alpha1
 kind: GatewayClassConfig
 metadata:
   name: limits-gateway-class-config
-spec: {}
+spec:
+  openshiftSCCName: restricted-v2

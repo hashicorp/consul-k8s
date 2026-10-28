@@ -415,6 +415,10 @@ func patchCoreDNSForConsul(t *testing.T, releaseName string) {
 	require.NoErrorf(t, err, "could not find Consul DNS service %s", dnsSvcName)
 	consulDNSIP := dnsSvc.Spec.ClusterIP
 	logger.Logf(t, "Consul DNS service ClusterIP: %s", consulDNSIP)
+	if suite.Config().EnableOpenshift || suite.Config().UseOpenshift {
+		k8s.ConfigureOpenShiftDNS(t, ctx, suite.Config(), consulDNSIP)
+		return
+	}
 
 	// 2. Detect whether the cluster uses coredns or kube-dns.
 	cmClient := k8sClient.CoreV1().ConfigMaps("kube-system")

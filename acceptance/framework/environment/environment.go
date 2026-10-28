@@ -10,6 +10,8 @@ import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	customgwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +50,7 @@ type KubernetesEnvironment struct {
 func NewKubernetesEnvironmentFromConfig(config *config.TestConfig) *KubernetesEnvironment {
 	// First kubeEnv is the default
 	defaultContext := NewContext(config.GetPrimaryKubeEnv().KubeNamespace, config.GetPrimaryKubeEnv().KubeConfig, config.GetPrimaryKubeEnv().KubeContext)
+	defaultContext.openShift = config.EnableOpenshift || config.UseOpenshift
 
 	// Create a kubernetes environment with default context.
 	kenv := &KubernetesEnvironment{
@@ -87,6 +90,10 @@ type kubernetesContext struct {
 	runtimeClient client.Client
 
 	options *k8s.KubectlOptions
+
+	// openShift registers the custom (consul.hashicorp.com) Gateway API types
+	// that the OpenShift tests and test cleanup read.
+	openShift bool
 }
 
 // KubernetesContextFromOptions returns the Kubernetes context from options.
@@ -184,6 +191,10 @@ func (k kubernetesContext) ControllerRuntimeClient(t testutil.TestingTB) client.
 	s := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(s))
 	require.NoError(t, gwv1.Install(s))
+	if k.openShift {
+		require.NoError(t, customgwv1beta1.Install(s))
+		require.NoError(t, customgwv1alpha2.Install(s))
+	}
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	client, err := client.New(config, client.Options{Scheme: s})

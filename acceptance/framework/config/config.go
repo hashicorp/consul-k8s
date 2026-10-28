@@ -107,6 +107,8 @@ type TestConfig struct {
 	UseKind         bool
 	UseOpenshift    bool
 
+	IsOpenshiftGreaterThan4_18 bool
+
 	helmChartPath string
 	DualStack     bool
 }
@@ -131,7 +133,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		}
 	}
 
-	if t.EnableOpenshift {
+	if t.EnableOpenshift || t.UseOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
 	}
 
@@ -146,7 +148,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		if t.UseGKE {
 			setIfNotEmpty(helmValues, "connectInject.cni.cniBinDir", "/home/kubernetes/bin")
 		}
-		if t.EnableOpenshift {
+		if t.EnableOpenshift || t.UseOpenshift {
 			setIfNotEmpty(helmValues, "connectInject.cni.multus", "true")
 			setIfNotEmpty(helmValues, "connectInject.cni.cniBinDir", "/var/lib/cni/bin")
 			setIfNotEmpty(helmValues, "connectInject.cni.cniNetDir", "/etc/kubernetes/cni/net.d")

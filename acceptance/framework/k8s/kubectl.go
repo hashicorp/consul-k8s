@@ -6,6 +6,7 @@ package k8s
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,24 @@ const (
 var kubeAPIConnectErrs = []string{
 	"was refused - did you specify the right host or port?",
 	"Unable to connect to the server",
+}
+
+// openShiftKubeAPIConnectErrs are transient connection errors seen with
+// managed OpenShift API servers. kubectl reports them in its output.
+var openShiftKubeAPIConnectErrs = append([]string{
+	"net/http: TLS handshake timeout",
+	"connection reset by peer",
+	"read: operation timed out",
+	"Client.Timeout exceeded while awaiting headers",
+	"http2: client connection lost",
+}, kubeAPIConnectErrs...)
+
+var retryOpenShiftKubeAPIConnectErrs atomic.Bool
+
+// RetryOpenShiftKubeAPIConnectErrors makes kubectl commands retry transient
+// Kubernetes API connection errors reported in kubectl output on OpenShift.
+func RetryOpenShiftKubeAPIConnectErrors() {
+	retryOpenShiftKubeAPIConnectErrs.Store(true)
 }
 
 // Functions included in this file already exist in terratest's k8s library, however,
@@ -76,6 +95,14 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 				if strings.Contains(err.Error(), connectionErr) {
 					r.Errorf("%v", err.Error())
 					return
+				}
+			}
+			if retryOpenShiftKubeAPIConnectErrs.Load() {
+				for _, connectionErr := range openShiftKubeAPIConnectErrs {
+					if strings.Contains(output, connectionErr) {
+						r.Errorf("%v: %s", err, output)
+						return
+					}
 				}
 			}
 		}

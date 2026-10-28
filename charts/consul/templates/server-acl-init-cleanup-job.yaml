@@ -32,7 +32,7 @@ metadata:
     # If the hook fails then all that happens is we didn't delete the job.
     # There's no reason for *this* job to stay around in that case so delete
     # regardless of success.
-    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
 spec:
   template:
     metadata:

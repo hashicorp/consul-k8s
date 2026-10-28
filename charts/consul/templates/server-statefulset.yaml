@@ -223,7 +223,10 @@ spec:
     {{- end }}
       terminationGracePeriodSeconds: 30
       serviceAccountName: {{ template "consul.fullname" . }}-server
-      {{- if not .Values.global.openshift.enabled }}
+      {{- if .Values.global.openshift.enabled }}
+      securityContext:
+        fsGroup: {{ .Values.server.securityContext.fsGroup }}
+      {{- else }}
       securityContext:
         {{- toYaml .Values.server.securityContext | nindent 8 }}
       {{- end }}

@@ -87,6 +87,9 @@ func TestAPIGateway_ExtAuthz_OIDC_Mesh(t *testing.T) {
 	require.NoError(t, err)
 
 	fixturePath := "../fixtures/cases/api-gateways/ext-authz-oidc-mesh"
+	routeManifest := fixturePath + "/httproute.yaml"
+	fixturePath = k8s.OpenShiftStaticServerOverlay(t, cfg, fixturePath, k8sNamespace)
+	k8s.ApplyOpenShiftCNINetworkAttachment(t, k8sOptions, cfg)
 
 	logger.Log(t, "creating within-mesh oidc ext-authz api-gateway resources")
 	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "apply", "-k", fixturePath)
@@ -117,7 +120,6 @@ func TestAPIGateway_ExtAuthz_OIDC_Mesh(t *testing.T) {
 	waitForConsulServiceRegistered(t, consulClient, "static-server")
 
 	logger.Log(t, "creating the httproute now that static-server is registered")
-	routeManifest := fixturePath + "/httproute.yaml"
 	out, err = k8s.RunKubectlAndGetOutputE(t, k8sOptions, "apply", "-f", routeManifest)
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {

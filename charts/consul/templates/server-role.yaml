@@ -10,7 +10,7 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: server
-{{- if (or (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts) .Values.global.enablePodSecurityPolicies) }}
+{{- if (or .Values.global.openshift.enabled .Values.global.enablePodSecurityPolicies) }}
 rules:
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
@@ -20,7 +20,7 @@ rules:
   verbs:
   - use
 {{- end }}
-{{- if (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts ) }}
+{{- if .Values.global.openshift.enabled }}
 - apiGroups: ["security.openshift.io"]
   resources: ["securitycontextconstraints"]
   resourceNames:

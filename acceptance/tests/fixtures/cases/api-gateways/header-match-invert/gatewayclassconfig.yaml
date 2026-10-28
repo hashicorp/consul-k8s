@@ -6,5 +6,6 @@ kind: GatewayClassConfig
 metadata:
   name: header-invert-class-config
 spec:
+  openshiftSCCName: restricted-v2
   # Use a non-privileged port so the gateway pod works under "restricted" PSA.
   mapPrivilegedContainerPorts: 8000
