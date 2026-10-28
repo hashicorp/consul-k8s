@@ -110,7 +110,7 @@ type PeeringMeshConfig struct {
 	PeerThroughMeshGateways bool `json:"peerThroughMeshGateways,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || !(self.tlsMinVersion in ['TLSv1_0', 'TLSv1_1'])",message="ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"
+// +kubebuilder:validation:XValidation:rule="!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || !has(self.tlsMinVersion) || !(self.tlsMinVersion in ['TLSv1_0', 'TLSv1_1'])",message="ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"
 type MeshDirectionalTLSConfig struct {
 	// TLSMinVersion sets the default minimum TLS version supported.
 	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
@@ -385,13 +385,24 @@ func (in *MeshDirectionalTLSConfig) validate(path *field.Path) field.ErrorList {
 	// map in github.com/hashicorp/consul/agent/structs/config_entry_mesh.go is also updated.
 	validCurves := []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"}
 	if len(in.ECDHCurves) > 0 {
-		if isTLSVersionLessThanTLS12(in.TLSMinVersion) {
+		versionAllowsCurves := !isTLSVersionLessThanTLS12(in.TLSMinVersion)
+		if !versionAllowsCurves {
 			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves, "ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"))
 		}
+		validCurveNames := true
 		for i, curve := range in.ECDHCurves {
 			if !sliceContains(validCurves, curve) {
+				validCurveNames = false
 				errs = append(errs, field.Invalid(path.Child("ecdhCurves").Index(i), curve, notInSliceMessage(validCurves)))
 			}
+		}
+		// Consul service mesh leaf certificates always use ECDSA P-256 keys. In
+		// TLS 1.2 a peer only accepts an ECDSA certificate whose curve it offered,
+		// so TLS 1.2 handshakes fail unless P-256 is in the list.
+		if versionAllowsCurves && validCurveNames && sliceContains(versions, in.TLSMinVersion) && in.TLSMinVersion != "TLSv1_3" && !sliceContains(in.ECDHCurves, "P-256") {
+			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves,
+				`ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); `+
+					`Consul service mesh certificates use ECDSA P-256 keys. Add "P-256" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to "TLSv1_3"`))
 		}
 	}
 
