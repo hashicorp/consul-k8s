@@ -3,7 +3,8 @@
 
 # Reusable workflow: merges per-module coverage profiles, computes the total,
 # posts/edits a PR comment, uploads an HTML artifact, uploads to Codecov, and
-# (on main) pushes a coverage badge SVG to the `badges` branch for the README.
+# (on main) pushes the coverage badge SVG and the per-package baseline
+# (coverage-baseline.txt, read by the regression gate) to the `badges` branch.
 
 name: reusable-coverage-report
 
@@ -136,6 +137,16 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           go tool cover -html=merged-coverage.out -o coverage.html
+
+
+      - name: Upload pkg-summary artifact
+        # Consumed by the coverage-regression-gate job in coverage.yml.
+        if: steps.coverage.outputs.total != 'N/A'
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: pkg-summary
+          path: pkg-summary.txt
+          if-no-files-found: error
 
       - name: Compute patch coverage
         id: patch
@@ -351,10 +362,11 @@ jobs:
           fi
 
           cp /tmp/coverage.svg /tmp/badges-wt/coverage.svg
-          git -C /tmp/badges-wt add coverage.svg
+          cp pkg-summary.txt /tmp/badges-wt/coverage-baseline.txt
+          git -C /tmp/badges-wt add coverage.svg coverage-baseline.txt
           if git -C /tmp/badges-wt diff --staged --quiet; then
-            echo "Badge unchanged, skipping commit"
+            echo "Badge and baseline unchanged, skipping commit"
           else
-            git -C /tmp/badges-wt commit -m "chore: update coverage badge [skip ci]"
+            git -C /tmp/badges-wt commit -m "chore: update coverage badge and baseline [skip ci]"
             git -C /tmp/badges-wt push origin HEAD:badges
           fi
