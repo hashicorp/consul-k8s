@@ -170,98 +170,103 @@ jobs:
   coverage-regression-gate:
     name: coverage-regression-gate
     needs: [coverage-report]
-    # Only runs on PRs — a push to main has no baseline to regress against
-    # (it IS the new baseline), and the regression gate compares PR coverage
-    # against the committed .github/coverage-baseline.txt file.
+    # Fails a PR into main if any package's average coverage drops more than
+    # REGRESSION_TOLERANCE points below the baseline published from main to the
+    # `badges` branch. Pushes to main (no pr-number) do not run it, and PRs into
+    # release/** are skipped because the baseline only describes main.
     if: inputs.pr-number != ''
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Allowed per-package drop in percentage points. Packages here are whole
+      # modules (cli, control-plane) averaged over hundreds of functions, and no
+      # drift was observed between PR runs on identical code; 0.2 absorbs
+      # one-decimal rounding without hiding real regressions.
+      REGRESSION_TOLERANCE: "0.2"
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+      - name: Decide whether to gate
+        id: scope
+        env:
+          TOTAL: ${{ needs.coverage-report.outputs.total }}
+          PR: ${{ inputs.pr-number }}
+          PR_BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          skip() {
+            echo "::notice::$1"
+            printf '### ✅ Coverage regression gate skipped\n\n%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          if [ -z "$PR_BASE" ]; then
+            echo "::error::Could not determine the base branch of PR #${PR}. Failing closed."
+            exit 1
+          fi
+          [ "$PR_BASE" = "main" ] || skip "PR #${PR} targets '${PR_BASE}'; the baseline only describes main."
+          [ "${TOTAL:-N/A}" != "N/A" ] || skip "No coverage data was produced, so there is nothing to compare."
+          echo "run=true" >> "$GITHUB_OUTPUT"
 
       - name: Download pkg-summary artifact
+        if: steps.scope.outputs.run == 'true'
         uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           name: pkg-summary
           path: .
 
       - name: Enforce per-package coverage regression gate
+        if: steps.scope.outputs.run == 'true'
         env:
-          TOTAL: ${{ needs.coverage-report.outputs.total }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          # If no coverage profiles were produced (e.g. only non-Go files
-          # changed), there is nothing to compare — pass.
-          if [ "${TOTAL:-N/A}" = "N/A" ]; then
-            echo "::notice::No coverage data produced; regression gate skipped."
-            {
-              echo "### ✅ Coverage regression gate passed"
-              echo ""
-              echo "No coverage data was produced (no coverable Go files), so there is nothing to compare."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+          # Read the baseline from the badges branch rather than the PR checkout
+          # so a PR can neither edit nor go stale against it.
+          BASELINE="$RUNNER_TEMP/coverage-baseline.txt"
+          if ! gh api -H "Accept: application/vnd.github.raw" \
+              "repos/${REPO}/contents/coverage-baseline.txt?ref=badges" > "$BASELINE" 2> "$RUNNER_TEMP/gh-err.txt"; then
+            if grep -q "HTTP 404" "$RUNNER_TEMP/gh-err.txt"; then
+              echo "::notice::No coverage baseline on the badges branch yet; it is published by the next merge to main."
+              printf '### ✅ Coverage regression gate skipped\n\nNo baseline published yet. It is created by the next merge to `main`.\n' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            cat "$RUNNER_TEMP/gh-err.txt"
+            echo "::error::Failed to fetch the coverage baseline. Failing closed; re-run the job."
+            exit 1
           fi
-
-          # If no baseline file exists yet (first run after feature merge),
-          # skip gracefully — the next push to main will create it.
-          if [ ! -f ".github/coverage-baseline.txt" ]; then
-            echo "::notice::No coverage baseline found (.github/coverage-baseline.txt). Skipping regression check."
-            {
-              echo "### ✅ Coverage regression gate passed"
-              echo ""
-              echo "No coverage baseline file found. The baseline will be created on the next merge to \`main\`."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          BASELINE=".github/coverage-baseline.txt"
-          PR_SUMMARY="pkg-summary.txt"
 
           FAILED=0
           TABLE_ROWS=""
-
-          # For every package in the PR summary, check if its average dropped
-          # below the stored baseline value. Packages not in the baseline (new
-          # packages) are skipped — they have no prior coverage to regress from.
-          while IFS= read -r line; do
-            pkg=$(echo "$line" | awk '{print $1}')
-            pr_pct=$(echo "$line" | awk '{print $2}' | tr -d '%')
-
-            # Look up this package in the baseline.
-            base_line=$(grep "^${pkg} " "$BASELINE" || true)
-            if [ -z "$base_line" ]; then
-              # New package — no baseline to compare against, pass.
+          while read -r pkg pr_pct _; do
+            [ -n "$pkg" ] || continue
+            pr_pct="${pr_pct%\%}"
+            base_pct=$(awk -v p="$pkg" '$1 == p { v = $2; sub(/%$/, "", v); print v; exit }' "$BASELINE")
+            if [ -z "$base_pct" ]; then
               TABLE_ROWS="${TABLE_ROWS}| \`${pkg}\` | N/A (new) | ${pr_pct}% | — | ✅ new package |\n"
               continue
             fi
-
-            base_pct=$(echo "$base_line" | awk '{print $2}' | tr -d '%')
-
-            # Compare: fail if PR average is strictly less than baseline.
-            if awk "BEGIN { exit !(${pr_pct} < ${base_pct}) }"; then
-              delta=$(awk "BEGIN { printf \"%.1f\", ${pr_pct} - ${base_pct} }")
-              TABLE_ROWS="${TABLE_ROWS}| \`${pkg}\` | ${base_pct}% | ${pr_pct}% | ${delta}% | ❌ REGRESSED |\n"
-              echo "::error::Package '${pkg}' coverage dropped from ${base_pct}% to ${pr_pct}% (${delta}%)"
+            delta=$(awk -v a="$pr_pct" -v b="$base_pct" 'BEGIN { printf "%+.1f", a - b }')
+            if awk -v a="$pr_pct" -v b="$base_pct" -v t="$REGRESSION_TOLERANCE" 'BEGIN { exit !(b - a > t + 1e-9) }'; then
+              TABLE_ROWS="${TABLE_ROWS}| \`${pkg}\` | ${base_pct}% | ${pr_pct}% | ${delta} | ❌ REGRESSED |\n"
+              echo "::error::Package '${pkg}' coverage dropped from ${base_pct}% to ${pr_pct}% (${delta}), more than the allowed ${REGRESSION_TOLERANCE} points."
               FAILED=1
             else
-              delta=$(awk "BEGIN { printf \"%.1f\", ${pr_pct} - ${base_pct} }")
-              prefix=""
-              [ "$(awk "BEGIN{print (${delta}>0)}")" = "1" ] && prefix="+"
-              TABLE_ROWS="${TABLE_ROWS}| \`${pkg}\` | ${base_pct}% | ${pr_pct}% | ${prefix}${delta}% | ✅ OK |\n"
+              TABLE_ROWS="${TABLE_ROWS}| \`${pkg}\` | ${base_pct}% | ${pr_pct}% | ${delta} | ✅ OK |\n"
             fi
-          done < "$PR_SUMMARY"
+          done < pkg-summary.txt
 
-          # Write the full table to the step summary regardless of pass/fail.
           {
             if [ "$FAILED" -eq 1 ]; then
               echo "### ❌ Coverage regression gate failed"
               echo ""
-              echo "One or more packages touched by this PR have lower average coverage than the \`main\` baseline."
-              echo "Add or improve tests so that per-package coverage does not drop."
+              echo "One or more packages dropped more than ${REGRESSION_TOLERANCE} points below the \`main\` baseline."
+              echo "Add or restore tests to bring these packages back up."
             else
               echo "### ✅ Coverage regression gate passed"
               echo ""
-              echo "All packages maintain or improve their coverage compared to the \`main\` baseline."
+              echo "No package dropped more than ${REGRESSION_TOLERANCE} points below the \`main\` baseline."
             fi
             echo ""
             echo "| Package | Baseline | PR | Delta | Status |"
@@ -269,6 +274,4 @@ jobs:
             printf "%b" "$TABLE_ROWS"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "$FAILED" -eq 1 ]; then
-            exit 1
-          fi
+          exit "$FAILED"
