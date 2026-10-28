@@ -23,7 +23,7 @@ allowPrivilegedContainer: false
 allowedCapabilities: null
 defaultAddCapabilities: null
 fsGroup:
-  type: MustRunAs
+  type: RunAsAny
 groups: []
 priority: null
 readOnlyRootFilesystem: false
@@ -34,10 +34,12 @@ requiredDropCapabilities:
 - SETGID
 runAsUser:
   type: MustRunAsRange
+seccompProfiles:
+- '*'
 seLinuxContext:
   type: MustRunAs
 supplementalGroups:
-  type: MustRunAs
+  type: RunAsAny
 users: []
 volumes:
 - configMap

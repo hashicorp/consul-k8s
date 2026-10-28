@@ -132,7 +132,7 @@ if [[ -n "$namespace_json" ]]; then
 fi
 
 echo "Cleaning OCP acceptance resources in context '$context', namespace '$namespace'."
-releases=$("${helm[@]}" list --namespace "$namespace" --all --output json)
+releases=$("${helm[@]}" list --namespace "$namespace" --output json)
 unexpected=$(jq -r '.[] | select(.chart | test("^(consul(-helm)?|vault)-") | not) | .name' <<< "$releases")
 if [[ -n "$unexpected" ]]; then
   echo "Refusing to remove namespace containing non-test Helm releases: $unexpected" >&2
@@ -253,7 +253,11 @@ for test_namespace in $test_namespaces; do
 done
 
 crds=$("${kubectl[@]}" get crd -o json)
-crd_names=$(jq -r --arg ns "$namespace" '.items[] | select((.spec.group == "consul.hashicorp.com" or .spec.group == "auth.consul.hashicorp.com") and .metadata.annotations["meta.helm.sh/release-namespace"] == $ns) | .metadata.name' <<< "$crds")
+# Delete all consul CRDs regardless of which release namespace owns them.
+# This handles orphaned CRDs from runs that used a different namespace (e.g. 'default').
+crd_names=$(jq -r '.items[] |
+  select(.spec.group == "consul.hashicorp.com" or .spec.group == "auth.consul.hashicorp.com") |
+  .metadata.name' <<< "$crds")
 while IFS= read -r crd; do
   [[ -n "$crd" ]] || continue
   # Deleting a CRD deletes every instance, but instances keep their Consul finalizers once the
