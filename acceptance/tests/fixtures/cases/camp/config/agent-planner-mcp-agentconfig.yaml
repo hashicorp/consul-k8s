@@ -1,0 +1,13 @@
+# AgentConfig defaults selected by ai-app's ai-agent-config annotation.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: AgentConfig
+metadata:
+  name: agent-planner-mcp
+spec:
+  enabled: true
+  defaults:
+    mcpPort: 15101
+    interceptorPort: 21101
+    hitl:
+      port: 16101
+      approvalTimeout: 60s

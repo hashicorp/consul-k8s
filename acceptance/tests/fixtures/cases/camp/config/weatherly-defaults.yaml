@@ -1,0 +1,13 @@
+# ServiceDefaults for weatherly — set protocol to "http".
+#
+# Consul CRD equivalent of weatherly-defaults.hcl.
+# Required so that the L7 ServiceIntentions (which match on x-mcp-* headers)
+# are accepted by Consul. Consul rejects L7 `permissions` on services whose
+# protocol is the default "tcp".
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: weatherly
+  namespace: default
+spec:
+  protocol: http
