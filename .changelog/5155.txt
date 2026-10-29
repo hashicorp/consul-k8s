@@ -1,0 +1,3 @@
+```release-note:improvement
+api-gateway: add `externalTrafficPolicy` to `GatewayClassConfig` to allow setting the field on the generated gateway Service, so it is no longer reverted on every reconcile.
+```
