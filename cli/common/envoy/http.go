@@ -347,7 +347,6 @@ func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
 
 	for _, listener := range listenersConfig {
 		address := fmt.Sprintf("%s:%d", listener.Listener.Address.SocketAddress.Address, int(listener.Listener.Address.SocketAddress.PortValue))
-
 		// Format the filter chain configs into something more readable.
 		filterChain := []FilterChain{}
 		for _, chain := range listener.Listener.FilterChains {

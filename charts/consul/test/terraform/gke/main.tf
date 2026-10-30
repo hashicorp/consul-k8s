@@ -6,6 +6,10 @@ terraform {
     google = {
       version = "~> 5.3.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12.0"
+    }
   }
 }
 
@@ -34,6 +38,10 @@ data "google_container_engine_versions" "main" {
 resource "google_compute_network" "custom_network" {
   name                    = "network-${random_string.cluster_prefix.result}"
   auto_create_subnetworks = false
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes  = [name]
+  }
 }
 
 resource "google_compute_subnetwork" "subnet" {
@@ -58,7 +66,10 @@ resource "google_container_cluster" "cluster" {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
-  subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
+  subnetwork = google_compute_subnetwork.subnet[count.index].self_link
+  ip_allocation_policy {
+    cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/14", 2, count.index)
+  }
   resource_labels     = var.labels
   deletion_protection = false
 }
@@ -76,9 +87,11 @@ resource "google_compute_firewall" "firewall-rules" {
     protocol = "all"
   }
 
-  source_ranges = [google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr]
-  source_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index == 0 ? 1 : 0}"]
-  target_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index}"]
+  source_ranges = [
+    google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr,
+    google_compute_subnetwork.subnet[count.index == 0 ? 1 : 0].ip_cidr_range
+  ]
+  target_tags = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
 }
 
 resource "null_resource" "kubectl" {
@@ -103,4 +116,113 @@ resource "null_resource" "kubectl" {
     on_failure = continue
     command    = "rm $HOME/.kube/consul-k8s*"
   }
+}
+
+# Deploy IBM Uptycs EDR agent to each GKE cluster.
+data "google_client_config" "default" {}
+
+provider "helm" {
+  alias = "cluster_0"
+  kubernetes {
+    host                   = "https://${google_container_cluster.cluster[0].endpoint}"
+    token                  = data.google_client_config.default.access_token
+    cluster_ca_certificate = base64decode(google_container_cluster.cluster[0].master_auth[0].cluster_ca_certificate)
+  }
+}
+
+provider "helm" {
+  alias = "cluster_1"
+  kubernetes {
+    host                   = var.cluster_count > 1 ? "https://${google_container_cluster.cluster[1].endpoint}" : "https://${google_container_cluster.cluster[0].endpoint}"
+    token                  = data.google_client_config.default.access_token
+    cluster_ca_certificate = base64decode(var.cluster_count > 1 ? google_container_cluster.cluster[1].master_auth[0].cluster_ca_certificate : google_container_cluster.cluster[0].master_auth[0].cluster_ca_certificate)
+  }
+}
+
+# Cluster 0 EDR
+resource "helm_release" "uptycs_0" {
+  depends_on       = [null_resource.kubectl]
+  provider         = helm.cluster_0
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_0" {
+  depends_on       = [helm_release.uptycs_0]
+  provider         = helm.cluster_0
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = google_container_cluster.cluster[0].name
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
+}
+
+# Cluster 1 EDR (only when cluster_count > 1)
+resource "helm_release" "uptycs_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  depends_on       = [null_resource.kubectl]
+  provider         = helm.cluster_1
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  depends_on       = [helm_release.uptycs_1]
+  provider         = helm.cluster_1
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = google_container_cluster.cluster[1].name
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
 }

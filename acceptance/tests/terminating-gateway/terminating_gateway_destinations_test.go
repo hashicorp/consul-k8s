@@ -6,12 +6,15 @@ package terminatinggateway
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 )
@@ -102,12 +105,18 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			require.NotEmpty(t, staticServerIP)
 
 			staticServerHostnameURL := fmt.Sprintf("https://%s", staticServerServiceName)
-			staticServerIPURL := fmt.Sprintf("http://%s", staticServerIP)
-
+			staticServerIPURL := ""
+			if strings.Contains(staticServerIP, ":") {
+				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
+			} else {
+				staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
+			}
 			// Create the service default declaring the external service (aka Destination)
 			logger.Log(t, "creating tcp-based service defaults")
-			CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
-			CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "", 80, staticServerIP)
+			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+				CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
+				CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "", 80, staticServerIP)
+			})
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -115,9 +124,10 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 				// via the static-server. It should fail to connect with the
 				// static-server pod because of intentions.
 				logger.Log(t, "testing intentions prevent connections through the terminating gateway")
-				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
-				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
-
+				retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
+					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
+				})
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
 				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerHostnameID)
 				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerIPID)
@@ -125,23 +135,32 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
-
+			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
+			})
 			// Try running some different scenarios
 			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerServiceName)
-			staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
 
+			if strings.Contains(staticServerIP, ":") {
+				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
+			} else {
+				staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
+			}
 			// Update the service default declaring the external service (aka Destination)
 			logger.Log(t, "updating service defaults to try other scenarios")
 
 			// You can't use TLS w/ protocol set to anything L7; Envoy can't snoop the traffic when the client encrypts it
-			CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "http", 80, staticServerServiceName)
-			CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "http", 80, staticServerIP)
+			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+				CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "http", 80, staticServerServiceName)
+				CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "http", 80, staticServerIP)
+			})
 
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerHostnameURL)
+			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerHostnameURL)
+			})
 		})
 	}
 }

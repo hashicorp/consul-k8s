@@ -1,0 +1,12 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dp2-static-client
+spec:
+  template:
+    metadata:
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"

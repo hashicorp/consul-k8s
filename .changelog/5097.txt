@@ -1,0 +1,3 @@
+```release-note:security
+Added input length validation on "consul.hashicorp.com/service-name" annotation
+```

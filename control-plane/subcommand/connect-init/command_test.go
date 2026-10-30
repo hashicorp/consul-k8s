@@ -973,3 +973,7 @@ func (f *fakeIptablesProvider) ApplyRules() error {
 func (f *fakeIptablesProvider) Rules() []string {
 	return f.rules
 }
+
+func (f *fakeIptablesProvider) ClearAllRules() {
+	f.rules = nil
+}

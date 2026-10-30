@@ -234,8 +234,8 @@ func (r *PeeringDialerController) updateStatus(ctx context.Context, dialerObjKey
 			r.Log.Error(err, "failed to update PeeringDialer status", "name", dialer.Name, "namespace", dialer.Namespace)
 			return err
 		}
-		if dialer.Status.LatestPeeringVersion == nil || *dialer.Status.LatestPeeringVersion < peeringVersion {
-			dialer.Status.LatestPeeringVersion = ptr.To(uint64(peeringVersion))
+		if dialer.Status.LatestPeeringVersion == nil || *dialer.Status.LatestPeeringVersion < int64(peeringVersion) {
+			dialer.Status.LatestPeeringVersion = ptr.To(int64(peeringVersion))
 		}
 	}
 	err := r.Status().Update(ctx, dialer)
@@ -308,7 +308,7 @@ func (r *PeeringDialerController) versionAnnotationUpdated(dialer *consulv1alpha
 		if err != nil {
 			return false, err
 		}
-		if dialer.Status.LatestPeeringVersion == nil || *dialer.Status.LatestPeeringVersion < peeringVersion {
+		if dialer.Status.LatestPeeringVersion == nil || *dialer.Status.LatestPeeringVersion < int64(peeringVersion) {
 			return true, nil
 		}
 	}

@@ -234,7 +234,7 @@ func shouldGenerateToken(acceptor *consulv1alpha1.PeeringAcceptor, existingSecre
 			if err != nil {
 				return false, false, err
 			}
-			if acceptor.Status.LatestPeeringVersion == nil || *acceptor.Status.LatestPeeringVersion < peeringVersion {
+			if acceptor.Status.LatestPeeringVersion == nil || *acceptor.Status.LatestPeeringVersion < int64(peeringVersion) {
 				return true, false, nil
 			}
 		}
@@ -265,8 +265,8 @@ func (r *AcceptorController) updateStatus(ctx context.Context, acceptorObjKey ty
 			r.Log.Error(err, "failed to update PeeringAcceptor status", "name", acceptor.Name, "namespace", acceptor.Namespace)
 			return err
 		}
-		if acceptor.Status.LatestPeeringVersion == nil || *acceptor.Status.LatestPeeringVersion < peeringVersion {
-			acceptor.Status.LatestPeeringVersion = ptr.To(uint64(peeringVersion))
+		if acceptor.Status.LatestPeeringVersion == nil || *acceptor.Status.LatestPeeringVersion < int64(peeringVersion) {
+			acceptor.Status.LatestPeeringVersion = ptr.To(int64(peeringVersion))
 		}
 	}
 	err := r.Status().Update(ctx, acceptor)

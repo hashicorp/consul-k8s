@@ -577,7 +577,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsgs: []string{
-				`jwtprovider.consul.hashicorp.com "test-no-jwks" is invalid: spec.jsonWebKeySet: Invalid value: "null": jsonWebKeySet is required`,
+				`jwtprovider.consul.hashicorp.com "test-no-jwks" is invalid: spec.jsonWebKeySet: Invalid value: null: jsonWebKeySet is required`,
 			},
 		},
 

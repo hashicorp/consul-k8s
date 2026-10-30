@@ -1,0 +1,3 @@
+```release-note:improvement
+client: Add optional startup staggering for client ACL init to spread /v1/acl/login calls and reduce login storms on large clusters. Controlled via client.aclInit.startupStagger.* values (disabled by default).
+```

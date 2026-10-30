@@ -32,6 +32,7 @@ rules:
   - routetimeoutfilters
   - routeauthfilters
   - gatewaypolicies
+  - customgatewaypolicies
   - registrations
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
@@ -70,6 +71,7 @@ rules:
   - jwtproviders/status
   - routeauthfilters/status
   - gatewaypolicies/status
+  - customgatewaypolicies/status
   verbs:
   - get
   - patch
@@ -84,7 +86,7 @@ rules:
     - create
     - update
 - apiGroups: [ "" ]
-  resources: ["endpoints", "namespaces", "nodes"]
+  resources: ["endpoints", "namespaces", "nodes", "configmaps"]
   verbs:
   - get
   - list
@@ -159,6 +161,22 @@ rules:
   - update
   - watch
 - apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - customgatewayclasses
+  - cgateways
+  - chttproutes
+  - ctcproutes
+  - creferencegrants
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - gateway.networking.k8s.io
   resources:
   - gatewayclasses/finalizers
@@ -168,12 +186,32 @@ rules:
   verbs:
   - update
 - apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - customgatewayclasses/finalizers
+  - cgateways/finalizers
+  - chttproutes/finalizers
+  - ctcproutes/finalizers
+  verbs:
+  - update
+- apiGroups:
   - gateway.networking.k8s.io
   resources:
   - gatewayclasses/status
   - gateways/status
   - httproutes/status
   - tcproutes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - customgatewayclasses/status
+  - cgateways/status
+  - chttproutes/status
+  - ctcproutes/status
   verbs:
   - get
   - patch

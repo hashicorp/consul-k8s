@@ -103,6 +103,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if multiPort {
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
+
 	container := corev1.Container{
 		Name:            initContainerName,
 		Image:           w.ImageConsulK8S,

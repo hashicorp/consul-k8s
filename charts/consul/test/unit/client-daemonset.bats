@@ -638,7 +638,7 @@ load _helpers
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 678c5c1c2ca0f8cb1464d38636f12714c05df26fab1a101e43ce619fdbc2e7d1 ]
+  [ "${actual}" = d26b63fd0ecf1b047896e344396b99e2b606d0816b0f5e6d81483a40ea9b4e63 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when extraConfig is provided" {
@@ -649,7 +649,7 @@ load _helpers
       --set 'client.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 0ef58da6fd14fb57c702a2a0d631c4eecacff152fe3a36836a23283b19d8dbe1 ]
+  [ "${actual}" = e3f318b714608d58ed74f23970cfdb3ed4d89d0247e1e321ffb41779fd254a23 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when connectInject.enabled=true" {
@@ -660,7 +660,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 678c5c1c2ca0f8cb1464d38636f12714c05df26fab1a101e43ce619fdbc2e7d1 ]
+  [ "${actual}" = d26b63fd0ecf1b047896e344396b99e2b606d0816b0f5e6d81483a40ea9b4e63 ]
 }
 
 #--------------------------------------------------------------------
@@ -1354,6 +1354,41 @@ load _helpers
   local actual=$(echo $object |
       yq -r '.command | any(contains("log-json=false"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]  
+}
+
+@test "client/DaemonSet: acl-init adds startupStagger sleep when enabled" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'client.aclInit.startupStagger.enabled=true' \
+      --set 'client.aclInit.startupStagger.minSeconds=10' \
+      --set 'client.aclInit.startupStagger.maxSeconds=40' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("min_delay=10"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("max_delay=40"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("client-acl-init: staggering for"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: acl-init startupStagger disabled by default" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("startupStagger"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "client/DaemonSet: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {

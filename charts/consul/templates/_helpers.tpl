@@ -15,6 +15,76 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{/*
+Base name that all Kubernetes auth methods managed by this chart are derived from.
+Defaults to the release fullname so that existing installations keep their auth
+method names. Set global.acls.authMethod.name to a value that is unique per
+Kubernetes cluster when several clusters share a single Consul control plane,
+otherwise the clusters overwrite each other's auth methods.
+*/}}
+{{- define "consul.authMethodPrefix" -}}
+{{- default (include "consul.fullname" .) .Values.global.acls.authMethod.name -}}
+{{- end -}}
+
+{{/*
+Auth method that Consul components use to issue a `consul login` for local tokens.
+*/}}
+{{- define "consul.localComponentAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-component-auth-method
+{{- end -}}
+
+{{/*
+Auth method that Consul components use to issue a `consul login` for global tokens.
+Only created in secondary datacenters when federation is enabled, which is why it
+is suffixed with the datacenter name to keep it distinct from the local one.
+*/}}
+{{- define "consul.globalComponentAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+{{- end -}}
+
+{{/*
+Auth method that service mesh workloads use to issue a `consul login`.
+*/}}
+{{- define "consul.connectInjectAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-auth-method
+{{- end -}}
+
+{{/*
+Resolve the Consul namespace that a terminating gateway service should be
+registered into. Resolution order:
+  1. Per-gateway consulNamespace.
+  2. terminatingGateways.defaults.consulNamespace, unless it is the bare
+     "default" sentinel (treated as unset so mirroring can take precedence).
+  3. The mirrored Consul namespace derived from the release namespace when
+     namespace mirroring is enabled.
+  4. The terminatingGateways.defaults.consulNamespace value (i.e. "default").
+
+Note: This intentionally does NOT consult
+connectInject.consulNamespaces.consulDestinationNamespace. Terminating gateways have
+historically only resolved their namespace from terminatingGateways.defaults.consulNamespace
+/ the per-gateway consulNamespace, and the gateway's ACL policy (created by server-acl-init)
+is scoped to that same namespace. Following the connect destination namespace here would
+register the service into a namespace its ACL token is not authorized for. Mirroring is the
+only additional case we resolve, matching connect-injected services and the API gateway.
+
+Usage:
+  {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
+*/}}
+{{- define "consul.terminatingGatewayNamespace" -}}
+{{- $root := .root -}}
+{{- $gatewayNamespace := .gatewayNamespace -}}
+{{- $defaultsNamespace := .defaultsNamespace -}}
+{{- if $gatewayNamespace -}}
+{{- $gatewayNamespace -}}
+{{- else if (and $defaultsNamespace (ne $defaultsNamespace "default")) -}}
+{{- $defaultsNamespace -}}
+{{- else if $root.Values.connectInject.consulNamespaces.mirroringK8S -}}
+{{- printf "%s%s" $root.Values.connectInject.consulNamespaces.mirroringK8SPrefix $root.Release.Namespace -}}
+{{- else -}}
+{{- default "default" $defaultsNamespace -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "consul.restrictedSecurityContext" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:
@@ -39,6 +109,13 @@ and consul-k8s-control-plane images.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.podSecurityContext" -}}
+{{- if and .Values.global.podSecurityContext.enabled (not .Values.global.openshift.enabled) -}}
+securityContext:
+  fsGroup: 100
+  fsGroupChangePolicy: OnRootMismatch
+{{- end -}}
+{{- end -}}
 
 {{- define "consul.restrictedSecurityContextWithNetBindService" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
@@ -175,6 +252,48 @@ is passed to consul as a -config-file param on command line.
               [ -n "${HOST_IP}" ] && sed -Ei "s|HOST_IP|${HOST_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${POD_IP}" ] && sed -Ei "s|POD_IP|${POD_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
+{{- end -}}
+
+{{/*
+Rehashes the CA certificates written to /trusted-cas so that OpenSSL-based clients
+can discover them via SSL_CERT_DIR. OpenSSL only looks up CAs in a certificate
+directory by their subject hash (<hash>.N), so the .pem files alone are ignored.
+
+Notes on the implementation:
+  - Certificates that share a subject (for example an old and a new revision of the
+    same CA during a rotation) share a subject hash, so suffixes are allocated
+    sequentially instead of always using .0. Otherwise all but the last would be
+    silently dropped.
+  - Pre-existing symlinks are cleared first so that a container restart, which
+    reuses the same emptyDir, does not keep appending duplicate links.
+  - The whole block is a no-op when openssl is not present in the image (the
+    consul-telemetry-collector image does not ship it). The command runs under
+    `sh -ec`, so an unguarded openssl call would abort container startup.
+
+Callers are expected to indent this with nindent.
+*/}}
+{{- define "consul.trustedCAsRehash" -}}
+if command -v openssl > /dev/null 2>&1; then
+  for CERT_LINK in /trusted-cas/*; do
+    if [ -L "${CERT_LINK}" ]; then
+      rm -f "${CERT_LINK}"
+    fi
+  done
+  for CERT_FILE in /trusted-cas/custom-ca-*.pem; do
+    if [ ! -e "${CERT_FILE}" ]; then
+      continue
+    fi
+    CERT_HASH=$(openssl x509 -subject_hash -noout -in "${CERT_FILE}" 2> /dev/null) || CERT_HASH=""
+    if [ -z "${CERT_HASH}" ]; then
+      continue
+    fi
+    CERT_SUFFIX=0
+    while [ -e "/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}" ]; do
+      CERT_SUFFIX=$((CERT_SUFFIX + 1))
+    done
+    ln -sf "${CERT_FILE}" "/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}"
+  done
+fi
 {{- end -}}
 
 {{/*

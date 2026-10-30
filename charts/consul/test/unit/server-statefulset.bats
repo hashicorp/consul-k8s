@@ -1123,7 +1123,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = a4771bea366d4a6ee9037572665dc4040519dc22e9b0ff3463a263aab13675b8 ]
+  [ "${actual}" = e0c357722aa06d6e88f2e3558f1825c095c8789d3348f180ff1bb4833136e7d2 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -1133,7 +1133,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = c6b872933263bf5fe847d61e638035637d2db89edf31ad25d0aaeaa5261649c9 ]
+  [ "${actual}" = 19c5f7c594db91a1fdf2c042b23f7875c82a6e25a80d1fa4a84142ce21b9f672 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -1143,7 +1143,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 576044232d6181bca69628af87c12f15311ebd3f0ab700e112b3e1dea9225125 ]
+  [ "${actual}" = 0c3baa78b3d60a625975411f6f8eb6123c0d2dc6dadbb8edf5f23a83f68e7dd3 ]
 }
 
 #--------------------------------------------------------------------
@@ -3263,6 +3263,58 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
+@test "server/StatefulSet: trustedCAs: if trustedCAs is set symlink is created for trusted CA" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("ln -sf \"${CERT_FILE}\" \"/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: trustedCAs: rehash is guarded on openssl being available" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("if command -v openssl > /dev/null 2>&1; then")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: trustedCAs: vault server CA is copied into /trusted-cas when vault is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cp /vault/secrets/serverca.crt /trusted-cas/custom-ca-server.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: trustedCAs: vault server CA is not copied when vault is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cp /vault/secrets/serverca.crt")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "server/StatefulSet: trustedCAs: if tustedCAs multiple are set" {
   cd `chart_dir`
   local object=$(helm template \
@@ -3278,6 +3330,10 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-0.pem")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-1.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object | jq '.command[2] | contains("for CERT_FILE in /trusted-cas/custom-ca-*.pem; do")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object | jq '.command[2] | contains("ln -sf \"${CERT_FILE}\" \"/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -3471,6 +3527,60 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 }
 
 #--------------------------------------------------------------------
+# snapshotAgent Consul namespaces
+
+@test "server/StatefulSet: snapshot-agent: CONSUL_NAMESPACE not set when enableConsulNamespaces is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env | any(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: CONSUL_NAMESPACE mirrors release namespace when mirroringK8S is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[] | select(.name == "CONSUL_NAMESPACE") | .value' | tee /dev/stderr)
+  [ "${actual}" = "consul" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: CONSUL_NAMESPACE not set when mirroring disabled even if destination namespace is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
+      --set 'connectInject.consulNamespaces.consulDestinationNamespace=dest-ns' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env | any(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: CONSUL_PARTITION set when adminPartitions enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=default' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[] | select(.name == "CONSUL_PARTITION") | .value' | tee /dev/stderr)
+  [ "${actual}" = "default" ]
+}
+
+#--------------------------------------------------------------------
 # snapshotAgent Interval
 
 @test "server/StatefulSet: snapshot-agent: interval defaults to 1h" {
@@ -3495,4 +3605,3 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       yq -r '.spec.template.spec.containers[1].command[2] | contains("-interval=10h34m5s")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-

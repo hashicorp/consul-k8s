@@ -478,6 +478,10 @@ load _helpers
 
 @test "serverACLInit/Job: terminating gateways acl option enabled with .terminatingGateways.enabled=true, namespaces enabled, no default namespace set" {
   cd `chart_dir`
+  # With namespaces enabled and mirroring on (the chart default), the gateway is
+  # mirrored into the Consul namespace matching the release namespace. The ACL
+  # token name must use that same namespace so it stays in lockstep with the
+  # gateway's service registration.
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
@@ -485,8 +489,9 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'terminatingGateways.defaults.consulNamespace=' \
+      --namespace consul \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway.consul\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -1974,6 +1979,51 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-host"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
+}
+
+#--------------------------------------------------------------------
+# global.acls.authMethod
+
+@test "serverACLInit/Job: -auth-method-name-prefix defaults to the fullname" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-name-prefix=release-name-consul"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: -auth-method-name-prefix can be set with global.acls.authMethod.name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.authMethod.name=cluster-b' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-auth-method-name-prefix=cluster-b"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: -create-auth-methods defaults to true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-auth-methods=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: -create-auth-methods can be set to false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.authMethod.create=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-create-auth-methods=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "serverACLInit/Job: doesn't set auth method host by default when externalServers.k8sAuthMethodHost is provided but externalServers.enabled is false" {

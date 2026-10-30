@@ -5,7 +5,7 @@
 
 package version
 
-// IsFIPS returns true if consul-k8s is operating in FIPS-140-2 mode.
+// IsFIPS returns true if consul-k8s is operating in FIPS-140-3 mode.
 func IsFIPS() bool {
 	return false
 }

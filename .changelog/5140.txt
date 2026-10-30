@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix ACL role/policy/binding collisions for gateways with the same name across Kubernetes namespaces by scoping cache keys and managed ACL resource names by namespace; this prevents cross-namespace role detachment and resulting service:write permission loss.
+```

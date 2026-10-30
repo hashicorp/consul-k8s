@@ -1,0 +1,3 @@
+```release-note:security
+security: upgrade 'go.opentelemetry.io/otel' to 1.44.0 to resolve [GHSA-mh2q-q3fh-2475]
+```

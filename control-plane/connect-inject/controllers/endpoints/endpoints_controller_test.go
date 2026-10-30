@@ -2488,6 +2488,109 @@ func TestReconcile_PodErrorPreservesToken(t *testing.T) {
 
 }
 
+// TestReconcile_EndpointsLagBehindPodIP verifies the controller's handling of the
+// startup race where a Pod already has a valid Status.PodIP but the backing Endpoints
+// object hasn't yet been populated with that IP (address.IP == "").
+//
+// In this case the controller should NOT treat the skip as terminal: it should requeue
+// (RequeueAfter == endpointsLagRequeueInterval) so registration is retried once the
+// Endpoints object catches up, and it should not register the service prematurely.
+//
+// It also verifies the genuinely-incomplete case (Pod has no IP either), where the
+// controller should skip without requeueing for endpoints lag.
+func TestReconcile_EndpointsLagBehindPodIP(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		// podIP is the IP set on the Pod's Status.PodIP.
+		podIP string
+		// expectRequeue indicates whether we expect a requeue for the endpoints-lag condition.
+		expectRequeue bool
+	}{
+		{
+			name:          "pod has valid IP but endpoints address IP is empty - should requeue",
+			podIP:         "10.244.0.16",
+			expectRequeue: true,
+		},
+		{
+			name:          "pod also has no IP yet - genuinely incomplete, should not requeue",
+			podIP:         "",
+			expectRequeue: false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			svcName := "echo-3"
+
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+
+			// Pod is managed by this controller and injected, with a (possibly empty) PodIP.
+			pod1 := createServicePod("pod1", tt.podIP, true, true)
+
+			// The Endpoints object exists and references the pod, but its address IP is empty,
+			// simulating the window where Endpoints lags behind Pod IP assignment.
+			endpoint := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      svcName,
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{
+								IP: "",
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: "default",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			k8sObjects := []runtime.Object{pod1, endpoint, &ns, &node}
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
+
+			ep := &Controller{
+				Client:                fakeClient,
+				Log:                   logrtest.New(t),
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consulServer",
+				ReleaseNamespace:      "default",
+			}
+
+			namespacedName := types.NamespacedName{Namespace: "default", Name: svcName}
+
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+			require.NoError(t, err)
+
+			if tt.expectRequeue {
+				require.Equal(t, endpointsLagRequeueInterval, resp.RequeueAfter,
+					"expected reconcile to requeue while Endpoints catches up to Pod IP")
+			} else {
+				require.Zero(t, resp.RequeueAfter,
+					"expected no endpoints-lag requeue when the Pod itself has no IP yet")
+			}
+
+			// In either case, the service must not have been registered prematurely because
+			// the Endpoints address IP was empty.
+			serviceInstances, _, err := consulClient.Catalog().Service(svcName, "", nil)
+			require.NoError(t, err)
+			require.Empty(t, serviceInstances, "service should not be registered while address IP is empty")
+		})
+	}
+}
+
 type fakeClientWithPodCustomization struct {
 	client.WithWatch
 }

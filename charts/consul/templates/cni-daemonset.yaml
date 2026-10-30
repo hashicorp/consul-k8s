@@ -43,12 +43,17 @@ spec:
       # consul-cni only runs on linux operating systems
       nodeSelector:
         kubernetes.io/os: linux
+      {{- if .Values.connectInject.cni.tolerations }}
+      tolerations:
+        {{ tpl .Values.connectInject.cni.tolerations . | nindent 8 | trim }}
+      {{- else }}
       tolerations:
         # Mark the pod as a critical add-on for rescheduling.
         - key: CriticalAddonsOnly
           operator: Exists
         - effect: NoExecute
           operator: Exists
+      {{- end }}
       # Tell kubernetes that this daemonset is critical so that it will be scheduled on a new node before other pods
       priorityClassName: system-node-critical
       serviceAccountName: {{ template "consul.fullname" . }}-cni
@@ -66,6 +71,11 @@ spec:
           {{ template "consul.imagePullPolicy" . }}
           securityContext:
             privileged: true
+          env:
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
           command:
             - consul-k8s-control-plane
             - install-cni
@@ -73,6 +83,7 @@ spec:
             - -cni-bin-dir={{ .Values.connectInject.cni.cniBinDir }}
             - -cni-net-dir={{ .Values.connectInject.cni.cniNetDir }}
             - -multus={{ .Values.connectInject.cni.multus }}
+            - -installation-id=$(POD_UID)
             {{- if .Values.connectInject.cni.autorotateToken }}
             - -autorotate-token={{ .Values.connectInject.cni.autorotateToken }}
             {{- end }}

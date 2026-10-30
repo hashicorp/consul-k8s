@@ -13,17 +13,10 @@
 # See `security-scanner` docs or run with `--help` for scan target syntax.
 
 container {
-  dependencies = true
-  alpine_secdb = true
-
-  secrets {
-    all = true
-  }
-}
-
-binary {
-  go_modules   = true
-  osv          = true
+  dependencies    = true
+  alpine_security = true
+  osv             = true
+  go_modules      = true
 
   secrets {
     all = true
@@ -31,7 +24,37 @@ binary {
 
   triage {
     suppress {
-      vulnerabilites = [
+      vulnerabilities = [
+        "GO-2026-5932",
+        "GO-2026-6443",
+      ]
+      paths = [
+        // The OSV scanner will trip on several packages that are included in the
+        // the UBI images. This is due to RHEL using the same base version in the
+        // package name for the life of the distro regardless of whether or not
+        // that version has been patched for security. Rather than enumate ever
+        // single CVE that the OSV scanner will find (several tens) we'll ignore
+        // the base UBI packages.
+        "usr/lib/sysimage/rpm/*",
+        "var/lib/rpm/*",
+      ]
+    }
+  }
+}
+
+binary {
+  go_modules = true
+  osv        = true
+
+  secrets {
+    all = true
+  }
+
+  triage {
+    suppress {
+      vulnerabilities = [
+        "GO-2026-5932",
+        "GO-2026-6443",
       ]
     }
   }

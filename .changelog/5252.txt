@@ -1,0 +1,3 @@
+```release-note:bug
+connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used. The original check queried `/v1/agent/version` with a non-pointer map, so the response was never decoded and both FIPS warnings fired on every pod startup. The fix decodes the endpoint response correctly and checks the returned `FIPS` value.
+```

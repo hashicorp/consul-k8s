@@ -1,0 +1,5 @@
+```release-note:security
+Helm: Upgraded to v3.21.3
+Containerd: Removed
+CVEs: Upgraded Helm packages (*to remove containerd packages) to address a few CVEs
+```

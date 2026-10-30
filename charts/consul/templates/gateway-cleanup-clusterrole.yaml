@@ -18,6 +18,14 @@ rules:
     - get
     - delete
   - apiGroups:
+      - consul.hashicorp.com
+    resources:
+      - terminatinggateways
+    verbs:
+      - get
+      - list
+      - delete
+  - apiGroups:
     - gateway.networking.k8s.io
     resources:
     - gatewayclasses

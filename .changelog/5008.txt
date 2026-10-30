@@ -1,0 +1,4 @@
+```release-note:enhancement
+api-gateway: Add support for file-based Envoy access log sinks via proxy-defaults. Previously, only stdout logging was supported.
+connect-inject: When proxy-defaults enables file-based access logs, automatically inject an emptyDir volume and volumeMount into the consul-dataplane container.
+```

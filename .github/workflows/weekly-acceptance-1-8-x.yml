@@ -1,7 +1,7 @@
 # Dispatch to the consul-k8s-workflows with a weekly cron
 #
 # A separate file is needed for each release because the cron schedules are different for each release.
-name: weekly-acceptance-1-7-x
+name: weekly-acceptance-1-8-x
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
@@ -25,4 +25,4 @@ jobs:
         repo: hashicorp/consul-k8s-workflows
         ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}" }'

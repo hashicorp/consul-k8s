@@ -88,11 +88,23 @@ load _helpers
 #--------------------------------------------------------------------
 # logLevel
 
-@test "client/ConfigMap: client.logLevel is empty" {
+@test "client/ConfigMap: client.logLevel is empty, falls back to global.logLevel" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-config-configmap.yaml  \
       --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["log-level.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${actual}" = "INFO" ]
+}
+
+@test "client/ConfigMap: client.logLevel is empty and global.logLevel is empty" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.logLevel=' \
       . | tee /dev/stderr |
       yq -r '.data["log-level.json"]' | jq -r .log_level | tee /dev/stderr)
 
