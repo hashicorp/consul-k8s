@@ -10,10 +10,3 @@ metadata:
   name: multiport
 secrets:
 - name: multiport
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: multiport-admin
-secrets:
-- name: multiport-admin

@@ -7,3 +7,4 @@ resources:
 - ../../bases/multiport-app
 patches:
 - path: patch.yaml
+- path: patch-admin.yaml
