@@ -369,15 +369,7 @@ func TestValidConfig(t *testing.T) {
 		{
 			name:    "config is corrupted and consul-cni is not last in chain",
 			cfgFile: "testdata/10-kindnet.conflist.notlast",
-			consulConfig: &config.CNIConfig{
-				CNIBinDir:  "/opt/cni/bin",
-				CNINetDir:  "/etc/cni/net.d",
-				Kubeconfig: "ZZZ-consul-cni-kubeconfig",
-				LogLevel:   "info",
-				Multus:     false,
-				Name:       "consul-cni",
-				Type:       "consul-cni",
-			},
+			consulConfig: config.NewDefaultCNIConfig(),
 			expectedErr: fmt.Errorf("consul-cni config is not the last plugin in plugin chain"),
 		},
 	}

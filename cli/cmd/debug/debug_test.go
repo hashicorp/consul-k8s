@@ -509,7 +509,7 @@ func TestDebugRun(t *testing.T) {
 			expectDebugArchive: true,
 			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture successful",
 				"Crds capture successful", "Sidecar capture successful", "Proxy capture successful",
-				"Capturing pods logs.....", "Logs capture successful", "Index capture successful", "Saved debug archive"},
+				"Capturing pod logs.....", "Logs capture successful", "Index capture successful", "Saved debug archive"},
 		},
 		"success case with all targets with since": {
 			args: []string{"-archive=false", "-since=10s", "-output=tc2"}, // Default is all capture targets
@@ -529,7 +529,7 @@ func TestDebugRun(t *testing.T) {
 			expectDebugArchive: false,
 			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture successful",
 				"Crds capture successful", "Sidecar capture successful", "Proxy capture successful",
-				"Capturing pods logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
+				"Capturing pod logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
 		},
 		"helm capture fail": {
 			args: []string{"-archive=false", "-duration=10s", "-output=tc3"},
@@ -549,7 +549,7 @@ func TestDebugRun(t *testing.T) {
 			expectDebugArchive: false,
 			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture failed with error", "testing helm error",
 				"Crds capture successful", "Sidecar capture successful", "Proxy capture successful",
-				"Capturing pods logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
+				"Capturing pod logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
 		},
 		"envoy proxy data capture fail": {
 			args: []string{"-archive=false", "-duration=10s", "-output=tc4"},
@@ -569,7 +569,7 @@ func TestDebugRun(t *testing.T) {
 			expectDebugArchive: false,
 			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture successful",
 				"Crds capture successful", "Sidecar capture successful", "Proxy capture failed with error", errMultipleErrorsOccuredAndWritten.Error(),
-				"Capturing pods logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
+				"Capturing pod logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
 		},
 		"log capture fail": {
 			args: []string{"-archive=true", "-duration=10s", "-output=tc5"},
@@ -589,7 +589,7 @@ func TestDebugRun(t *testing.T) {
 			expectDebugArchive: true,
 			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture successful",
 				"Crds capture successful", "Sidecar capture successful", "Proxy capture successful",
-				"Capturing pods logs.....", "Logs capture failed with error", errMultipleErrorsOccuredAndWritten.Error(),
+				"Capturing pod logs.....", "Logs capture failed with error", errMultipleErrorsOccuredAndWritten.Error(),
 				"Index capture successful", "Saved debug archive"},
 		},
 	}

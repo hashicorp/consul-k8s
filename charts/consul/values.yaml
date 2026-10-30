@@ -5,6 +5,7 @@
 
 # Holds values that affect multiple components of the chart.
 global:
+  installK8sNetworkingCRDs: true
   # The main enabled/disabled setting. If true, servers,
   # clients, Consul DNS and the Consul UI will be enabled. Each component can override
   # this default via its component-specific "enabled" config. If false, no components
@@ -28,7 +29,7 @@ global:
   name: null
 
   # The domain Consul will answer DNS queries for
-  # (Refer to [`-domain`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_domain)) and the domain services synced from
+  # (Refer to [`-domain`](https://developer.hashicorp.com/consul/commands/agent#_domain)) and the domain services synced from
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.
   domain: consul
 
@@ -66,7 +67,8 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.23.0-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:2.1.0-rc1
+
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -86,7 +88,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.10.0-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:2.1.0-dev
 
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -106,7 +108,7 @@ global:
   # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
   # The Vault cluster needs to have the Kubernetes Auth Method, KV2 and PKI secrets engines enabled
   # and have necessary secrets, policies and roles created prior to installing Consul.
-  # Refer to [Vault as the Secrets Backend](https://developer.hashicorp.com/consul/docs/k8s/deployment-configurations/vault)
+  # Refer to [Vault as the Secrets Backend](https://developer.hashicorp.com/consul/docs/deploy/server/k8s/vault)
   # documentation for full instructions.
   #
   # The Vault cluster _must_ not have the Consul cluster installed by this Helm chart as its storage backend
@@ -120,7 +122,7 @@ global:
   secretsBackend:
     vault:
       # Vault namespace (optional). This sets the Vault namespace for the `vault.hashicorp.com/namespace`
-      # agent annotation and [Vault Connect CA namespace](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace).
+      # agent annotation and [Vault Connect CA namespace](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#namespace).
       # To override one of these values individually, see `agentAnnotations` and `connectCA.additionalConfig`.
       vaultNamespace: ""
 
@@ -162,6 +164,17 @@ global:
       # ```
       # and check the name of `metadata.name`.
       manageSystemACLsRole: ""
+
+      # The Vault role for the feature-gate-set job when it reads an ACL token.
+      # Bind this role to the feature-gate-set ServiceAccount and grant it read access to
+      # `global.acls.bootstrapToken.secretName`, or `global.acls.replicationToken.secretName`
+      # in a secondary datacenter that does not configure a bootstrap token.
+      # If TLS is enabled, also grant read access
+      # to `global.tls.caCert.secretName`.
+      # To discover the service account name, run:
+      # $ helm template --show-only templates/feature-gate-set-serviceaccount.yaml <release-name> hashicorp/consul
+      # and check `metadata.name`.
+      featureGateSetRole: ""
 
       # [Enterprise Only] A Vault role that allows the Consul `partition-init` job to read a Vault secret for the partition ACL token.
       #  The `partition-init` job bootstraps Admin Partitions on Consul servers.
@@ -212,7 +225,7 @@ global:
       # The provider will be configured to use the Vault Kubernetes auth method
       # and therefore requires the role provided by `global.secretsBackend.vault.consulServerRole`
       # to have permissions to the root and intermediate PKI paths.
-      # Please refer to [Vault ACL policies](https://developer.hashicorp.com/consul/docs/connect/ca/vault#vault-acl-policies)
+      # Please refer to [Vault ACL policies](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#vault-acl-policies)
       # documentation for information on how to configure the Vault policies.
       connectCA:
         # The address of the Vault server.
@@ -222,15 +235,15 @@ global:
         authMethodPath: "kubernetes"
 
         # The path to a PKI secrets engine for the root certificate.
-        # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#rootpkipath).
+        # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#rootpkipath).
         rootPKIPath: ""
 
         # The path to a PKI secrets engine for the generated intermediate certificate.
-        # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#intermediatepkipath).
+        # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#intermediatepkipath).
         intermediatePKIPath: ""
 
         # Additional Connect CA configuration in JSON format.
-        # Please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#configuration)
+        # Please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#configuration)
         # for all configuration options available for that provider.
         #
         # Example:
@@ -268,7 +281,7 @@ global:
           secretName: null
 
   # Configures Consul's gossip encryption key.
-  # (Refer to [`-encrypt`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_encrypt)).
+  # (Refer to [`-encrypt`](https://developer.hashicorp.com/consul/commands/agent#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
   # The recommended method is to automatically generate the key.
   # To automatically generate and set a gossip encryption key, set autoGenerate to true.
@@ -304,19 +317,19 @@ global:
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
-  # Refer to [`-recursor`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_recursor) for more details.
+  # Refer to [`-recursor`](https://developer.hashicorp.com/consul/commands/agent#_recursor) for more details.
   # If this is an empty array (the default), then Consul DNS will only resolve queries for the Consul top level domain (by default `.consul`).
   # @type: array<string>
   recursors: []
 
-  # Enables [TLS](https://developer.hashicorp.com/consul/tutorials/security/tls-encryption-secure)
+  # Enables [TLS](https://developer.hashicorp.com/consul/docs/secure/encryption/tls/mtls)
   # across the cluster to verify authenticity of the Consul servers and clients.
   # Requires Consul v1.4.1+.
   tls:
     # If true, the Helm chart will enable TLS for Consul
     # servers and clients and all consul-k8s-control-plane components, as well as generate certificate
     # authority (optional) and server and client certificates.
-    # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
+    # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/east-west/cluster-peering/tech-specs/k8s).
     enabled: false
 
     # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
@@ -343,7 +356,7 @@ global:
     # If true, `verify_outgoing`, `verify_server_hostname`,
     # and `verify_incoming` for internal RPC communication will be set to `true` for Consul servers and clients.
     # Set this to false to incrementally roll out TLS on an existing Consul cluster.
-    # Please refer to [TLS on existing clusters](https://developer.hashicorp.com/consul/docs/k8s/operations/tls-on-existing-cluster)
+    # Please refer to [TLS on existing clusters](https://developer.hashicorp.com/consul/docs/secure/encryption/tls/rotate/k8s)
     # for more details.
     verify: true
 
@@ -421,6 +434,41 @@ global:
     # for all Consul and consul-k8s-control-plane components.
     # This requires Consul >= 1.4.
     manageSystemACLs: false
+
+    # Configures the Kubernetes auth methods that Consul components and service mesh
+    # workloads use to authenticate with Consul.
+    authMethod:
+      # The base name used to derive the Kubernetes auth methods managed by this chart.
+      # If empty, it defaults to the Helm release fullname, which preserves the
+      # auth method names used by existing installations.
+      #
+      # Two auth methods are derived from this value:
+      # `<name>-k8s-component-auth-method` for Consul components and
+      # `<name>-k8s-auth-method` for service mesh workloads. When federation is
+      # enabled, secondary datacenters additionally derive
+      # `<name>-k8s-component-auth-method-<global.datacenter>` for global tokens.
+      #
+      # Set this to a value that is unique per Kubernetes cluster when multiple
+      # Kubernetes clusters share a single Consul control plane within the same
+      # admin partition. Otherwise each cluster overwrites the other's auth methods,
+      # because auth method names are not namespaced by cluster.
+      #
+      # Note that ACL policies and roles are still derived from `global.name`, so
+      # clusters that share a control plane should also use a unique `global.name`.
+      # @type: string
+      name: ""
+
+      # If true, the `server-acl-init` job creates and manages the Kubernetes auth
+      # methods described by `name`. Set this to false if you provision the auth
+      # methods yourself, for example because the Consul servers are managed
+      # separately from this Helm release.
+      #
+      # When false, the auth methods must already exist before this chart is
+      # installed, and they must use the names derived from `name`. The
+      # `server-acl-init` job still creates the ACL policies, roles and binding
+      # rules that Consul components require on those auth methods.
+      # @type: boolean
+      create: true
 
     # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
@@ -558,6 +606,31 @@ global:
     # Manages license autoload. Required in Consul 1.10.0+, 1.9.7+ and 1.8.12+.
     enableLicenseAutoload: true
 
+  # Configures the global registry integration. When enabled, the Consul server will
+  # communicate with an external registry service. The token used by the registry
+  # is read from a Kubernetes secret.
+  globalRegistry:
+    # If true, enables the global_registry stanza in the Consul server configuration.
+    # @type: boolean
+    enabled: false
+
+    # The address of the global registry service.
+    # @type: string
+    address: null
+
+    # The cluster ID to use when communicating with the global registry.
+    # @type: string
+    clusterId: null
+
+    # The name of the Kubernetes secret that holds the global registry token.
+    # A Kubernetes secret must be in the same namespace that Consul is installed into.
+    # @type: string
+    tokenSecretName: null
+
+    # The key within the Kubernetes secret that holds the global registry token.
+    # @type: string
+    tokenSecretKey: null
+
   # Configure federation.
   federation:
     # If enabled, this datacenter will be federation-capable. Only federation
@@ -591,7 +664,7 @@ global:
     # This address must be reachable from the Consul servers in the primary datacenter.
     # This auth method will be used to provision ACL tokens for Consul components and is different
     # from the one used by the Consul Service Mesh.
-    # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
+    # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/secure/acl/auth-method/k8s).
     #
     # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
     # `externalServers.k8sAuthMethodHost` should be set to the same value.
@@ -793,7 +866,39 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.10.0-dev
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-rc1
+  # Disable this once the manifests are generated and subsequent helm upgrades
+  
+  generateManifests: false
+
+  # Uses the provided storage class name for the generated manifests - recommended to create SC with volumebinding as Immediate. If not provided, the default storage class will be used.
+  generateManifestsStorageClassName: ""
+
+  # Storage requirement for generateManifests pvc
+  generateManifestsStorage: "1Gi"
+
+  # Image used by the post-upgrade apply-manifests Job to run kubectl (non-OpenShift) or oc (OpenShift).
+  # Override this to supply an air-gapped or security-approved image.
+  # When global.openshift.enabled=true, the image must contain oc; otherwise it must contain kubectl.
+  # If not set, defaults to bitnami/kubectl:latest (non-OpenShift) or registry.redhat.io/openshift4/ose-cli (OpenShift).
+  imageApplyManifests: ""
+
+  # During the install:
+  # custom crds and gateway TCP crd enabling
+  # enableTcpRoute installs the TCP GVK under gateway.networking.k8s.io and enables the stable gatewaycontroller to watch for the resources.
+  # crds.consulapi.enabled install the CRDs under consul.hashicorp.com API group and enables the new custom gateway controller to watch for the resources.
+
+  # During the upgrade - manifests are generated.
+  # if consulapi.enabled is set to false; no manifests will be generated under consul.hashicorp.com API group
+  # if consulapi.enables is set to true; manifests will be generated and applied under consul.hashicorp.com API group
+  crds:
+    enableTcpRoute: true
+    consulapi:
+      enabled: false
+
+  # Add additional pod-level securityContext for the generate-manifests Job when volume permissions require it.
+  podSecurityContext:
+    enabled: false
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -802,12 +907,46 @@ global:
     # its components on OpenShift.
     enabled: false
 
+    # During the install:
+    # in this case ideally customer deploys the consul directly on the 4.19+ and thus is void.
+
+    # During the upgrade:
+    # This should be enabled when the customer plans to upgrade the OCP from 4.18 to 4.19+ versions.
+    # This will generate the manifests inaccordance to 2 cases along with enableTcpRoute:
+    # case 1: when upgradeTo419From418 is true and enableTcpRoute is false:
+    # generate the manifests only for gateway.networking.k8s.io and ignores the TCP watch
+    # case 2: when upgradeTo419From418 is true and enableTcpRoute is true:
+    # generate the manifests for both consul.hashicorp.com and gateway.networking.k8s.io ( the deleteion of TCP GVK is manual )
+    upgradeTo419From418: false
+
+    # During the install:
+    # for isOcpGreaterthan4_18: n this case ideally customer deploys the consul directly on the 4.19+ and thus is void.
+   
+    # for crds.enableTcpRoute set to true; controller watches for the TCP
+    # for crds.enableTcpRoute set to false; controller does not watch for the TCp.
+
+    # for crds.consulapi.enabled set to true; controller watches for resources under the API group - consul.hashicorp.com
+ 
+    # During the upgrade:
+    # If isOcpGreaterthan4_18 is false and enableTcpRoute is false:
+    # generate the manifests only for gateway.networking.k8s.io and ignores the TCP watch
+    # If isOcpGreaterthan4_18 is false and enableTcpRoute is true:
+    # generate the manifests only for gateway.networking.k8s.io and watches for the TCP
+    # If isOcpGreaterthan4_18 is true and enableTcpRoute is false:
+    # generate the manifests only for gateway.networking.k8s.io and ignores the TCP watch
+    # If isOcpGreaterthan4_18 is true and enableTcpRoute is true:
+    # generate the manifests for both consul.hashicorp.com ( all current GVK ) and gateway.networking.k8s.io ( no TCP )
+
+    # in any case, crds.consulapi.enabled install the CRDs under consul.hashicorp.com API group and enables the new custom gateway controller to watch for the resources.
+    isOcpGreaterthan4_18: false
+    crds: 
+      enableTcpRoute: false
+      consulapi:
+        enabled: false 
+
   # The time in seconds that the consul API client will wait for a response from
   # the API before cancelling the request.
   consulAPITimeout: 5s
-
-  # Enables installing an HCP Consul Central self-managed cluster.
-  # Requires Consul v1.14+.
 
   # Extra labels to attach to all pods, deployments, daemonsets, statefulsets, and jobs. This should be a YAML map.
   #
@@ -876,7 +1015,7 @@ server:
   image: null
 
   # The number of server agents to run. This determines the fault tolerance of
-  # the cluster. Please refer to the [deployment table](https://developer.hashicorp.com/consul/docs/architecture/consensus#deployment-table)
+  # the cluster. Please refer to the [deployment table](https://developer.hashicorp.com/consul/docs/concept/consensus#deployment-table)
   # for more information.
   replicas: 1
 
@@ -918,7 +1057,7 @@ server:
   # Vault Secrets backend:
   # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
   # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`.
-  # Complete [this tutorial](https://developer.hashicorp.com/consul/tutorials/vault-secure/vault-pki-consul-secure-tls)
+  # Refer to [Generate mTLS Certificates for Consul with Vault and Consul Template](https://developer.hashicorp.com/consul/docs/automate/consul-template/vault/mtls)
   # to learn how to generate a compatible certificate.
   # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
   # must be provided.
@@ -962,7 +1101,7 @@ server:
   # storage classes, the PersistentVolumeClaims would need to be manually created.
   # A `null` value will use the Kubernetes cluster's default StorageClass. If a default
   # StorageClass does not exist, you will need to create one.
-  # Refer to the [Read/Write Tuning](https://developer.hashicorp.com/consul/docs/install/performance#read-write-tuning)
+  # Refer to the [Read/Write Tuning](https://developer.hashicorp.com/consul/docs/reference/architecture/server#read-write-tuning)
   # section of the Server Performance Requirements documentation for considerations
   # around choosing a performant storage class.
   #
@@ -987,11 +1126,11 @@ server:
   # @type: map
   persistentVolumeClaimRetentionPolicy: null
 
-  # This will enable/disable [service mesh](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
+  # This will enable/disable [service mesh](https://developer.hashicorp.com/consul/docs/connect/enable). Setting this to true
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
   # a new CA and set of certificates. Additional service mesh settings can be configured
-  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries).
+  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/fundamentals/config-entry).
   connect: true
 
   # When set to true, enables Consul to report additional debugging information, including runtime profiling (pprof) data.
@@ -1095,7 +1234,7 @@ server:
   # control a rolling update of Consul server agents. This value specifies the
   # [partition](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#partitions)
   # for performing a rolling update. Please read the linked Kubernetes
-  # and [Upgrade Consul](https://developer.hashicorp.com/consul/docs/k8s/upgrade#upgrading-consul-servers)
+  # and [Upgrade Consul](https://developer.hashicorp.com/consul/docs/upgrade/k8s#upgrading-consul-servers)
   # documentation for more information.
   updatePartition: 0
 
@@ -1121,7 +1260,7 @@ server:
     # @type: integer
     maxUnavailable: null
 
-  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
+  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/general) for Consul
   # servers. This will be saved as-is into a ConfigMap that is read by the Consul
   # server agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -1421,7 +1560,7 @@ server:
 
   # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing
   # and configure a sink and filters for their audit logs. Please refer to
-  # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
+  # [audit logs](https://developer.hashicorp.com/consul/docs/monitor/log/audit) documentation
   # for further information.
   auditLogs:
     # Controls whether Consul logs out each time a user performs an operation.
@@ -1480,7 +1619,7 @@ server:
     # This object specifies configurations that limit the rate of RPC and gRPC
     # requests on the Consul server. Limiting the rate of gRPC and RPC requests
     # also limits HTTP requests to the Consul server.
-    # https://developer.hashicorp.com/consul/docs/agent/config/config-files#request_limits
+    # https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/general#request_limits
     requestLimits:
       # Setting for disabling or enabling rate limiting.  If not disabled, it
       # enforces the action that will occur when RequestLimitsReadRate
@@ -1522,6 +1661,10 @@ externalServers:
   # An array of external Consul server hosts that are used to make
   # HTTPS connections from the components in this Helm chart.
   # Valid values include an IP, a DNS name, or an [exec=](https://github.com/hashicorp/go-netaddrs) string.
+  # For `provider=k8s` discovery, the feature-gate hook is granted pod-list access
+  # in the release namespace only. Specify that namespace in the discovery string.
+  # Discovery in other namespaces or across all namespaces requires additional
+  # administrator-managed RBAC for the `<release>-consul-feature-gate-set` service account.
   # The port must be provided separately below.
   # Note: This slice can only contain a single element.
   # Note: If enabling clients, `client.join` must also be set to the hosts that should be
@@ -1553,7 +1696,7 @@ externalServers:
   # If you are setting `global.acls.manageSystemACLs` and
   # `connectInject.enabled` to true, set `k8sAuthMethodHost` to the address of the Kubernetes API server.
   # This address must be reachable from the Consul servers.
-  # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
+  # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/secure/acl/auth-method/k8s).
   #
   # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
   # `externalServers.k8sAuthMethodHost` should be set to the same value.
@@ -1589,7 +1732,7 @@ client:
   # @type: string
   image: null
 
-  # A list of valid [`-retry-join` values](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_retry_join).
+  # A list of valid [`-retry-join` values](https://developer.hashicorp.com/consul/commands/agent#_retry_join).
   # If this is `null` (default), then the clients will attempt to automatically
   # join the server cluster running within Kubernetes.
   # This means that with `server.enabled` set to true, clients will automatically
@@ -1615,7 +1758,7 @@ client:
   grpc: true
 
   # nodeMeta specifies an arbitrary metadata key/value pair to associate with the node
-  # (refer to [`-node-meta`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_node_meta))
+  # (refer to [`-node-meta`](https://developer.hashicorp.com/consul/commands/agent#_node_meta))
   nodeMeta:
     pod-name: ${HOSTNAME}
     host-ip: ${HOST_IP}
@@ -1696,7 +1839,7 @@ client:
       # Maximum seconds to sleep before attempting the ACL login.
       maxSeconds: 0
 
-  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
+  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
   # client agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -2072,7 +2215,7 @@ ui:
     # @default: global.metrics.enabled
     enabled: "-"
     # Provider for metrics. Refer to
-    # [`metrics_provider`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_metrics_provider)
+    # [`metrics_provider`](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/ui#ui_config_metrics_provider)
     # This value is only used if `ui.enabled` is set to true.
     # @type: string
     provider: "prometheus"
@@ -2082,10 +2225,10 @@ ui:
     # @type: string
     baseURL: http://prometheus-server
 
-  # Corresponds to [`dashboard_url_templates`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates)
+  # Corresponds to [`dashboard_url_templates`](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/ui#ui_config_dashboard_url_templates)
   # configuration.
   dashboardURLTemplates:
-    # Sets [`dashboardURLTemplates.service`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates_service).
+    # Sets [`dashboardURLTemplates.service`](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/ui#ui_config_dashboard_url_templates_service).
     service: ""
 
 # Configure the catalog sync process to sync K8S with Consul
@@ -2111,7 +2254,7 @@ syncCatalog:
   image: null
 
   # If true, all valid services in K8S are
-  # synced by default. If false, the service must be [annotated](https://developer.hashicorp.com/consul/docs/k8s/service-sync#enable-and-disable-sync)
+  # synced by default. If false, the service must be [annotated](https://developer.hashicorp.com/consul/docs/register/service/k8s/service-sync#enable-and-disable-sync)
   # properly to sync.
   # In either case an annotation can override the default.
   default: true
@@ -2379,10 +2522,24 @@ connectInject:
 
   # If true, the injector will inject the
   # Connect sidecar into all pods by default. Otherwise, pods must specify the
-  # [injection annotation](https://developer.hashicorp.com/consul/docs/k8s/connect#consul-hashicorp-com-connect-inject)
+  # [injection annotation](https://developer.hashicorp.com/consul/docs/connect/k8s#consul-hashicorp-com-connect-inject)
   # to opt-in to Connect injection. If this is true, pods can use the same annotation
   # to explicitly opt-out of injection.
   default: false
+
+  # Controls whether one Consul service registration may contain multiple
+  # named ports. When disabled, a multi-port workload must select exactly one
+  # port with consul.hashicorp.com/connect-service-port.
+  multiportServiceRegistration:
+    # @type: boolean
+    enabled: false
+    # Controls how existing mesh-injected Deployments, StatefulSets, and
+    # DaemonSets are handled during a Helm upgrade while multi-port
+    # registration is disabled. NONE leaves existing workload specifications
+    # untouched. TRANSLATE selects one service port. DECOMMISSION removes
+    # eligible workloads from the mesh.
+    # @type: string
+    conversionStrategy: "NONE"
 
   # Configures Transparent Proxy for Consul Service mesh services.
   # Using this feature requires Consul 1.10.0-beta1+.
@@ -2498,10 +2655,28 @@ connectInject:
           memory: "100Mi"
           cpu: "100m"
 
-      # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
+      # [Enterprise Only] These settings enable per-Gateway scaling behavior for
+      # the managed GatewayClass, including Gateway annotations for static
+      # replicas, controller-managed HPA resources, and preserving manual scale.
+      # Requires Consul Enterprise with a valid license.
+      scaling:
+        enabled: false
+
+      # DEPRECATED: These values are deprecated and will be removed in a future release.
+      # Use Gateway annotations instead for per-gateway scaling configuration.
+      # See: [API Gateway Scaling](https://developer.hashicorp.com/consul/docs/north-south/api-gateway/k8s/scale)
+      #
+      # For static replica count, use: `consul.hashicorp.com/default-replicas: "<N>"`.
+      # For HPA, use: `consul.hashicorp.com/hpa-enabled: "true"` with min/max replicas annotations.
       deployment:
+        # Default number of gateway instances.
+        # DEPRECATED: Use consul.hashicorp.com/default-replicas annotation on Gateway resource
         defaultInstances: 1
+        # Maximum number of gateway instances.
+        # DEPRECATED: No longer enforced. Use HPA maxReplicas via annotations instead
         maxInstances: 1
+        # Minimum number of gateway instances.
+        # DEPRECATED: Use HPA minReplicas via annotations instead
         minInstances: 1
 
       # The name of the OpenShift SecurityContextConstraints resource to use for Gateways.
@@ -2637,6 +2812,24 @@ connectInject:
       runAsNonRoot: false
       runAsGroup: 0
       runAsUser: 0
+
+    # Toleration settings for the CNI installer DaemonSet pods.
+    # This should be a multi-line string matching the Tolerations
+    # array in a Pod spec. If not set, defaults to tolerating
+    # CriticalAddonsOnly and NoExecute taints.
+    # 
+    # Example:
+    #
+    # ```yaml
+    # tolerations: |
+    #   - key: dd
+    #     operator: Exists
+    #   - effect: bb
+    #     operator: Exists
+    # ```
+    # 
+    # @type: string
+    tolerations: null
 
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.
@@ -2781,6 +2974,7 @@ connectInject:
   # want those pods injected and local-path-storage and openebs so that
   # Kind (Kubernetes In Docker) and [OpenEBS](https://openebs.io/) respectively can provision Pods used to create PVCs.
   # We also exclude gmp-system and gke-managed-cim namespaces that are used by GKE for managing the cluster.
+  # We also exclude any namespaces with the label `openshift.io/cluster-monitoring` since those are used by OpenShift for cluster monitoring and typically should not be injected.
   # Note that this exclusion is only supported in Kubernetes v1.21.1+.
   #
   # Example:
@@ -2796,6 +2990,8 @@ connectInject:
       - key: "kubernetes.io/metadata.name"
         operator: "NotIn"
         values: ["kube-system","local-path-storage","openebs","gmp-system","gke-managed-cim"]
+      - key: "openshift.io/cluster-monitoring"
+        operator: "DoesNotExist"
 
   # List of k8s namespaces to allow Connect sidecar
   # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,
@@ -2881,14 +3077,20 @@ connectInject:
   # If set to an empty string all service accounts can log in.
   # This only has effect if ACLs are enabled.
   #
-  # Refer to Auth methods [Binding rules](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods#binding-rules)
-  # and [Trusted identiy attributes](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes#trusted-identity-attributes)
+  # Refer to Auth methods [Binding rules](https://developer.hashicorp.com/consul/docs/secure/acl/auth-method#binding-rules)
+  # and [Trusted identiy attributes](https://developer.hashicorp.com/consul/docs/secure/acl/auth-method/k8s#trusted-identity-attributes)
   # for more details.
   # Requires Consul >= v1.5.
   aclBindingRuleSelector: "serviceaccount.name!=default"
 
   # If you are not using global.acls.manageSystemACLs and instead manually setting up an
   # auth method for Connect inject, set this to the name of your auth method.
+  #
+  # Note that binding rules for this auth method are not managed by Consul, so you must
+  # create them yourself. When `global.acls.manageSystemACLs` is true, prefer
+  # `global.acls.authMethod.name` instead: the service mesh auth method is derived from it
+  # and its binding rules are managed for you. Setting both at the same time while
+  # `global.acls.manageSystemACLs` is true is rejected.
   overrideAuthMethodName: ""
 
   # Refers to a Kubernetes secret that you have created that contains
@@ -2903,6 +3105,21 @@ connectInject:
     # @type: string
     secretName: null
     # The key within the Vault secret that holds the ACL inject token.
+    # @type: string
+    secretKey: null
+
+  # Refers to a Kubernetes secret that contains an ACL token with operator privileges
+  # for global config entry writes reconciled by connect-inject (for example, for writing
+  # RateLimit).
+  #
+  # This token is optional and only used when both secretName and secretKey
+  # are provided. When set, connect-inject passes only the secret name/key
+  # and reads the token from the Kubernetes Secret in code.
+  globalConfigACLToken:
+    # The name of the Kubernetes secret that holds the global config ACL token.
+    # @type: string
+    secretName: null
+    # The key within the Kubernetes secret that holds the global config ACL token.
     # @type: string
     secretKey: null
 
@@ -3023,11 +3240,11 @@ connectInject:
         # @type: string
         cpu: null
 
-# [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
+# [Mesh Gateways](https://developer.hashicorp.com/consul/docs/east-west/mesh-gateway) enable Consul to work across Consul datacenters.
 meshGateway:
-  # If [mesh gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
+  # If [mesh gateways](https://developer.hashicorp.com/consul/docs/east-west/mesh-gateway) are enabled, a Deployment will be created that runs
   # gateways and Consul service mesh will be configured to use gateways.
-  # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
+  # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/east-west/cluster-peering/tech-specs/k8s).
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
@@ -3544,6 +3761,96 @@ terminatingGateways:
     # Note: The Consul namespace MUST exist before the gateway is deployed.
     consulNamespace: "default"
 
+    # `credentialInjection` configures the optional credential-injection sidecars
+    # for a terminating gateway. It supports two delivery sources (see `source`):
+    # a Vault Agent that renders external-model credentials, or a Kubernetes Secret
+    # mounted read-only. Either way, credentials are injected by a credential
+    # processor at the terminating gateway. This is disabled by default. When
+    # enabled, the referenced ConfigMaps/Secret and (for the Vault source) the
+    # Vault Kubernetes auth role/mount must be provisioned by an operator
+    # beforehand. Any field set on an individual gateway in the `gateways` list
+    # overrides the default here.
+    #
+    # ConfigMap rollout note: editing a referenced non-secret ConfigMap
+    # automatically rolls the workload only for controller-managed (CRD)
+    # TerminatingGateways, which watch those ConfigMaps. For Helm-managed gateways
+    # the content hash is recomputed only on the next `helm install/upgrade`, so
+    # run a `helm upgrade` (or use an external reloader) to roll them after such an
+    # edit.
+    credentialInjection:
+      # Enabled controls whether the credential processor and Vault Agent
+      # sidecars are added to the terminating gateway deployment.
+      # Credential injection is not supported on OpenShift: rendering fails if
+      # this is true while `global.openshift.enabled` is true.
+      # Credential injection is part of Consul AI and requires `ai.enabled=true`,
+      # which enables the Consul `consul-ai` feature gate: rendering fails if this
+      # is true while `ai.enabled` is false.
+      enabled: false
+
+      # Source selects the credential delivery mechanism: "vault" (default) runs
+      # the Vault Agent sidecars, or "kubernetesSecret" mounts a Kubernetes Secret
+      # read-only into the credential processor. Kubernetes Secrets are a weaker
+      # posture than Vault (base64 at rest, readable via the API with RBAC); enable
+      # etcd encryption-at-rest and scope RBAC before using this source.
+      # @type: string
+      source: "vault"
+
+      # SecretName names the Kubernetes Secret (in the gateway's namespace) whose
+      # data keys are per-binding credential envelope files. Required when
+      # source is "kubernetesSecret"; ignored otherwise.
+      # @type: string
+      secretName: ""
+
+      # ProcessorImage is the container image for the credential processor sidecar.
+      # @type: string
+      processorImage: ""
+
+      # VaultAgentImage is the container image for the Vault Agent sidecar.
+      # @type: string
+      vaultAgentImage: ""
+
+      # ProcessorConfigMap names a ConfigMap (in the gateway's namespace) carrying
+      # the credential processor's non-secret binding configuration.
+      # @type: string
+      processorConfigMap: ""
+
+      # VaultAgentConfigMap names a ConfigMap (in the gateway's namespace) carrying
+      # the Vault Agent configuration and credential templates. This ConfigMap
+      # exclusively owns the Vault auth configuration (auto-auth method, role, and
+      # mount); there are no separate auth role/mount fields.
+      # @type: string
+      vaultAgentConfigMap: ""
+
+      # VaultAddress is the address of the Vault server the sidecar authenticates
+      # against. It must be an absolute https:// URL.
+      # @type: string
+      vaultAddress: ""
+
+      # VaultNamespace is the optional Vault Enterprise namespace.
+      # @type: string
+      vaultNamespace: ""
+
+      # VaultCAConfigMap optionally names a ConfigMap (in the gateway's namespace)
+      # carrying the CA certificate used to verify the Vault server.
+      # @type: string
+      vaultCAConfigMap: ""
+
+      # TokenAudience is the audience requested for the projected Kubernetes
+      # service account token the Vault Agent uses for Kubernetes auth.
+      # @type: string
+      tokenAudience: ""
+
+      # TokenExpirationSeconds is the requested expiration, in seconds, of the
+      # projected service account token. Null uses the platform default.
+      # @type: integer
+      tokenExpirationSeconds: null
+
+      # DrainSeconds bounds how long the sidecars wait to finish in-flight
+      # credential refresh work before terminating during a rolling update.
+      # Must be between 0 and 300; 0 disables the drain wait. Null uses 30.
+      # @type: integer
+      drainSeconds: null
+
   # Gateways is a list of gateway objects. The only required field for
   # each is `name`, though they can also contain any of the fields in
   # `defaults`. Values defined here override the defaults except in the
@@ -3699,3 +4006,218 @@ telemetryCollector:
   # it could be used to configure custom consul parameters.
   # @type: map
   extraEnvironmentVars: {}
+
+# Configures the AI Inference Model feature for Consul service mesh.
+# When enabled, an interceptor sidecar is injected alongside application
+# pods to handle AI inference traffic (e.g. proxying OpenAI-compatible calls).
+ai:
+  # Enables the AI controllers and CRDs. When false:
+  #   - The InferenceModelConfig CRD is not installed.
+  #   - The post-install Job, ServiceAccount, ClusterRole, and ClusterRoleBinding
+  #     are not created.
+  #   - The connect-inject controller does NOT start the InferenceModelConfig watcher.
+  # OBO sidecars are not affected by this setting. They are injected into
+  # any pod with the consul.hashicorp.com/ai-role=ai-agent annotation.
+  # @type: boolean
+  enabled: false
+
+  inferenceModel:
+    defaults:
+      # The port the interceptor container listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21101
+
+      # The base URL path forwarded to the upstream LLM endpoint.
+      # @type: string
+      inferencePath: "/v1"
+
+      # The wire protocol used to communicate with the upstream LLM.
+      # Supported values: "openai", "anthropic", "bedrock"
+      # @type: string
+      inferenceProtocol: "openai"
+
+      # Resource requests and limits for the AI interceptor init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "500m"
+        limits:
+          memory: "512Mi"
+          cpu: "1000m"
+
+  mcpServer:
+    # The container image for the MCP server sidecar injected by the webhook
+    # into pods annotated with consul.hashicorp.com/ai-role: "mcp-server".
+    #
+    # @default: ""
+    # @type: string
+    # TODO: this is yet to be implemented
+    image: "hashicorp/consul-mcp-gateway:2.1.0-rc1"
+
+    defaults:
+      # The port the MCP server container listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21102
+
+      # MCP wire transport: streamable-http | sse | stdio
+      # @type: string
+      transport: "streamable-http"
+
+      # HTTP path the MCP server listens on.
+      # @type: string
+      path: "/mcp"
+
+      # MCP protocol version the server advertises.
+      # @type: string
+      protocolVersion: "2025-03-26"
+
+      # Resource requests and limits for the MCP server init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+
+  inferenceGateway:
+    # Enable the InferenceGateway feature. When false, the CRD is not installed
+    # and its controller and Consul cache are not started. No InferenceGateway
+    # objects are rendered regardless of the gateways list.
+    # Requires ai.enabled=true and connectInject.enabled=true.
+    # @type: boolean
+    enabled: false
+
+    # The container image used by the InferenceGateway Deployment.
+    # The controller creates one Deployment per InferenceGateway resource in the
+    # cluster; this image is the process that receives inference traffic and
+    # forwards it to the backing InferencePoolConfig backends.
+    #
+    # Examples:
+    #
+    # ```yaml
+    # image: "hashicorp/consul-inference-gateway:0.1.0"
+    # image: "myregistry/my-inference-gateway:latest"
+    # ```
+    # @default: hashicorp/consul-inference-gateway:<latest version>
+    # @type: string
+    image: "hashicorp/consul-inference-gateway:2.1.0-rc1"
+
+    # Default values applied to every gateway in the gateways list below unless
+    # overridden on the individual gateway entry.
+    defaults:
+      # Number of replicas for each InferenceGateway Deployment.
+      # An explicit per-gateway replicas value, including zero, overrides this default.
+      # @type: integer
+      replicas: 1
+
+      # Service configuration for the ClusterIP Service fronting each gateway.
+      service:
+        # Kubernetes Service type.
+        # @type: string
+        type: ClusterIP
+
+        # Ports exposed by the Service.
+        # @type: array<map>
+        ports:
+          - port: 8443
+
+      # Resource requests and limits for the InferenceGateway Deployment containers.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+
+    # List of InferenceGateway instances to create. Each entry must have a
+    # unique `name` and may override any field from `defaults` above.
+    # The Helm chart renders one InferenceGateway CRD object per entry.
+    # The controller then reconciles each into a Deployment, Service, and
+    # Consul ai-gateway config entry. The gateway name is used directly for
+    # the Consul service/config entry and ServiceAccount identity.
+    # The service and config entry both use the destination Consul namespace,
+    # or the mirrored Kubernetes namespace (including mirroringK8SPrefix).
+    # With namespace mirroring, same-named gateways in different Kubernetes
+    # namespaces are independent; use the gateway name and mirrored Consul
+    # namespace in service intentions. In OSS or a shared destination namespace,
+    # gateway names must be unique: a conflicting gateway is rejected before
+    # its Deployment is created and cannot overwrite or delete the owner's entry.
+    #
+    # Example:
+    #
+    # ```yaml
+    # gateways:
+    #   - name: travel-inference-pool
+    #     poolRef:
+    #       name: travel-inference-pool  # optional: defaults to .name
+    #     replicas: 3
+    #     service:
+    #       type: ClusterIP
+    #       ports:
+    #         - port: 8443
+    #     resources:
+    #       requests:
+    #         memory: "256Mi"
+    #         cpu: "500m"
+    #       limits:
+    #         memory: "512Mi"
+    #         cpu: "1000m"
+    # ```
+    # @type: array<map>
+    gateways: []
+
+  agent:
+    # Multi-binary image for the AI sidecar (consul-mcp-sc): MCP + OBO in one
+    # container. When set and a pod carries consul.hashicorp.com/ai-role:
+    # "ai-agent", the webhook injects this image alongside consul-dataplane.
+    #
+    # Examples:
+    #
+    # ```yaml
+    # image: "hashicorp/consul-mcp-sc:0.1.0"
+    # image: "myregistry/consul-mcp-sc:latest"
+    # ```
+    # @default: "hashicorp/consul-mcp-sc:2.1.0-rc1"
+    # @type: string
+    image: "hashicorp/consul-mcp-sc:2.1.0-rc1"
+
+    defaults:
+      # The port the agent interceptor listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21101
+
+      # TCP port used for MCP connectivity within the pod.
+      # @type: integer
+      mcpPort: 15101
+
+      # Human-in-the-loop (HITL) approval settings.
+      hitl:
+        # TCP port the HITL approval server listens on inside the pod.
+        # @type: integer
+        port: 16101
+
+        # Duration the agent waits for a human approval before timing out.
+        # @type: string
+        approvalTimeout: "60s"
+
+      # Resource requests and limits for the agent init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"

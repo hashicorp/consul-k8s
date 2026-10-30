@@ -334,7 +334,7 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`spec.services[0]: Invalid value: []v1alpha1.ServiceConsumer{}: service must have at least 1 consumer.`,
+				`service must have at least 1 consumer.`,
 			},
 		},
 		"both partition and peer name specified": {
@@ -539,9 +539,9 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"second", Peer:"second-peer", SamenessGroup:""}: service consumer must define at most one of Peer, Partition, or SamenessGroup`,
-				`spec.services[0].consumers[1]: Invalid value: v1alpha1.ServiceConsumer{Partition:"", Peer:"", SamenessGroup:""}: service consumer must define at least one of Peer, Partition, or SamenessGroup`,
-				`spec.services[0].consumers[2]: Invalid value: v1alpha1.ServiceConsumer{Partition:"partition2", Peer:"", SamenessGroup:"sg2"}: service consumer must define at most one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[0]: Invalid value: {"partition":"second","peer":"second-peer"}: service consumer must define at most one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[1]: Invalid value: {}: service consumer must define at least one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[2]: Invalid value: {"partition":"partition2","samenessGroup":"sg2"}: service consumer must define at most one of Peer, Partition, or SamenessGroup`,
 			},
 		},
 	}

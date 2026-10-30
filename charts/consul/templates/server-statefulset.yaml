@@ -12,6 +12,8 @@
 {{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
 {{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
 {{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if (and .Values.global.globalRegistry.tokenSecretName (not .Values.global.globalRegistry.tokenSecretKey)) }}{{fail "globalRegistry.tokenSecretKey and tokenSecretName must both be specified." }}{{ end -}}
+{{- if (and (not .Values.global.globalRegistry.tokenSecretName) .Values.global.globalRegistry.tokenSecretKey) }}{{fail "globalRegistry.tokenSecretKey and tokenSecretName must both be specified." }}{{ end -}}
 {{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
 {{- if (and (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.bootstrapToken.secretKey) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
 {{- if .Values.server.snapshotAgent.enabled -}}
@@ -260,6 +262,11 @@ spec:
           secret:
             secretName: {{ .Values.global.enterpriseLicense.secretName }}
         {{- end }}
+        {{- if (and .Values.global.globalRegistry.enabled .Values.global.globalRegistry.tokenSecretName .Values.global.globalRegistry.tokenSecretKey) }}
+        - name: consul-global-registry-token
+          secret:
+            secretName: {{ .Values.global.globalRegistry.tokenSecretName }}
+        {{- end }}
         {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
         - name: vault-ca
           secret:
@@ -356,7 +363,6 @@ spec:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
           {{ template "consul.imagePullPolicy" . }}
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
@@ -441,6 +447,10 @@ spec:
               {{- $cert | nindent 14 }}
               EOF
               {{- end }}
+              {{- if and .Values.global.secretsBackend.vault.enabled .Values.server.serverCert.secretName }}
+              cp /vault/secrets/serverca.crt /trusted-cas/custom-ca-server.pem
+              {{- end }}
+              {{- include "consul.trustedCAsRehash" . | nindent 14 }}
               {{- end }}
 
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
@@ -508,6 +518,11 @@ spec:
             {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-license
               mountPath: /consul/license
+              readOnly: true
+            {{- end }}
+            {{- if (and .Values.global.globalRegistry.enabled .Values.global.globalRegistry.tokenSecretName .Values.global.globalRegistry.tokenSecretKey) }}
+            - name: consul-global-registry-token
+              mountPath: /consul/global-registry-token
               readOnly: true
             {{- end }}
             {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
@@ -666,6 +681,14 @@ spec:
               {{- else }}
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
               {{- end }}
+            {{- end }}
+            {{- if (and .Values.global.enableConsulNamespaces .Values.connectInject.consulNamespaces.mirroringK8S) }}
+            - name: CONSUL_NAMESPACE
+              value: {{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}{{ .Release.Namespace }}
+            {{- end }}
+            {{- if .Values.global.adminPartitions.enabled }}
+            - name: CONSUL_PARTITION
+              value: {{ .Values.global.adminPartitions.name }}
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server.snapshotAgent | nindent 12 }}
           command:

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package connectinject
 
 import (
@@ -9,21 +6,27 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	v1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	gatewaycommoncustom "github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/common"
+	gatewaycontrollerscustom "github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/controllers"
 	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/catalog/registration"
+	aicontrollers "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/ai"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	controllers "github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -74,6 +77,21 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
 
+	// If partitions are enabled, we know this is Consul Enterprise,
+	// so skip the license check. The license endpoint requires operator:read
+	// which is not allowed in partition-scoped ACL policies.
+	var isEnterpriseDistribution bool
+	if c.flagEnablePartitions {
+		isEnterpriseDistribution = true
+	} else {
+		var err error
+		isEnterpriseDistribution, err = consul.IsEnterpriseDistribution(consulConfig, watcher)
+		if err != nil {
+			setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; multi-port service registrations will remain disabled until a valid license is detected", "error", err)
+			isEnterpriseDistribution = false
+		}
+	}
+
 	if err := (&endpoints.Controller{
 		Client:                     mgr.GetClient(),
 		ConsulClientConfig:         consulConfig,
@@ -99,6 +117,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ReleaseNamespace:           c.flagReleaseNamespace,
 		EnableAutoEncrypt:          c.flagEnableAutoEncrypt,
 		EnableTelemetryCollector:   c.flagEnableTelemetryCollector,
+		IsEnterpriseDistribution:   isEnterpriseDistribution,
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})
@@ -107,8 +126,92 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 
 	// API Gateway Controllers
 	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to register field indexes")
+		setupLog.Error(err, "unable to register field indexes for gateway.networking.k8s.io API")
 		return err
+	}
+
+	if c.flagEnableCustomGatewayCRDController {
+		// register field indexes for consul.hashicorp.com API controllers for custom
+		if err := gatewaycontrollerscustom.RegisterFieldIndexes(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to register field indexes for consul.hashicorp.com API ")
+			return err
+		}
+		// custom config controller
+		if err := (&gatewaycontrollerscustom.CustomGatewayClassConfigController{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controller").WithName("custom-gateways"),
+		}).SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollerscustom.CustomGatewayClassConfigController{})
+			return err
+		}
+
+		// custom gatewayclass controller
+		if err := (&gatewaycontrollerscustom.CustomGatewayClassController{
+			ControllerName: gatewaycommoncustom.GatewayClassControllerName,
+			Client:         mgr.GetClient(),
+			Log:            ctrl.Log.WithName("controllers").WithName("CustomGatewayClass"),
+		}).SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "CustomGatewayClass")
+			return err
+		}
+
+		// custom gateway controller
+		customcache, customcleaner, err := gatewaycontrollerscustom.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollerscustom.CustomGatewayControllerConfig{
+			HelmConfig: gatewaycommoncustom.HelmConfig{
+				ConsulConfig: gatewaycommoncustom.ConsulConfig{
+					Address:    c.consul.Addresses,
+					GRPCPort:   consulConfig.GRPCPort,
+					HTTPPort:   consulConfig.HTTPPort,
+					APITimeout: consulConfig.APITimeout,
+				},
+				ImageDataplane:              c.flagConsulDataplaneImage,
+				ImageConsulK8S:              c.flagConsulK8sImage,
+				ImagePullSecrets:            cfgFile.ImagePullSecrets,
+				GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
+				ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
+				NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
+				EnableNamespaces:            c.flagEnableNamespaces,
+				PeeringEnabled:              c.flagEnablePeering,
+				EnableOpenShift:             c.flagEnableOpenShift,
+				EnableNamespaceMirroring:    c.flagEnableK8SNSMirroring,
+				AuthMethod:                  c.consul.ConsulLogin.AuthMethod,
+				LogLevel:                    c.flagLogLevel,
+				LogJSON:                     c.flagLogJSON,
+				TLSEnabled:                  c.consul.UseTLS,
+				ConsulTLSServerName:         c.consul.TLSServerName,
+				ConsulPartition:             c.consul.Partition,
+				ConsulCACert:                string(c.caCertPem),
+				EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+				EnableGatewayScaling:        c.flagEnableGatewayScaling,
+				DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+				DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+				InitContainerResources:      &c.initContainerResources,
+			},
+			AllowK8sNamespacesSet: allowK8sNamespaces,
+			DenyK8sNamespacesSet:  denyK8sNamespaces,
+			ConsulClientConfig:    consulConfig,
+			ConsulServerConnMgr:   watcher,
+			ConsulMeta: apicommon.ConsulMeta{
+				IsEnterpriseDistribution: isEnterpriseDistribution,
+			},
+			NamespacesEnabled:       c.flagEnableNamespaces,
+			CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
+			Partition:               c.consul.Partition,
+			Datacenter:              c.consul.Datacenter,
+		})
+		if err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Gateway")
+			return err
+		}
+
+		go customcache.Run(ctx)
+		go customcleaner.Run(ctx)
+
+		// wait for the cache to fill
+		setupLog.Info("waiting for Consul custom cache sync")
+		customcache.WaitSynced(ctx)
+		setupLog.Info("Consul custom cache synced")
+
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassConfigController{
@@ -117,6 +220,80 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
 		return err
+	}
+
+	// AI controllers — only registered when ai.enabled=true.
+	// When false: no watches are set up, no RBAC is consumed, the CRDs are not installed.
+	if c.flagEnableAI {
+		if err := (&aicontrollers.InferenceModelConfigController{
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("inference-model-config"),
+			Recorder: mgr.GetEventRecorderFor("inferencemodelconfig-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferenceModelConfig")
+			return err
+		}
+		if err := (&aicontrollers.McpServerConfigController{
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("mcp-server-config"),
+			Recorder: mgr.GetEventRecorderFor("mcpserverconfig-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "McpServerConfig")
+			return err
+		}
+		if err := (&aicontrollers.AgentConfigController{
+			Client:   mgr.GetClient(),
+			Recorder: mgr.GetEventRecorderFor("agentconfig-controller"),
+			Log:      ctrl.Log.WithName("controller").WithName("agent-config"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "AgentConfig")
+			return err
+		}
+		if err := (&aicontrollers.InferencePoolConfigController{
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("inference-pool-config"),
+			Recorder: mgr.GetEventRecorderFor("inferencepoolconfig-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferencePoolConfig")
+			return err
+		}
+	}
+
+	// Match the chart's InferenceGateway CRD gate before starting its watches or cache.
+	if c.flagEnableAI && c.flagEnableAIInferenceGateway {
+		defaultResources, err := c.inferenceGatewayDefaultResources()
+		if err != nil {
+			setupLog.Error(err, "invalid AI inference gateway default resource flag")
+			return err
+		}
+		if err := (&aicontrollers.InferenceGatewayController{
+			Client:                 mgr.GetClient(),
+			Log:                    ctrl.Log.WithName("controller").WithName("inference-gateway"),
+			Recorder:               mgr.GetEventRecorderFor("inferencegateway-controller"),
+			GatewayImage:           c.flagAIInferenceGatewayImage,
+			DataplaneImage:         c.flagConsulDataplaneImage,
+			ConsulK8SImage:         c.flagConsulK8sImage,
+			DefaultService:         c.inferenceGatewayDefaultService(),
+			DefaultResources:       defaultResources,
+			ConsulClientConfig:     consulConfig,
+			ConsulServerConnMgr:    watcher,
+			ConsulAddress:          c.consul.Addresses,
+			ConsulTLSEnabled:       c.consul.UseTLS,
+			ConsulCACert:           string(c.caCertPem),
+			ConsulTLSServerName:    c.consul.TLSServerName,
+			ConsulPartition:        c.consul.Partition,
+			ConsulNamespace:        c.flagConsulDestinationNamespace,
+			EnableConsulNamespaces: c.flagEnableNamespaces,
+			EnableK8SNSMirroring:   c.flagEnableK8SNSMirroring,
+			EnableOpenShift:        c.flagEnableOpenShift,
+			NSMirroringPrefix:      c.flagK8SNSMirroringPrefix,
+			CrossNSACLPolicy:       c.flagCrossNamespaceACLPolicy,
+			Datacenter:             c.consul.Datacenter,
+			AuthMethod:             c.flagACLAuthMethod,
+		}).SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferenceGateway")
+			return err
+		}
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassController{
@@ -154,18 +331,23 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			ConsulPartition:             c.consul.Partition,
 			ConsulCACert:                string(c.caCertPem),
 			EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+			EnableGatewayScaling:        c.flagEnableGatewayScaling,
 			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 			InitContainerResources:      &c.initContainerResources,
 		},
-		AllowK8sNamespacesSet:   allowK8sNamespaces,
-		DenyK8sNamespacesSet:    denyK8sNamespaces,
-		ConsulClientConfig:      consulConfig,
-		ConsulServerConnMgr:     watcher,
+		AllowK8sNamespacesSet: allowK8sNamespaces,
+		DenyK8sNamespacesSet:  denyK8sNamespaces,
+		ConsulClientConfig:    consulConfig,
+		ConsulServerConnMgr:   watcher,
+		ConsulMeta: apicommon.ConsulMeta{
+			IsEnterpriseDistribution: isEnterpriseDistribution,
+		},
 		NamespacesEnabled:       c.flagEnableNamespaces,
 		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 		Partition:               c.consul.Partition,
 		Datacenter:              c.consul.Datacenter,
+		EnableTCP:               c.flagEnableTCPRoute,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
@@ -190,6 +372,23 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 		ConsulPartition:            c.consul.Partition,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+	}
+
+	globalConfigEntryReconciler := configEntryReconciler
+	if c.flagGlobalConfigACLToken != "" {
+		globalConfigEntryReconciler = &controllers.ConfigEntryController{
+			ConsulClientConfig:         consulConfig,
+			ConsulServerConnMgr:        watcher,
+			DatacenterName:             c.consul.Datacenter,
+			EnableConsulNamespaces:     c.flagEnableNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+			ConsulPartition:            c.consul.Partition,
+			CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+			ACLTokenOverride:           c.flagGlobalConfigACLToken,
+		}
+		setupLog.Info("using dedicated ACL token for global config entry controllers")
 	}
 	if err := (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
@@ -279,6 +478,8 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		NamespacesEnabled:     c.flagEnableNamespaces,
 		PartitionsEnabled:     c.flagEnablePartitions,
 		Scheme:                mgr.GetScheme(),
+		ReleaseName:           c.flagReleaseName,
+		ReleaseNamespace:      c.flagReleaseNamespace,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.TerminatingGateway)
 		return err
@@ -310,7 +511,15 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ControlPlaneRequestLimit)
 		return err
 	}
-
+	if err := (&controllers.RateLimitController{
+		ConfigEntryController: globalConfigEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.RateLimit),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.RateLimit)
+		return err
+	}
 	if err := (&registration.RegistrationsController{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -370,10 +579,13 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ConsulServerConnMgr:                       watcher,
 		ImageConsul:                               c.flagConsulImage,
 		ImageConsulDataplane:                      c.flagConsulDataplaneImage,
+		ImageMCPServer:                            c.flagAIMCPServerImage,
+		ImageAIAgent:                              c.flagAIAgentImage,
 		EnvoyExtraArgs:                            c.flagEnvoyExtraArgs,
 		ImageConsulK8S:                            c.flagConsulK8sImage,
 		GlobalImagePullPolicy:                     c.flagGlobalImagePullPolicy,
 		RequireAnnotation:                         !c.flagDefaultInject,
+		DisableMultiportRegistration:              c.flagDisableMultiportRegistration,
 		AuthMethod:                                c.flagACLAuthMethod,
 		ConsulCACert:                              string(c.caCertPem),
 		TLSEnabled:                                c.consul.UseTLS,
@@ -413,12 +625,13 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}).SetupWithManager(mgr)
 
 	consulMeta := apicommon.ConsulMeta{
-		PartitionsEnabled:    c.flagEnablePartitions,
-		Partition:            c.consul.Partition,
-		NamespacesEnabled:    c.flagEnableNamespaces,
-		DestinationNamespace: c.flagConsulDestinationNamespace,
-		Mirroring:            c.flagEnableK8SNSMirroring,
-		Prefix:               c.flagK8SNSMirroringPrefix,
+		IsEnterpriseDistribution: isEnterpriseDistribution,
+		PartitionsEnabled:        c.flagEnablePartitions,
+		Partition:                c.consul.Partition,
+		NamespacesEnabled:        c.flagEnableNamespaces,
+		DestinationNamespace:     c.flagConsulDestinationNamespace,
+		Mirroring:                c.flagEnableK8SNSMirroring,
+		Prefix:                   c.flagK8SNSMirroringPrefix,
 	}
 
 	// Note: The path here should be identical to the one on the kubebuilder
@@ -501,9 +714,24 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 
+	(&v1alpha1.RateLimitWebhook{
+		Client:                  mgr.GetClient(),
+		Logger:                  ctrl.Log.WithName("webhooks").WithName(apicommon.RateLimit),
+		ConsulMeta:              consulMeta,
+		EnableACLs:              c.flagACLAuthMethod != "",
+		EnablePartitions:        c.flagEnablePartitions,
+		HasGlobalConfigACLToken: c.flagGlobalConfigACLToken != "",
+	}).SetupWithManager(mgr)
+
 	(&v1alpha1.GatewayPolicyWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.GatewayPolicy),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.CustomGatewayPolicyWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.CustomGatewayPolicy),
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 
@@ -536,4 +764,70 @@ func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// inferenceGatewayDefaultService builds the DefaultService value for the
+// InferenceGatewayController from the CLI flags that mirror
+// ai.inferenceGateway.defaults.service in values.yaml.
+func (c *Command) inferenceGatewayDefaultService() v1alpha1.InferenceGatewayService {
+	svcType := v1.ServiceTypeClusterIP
+	if c.flagAIInferenceGatewayDefaultServiceType != "" {
+		svcType = v1.ServiceType(c.flagAIInferenceGatewayDefaultServiceType)
+	}
+	port := int32(c.flagAIInferenceGatewayDefaultServicePort)
+	if port <= 0 {
+		port = 8443
+	}
+	return v1alpha1.InferenceGatewayService{
+		Type:  svcType,
+		Ports: []v1alpha1.InferenceGatewayServicePort{{Port: port}},
+	}
+}
+
+// inferenceGatewayDefaultResources builds the DefaultResources value for the
+// InferenceGatewayController from the CLI flags that mirror
+// ai.inferenceGateway.defaults.resources in values.yaml.
+// Any flag left empty is omitted from the resource list.
+// Returns an error if any flag value is not a valid Kubernetes resource quantity.
+func (c *Command) inferenceGatewayDefaultResources() (v1.ResourceRequirements, error) {
+	req := v1.ResourceList{}
+	lim := v1.ResourceList{}
+
+	if c.flagAIInferenceGatewayDefaultCPURequest != "" {
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultCPURequest)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-cpu-request %q: %w", c.flagAIInferenceGatewayDefaultCPURequest, err)
+		}
+		req[v1.ResourceCPU] = q
+	}
+	if c.flagAIInferenceGatewayDefaultMemRequest != "" {
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultMemRequest)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-mem-request %q: %w", c.flagAIInferenceGatewayDefaultMemRequest, err)
+		}
+		req[v1.ResourceMemory] = q
+	}
+	if c.flagAIInferenceGatewayDefaultCPULimit != "" {
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultCPULimit)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-cpu-limit %q: %w", c.flagAIInferenceGatewayDefaultCPULimit, err)
+		}
+		lim[v1.ResourceCPU] = q
+	}
+	if c.flagAIInferenceGatewayDefaultMemLimit != "" {
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultMemLimit)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-mem-limit %q: %w", c.flagAIInferenceGatewayDefaultMemLimit, err)
+		}
+		lim[v1.ResourceMemory] = q
+	}
+
+	res := v1.ResourceRequirements{}
+	if len(req) > 0 {
+		res.Requests = req
+	}
+	if len(lim) > 0 {
+		res.Limits = lim
+	}
+	return res, nil
 }

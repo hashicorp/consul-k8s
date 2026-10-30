@@ -24,8 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	logrtest "github.com/go-logr/logr/testing"
 
@@ -37,15 +36,15 @@ import (
 
 type fakeReferenceValidator struct{}
 
-func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
+func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1.SecretObjectReference) bool {
 	return true
 }
 
-func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
+func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1.BackendRef) bool {
 	return true
 }
 
-func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
+func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1.TCPRoute, backendRef gwv1.BackendRef) bool {
 	return true
 }
 
@@ -164,41 +163,41 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 	testCases := map[string]struct {
 		annotations            map[string]string
 		expectedGWName         string
-		listenerOneK8sCertRefs []gwv1beta1.SecretObjectReference
-		listenerOneTLSOptions  map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue
+		listenerOneK8sCertRefs []gwv1.SecretObjectReference
+		listenerOneTLSOptions  map[gwv1.AnnotationKey]gwv1.AnnotationValue
 	}{
 		"gw name": {
 			annotations:    make(map[string]string),
 			expectedGWName: k8sObjectName,
-			listenerOneK8sCertRefs: []gwv1beta1.SecretObjectReference{
+			listenerOneK8sCertRefs: []gwv1.SecretObjectReference{
 				{
-					Name:      gwv1beta1.ObjectName(listenerOneCertName),
-					Namespace: PointerTo(gwv1beta1.Namespace(listenerOneCertK8sNamespace)),
+					Name:      gwv1.ObjectName(listenerOneCertName),
+					Namespace: PointerTo(gwv1.Namespace(listenerOneCertK8sNamespace)),
 				},
 			},
-			listenerOneTLSOptions: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
-				TLSMaxVersionAnnotationKey:   gwv1beta1.AnnotationValue(listenerOneMaxVersion),
-				TLSMinVersionAnnotationKey:   gwv1beta1.AnnotationValue(listenerOneMinVersion),
-				TLSCipherSuitesAnnotationKey: gwv1beta1.AnnotationValue(strings.Join(listenerOneCipherSuites, ",")),
+			listenerOneTLSOptions: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+				TLSMaxVersionAnnotationKey:   gwv1.AnnotationValue(listenerOneMaxVersion),
+				TLSMinVersionAnnotationKey:   gwv1.AnnotationValue(listenerOneMinVersion),
+				TLSCipherSuitesAnnotationKey: gwv1.AnnotationValue(strings.Join(listenerOneCipherSuites, ",")),
 			},
 		},
 		"when k8s has certs that are not referenced in consul": {
 			annotations:    make(map[string]string),
 			expectedGWName: k8sObjectName,
-			listenerOneK8sCertRefs: []gwv1beta1.SecretObjectReference{
+			listenerOneK8sCertRefs: []gwv1.SecretObjectReference{
 				{
-					Name:      gwv1beta1.ObjectName(listenerOneCertName),
-					Namespace: PointerTo(gwv1beta1.Namespace(listenerOneCertK8sNamespace)),
+					Name:      gwv1.ObjectName(listenerOneCertName),
+					Namespace: PointerTo(gwv1.Namespace(listenerOneCertK8sNamespace)),
 				},
 				{
-					Name:      gwv1beta1.ObjectName("cert that won't exist in the translated type"),
-					Namespace: PointerTo(gwv1beta1.Namespace(listenerOneCertK8sNamespace)),
+					Name:      gwv1.ObjectName("cert that won't exist in the translated type"),
+					Namespace: PointerTo(gwv1.Namespace(listenerOneCertK8sNamespace)),
 				},
 			},
-			listenerOneTLSOptions: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
-				TLSMaxVersionAnnotationKey:   gwv1beta1.AnnotationValue(listenerOneMaxVersion),
-				TLSMinVersionAnnotationKey:   gwv1beta1.AnnotationValue(listenerOneMinVersion),
-				TLSCipherSuitesAnnotationKey: gwv1beta1.AnnotationValue(strings.Join(listenerOneCipherSuites, ",")),
+			listenerOneTLSOptions: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+				TLSMaxVersionAnnotationKey:   gwv1.AnnotationValue(listenerOneMaxVersion),
+				TLSMinVersionAnnotationKey:   gwv1.AnnotationValue(listenerOneMinVersion),
+				TLSCipherSuitesAnnotationKey: gwv1.AnnotationValue(strings.Join(listenerOneCipherSuites, ",")),
 			},
 		},
 	}
@@ -208,7 +207,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			input := gwv1beta1.Gateway{
+			input := gwv1.Gateway{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "Gateway",
 				},
@@ -217,68 +216,68 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 					Namespace:   k8sNamespace,
 					Annotations: tc.annotations,
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
-							Name:     gwv1beta1.SectionName(listenerOneName),
-							Hostname: PointerTo(gwv1beta1.Hostname(listenerOneHostname)),
-							Port:     gwv1beta1.PortNumber(listenerOnePort),
-							Protocol: gwv1beta1.ProtocolType(listenerOneProtocol),
-							TLS: &gwv1beta1.GatewayTLSConfig{
+							Name:     gwv1.SectionName(listenerOneName),
+							Hostname: PointerTo(gwv1.Hostname(listenerOneHostname)),
+							Port:     gwv1.PortNumber(listenerOnePort),
+							Protocol: gwv1.ProtocolType(listenerOneProtocol),
+							TLS: &gwv1.ListenerTLSConfig{
 								CertificateRefs: tc.listenerOneK8sCertRefs,
 								Options:         tc.listenerOneTLSOptions,
 							},
 						},
 						{
-							Name:     gwv1beta1.SectionName(listenerTwoName),
-							Hostname: PointerTo(gwv1beta1.Hostname(listenerTwoHostname)),
-							Port:     gwv1beta1.PortNumber(listenerTwoPort),
-							Protocol: gwv1beta1.ProtocolType(listenerTwoProtocol),
-							TLS: &gwv1beta1.GatewayTLSConfig{
-								CertificateRefs: []gwv1beta1.SecretObjectReference{
+							Name:     gwv1.SectionName(listenerTwoName),
+							Hostname: PointerTo(gwv1.Hostname(listenerTwoHostname)),
+							Port:     gwv1.PortNumber(listenerTwoPort),
+							Protocol: gwv1.ProtocolType(listenerTwoProtocol),
+							TLS: &gwv1.ListenerTLSConfig{
+								CertificateRefs: []gwv1.SecretObjectReference{
 									{
-										Name:      gwv1beta1.ObjectName(listenerTwoCertName),
-										Namespace: PointerTo(gwv1beta1.Namespace(listenerTwoCertK8sNamespace)),
+										Name:      gwv1.ObjectName(listenerTwoCertName),
+										Namespace: PointerTo(gwv1.Namespace(listenerTwoCertK8sNamespace)),
 									},
 								},
 							},
 						},
 					},
 				},
-				Status: gwv1beta1.GatewayStatus{
+				Status: gwv1.GatewayStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:               string(gwv1beta1.GatewayConditionAccepted),
+							Type:               string(gwv1.GatewayConditionAccepted),
 							Status:             metav1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: gwLastTransmissionTime},
-							Reason:             string(gwv1beta1.GatewayReasonAccepted),
+							Reason:             string(gwv1.GatewayReasonAccepted),
 							Message:            "I'm accepted",
 						},
 					},
-					Listeners: []gwv1beta1.ListenerStatus{
+					Listeners: []gwv1.ListenerStatus{
 						{
-							Name:           gwv1beta1.SectionName(listenerOneName),
+							Name:           gwv1.SectionName(listenerOneName),
 							AttachedRoutes: 5,
 							Conditions: []metav1.Condition{
 								{
-									Type:               string(gwv1beta1.GatewayConditionReady),
+									Type:               string(gwv1.GatewayConditionReady),
 									Status:             metav1.ConditionTrue,
 									LastTransitionTime: metav1.Time{Time: listenerOneLastTransmissionTime},
-									Reason:             string(gwv1beta1.GatewayConditionReady),
+									Reason:             string(gwv1.GatewayConditionReady),
 									Message:            "I'm ready",
 								},
 							},
 						},
 
 						{
-							Name:           gwv1beta1.SectionName(listenerTwoName),
+							Name:           gwv1.SectionName(listenerTwoName),
 							AttachedRoutes: 3,
 							Conditions: []metav1.Condition{
 								{
-									Type:               string(gwv1beta1.GatewayConditionReady),
+									Type:               string(gwv1.GatewayConditionReady),
 									Status:             metav1.ConditionTrue,
 									LastTransitionTime: metav1.Time{Time: listenerTwoLastTransmissionTime},
-									Reason:             string(gwv1beta1.GatewayConditionReady),
+									Reason:             string(gwv1.GatewayConditionReady),
 									Message:            "I'm also ready",
 								},
 							},
@@ -355,10 +354,113 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 	}
 }
 
+func TestTranslator_ToAPIGateway_GatewayLevelTLS(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		annotations map[string]string
+		expectedTLS api.GatewayTLSConfig
+	}{
+		"tls-enabled=true sets gateway-level TLS.Enabled": {
+			annotations: map[string]string{AnnotationTLSEnabled: TLSEnabledValue},
+			expectedTLS: api.GatewayTLSConfig{Enabled: true},
+		},
+		"no annotation leaves gateway-level TLS at zero value": {
+			annotations: map[string]string{},
+			expectedTLS: api.GatewayTLSConfig{},
+		},
+		"unrecognized value leaves gateway-level TLS at zero value": {
+			annotations: map[string]string{AnnotationTLSEnabled: "yes"},
+			expectedTLS: api.GatewayTLSConfig{},
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			input := gwv1.Gateway{
+				TypeMeta:   metav1.TypeMeta{Kind: "Gateway"},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-gw", Namespace: "ns", Annotations: tc.annotations},
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
+						{
+							Name:     gwv1.SectionName("https"),
+							Port:     gwv1.PortNumber(8443),
+							Protocol: gwv1.ProtocolType("HTTPS"),
+							TLS:      &gwv1.ListenerTLSConfig{},
+						},
+					},
+				},
+			}
+
+			translator := ResourceTranslator{}
+			resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+
+			actual := translator.ToAPIGateway(input, resources, &v1alpha1.GatewayClassConfig{})
+
+			require.Equal(t, tc.expectedTLS, actual.TLS)
+		})
+	}
+}
+
+func TestTranslator_ToAPIGateway_TLSWithSDS(t *testing.T) {
+	t.Parallel()
+	translator := ResourceTranslator{
+		EnableConsulNamespaces: true,
+		EnableK8sMirroring:     true,
+	}
+
+	gateway := gwv1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "api-gateway",
+			Namespace: "default",
+			Annotations: map[string]string{
+				TLSSDSClusterNameAnnotationKey:  "gateway-sds",
+				TLSSDSCertResourceAnnotationKey: "default-cert",
+			},
+		},
+		Spec: gwv1.GatewaySpec{
+			Listeners: []gwv1.Listener{
+				{
+					Name:     "gateway-default-sds",
+					Port:     8443,
+					Protocol: gwv1.HTTPSProtocolType,
+					TLS:      &gwv1.ListenerTLSConfig{},
+				},
+				{
+					Name:     "listener-override-sds",
+					Port:     9443,
+					Protocol: gwv1.HTTPSProtocolType,
+					TLS: &gwv1.ListenerTLSConfig{Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+						gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "listener-sds",
+						gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
+					}},
+				},
+			},
+		},
+	}
+
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+	translated := translator.ToAPIGateway(gateway, resources, &v1alpha1.GatewayClassConfig{})
+
+	require.Len(t, translated.Listeners, 2)
+	require.NotNil(t, translated.Listeners[0].TLS.SDS)
+	require.Equal(t, "gateway-sds", translated.Listeners[0].TLS.SDS.ClusterName)
+	require.Equal(t, "default-cert", translated.Listeners[0].TLS.SDS.CertResource)
+	require.Empty(t, translated.Listeners[0].TLS.Certificates)
+
+	require.NotNil(t, translated.Listeners[1].TLS.SDS)
+	require.Equal(t, "listener-sds", translated.Listeners[1].TLS.SDS.ClusterName)
+	require.Equal(t, "listener-cert", translated.Listeners[1].TLS.SDS.CertResource)
+	require.Empty(t, translated.Listeners[1].TLS.Certificates)
+}
+
 func TestTranslator_ToHTTPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		k8sHTTPRoute    gwv1beta1.HTTPRoute
+		k8sHTTPRoute    gwv1.HTTPRoute
 		services        []types.NamespacedName
 		meshServices    []v1alpha1.MeshService
 		externalFilters []client.Object
@@ -370,56 +472,56 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 	}{
 		"base test": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "k8s-http-route",
 						Namespace:   "k8s-ns",
 						Annotations: map[string]string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
-						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-							ParentRefs: []gwv1beta1.ParentReference{
+					Spec: gwv1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
 								{
-									Namespace:   PointerTo(gwv1beta1.Namespace("k8s-gw-ns")),
-									Name:        gwv1beta1.ObjectName("api-gw"),
-									Kind:        PointerTo(gwv1beta1.Kind("Gateway")),
-									SectionName: PointerTo(gwv1beta1.SectionName("listener-1")),
+									Namespace:   PointerTo(gwv1.Namespace("k8s-gw-ns")),
+									Name:        gwv1.ObjectName("api-gw"),
+									Kind:        PointerTo(gwv1.Kind("Gateway")),
+									SectionName: PointerTo(gwv1.SectionName("listener-1")),
 								},
 							},
 						},
-						Hostnames: []gwv1beta1.Hostname{
+						Hostnames: []gwv1.Hostname{
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
-										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+										Path: &gwv1.HTTPPathMatch{
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
-										Headers: []gwv1beta1.HTTPHeaderMatch{
+										Headers: []gwv1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
-										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+										QueryParams: []gwv1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
-										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
-											Set: []gwv1beta1.HTTPHeader{
+										RequestHeaderModifier: &gwv1.HTTPHeaderFilter{
+											Set: []gwv1.HTTPHeader{
 												{
 													Name:  "Magic",
 													Value: "v2",
@@ -429,7 +531,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 													Value: "dj khaled",
 												},
 											},
-											Add: []gwv1beta1.HTTPHeader{
+											Add: []gwv1.HTTPHeader{
 												{
 													Name:  "add it on",
 													Value: "the value",
@@ -437,27 +539,27 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											},
 											Remove: []string{"time to go"},
 										},
-										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
-											Path: &gwv1beta1.HTTPPathModifier{
-												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+										URLRewrite: &gwv1.HTTPURLRewriteFilter{
+											Path: &gwv1.HTTPPathModifier{
+												Type:               gwv1.PrefixMatchHTTPPathModifier,
 												ReplacePrefixMatch: PointerTo("v1"),
 											},
 										},
 									},
 								},
-								BackendRefs: []gwv1beta1.HTTPBackendRef{
+								BackendRefs: []gwv1.HTTPBackendRef{
 									{
-										BackendRef: gwv1beta1.BackendRef{
-											BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
 												Name:      "service one",
-												Namespace: PointerTo(gwv1beta1.Namespace("other")),
+												Namespace: PointerTo(gwv1.Namespace("other")),
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
-												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
-													Set: []gwv1beta1.HTTPHeader{
+												RequestHeaderModifier: &gwv1.HTTPHeaderFilter{
+													Set: []gwv1.HTTPHeader{
 														{
 															Name:  "svc - Magic",
 															Value: "svc - v2",
@@ -467,7 +569,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 															Value: "svc - dj khaled",
 														},
 													},
-													Add: []gwv1beta1.HTTPHeader{
+													Add: []gwv1.HTTPHeader{
 														{
 															Name:  "svc - add it on",
 															Value: "svc - the value",
@@ -475,9 +577,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 													},
 													Remove: []string{"svc - time to go"},
 												},
-												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
-													Path: &gwv1beta1.HTTPPathModifier{
-														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												URLRewrite: &gwv1.HTTPURLRewriteFilter{
+													Path: &gwv1.HTTPPathModifier{
+														Type:               gwv1.PrefixMatchHTTPPathModifier,
 														ReplacePrefixMatch: PointerTo("path"),
 													},
 												},
@@ -577,55 +679,55 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 		},
 		"dropping path rewrites that are not prefix match": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "k8s-http-route",
 						Namespace: "k8s-ns",
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
-						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-							ParentRefs: []gwv1beta1.ParentReference{
+					Spec: gwv1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
 								{
-									Namespace:   PointerTo(gwv1beta1.Namespace("k8s-gw-ns")),
-									Name:        gwv1beta1.ObjectName("api-gw"),
-									SectionName: PointerTo(gwv1beta1.SectionName("listener-1")),
-									Kind:        PointerTo(gwv1beta1.Kind("Gateway")),
+									Namespace:   PointerTo(gwv1.Namespace("k8s-gw-ns")),
+									Name:        gwv1.ObjectName("api-gw"),
+									SectionName: PointerTo(gwv1.SectionName("listener-1")),
+									Kind:        PointerTo(gwv1.Kind("Gateway")),
 								},
 							},
 						},
-						Hostnames: []gwv1beta1.Hostname{
+						Hostnames: []gwv1.Hostname{
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
-										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+										Path: &gwv1.HTTPPathMatch{
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
-										Headers: []gwv1beta1.HTTPHeaderMatch{
+										Headers: []gwv1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
-										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+										QueryParams: []gwv1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
-										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
-											Set: []gwv1beta1.HTTPHeader{
+										RequestHeaderModifier: &gwv1.HTTPHeaderFilter{
+											Set: []gwv1.HTTPHeader{
 												{
 													Name:  "Magic",
 													Value: "v2",
@@ -635,7 +737,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 													Value: "dj khaled",
 												},
 											},
-											Add: []gwv1beta1.HTTPHeader{
+											Add: []gwv1.HTTPHeader{
 												{
 													Name:  "add it on",
 													Value: "the value",
@@ -644,27 +746,27 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											Remove: []string{"time to go"},
 										},
 										// THIS IS THE CHANGE
-										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
-											Path: &gwv1beta1.HTTPPathModifier{
-												Type:            gwv1beta1.FullPathHTTPPathModifier,
+										URLRewrite: &gwv1.HTTPURLRewriteFilter{
+											Path: &gwv1.HTTPPathModifier{
+												Type:            gwv1.FullPathHTTPPathModifier,
 												ReplaceFullPath: PointerTo("v1"),
 											},
 										},
 									},
 								},
-								BackendRefs: []gwv1beta1.HTTPBackendRef{
+								BackendRefs: []gwv1.HTTPBackendRef{
 									{
-										BackendRef: gwv1beta1.BackendRef{
-											BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
 												Name:      "service one",
-												Namespace: PointerTo(gwv1beta1.Namespace("some ns")),
+												Namespace: PointerTo(gwv1.Namespace("some ns")),
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
-												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
-													Set: []gwv1beta1.HTTPHeader{
+												RequestHeaderModifier: &gwv1.HTTPHeaderFilter{
+													Set: []gwv1.HTTPHeader{
 														{
 															Name:  "svc - Magic",
 															Value: "svc - v2",
@@ -674,7 +776,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 															Value: "svc - dj khaled",
 														},
 													},
-													Add: []gwv1beta1.HTTPHeader{
+													Add: []gwv1.HTTPHeader{
 														{
 															Name:  "svc - add it on",
 															Value: "svc - the value",
@@ -682,9 +784,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 													},
 													Remove: []string{"svc - time to go"},
 												},
-												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
-													Path: &gwv1beta1.HTTPPathModifier{
-														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												URLRewrite: &gwv1.HTTPURLRewriteFilter{
+													Path: &gwv1.HTTPPathModifier{
+														Type:               gwv1.PrefixMatchHTTPPathModifier,
 														ReplacePrefixMatch: PointerTo("path"),
 													},
 												},
@@ -787,63 +889,63 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 		},
 		"parent ref that is not registered with consul is dropped": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "k8s-http-route",
 						Namespace:   "k8s-ns",
 						Annotations: map[string]string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
-						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-							ParentRefs: []gwv1beta1.ParentReference{
+					Spec: gwv1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
 								{
-									Namespace:   PointerTo(gwv1beta1.Namespace("k8s-gw-ns")),
-									Name:        gwv1beta1.ObjectName("api-gw"),
-									Kind:        PointerTo(gwv1beta1.Kind("Gateway")),
-									SectionName: PointerTo(gwv1beta1.SectionName("listener-1")),
+									Namespace:   PointerTo(gwv1.Namespace("k8s-gw-ns")),
+									Name:        gwv1.ObjectName("api-gw"),
+									Kind:        PointerTo(gwv1.Kind("Gateway")),
+									SectionName: PointerTo(gwv1.SectionName("listener-1")),
 								},
 
 								{
-									Namespace:   PointerTo(gwv1beta1.Namespace("k8s-gw-ns")),
-									Name:        gwv1beta1.ObjectName("consul don't know about me"),
-									Kind:        PointerTo(gwv1beta1.Kind("Gateway")),
-									SectionName: PointerTo(gwv1beta1.SectionName("listener-1")),
+									Namespace:   PointerTo(gwv1.Namespace("k8s-gw-ns")),
+									Name:        gwv1.ObjectName("consul don't know about me"),
+									Kind:        PointerTo(gwv1.Kind("Gateway")),
+									SectionName: PointerTo(gwv1.SectionName("listener-1")),
 								},
 							},
 						},
-						Hostnames: []gwv1beta1.Hostname{
+						Hostnames: []gwv1.Hostname{
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
-										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+										Path: &gwv1.HTTPPathMatch{
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
-										Headers: []gwv1beta1.HTTPHeaderMatch{
+										Headers: []gwv1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
-										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+										QueryParams: []gwv1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
-										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
-											Set: []gwv1beta1.HTTPHeader{
+										RequestHeaderModifier: &gwv1.HTTPHeaderFilter{
+											Set: []gwv1.HTTPHeader{
 												{
 													Name:  "Magic",
 													Value: "v2",
@@ -853,7 +955,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 													Value: "dj khaled",
 												},
 											},
-											Add: []gwv1beta1.HTTPHeader{
+											Add: []gwv1.HTTPHeader{
 												{
 													Name:  "add it on",
 													Value: "the value",
@@ -861,27 +963,27 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											},
 											Remove: []string{"time to go"},
 										},
-										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
-											Path: &gwv1beta1.HTTPPathModifier{
-												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+										URLRewrite: &gwv1.HTTPURLRewriteFilter{
+											Path: &gwv1.HTTPPathModifier{
+												Type:               gwv1.PrefixMatchHTTPPathModifier,
 												ReplacePrefixMatch: PointerTo("v1"),
 											},
 										},
 									},
 								},
-								BackendRefs: []gwv1beta1.HTTPBackendRef{
+								BackendRefs: []gwv1.HTTPBackendRef{
 									{
-										BackendRef: gwv1beta1.BackendRef{
-											BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
 												Name:      "service one",
-												Namespace: PointerTo(gwv1beta1.Namespace("some ns")),
+												Namespace: PointerTo(gwv1.Namespace("some ns")),
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
-												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
-													Set: []gwv1beta1.HTTPHeader{
+												RequestHeaderModifier: &gwv1.HTTPHeaderFilter{
+													Set: []gwv1.HTTPHeader{
 														{
 															Name:  "svc - Magic",
 															Value: "svc - v2",
@@ -891,7 +993,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 															Value: "svc - dj khaled",
 														},
 													},
-													Add: []gwv1beta1.HTTPHeader{
+													Add: []gwv1.HTTPHeader{
 														{
 															Name:  "svc - add it on",
 															Value: "svc - the value",
@@ -899,9 +1001,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 													},
 													Remove: []string{"svc - time to go"},
 												},
-												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
-													Path: &gwv1beta1.HTTPPathModifier{
-														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												URLRewrite: &gwv1.HTTPURLRewriteFilter{
+													Path: &gwv1.HTTPPathModifier{
+														Type:               gwv1.PrefixMatchHTTPPathModifier,
 														ReplacePrefixMatch: PointerTo("path"),
 													},
 												},
@@ -1005,55 +1107,55 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 		},
 		"when section name on apigw is not supplied": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "k8s-http-route",
 						Namespace:   "k8s-ns",
 						Annotations: map[string]string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
-						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-							ParentRefs: []gwv1beta1.ParentReference{
+					Spec: gwv1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
 								{
-									Namespace: PointerTo(gwv1beta1.Namespace("k8s-gw-ns")),
-									Name:      gwv1beta1.ObjectName("api-gw"),
-									Kind:      PointerTo(gwv1beta1.Kind("Gateway")),
+									Namespace: PointerTo(gwv1.Namespace("k8s-gw-ns")),
+									Name:      gwv1.ObjectName("api-gw"),
+									Kind:      PointerTo(gwv1.Kind("Gateway")),
 								},
 							},
 						},
-						Hostnames: []gwv1beta1.Hostname{
+						Hostnames: []gwv1.Hostname{
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
-										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+										Path: &gwv1.HTTPPathMatch{
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
-										Headers: []gwv1beta1.HTTPHeaderMatch{
+										Headers: []gwv1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
-										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+										QueryParams: []gwv1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
-										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
-											Set: []gwv1beta1.HTTPHeader{
+										RequestHeaderModifier: &gwv1.HTTPHeaderFilter{
+											Set: []gwv1.HTTPHeader{
 												{
 													Name:  "Magic",
 													Value: "v2",
@@ -1063,7 +1165,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 													Value: "dj khaled",
 												},
 											},
-											Add: []gwv1beta1.HTTPHeader{
+											Add: []gwv1.HTTPHeader{
 												{
 													Name:  "add it on",
 													Value: "the value",
@@ -1071,46 +1173,46 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											},
 											Remove: []string{"time to go"},
 										},
-										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
-											Path: &gwv1beta1.HTTPPathModifier{
-												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+										URLRewrite: &gwv1.HTTPURLRewriteFilter{
+											Path: &gwv1.HTTPPathModifier{
+												Type:               gwv1.PrefixMatchHTTPPathModifier,
 												ReplacePrefixMatch: PointerTo("v1"),
 											},
 										},
 									},
 								},
-								BackendRefs: []gwv1beta1.HTTPBackendRef{
+								BackendRefs: []gwv1.HTTPBackendRef{
 									{
 										// this ref should get dropped
-										BackendRef: gwv1beta1.BackendRef{
-											BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
 												Name:      "service two",
-												Namespace: PointerTo(gwv1beta1.Namespace("some ns")),
+												Namespace: PointerTo(gwv1.Namespace("some ns")),
 											},
 										},
 									},
 									{
-										BackendRef: gwv1beta1.BackendRef{
-											BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
 												Name:      "some-service-part-three",
-												Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
-												Group:     PointerTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
-												Kind:      PointerTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
+												Namespace: PointerTo(gwv1.Namespace("svc-ns")),
+												Group:     PointerTo(gwv1.Group(v1alpha1.ConsulHashicorpGroup)),
+												Kind:      PointerTo(gwv1.Kind(v1alpha1.MeshServiceKind)),
 											},
 										},
 									},
 									{
-										BackendRef: gwv1beta1.BackendRef{
-											BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
 												Name:      "service one",
-												Namespace: PointerTo(gwv1beta1.Namespace("some ns")),
+												Namespace: PointerTo(gwv1.Namespace("some ns")),
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
-												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
-													Set: []gwv1beta1.HTTPHeader{
+												RequestHeaderModifier: &gwv1.HTTPHeaderFilter{
+													Set: []gwv1.HTTPHeader{
 														{
 															Name:  "svc - Magic",
 															Value: "svc - v2",
@@ -1120,7 +1222,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 															Value: "svc - dj khaled",
 														},
 													},
-													Add: []gwv1beta1.HTTPHeader{
+													Add: []gwv1.HTTPHeader{
 														{
 															Name:  "svc - add it on",
 															Value: "svc - the value",
@@ -1128,9 +1230,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 													},
 													Remove: []string{"svc - time to go"},
 												},
-												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
-													Path: &gwv1beta1.HTTPPathModifier{
-														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												URLRewrite: &gwv1.HTTPURLRewriteFilter{
+													Path: &gwv1.HTTPPathModifier{
+														Type:               gwv1.PrefixMatchHTTPPathModifier,
 														ReplacePrefixMatch: PointerTo("path"),
 													},
 												},
@@ -1246,87 +1348,87 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 		},
 		"test with external filters": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "k8s-http-route",
 						Namespace:   "k8s-ns",
 						Annotations: map[string]string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
-						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-							ParentRefs: []gwv1beta1.ParentReference{
+					Spec: gwv1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
 								{
-									Namespace:   PointerTo(gwv1beta1.Namespace("k8s-gw-ns")),
-									Name:        gwv1beta1.ObjectName("api-gw"),
-									Kind:        PointerTo(gwv1beta1.Kind("Gateway")),
-									SectionName: PointerTo(gwv1beta1.SectionName("listener-1")),
+									Namespace:   PointerTo(gwv1.Namespace("k8s-gw-ns")),
+									Name:        gwv1.ObjectName("api-gw"),
+									Kind:        PointerTo(gwv1.Kind("Gateway")),
+									SectionName: PointerTo(gwv1.SectionName("listener-1")),
 								},
 							},
 						},
-						Hostnames: []gwv1beta1.Hostname{
+						Hostnames: []gwv1.Hostname{
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
-										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+										Path: &gwv1.HTTPPathMatch{
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
-										Headers: []gwv1beta1.HTTPHeaderMatch{
+										Headers: []gwv1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
-										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
+										QueryParams: []gwv1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
-										ExtensionRef: &gwv1beta1.LocalObjectReference{
+										ExtensionRef: &gwv1.LocalObjectReference{
 											Name:  "test",
 											Kind:  v1alpha1.RouteRetryFilterKind,
-											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
+											Group: gwv1.Group(v1alpha1.GroupVersion.Group),
 										},
 									},
 									{
-										ExtensionRef: &gwv1beta1.LocalObjectReference{
+										ExtensionRef: &gwv1.LocalObjectReference{
 											Name:  "test-timeout-filter",
 											Kind:  v1alpha1.RouteTimeoutFilterKind,
-											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
+											Group: gwv1.Group(v1alpha1.GroupVersion.Group),
 										},
 									},
 									{
-										ExtensionRef: &gwv1beta1.LocalObjectReference{
+										ExtensionRef: &gwv1.LocalObjectReference{
 											Name:  "test-jwt-filter",
 											Kind:  v1alpha1.RouteAuthFilterKind,
-											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
+											Group: gwv1.Group(v1alpha1.GroupVersion.Group),
 										},
 									},
 								},
-								BackendRefs: []gwv1beta1.HTTPBackendRef{
+								BackendRefs: []gwv1.HTTPBackendRef{
 									{
-										BackendRef: gwv1beta1.BackendRef{
-											BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
 												Name:      "service one",
-												Namespace: PointerTo(gwv1beta1.Namespace("other")),
+												Namespace: PointerTo(gwv1.Namespace("other")),
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
-												ExtensionRef: &gwv1beta1.LocalObjectReference{
+												ExtensionRef: &gwv1.LocalObjectReference{
 													Name:  "test",
 													Kind:  v1alpha1.RouteRetryFilterKind,
 													Group: "consul.hashicorp.com/v1alpha1",
@@ -1540,7 +1642,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 func TestTranslator_ToTCPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		k8sRoute     gwv1alpha2.TCPRoute
+		k8sRoute     gwv1.TCPRoute
 		services     []types.NamespacedName
 		meshServices []v1alpha1.MeshService
 	}
@@ -1550,39 +1652,39 @@ func TestTranslator_ToTCPRoute(t *testing.T) {
 	}{
 		"base test": {
 			args: args{
-				k8sRoute: gwv1alpha2.TCPRoute{
+				k8sRoute: gwv1.TCPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "tcp-route",
 						Namespace: "k8s-ns",
 					},
-					Spec: gwv1alpha2.TCPRouteSpec{
-						Rules: []gwv1alpha2.TCPRouteRule{
+					Spec: gwv1.TCPRouteSpec{
+						Rules: []gwv1.TCPRouteRule{
 							{
-								BackendRefs: []gwv1beta1.BackendRef{
+								BackendRefs: []gwv1.BackendRef{
 									{
-										BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendObjectReference: gwv1.BackendObjectReference{
 											Name:      "some-service",
-											Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
 								},
 							},
 							{
-								BackendRefs: []gwv1beta1.BackendRef{
+								BackendRefs: []gwv1.BackendRef{
 									{
-										BackendObjectReference: gwv1beta1.BackendObjectReference{
+										BackendObjectReference: gwv1.BackendObjectReference{
 											Name:      "some-service-part-two",
-											Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
 									{
-										BackendObjectReference: gwv1beta1.BackendObjectReference{
-											Group:     PointerTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
-											Kind:      PointerTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
+										BackendObjectReference: gwv1.BackendObjectReference{
+											Group:     PointerTo(gwv1.Group(v1alpha1.ConsulHashicorpGroup)),
+											Kind:      PointerTo(gwv1.Kind(v1alpha1.MeshServiceKind)),
 											Name:      "some-service-part-three",
-											Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
@@ -1708,7 +1810,7 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 		Datacenter             string
 	}
 	type args struct {
-		filters []gwv1beta1.HTTPRouteFilter
+		filters []gwv1.HTTPRouteFilter
 	}
 	tests := []struct {
 		name                string
@@ -1721,9 +1823,9 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 			name:   "no httproutemodifier set",
 			fields: fields{},
 			args: args{
-				filters: []gwv1beta1.HTTPRouteFilter{
+				filters: []gwv1.HTTPRouteFilter{
 					{
-						URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{},
+						URLRewrite: &gwv1.HTTPURLRewriteFilter{},
 					},
 				},
 			},
@@ -1746,22 +1848,326 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 				ConsulPartition:        tt.fields.ConsulPartition,
 				Datacenter:             tt.fields.Datacenter,
 			}
-			requestHeaders, responseHeaders := t.translateHTTPFilters(tt.args.filters, nil, "")
+			requestHeaders, responseHeaders, _ := t.translateHTTPFilters(tt.args.filters, nil, "", nil)
 			assert.Equalf(t1, tt.want, requestHeaders, "translateHTTPFilters(%v)", tt.args.filters)
 			assert.Equalf(t1, tt.wantResponseFilters, responseHeaders, "translateHTTPFilters(%v)", tt.args.filters)
 		})
 	}
 }
 
-func newSectionNamePtr(s string) *gwv1beta1.SectionName {
-	sectionName := gwv1beta1.SectionName(s)
+func TestResourceTranslator_translateRouteExtProcFilter(t *testing.T) {
+	translator := ResourceTranslator{}
+
+	for name, tc := range map[string]struct {
+		routeExtProc *v1alpha1.RouteExtProc
+		expected     api.ExtProcFilter
+	}{
+		"minimal filter without overrides": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					StatPrefix: "my-prefix",
+					Mode:       "enabled",
+				},
+			},
+			expected: api.ExtProcFilter{
+				StatPrefix: "my-prefix",
+				Mode:       "enabled",
+			},
+		},
+		"override mode with empty overrides": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode:      "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode:      "override",
+				Overrides: &api.ExtProcOverrides{},
+			},
+		},
+		"override mode with nil processing": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode: "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: nil,
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode:      "override",
+				Overrides: &api.ExtProcOverrides{},
+			},
+		},
+		"override mode with full processing directions": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					StatPrefix: "prefix",
+					Mode:       "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: &v1alpha1.RouteExtProcProcessing{
+							Request: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode:  "SEND",
+								BodyMode:     "BUFFERED",
+								TrailersMode: "SKIP",
+								MaxBodyBytes: 1024,
+							},
+							Response: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode:  "SKIP",
+								BodyMode:     "STREAMED",
+								TrailersMode: "SEND",
+								MaxBodyBytes: 2048,
+							},
+						},
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				StatPrefix: "prefix",
+				Mode:       "override",
+				Overrides: &api.ExtProcOverrides{
+					Processing: &api.ExtProcProcessing{
+						Request: &api.ExtProcProcessingDirection{
+							HeadersMode:  "SEND",
+							BodyMode:     "BUFFERED",
+							TrailersMode: "SKIP",
+							MaxBodyBytes: 1024,
+						},
+						Response: &api.ExtProcProcessingDirection{
+							HeadersMode:  "SKIP",
+							BodyMode:     "STREAMED",
+							TrailersMode: "SEND",
+							MaxBodyBytes: 2048,
+						},
+					},
+				},
+			},
+		},
+		"override mode with only request processing": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode: "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: &v1alpha1.RouteExtProcProcessing{
+							Request: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode: "SEND",
+							},
+						},
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode: "override",
+				Overrides: &api.ExtProcOverrides{
+					Processing: &api.ExtProcProcessing{
+						Request: &api.ExtProcProcessingDirection{
+							HeadersMode: "SEND",
+						},
+						Response: nil,
+					},
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, translator.translateRouteExtProcFilter(tc.routeExtProc))
+		})
+	}
+}
+
+func TestTranslateExtProcProcessingDirection(t *testing.T) {
+	for name, tc := range map[string]struct {
+		direction *v1alpha1.RouteExtProcProcessingDirection
+		expected  *api.ExtProcProcessingDirection
+	}{
+		"nil direction returns nil": {
+			direction: nil,
+			expected:  nil,
+		},
+		"empty direction": {
+			direction: &v1alpha1.RouteExtProcProcessingDirection{},
+			expected:  &api.ExtProcProcessingDirection{},
+		},
+		"fully populated direction": {
+			direction: &v1alpha1.RouteExtProcProcessingDirection{
+				HeadersMode:  "SEND",
+				BodyMode:     "BUFFERED_PARTIAL",
+				TrailersMode: "SKIP",
+				MaxBodyBytes: 4096,
+			},
+			expected: &api.ExtProcProcessingDirection{
+				HeadersMode:  "SEND",
+				BodyMode:     "BUFFERED_PARTIAL",
+				TrailersMode: "SKIP",
+				MaxBodyBytes: 4096,
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, translateExtProcProcessingDirection(tc.direction))
+		})
+	}
+}
+
+func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{EnableConsulNamespaces: true, EnableK8sMirroring: true}
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+	resources.AddService(types.NamespacedName{Namespace: "default", Name: "backend"}, "backend")
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta: metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backend-sds",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{
+			SDS: &v1alpha1.GatewayTLSSDSConfig{
+				ClusterName:  "sds-cluster",
+				CertResource: "backend-cert",
+			},
+		},
+	})
+
+	route := gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{
+			Rules: []gwv1.HTTPRouteRule{{
+				BackendRefs: []gwv1.HTTPBackendRef{{
+					BackendRef: gwv1.BackendRef{BackendObjectReference: gwv1.BackendObjectReference{Name: "backend"}},
+					Filters: []gwv1.HTTPRouteFilter{{
+						Type: gwv1.HTTPRouteFilterExtensionRef,
+						ExtensionRef: &gwv1.LocalObjectReference{
+							Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+							Kind:  gwv1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+							Name:  "backend-sds",
+						},
+					}},
+				}},
+			}},
+		},
+	}
+
+	out := translator.ToHTTPRoute(route, resources)
+	require.Len(t, out.Rules, 1)
+	require.Len(t, out.Rules[0].Services, 1)
+	require.NotNil(t, out.Rules[0].Services[0].TLS)
+	require.NotNil(t, out.Rules[0].Services[0].TLS.SDS)
+	require.Equal(t, "sds-cluster", out.Rules[0].Services[0].TLS.SDS.ClusterName)
+	require.Equal(t, "backend-cert", out.Rules[0].Services[0].TLS.SDS.CertResource)
+}
+
+func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter_InheritsCluster(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{EnableConsulNamespaces: true, EnableK8sMirroring: true}
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+
+	gateway := gwv1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sds-gateway",
+			Namespace: "default",
+			Annotations: map[string]string{
+				TLSSDSClusterNameAnnotationKey:  "inherited-sds-cluster",
+				TLSSDSCertResourceAnnotationKey: "listener-cert",
+			},
+		},
+		Spec: gwv1.GatewaySpec{
+			Listeners: []gwv1.Listener{{
+				Name:     "https",
+				Port:     8443,
+				Protocol: gwv1.HTTPSProtocolType,
+				TLS:      &gwv1.ListenerTLSConfig{},
+			}},
+		},
+	}
+	resources.ReferenceCountGateway(gateway)
+	resources.AddService(types.NamespacedName{Namespace: "default", Name: "backend"}, "backend")
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta: metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backend-sds",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{
+			SDS: &v1alpha1.GatewayTLSSDSConfig{
+				ClusterName:  "",
+				CertResource: "backend-cert",
+			},
+		},
+	})
+
+	httpsSection := gwv1.SectionName("https")
+	route := gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{
+			CommonRouteSpec: gwv1.CommonRouteSpec{
+				ParentRefs: []gwv1.ParentReference{{
+					Name:        gwv1.ObjectName("sds-gateway"),
+					SectionName: &httpsSection,
+				}},
+			},
+			Rules: []gwv1.HTTPRouteRule{{
+				BackendRefs: []gwv1.HTTPBackendRef{{
+					BackendRef: gwv1.BackendRef{BackendObjectReference: gwv1.BackendObjectReference{Name: "backend"}},
+					Filters: []gwv1.HTTPRouteFilter{{
+						Type: gwv1.HTTPRouteFilterExtensionRef,
+						ExtensionRef: &gwv1.LocalObjectReference{
+							Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+							Kind:  gwv1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+							Name:  "backend-sds",
+						},
+					}},
+				}},
+			}},
+		},
+	}
+
+	out := translator.ToHTTPRoute(route, resources)
+	require.Len(t, out.Rules, 1)
+	require.Len(t, out.Rules[0].Services, 1)
+	require.NotNil(t, out.Rules[0].Services[0].TLS)
+	require.NotNil(t, out.Rules[0].Services[0].TLS.SDS)
+	require.Equal(t, "inherited-sds-cluster", out.Rules[0].Services[0].TLS.SDS.ClusterName)
+	require.Equal(t, "backend-cert", out.Rules[0].Services[0].TLS.SDS.CertResource)
+}
+
+func TestTranslator_ToHTTPRoute_NoBackendTLSSDSFilter(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{EnableConsulNamespaces: true, EnableK8sMirroring: true}
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+	resources.AddService(types.NamespacedName{Namespace: "default", Name: "backend"}, "backend")
+
+	route := gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{
+			Rules: []gwv1.HTTPRouteRule{{
+				BackendRefs: []gwv1.HTTPBackendRef{{
+					BackendRef: gwv1.BackendRef{BackendObjectReference: gwv1.BackendObjectReference{Name: "backend"}},
+				}},
+			}},
+		},
+	}
+
+	out := translator.ToHTTPRoute(route, resources)
+	require.Len(t, out.Rules, 1)
+	require.Len(t, out.Rules[0].Services, 1)
+	// No backend RouteTLSSDSFilter means no service-level override; listener SDS can remain the default.
+	require.Nil(t, out.Rules[0].Services[0].TLS)
+}
+
+func newSectionNamePtr(s string) *gwv1.SectionName {
+	sectionName := gwv1.SectionName(s)
 	return &sectionName
 }
 
 func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 	type args struct {
-		gateway  gwv1beta1.Gateway
-		listener gwv1beta1.Listener
+		gateway  gwv1.Gateway
+		listener gwv1.Listener
 		gwcc     *v1alpha1.GatewayClassConfig
 	}
 	tests := []struct {
@@ -1814,7 +2220,7 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 				},
 			},
 			args: args{
-				gateway: gwv1beta1.Gateway{
+				gateway: gwv1.Gateway{
 					TypeMeta: metav1.TypeMeta{
 						Kind: KindGateway,
 					},
@@ -1822,8 +2228,8 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 						Name:      "test",
 						Namespace: "test",
 					},
-					Spec: gwv1beta1.GatewaySpec{
-						Listeners: []gwv1beta1.Listener{
+					Spec: gwv1.GatewaySpec{
+						Listeners: []gwv1.Listener{
 							{
 								Name:     "test-listener",
 								Port:     80,
@@ -1832,7 +2238,7 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 						},
 					},
 				},
-				listener: gwv1beta1.Listener{
+				listener: gwv1.Listener{
 					Name:     "test-listener",
 					Port:     80,
 					Protocol: "HTTP",
@@ -1895,6 +2301,190 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 			got, got1 := translator.toAPIGatewayListener(tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
 			assert.Equalf(t, tt.want, got, "toAPIGatewayListener(%v, %v, %v, %v)", tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
 			assert.Equalf(t, tt.want1, got1, "toAPIGatewayListener(%v, %v, %v, %v)", tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
+		})
+	}
+}
+
+func TestResourceTranslator_toAPIGatewayListener_WithSDSAndCertificateRefs(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{
+		EnableConsulNamespaces: true,
+		ConsulDestNamespace:    "",
+		EnableK8sMirroring:     true,
+		MirroringPrefix:        "",
+	}
+
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+	resources.ReferenceCountCertificate(generateTestCertificate(t, "default", "gw-cert"))
+
+	gateway := gwv1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gw",
+			Namespace: "default",
+		},
+	}
+
+	listener := gwv1.Listener{
+		Name:     "https",
+		Port:     8443,
+		Protocol: gwv1.HTTPSProtocolType,
+		TLS: &gwv1.ListenerTLSConfig{
+			Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+				gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "sds-cluster",
+				gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
+			},
+			CertificateRefs: []gwv1.SecretObjectReference{{
+				Name:      "gw-cert",
+				Namespace: PointerTo(gwv1.Namespace("default")),
+			}},
+		},
+	}
+
+	got, ok := translator.toAPIGatewayListener(gateway, listener, resources, nil)
+	require.True(t, ok)
+	require.NotNil(t, got.TLS.SDS)
+	require.Equal(t, "sds-cluster", got.TLS.SDS.ClusterName)
+	require.Equal(t, "listener-cert", got.TLS.SDS.CertResource)
+
+	expectedCert := translator.NonNormalizedConfigEntryReference(api.FileSystemCertificate, types.NamespacedName{Name: "gw-cert", Namespace: "default"})
+	require.Contains(t, got.TLS.Certificates, expectedCert)
+}
+
+// TestResolveListenerProtocol verifies that the annotation-based protocol
+// override selects the correct Consul listener protocol (RFC-0002).
+func TestResolveListenerProtocol(t *testing.T) {
+	t.Parallel()
+
+	makeGateway := func(annotations map[string]string) gwv1.Gateway {
+		return gwv1.Gateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "edge",
+				Namespace:   "default",
+				Annotations: annotations,
+			},
+		}
+	}
+	makeListener := func(name string, protocol gwv1.ProtocolType) gwv1.Listener {
+		return gwv1.Listener{Name: gwv1.SectionName(name), Protocol: protocol}
+	}
+
+	tests := []struct {
+		name               string
+		gatewayAnnotations map[string]string
+		listener           gwv1.Listener
+		wantProtocol       string
+	}{
+		{
+			name: "grpc annotation overrides HTTP listener protocol",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "grpc",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "grpc",
+		},
+		{
+			name: "http2 annotation overrides HTTP listener protocol",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "h2" + ListenerProtocolAnnotationSuffix: "http2",
+			},
+			listener:     makeListener("h2", gwv1.HTTPProtocolType),
+			wantProtocol: "http2",
+		},
+		{
+			name: "annotation is case-insensitive",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "GRPC",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "grpc",
+		},
+		{
+			name: "invalid annotation value falls back to protocol map",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "invalid-protocol",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "http", // falls back to listenerProtocolMap["http"]
+		},
+		{
+			name:         "no annotation uses protocol map — HTTP",
+			listener:     makeListener("web", gwv1.HTTPProtocolType),
+			wantProtocol: "http",
+		},
+		{
+			name:         "no annotation uses protocol map — HTTPS",
+			listener:     makeListener("secure", gwv1.HTTPSProtocolType),
+			wantProtocol: "http",
+		},
+		{
+			name:         "no annotation uses protocol map — TCP",
+			listener:     makeListener("tcp", gwv1.TCPProtocolType),
+			wantProtocol: "tcp",
+		},
+		{
+			name: "annotation on different section does not affect this listener",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "other-listener" + ListenerProtocolAnnotationSuffix: "grpc",
+			},
+			listener:     makeListener("web", gwv1.HTTPProtocolType),
+			wantProtocol: "http",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gw := makeGateway(tt.gatewayAnnotations)
+			got := resolveListenerProtocol(gw, tt.listener)
+			require.Equal(t, tt.wantProtocol, got)
+		})
+	}
+}
+
+// TestToAPIGatewayListener_ProtocolAnnotation verifies that the annotation-based
+// protocol selection is propagated into the Consul api-gateway listener (RFC-0002).
+func TestToAPIGatewayListener_ProtocolAnnotation(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{
+		EnableConsulNamespaces: false,
+		ConsulDestNamespace:    "default",
+	}
+
+	for _, tc := range []struct {
+		annotation   string
+		wantProtocol string
+	}{
+		{"grpc", "grpc"},
+		{"http2", "http2"},
+	} {
+		tc := tc
+		t.Run(tc.annotation, func(t *testing.T) {
+			t.Parallel()
+
+			gateway := gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "edge",
+					Namespace: "default",
+					Annotations: map[string]string{
+						ListenerProtocolAnnotationPrefix + "listener" + ListenerProtocolAnnotationSuffix: tc.annotation,
+					},
+				},
+			}
+			listener := gwv1.Listener{
+				Name:     "listener",
+				Port:     9080,
+				Protocol: gwv1.HTTPProtocolType,
+			}
+
+			resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+			got, ok := translator.toAPIGatewayListener(gateway, listener, resources, nil)
+			require.True(t, ok)
+			require.Equal(t, tc.wantProtocol, got.Protocol,
+				"expected Consul listener protocol %q from annotation %q", tc.wantProtocol, tc.annotation)
 		})
 	}
 }

@@ -138,6 +138,26 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "-global-image-pull-policy must be `IfNotPresent`, `Always`, `Never`, or `` ",
 		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-global-config-acl-token-secret-name", "global-config-token",
+			},
+			expErr: "-global-config-acl-token-secret-name and -global-config-acl-token-secret-key must both be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-global-config-acl-token-secret-key", "token",
+			},
+			expErr: "-global-config-acl-token-secret-name and -global-config-acl-token-secret-key must both be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-global-config-acl-token", "s.token",
+				"-global-config-acl-token-secret-name", "global-config-token",
+				"-global-config-acl-token-secret-key", "token",
+			},
+			expErr: "-global-config-acl-token cannot be set together with -global-config-acl-token-secret-name/-global-config-acl-token-secret-key",
+		},
 	}
 
 	for _, c := range cases {
@@ -158,10 +178,34 @@ func TestRun_FlagValidation(t *testing.T) {
 func TestRun_ResourceLimitDefaults(t *testing.T) {
 	cmd := Command{}
 	cmd.init()
+	require.False(t, cmd.flagDisableMultiportRegistration)
 
 	// Init container defaults
 	require.Equal(t, cmd.flagInitContainerCPURequest, "50m")
 	require.Equal(t, cmd.flagInitContainerCPULimit, "50m")
 	require.Equal(t, cmd.flagInitContainerMemoryRequest, "25Mi")
 	require.Equal(t, cmd.flagInitContainerMemoryLimit, "150Mi")
+}
+
+func TestCommand_AIEnableFlags(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		flags       []string
+		wantAI      bool
+		wantGateway bool
+	}{
+		{name: "disabled by default"},
+		{name: "AI only", flags: []string{"-enable-ai=true"}, wantAI: true},
+		{name: "gateway only", flags: []string{"-enable-ai-inference-gateway=true"}, wantGateway: true},
+		{name: "both enabled", flags: []string{"-enable-ai=true", "-enable-ai-inference-gateway=true"}, wantAI: true, wantGateway: true},
+		{name: "gateway explicitly disabled", flags: []string{"-enable-ai=true", "-enable-ai-inference-gateway=false"}, wantAI: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := Command{}
+			cmd.init()
+			require.NoError(t, cmd.flagSet.Parse(tc.flags))
+			require.Equal(t, tc.wantAI, cmd.flagEnableAI)
+			require.Equal(t, tc.wantGateway, cmd.flagEnableAIInferenceGateway)
+		})
+	}
 }

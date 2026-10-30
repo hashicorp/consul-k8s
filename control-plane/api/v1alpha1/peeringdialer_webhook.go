@@ -20,7 +20,7 @@ import (
 type PeeringDialerWebhook struct {
 	client.Client
 	Logger  logr.Logger
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NOTE: The path value in the below line is the path to the webhook.

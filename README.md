@@ -3,6 +3,8 @@
   <span>Consul on Kubernetes</span>
 </h1>
 
+[![Coverage](https://raw.githubusercontent.com/hashicorp/consul-k8s/badges/coverage.svg)](https://github.com/hashicorp/consul-k8s/actions/workflows/coverage.yml)
+
  **We're looking for feedback on how folks are using Consul on Kubernetes. Please fill out our brief [survey](https://hashicorp.sjc1.qualtrics.com/jfe/form/SV_4MANbw1BUku7YhL)!** 
 
 ## Overview
@@ -121,3 +123,7 @@ file. These are also fully documented directly on the
 
 You can find examples and complete tutorials on how to deploy Consul on 
 Kubernetes using Helm on the [HashiCorp Learn website](https://learn.hashicorp.com/collections/consul/kubernetes).
+
+# Additional Licenses
+It includes a modified fork of Kubernetes Gateway API,
+which is licensed under Apache License 2.0.

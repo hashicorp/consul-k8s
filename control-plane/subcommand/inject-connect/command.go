@@ -16,11 +16,14 @@ import (
 	"syscall"
 	"time"
 
+	gwv1alpha2exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1beta1exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -31,6 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -47,19 +51,22 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	flagListen                string
-	flagCertDir               string // Directory with TLS certs for listening (PEM)
-	flagDefaultInject         bool   // True to inject by default
-	flagConfigFile            string // Path to a config file in JSON format
-	flagConsulImage           string // Docker image for Consul
-	flagConsulDataplaneImage  string // Docker image for Envoy
-	flagConsulK8sImage        string // Docker image for consul-k8s
-	flagGlobalImagePullPolicy string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
-	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
-	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
-	flagEnableWebhookCAUpdate bool
-	flagLogLevel              string
-	flagLogJSON               bool
+	flagListen                         string
+	flagCertDir                        string // Directory with TLS certs for listening (PEM)
+	flagDefaultInject                  bool   // True to inject by default
+	flagConfigFile                     string // Path to a config file in JSON format
+	flagConsulImage                    string // Docker image for Consul
+	flagConsulDataplaneImage           string // Docker image for Envoy
+	flagConsulK8sImage                 string // Docker image for consul-k8s
+	flagGlobalImagePullPolicy          string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
+	flagACLAuthMethod                  string // Auth Method to use for ACLs, if enabled
+	flagGlobalConfigACLToken           string // Optional ACL token used for global config entry reconciliations
+	flagGlobalConfigACLTokenSecretName string // Optional secret name containing ACL token for global config entry reconciliations
+	flagGlobalConfigACLTokenSecretKey  string // Optional secret key containing ACL token for global config entry reconciliations
+	flagEnvoyExtraArgs                 string // Extra envoy args when starting envoy
+	flagEnableWebhookCAUpdate          bool
+	flagLogLevel                       string
+	flagLogJSON                        bool
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -76,6 +83,9 @@ type Command struct {
 	// Flags for endpoints controller.
 	flagReleaseName      string
 	flagReleaseNamespace string
+
+	// Flags for the admission webhook.
+	flagDisableMultiportRegistration bool
 
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
@@ -99,6 +109,7 @@ type Command struct {
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
 	flagEnableGatewayMetrics        bool
+	flagEnableGatewayScaling        bool
 	flagDefaultEnableMetricsMerging bool
 	flagDefaultMergedMetricsPort    string
 	flagDefaultPrometheusScrapePort string
@@ -162,6 +173,24 @@ type Command struct {
 	flagDefaultSidecarProbePeriodSeconds            int
 	flagDefaultSidecarProbeFailureThreshold         int
 	flagDefaultSidecarProbeCheckTimeoutSeconds      int
+
+	// enable custom crds controller flags
+	flagEnableCustomGatewayCRDController bool
+	//enable tcp routes
+	flagEnableTCPRoute bool
+	// AI feature flags. OBO sidecars follow ai-role=ai-agent; there is no enable-obo switch.
+	flagEnableAI                 bool
+	flagEnableAIInferenceGateway bool
+	flagAIInferenceGatewayImage  string // Docker image for the InferenceGateway Deployment
+	flagAIMCPServerImage         string // Docker image for the MCP server sidecar
+	flagAIAgentImage             string // Docker image for the AI agent sidecar (consul-mcp-sc)
+	// InferenceGateway defaults sourced from ai.inferenceGateway.defaults in values.yaml
+	flagAIInferenceGatewayDefaultServiceType string // default Service type (ClusterIP/NodePort/LoadBalancer)
+	flagAIInferenceGatewayDefaultServicePort int    // default Service port
+	flagAIInferenceGatewayDefaultCPURequest  string // default container CPU request
+	flagAIInferenceGatewayDefaultCPULimit    string // default container CPU limit
+	flagAIInferenceGatewayDefaultMemRequest  string // default container memory request
+	flagAIInferenceGatewayDefaultMemLimit    string // default container memory limit
 }
 
 var (
@@ -175,8 +204,10 @@ func init() {
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
+	utilruntime.Must(gwv1.AddToScheme(scheme))
+	utilruntime.Must(gwv1beta1exp.AddToScheme(scheme))
+	utilruntime.Must(gwv1alpha2exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
-
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -203,12 +234,20 @@ func (c *Command) init() {
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLToken, "global-config-acl-token", "",
+		"Optional ACL token used for global config entry reconciliations (for example, ControlPlaneRequestLimit and RateLimit).")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLTokenSecretName, "global-config-acl-token-secret-name", "",
+		"Optional Kubernetes Secret name containing the ACL token used for global config entry reconciliations.")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLTokenSecretKey, "global-config-acl-token-secret-key", "",
+		"Optional Kubernetes Secret key containing the ACL token used for global config entry reconciliations.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
 	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
+	c.flagSet.BoolVar(&c.flagDisableMultiportRegistration, "disable-multiport-registration", false,
+		"Reject new multi-port Consul service registrations unless exactly one application port is selected.")
 	c.flagSet.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
 		"[Enterprise Only] Enables Admin Partitions.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,
@@ -247,6 +286,45 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
+	// enable TCP watch
+	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enabe-tcp-route", false, "Enables TCP Watch under gateway.networkings.k8s.io API Group")
+
+	// AI feature flags mirror ai.enabled and ai.inferenceGateway.enabled from values.yaml.
+	c.flagSet.BoolVar(&c.flagEnableAI, "enable-ai", false, "Enables AI controllers and CRD watchers. InferenceGateway additionally requires -enable-ai-inference-gateway.")
+	c.flagSet.BoolVar(&c.flagEnableAIInferenceGateway, "enable-ai-inference-gateway", false,
+		"Enables the InferenceGateway controller and its Consul cache. Requires -enable-ai.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayImage, "ai-inference-gateway-image", "",
+		"Docker image for the InferenceGateway Deployment created by the AI controller. "+
+			"Mirrors ai.inferenceGateway.image from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultServiceType, "ai-inference-gateway-default-service-type", "ClusterIP",
+		"Default Kubernetes Service type for InferenceGateway instances. "+
+			"Mirrors ai.inferenceGateway.defaults.service.type from values.yaml.")
+	c.flagSet.IntVar(&c.flagAIInferenceGatewayDefaultServicePort, "ai-inference-gateway-default-service-port", 8443,
+		"Default Service port for InferenceGateway instances. "+
+			"Mirrors the first entry of ai.inferenceGateway.defaults.service.ports from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultCPURequest, "ai-inference-gateway-default-cpu-request", "",
+		"Default CPU request for the InferenceGateway container. "+
+			"Mirrors ai.inferenceGateway.defaults.resources.requests.cpu from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultCPULimit, "ai-inference-gateway-default-cpu-limit", "",
+		"Default CPU limit for the InferenceGateway container. "+
+			"Mirrors ai.inferenceGateway.defaults.resources.limits.cpu from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultMemRequest, "ai-inference-gateway-default-mem-request", "",
+		"Default memory request for the InferenceGateway container. "+
+			"Mirrors ai.inferenceGateway.defaults.resources.requests.memory from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultMemLimit, "ai-inference-gateway-default-mem-limit", "",
+		"Default memory limit for the InferenceGateway container. "+
+			"Mirrors ai.inferenceGateway.defaults.resources.limits.memory from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIMCPServerImage, "ai-mcp-server-image", "",
+		"Docker image for the MCP server sidecar injected into pods with "+
+			"consul.hashicorp.com/ai-role: mcp-server. Mirrors ai.mcpServer.image from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIAgentImage, "ai-agent-image", "",
+		"Docker image for the AI agent sidecar (consul-mcp-sc multi-binary: MCP + OBO) "+
+			"injected into pods with consul.hashicorp.com/ai-role: ai-agent. "+
+			"Mirrors ai.agent.image from values.yaml.")
+
+	// custom controller flags
+	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")
+
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
@@ -268,6 +346,7 @@ func (c *Command) init() {
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
 	c.flagSet.BoolVar(&c.flagEnableGatewayMetrics, "enable-gateway-metrics", false, "Allows enabling Consul gateway metrics.")
+	c.flagSet.BoolVar(&c.flagEnableGatewayScaling, "enable-gateway-scaling", false, "[Enterprise Only] Enables API Gateway scaling annotations, controller-managed HPAs, and manual scaling preservation for the managed GatewayClass.")
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetricsMerging, "default-enable-metrics-merging", false, "Default for enabling merging of connect service metrics and envoy proxy metrics.")
 	c.flagSet.StringVar(&c.flagDefaultMergedMetricsPort, "default-merged-metrics-port", "20100", "Default port for merged metrics endpoint on the consul-sidecar.")
 	c.flagSet.StringVar(&c.flagDefaultPrometheusScrapePort, "default-prometheus-scrape-port", "20200", "Default port where Prometheus scrapes connect metrics from.")
@@ -286,6 +365,8 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbePeriodSeconds, "default-sidecar-probe-period-seconds", 1, "Default number of seconds for the k8s period between startup probe checks.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 10, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 5, "Default number of seconds for the k8s timeout for the startup probe checks.")
+
+	// Enable custom crds controller flags.
 
 	c.consul = &flags.ConsulFlags{}
 
@@ -372,6 +453,11 @@ func (c *Command) Run(args []string) int {
 	// Create a context to be used by the processes started in this command.
 	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancelFunc()
+
+	if err := c.loadGlobalConfigACLTokenFromSecret(ctx); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
 
 	// Start Consul server Connection manager.
 	serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
@@ -474,6 +560,16 @@ func (c *Command) validateFlags() error {
 		return errors.New("-default-envoy-proxy-concurrency must be >= 0 if set")
 	}
 
+	hasGlobalConfigTokenSecretName := c.flagGlobalConfigACLTokenSecretName != ""
+	hasGlobalConfigTokenSecretKey := c.flagGlobalConfigACLTokenSecretKey != ""
+	if hasGlobalConfigTokenSecretName != hasGlobalConfigTokenSecretKey {
+		return errors.New("-global-config-acl-token-secret-name and -global-config-acl-token-secret-key must both be set")
+	}
+
+	if c.flagGlobalConfigACLToken != "" && hasGlobalConfigTokenSecretName {
+		return errors.New("-global-config-acl-token cannot be set together with -global-config-acl-token-secret-name/-global-config-acl-token-secret-key")
+	}
+
 	// Validate ports in metrics flags.
 	err := common.ValidateUnprivilegedPort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
 	if err != nil {
@@ -484,6 +580,34 @@ func (c *Command) validateFlags() error {
 		return err
 	}
 
+	return nil
+}
+
+func (c *Command) loadGlobalConfigACLTokenFromSecret(ctx context.Context) error {
+	if c.flagGlobalConfigACLToken != "" {
+		return nil
+	}
+
+	if c.flagGlobalConfigACLTokenSecretName == "" || c.flagGlobalConfigACLTokenSecretKey == "" {
+		return nil
+	}
+
+	secret, err := c.clientset.CoreV1().Secrets(c.flagReleaseNamespace).Get(ctx, c.flagGlobalConfigACLTokenSecretName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("retrieving acl token secret %q in namespace %q: %w", c.flagGlobalConfigACLTokenSecretName, c.flagReleaseNamespace, err)
+	}
+
+	aclTokenBytes, ok := secret.Data[c.flagGlobalConfigACLTokenSecretKey]
+	if !ok {
+		return fmt.Errorf("secret %q does not contain key %q", c.flagGlobalConfigACLTokenSecretName, c.flagGlobalConfigACLTokenSecretKey)
+	}
+
+	aclToken := strings.TrimSpace(string(aclTokenBytes))
+	if aclToken == "" {
+		return fmt.Errorf("secret %q key %q is empty", c.flagGlobalConfigACLTokenSecretName, c.flagGlobalConfigACLTokenSecretKey)
+	}
+
+	c.flagGlobalConfigACLToken = aclToken
 	return nil
 }
 

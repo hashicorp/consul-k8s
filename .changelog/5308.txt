@@ -1,0 +1,4 @@
+```release-note:security
+Upgrade to use `x/net` 0.53.0.
+This resolves [GO-2026-4918](https://pkg.go.dev/vuln/GO-2026-4918)
+```

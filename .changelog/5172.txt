@@ -1,0 +1,4 @@
+
+```release-note:improvement
+api-gateway: Added Enterprise API Gateway scaling support with annotation-driven configuration. Gateways can now scale beyond the previous 8-instance limit using static replica counts (consul.hashicorp.com/default-replicas) or controller-managed HPA (consul.hashicorp.com/hpa-enabled, consul.hashicorp.com/hpa-minimum-replicas, consul.hashicorp.com/hpa-maximum-replicas, consul.hashicorp.com/hpa-cpu-utilisation-target). The deprecated GatewayClassConfig deployment fields (defaultInstances, minInstances, maxInstances) are now deprecated in favor of Gateway annotations.
+```

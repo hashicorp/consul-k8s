@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: Add `RouteUpstreamLimitsFilter` CRD and gateway-wide annotation defaults to configure per-service upstream circuit-breaker limits (`maxConnections`, `maxPendingRequests`, `maxConcurrentRequests`) and passive health checks (Envoy outlier detection) on API Gateway backends.
+```

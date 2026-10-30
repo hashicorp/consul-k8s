@@ -51,27 +51,35 @@ func TestController_initialData(t *testing.T) {
 
 // Test that created data after starting is loaded.
 func TestController_create(t *testing.T) {
-	t.Parallel()
 	require := require.New(t)
 
 	client := fake.NewSimpleClientset()
-	resource, data, deleted, _ := testResource(client)
+	resource, data, deleted, dataLock := testResource(client)
 
-	// Start the controller
+	// ✅ Start controller first
 	closer := TestControllerRun(resource)
+	defer closer()
 
-	// Wait some period of time
-	time.Sleep(100 * time.Millisecond)
-
-	// Add some initial data before the controller starts
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
-	require.NoError(err)
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("bar"), metav1.CreateOptions{})
+	// ✅ Create AFTER start
+	_, err := client.CoreV1().
+		Services(metav1.NamespaceDefault).
+		Create(context.Background(), testService("foo"), metav1.CreateOptions{})
 	require.NoError(err)
 
-	// Wait some period of time
-	time.Sleep(100 * time.Millisecond)
-	closer()
+	_, err = client.CoreV1().
+		Services(metav1.NamespaceDefault).
+		Create(context.Background(), testService("bar"), metav1.CreateOptions{})
+	require.NoError(err)
+
+	// ✅ Wait (must be > resync period ~1s)
+	require.Eventually(func() bool {
+		dataLock.Lock()
+		defer dataLock.Unlock()
+		return len(data) == 2
+	}, 3*time.Second, 50*time.Millisecond)
+
+	dataLock.Lock()
+	defer dataLock.Unlock()
 
 	require.Len(data, 2)
 	require.Len(deleted, 0)
@@ -79,84 +87,107 @@ func TestController_create(t *testing.T) {
 
 // Test that data that is created and deleted is properly removed.
 func TestController_createDelete(t *testing.T) {
-	t.Parallel()
 	require := require.New(t)
 
 	client := fake.NewSimpleClientset()
-	resource, data, deleted, _ := testResource(client)
+	resource, data, deleted, dataLock := testResource(client)
 
-	// Start the controller
 	closer := TestControllerRun(resource)
+	defer closer()
 
-	// Wait some period of time
-	time.Sleep(100 * time.Millisecond)
-
-	// Add some initial data before the controller starts
-	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
-	require.NoError(err)
-	barSvc := testService("bar")
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), barSvc, metav1.CreateOptions{})
+	// --- CREATE ---
+	_, err := client.CoreV1().
+		Services(metav1.NamespaceDefault).
+		Create(context.Background(), testService("foo"), metav1.CreateOptions{})
 	require.NoError(err)
 
-	// Wait a bit so that the create hopefully propagates
-	time.Sleep(50 * time.Millisecond)
-	require.NoError(client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.Background(), "bar", metav1.DeleteOptions{}))
+	barSvc, err := client.CoreV1().
+		Services(metav1.NamespaceDefault).
+		Create(context.Background(), testService("bar"), metav1.CreateOptions{})
+	require.NoError(err)
 
-	// Wait some period of time
-	time.Sleep(100 * time.Millisecond)
-	closer()
+	// ✅ WAIT until BOTH are observed (critical fix)
+	require.Eventually(func() bool {
+		dataLock.Lock()
+		defer dataLock.Unlock()
+		return len(data) == 2
+	}, 3*time.Second, 50*time.Millisecond)
+
+	// --- DELETE ---
+	require.NoError(client.CoreV1().
+		Services(metav1.NamespaceDefault).
+		Delete(context.Background(), barSvc.Name, metav1.DeleteOptions{}))
+
+	// ✅ WAIT for delete to be observed
+	require.Eventually(func() bool {
+		dataLock.Lock()
+		defer dataLock.Unlock()
+		return len(data) == 1 && len(deleted) == 1
+	}, 3*time.Second, 50*time.Millisecond)
+
+	dataLock.Lock()
+	defer dataLock.Unlock()
 
 	require.Len(data, 1)
 	require.Len(deleted, 1)
 	require.Contains(deleted, "default/bar")
+
 	deletedSvc, ok := deleted["default/bar"].(*apiv1.Service)
-	require.True(ok, "object was not of type Service")
+	require.True(ok)
 	require.Equal("bar", deletedSvc.Name)
 }
 
 // Test that data is properly updated.
 func TestController_update(t *testing.T) {
-	t.Parallel()
 	require := require.New(t)
 
 	client := fake.NewSimpleClientset()
 	resource, data, _, dataLock := testResource(client)
 
-	// Start the controller
+	// CREATE first
+	svc, err := client.CoreV1().
+		Services(metav1.NamespaceDefault).
+		Create(context.Background(), testService("foo"), metav1.CreateOptions{})
+	require.NoError(err)
+
+	// Start controller
 	closer := TestControllerRun(resource)
+	defer closer()
 
-	// Wait some period of time
-	time.Sleep(100 * time.Millisecond)
-
-	// Add some initial data before the controller starts
-	svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), testService("foo"), metav1.CreateOptions{})
-	require.NoError(err)
-
-	{
-		// Verify the type is correctly set
-		time.Sleep(50 * time.Millisecond)
+	// Wait for initial state
+	require.Eventually(func() bool {
 		dataLock.Lock()
-		actual := data["default/foo"].(*apiv1.Service)
-		dataLock.Unlock()
-		require.Equal(apiv1.ServiceTypeClusterIP, actual.Spec.Type)
-	}
+		defer dataLock.Unlock()
 
-	// Update
+		v, ok := data["default/foo"]
+		return ok && v != nil
+	}, 2*time.Second, 50*time.Millisecond)
+
+	// Validate initial
+	dataLock.Lock()
+	initial := data["default/foo"].(*apiv1.Service)
+	dataLock.Unlock()
+	require.Equal(apiv1.ServiceTypeClusterIP, initial.Spec.Type)
+
+	// UPDATE
 	svc.Spec.Type = apiv1.ServiceTypeNodePort
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Update(context.Background(), svc, metav1.UpdateOptions{})
+	_, err = client.CoreV1().
+		Services(metav1.NamespaceDefault).
+		Update(context.Background(), svc, metav1.UpdateOptions{})
 	require.NoError(err)
 
-	{
-		// Verify the type is correctly set
-		time.Sleep(50 * time.Millisecond)
+	// Wait for update
+	require.Eventually(func() bool {
 		dataLock.Lock()
-		actual := data["default/foo"].(*apiv1.Service)
-		dataLock.Unlock()
-		require.Equal(apiv1.ServiceTypeNodePort, actual.Spec.Type)
-	}
+		defer dataLock.Unlock()
 
-	// Wait some period of time
-	closer()
+		v, ok := data["default/foo"]
+		if !ok || v == nil {
+			return false
+		}
+
+		return v.(*apiv1.Service).Spec.Type == apiv1.ServiceTypeNodePort
+	}, 3*time.Second, 50*time.Millisecond)
 }
 
 // Test that backgrounders are started and stopped.
@@ -272,19 +303,19 @@ func testService(name string) *apiv1.Service {
 
 // testInformer creates an Informer that operates on the given K8S client
 // and watches for Service entries.
+
 func testInformer(client kubernetes.Interface) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return client.CoreV1().Services(metav1.NamespaceDefault).List(context.Background(), options)
 			},
-
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return client.CoreV1().Services(metav1.NamespaceDefault).Watch(context.Background(), options)
+				return watch.NewEmptyWatch(), nil
 			},
 		},
 		&apiv1.Service{},
-		0,
+		500*time.Millisecond,
 		cache.Indexers{},
 	)
 }

@@ -5,12 +5,14 @@ package common
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -27,6 +29,10 @@ type ResourceTranslator struct {
 	MirroringPrefix        string
 	ConsulPartition        string
 	Datacenter             string
+	// Logger is used to warn about annotation values that are ignored because
+	// they are malformed or out of range. The zero value is safe to use and
+	// discards all output.
+	Logger logr.Logger
 }
 
 func (t ResourceTranslator) NonNormalizedConfigEntryReference(kind string, id types.NamespacedName) api.ResourceReference {
@@ -57,10 +63,10 @@ func (t ResourceTranslator) Namespace(namespace string) string {
 }
 
 // ToAPIGateway translates a kuberenetes API gateway into a Consul APIGateway Config Entry.
-func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) *api.APIGatewayConfigEntry {
+func (t ResourceTranslator) ToAPIGateway(gateway gwv1.Gateway, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) *api.APIGatewayConfigEntry {
 	namespace := t.Namespace(gateway.Namespace)
 
-	listeners := ConvertSliceFuncIf(gateway.Spec.Listeners, func(listener gwv1beta1.Listener) (api.APIGatewayListener, bool) {
+	listeners := ConvertSliceFuncIf(gateway.Spec.Listeners, func(listener gwv1.Listener) (api.APIGatewayListener, bool) {
 		return t.toAPIGatewayListener(gateway, listener, resources, gwcc)
 	})
 
@@ -74,23 +80,286 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *R
 			constants.MetaKeyKubeName: gateway.Name,
 		}),
 		Listeners: listeners,
+		TLS:       gatewayTLS(gateway.Annotations),
+		Defaults:  t.translateGatewayDefaults(gateway),
+		ExtAuthz:  gatewayExtAuthz(gateway.Annotations),
 	}
 }
 
+// gatewayTLS translates the gateway-wide tls-enabled annotation into the Consul
+// APIGateway gateway-level TLS configuration. When the annotation is set to
+// "true" it returns a config with Enabled=true, opting the gateway into
+// zero-touch, Connect-leaf TLS termination. Otherwise it returns the zero value
+// (Enabled=false), which preserves the prior per-listener-only behavior.
+func gatewayTLS(annotations map[string]string) api.GatewayTLSConfig {
+	if annotations[AnnotationTLSEnabled] == TLSEnabledValue {
+		return api.GatewayTLSConfig{Enabled: true}
+	}
+	return api.GatewayTLSConfig{}
+}
+
+// gatewayExtAuthz translates the gateway-wide ext_authz annotation into the
+// Consul APIGateway ExtAuthz toggle. When the annotation is absent (or any
+// unrecognized value) it returns nil, which Consul treats as "enabled by
+// default".
+func gatewayExtAuthz(annotations map[string]string) *api.APIGatewayExtAuthz {
+	switch annotations[AnnotationExtAuthz] {
+	case ExtAuthzDisabledValue:
+		return &api.APIGatewayExtAuthz{Enabled: false}
+	case ExtAuthzEnabledValue:
+		return &api.APIGatewayExtAuthz{Enabled: true}
+	default:
+		return nil
+	}
+}
+
+// routeExtAuthzFromAnnotations translates the per-route ext_authz annotation
+// into the Consul http-route ExtAuthz filter. Returns nil when the annotation
+// is absent or unrecognized.
+func routeExtAuthzFromAnnotations(annotations map[string]string) *api.HTTPRouteExtAuthzFilter {
+	switch annotations[AnnotationExtAuthz] {
+	case ExtAuthzEnabledValue:
+		return &api.HTTPRouteExtAuthzFilter{Enabled: true}
+	case ExtAuthzDisabledValue:
+		return &api.HTTPRouteExtAuthzFilter{Enabled: false}
+	default:
+		return nil
+	}
+}
+
+// Gateway annotations that configure the gateway-wide upstream limit defaults
+// (api-gateway Defaults *UpstreamLimits). Any unset annotation leaves the
+// corresponding field nil so Envoy falls back to its own default. Annotations
+// are not covered by CRD schema validation, so values are range-checked here
+// and invalid values are ignored rather than propagated to Consul.
+const (
+	annotationDefaultMaxConnections        = "api-gateway.consul.hashicorp.com/default-max-connections"
+	annotationDefaultMaxPendingRequests    = "api-gateway.consul.hashicorp.com/default-max-pending-requests"
+	annotationDefaultMaxConcurrentRequests = "api-gateway.consul.hashicorp.com/default-max-concurrent-requests"
+
+	annotationDefaultPHCInterval              = "api-gateway.consul.hashicorp.com/default-passive-health-check-interval"
+	annotationDefaultPHCMaxFailures           = "api-gateway.consul.hashicorp.com/default-passive-health-check-max-failures"
+	annotationDefaultPHCEnforcingConsecutive5 = "api-gateway.consul.hashicorp.com/default-passive-health-check-enforcing-consecutive-5xx"
+	annotationDefaultPHCMaxEjectionPercent    = "api-gateway.consul.hashicorp.com/default-passive-health-check-max-ejection-percent"
+	annotationDefaultPHCBaseEjectionTime      = "api-gateway.consul.hashicorp.com/default-passive-health-check-base-ejection-time"
+)
+
+// translateGatewayDefaults reads the gateway-wide upstream limit defaults from
+// annotations on the Gateway resource and returns them as an api.UpstreamLimits.
+// It returns nil when no relevant annotation is set.
+func (t ResourceTranslator) translateGatewayDefaults(gateway gwv1.Gateway) *api.UpstreamLimits {
+	annotations := gateway.Annotations
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	limits := &api.UpstreamLimits{}
+	set := false
+
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxConnections); ok {
+		limits.MaxConnections = &n
+		set = true
+	}
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxPendingRequests); ok {
+		limits.MaxPendingRequests = &n
+		set = true
+	}
+	if n, ok := t.parseNonNegativeInt(annotations, annotationDefaultMaxConcurrentRequests); ok {
+		limits.MaxConcurrentRequests = &n
+		set = true
+	}
+
+	if phc := t.translateGatewayDefaultPassiveHealthCheck(annotations); phc != nil {
+		limits.PassiveHealthCheck = phc
+		set = true
+	}
+
+	if !set {
+		return nil
+	}
+	return limits
+}
+
+func (t ResourceTranslator) translateGatewayDefaultPassiveHealthCheck(annotations map[string]string) *api.PassiveHealthCheck {
+	phc := &api.PassiveHealthCheck{}
+	set := false
+
+	if d, ok := t.parseNonNegativeDuration(annotations, annotationDefaultPHCInterval); ok {
+		phc.Interval = d
+		set = true
+	}
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCMaxFailures, maxUint32); ok {
+		phc.MaxFailures = n
+		set = true
+	}
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCEnforcingConsecutive5, maxPercent); ok {
+		phc.EnforcingConsecutive5xx = &n
+		set = true
+	}
+	if n, ok := t.parseUint32(annotations, annotationDefaultPHCMaxEjectionPercent, maxPercent); ok {
+		phc.MaxEjectionPercent = &n
+		set = true
+	}
+	if d, ok := t.parseNonNegativeDuration(annotations, annotationDefaultPHCBaseEjectionTime); ok {
+		phc.BaseEjectionTime = &d
+		set = true
+	}
+
+	if !set {
+		return nil
+	}
+	return phc
+}
+
+const (
+	maxPercent = uint64(100)
+	maxUint32  = uint64(^uint32(0))
+)
+
+// rejectAnnotation warns that an annotation value was ignored. Ignoring rather
+// than failing the reconcile keeps a typo in an optional tuning annotation from
+// tearing down an otherwise healthy gateway, but the operator still gets a
+// signal in the controller logs instead of silently getting Envoy's defaults.
+func (t ResourceTranslator) rejectAnnotation(key, value, reason string) {
+	t.Logger.Info("ignoring invalid api-gateway annotation value",
+		"annotation", key, "value", value, "reason", reason)
+}
+
+// parseNonNegativeInt reads an integer annotation. Values that are missing,
+// unparseable or negative are ignored so that an operator typo cannot push an
+// invalid config entry to Consul (Envoy rejects negative circuit-breaker
+// thresholds). The corresponding field is then left unset and Envoy's own
+// default applies.
+func (t ResourceTranslator) parseNonNegativeInt(annotations map[string]string, key string) (int, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		t.rejectAnnotation(key, v, "value must be an integer")
+		return 0, false
+	}
+	if n < 0 {
+		t.rejectAnnotation(key, v, "value must not be negative")
+		return 0, false
+	}
+	return n, true
+}
+
+// parseUint32 reads an unsigned integer annotation, ignoring values that are
+// unparseable, negative or greater than max.
+func (t ResourceTranslator) parseUint32(annotations map[string]string, key string, max uint64) (uint32, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(v, 10, 32)
+	if err != nil {
+		t.rejectAnnotation(key, v, fmt.Sprintf("value must be an integer between 0 and %d", max))
+		return 0, false
+	}
+	if n > max {
+		t.rejectAnnotation(key, v, fmt.Sprintf("value must not be greater than %d", max))
+		return 0, false
+	}
+	return uint32(n), true
+}
+
+// parseNonNegativeDuration reads a duration annotation, ignoring values that are
+// unparseable or negative.
+func (t ResourceTranslator) parseNonNegativeDuration(annotations map[string]string, key string) (time.Duration, bool) {
+	v, ok := annotations[key]
+	if !ok {
+		return 0, false
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		t.rejectAnnotation(key, v, "value must be a duration such as \"10s\"")
+		return 0, false
+	}
+	if d < 0 {
+		t.rejectAnnotation(key, v, "duration must not be negative")
+		return 0, false
+	}
+	return d, true
+}
+
+// toConsulUpstreamLimits converts a RouteUpstreamLimitsFilter spec into the
+// Consul api.UpstreamLimits used on a route service's Limits.
+func toConsulUpstreamLimits(spec v1alpha1.RouteUpstreamLimitsFilterSpec) *api.UpstreamLimits {
+	limits := &api.UpstreamLimits{
+		MaxConnections:        spec.MaxConnections,
+		MaxPendingRequests:    spec.MaxPendingRequests,
+		MaxConcurrentRequests: spec.MaxConcurrentRequests,
+		PassiveHealthCheck:    toConsulPassiveHealthCheck(spec.PassiveHealthCheck),
+	}
+	return limits
+}
+
+func toConsulPassiveHealthCheck(phc *v1alpha1.PassiveHealthCheck) *api.PassiveHealthCheck {
+	if phc == nil {
+		return nil
+	}
+	out := &api.PassiveHealthCheck{
+		Interval:                phc.Interval.Duration,
+		MaxFailures:             phc.MaxFailures,
+		EnforcingConsecutive5xx: phc.EnforcingConsecutive5xx,
+		MaxEjectionPercent:      phc.MaxEjectionPercent,
+	}
+	if phc.BaseEjectionTime != nil {
+		d := phc.BaseEjectionTime.Duration
+		out.BaseEjectionTime = &d
+	}
+	return out
+}
+
+// listenerProtocolMap maps Kubernetes Gateway API listener protocol values to
+// the corresponding Consul api-gateway listener protocol strings.
 var listenerProtocolMap = map[string]string{
 	"https": "http",
 	"http":  "http",
 	"tcp":   "tcp",
+	// http2 and grpc are not standard Gateway API protocol types; they are
+	// selected via the ListenerProtocol annotation (see resolveListenerProtocol).
 }
 
-func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) (api.APIGatewayListener, bool) {
+// validConsulListenerProtocols is the set of values accepted by Consul's
+// APIGatewayListenerProtocol. Used to validate annotation-supplied overrides.
+var validConsulListenerProtocols = map[string]bool{
+	"http":  true,
+	"http2": true,
+	"grpc":  true,
+	"tcp":   true,
+}
+
+// resolveListenerProtocol returns the Consul listener protocol for the given
+// listener section. If the Gateway carries the per-section annotation
+// "api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol" with a
+// valid value, that value takes precedence over the protocol derived from the
+// Kubernetes listener.Protocol field.
+func resolveListenerProtocol(gateway gwv1.Gateway, listener gwv1.Listener) string {
+	annotationKey := ListenerProtocolAnnotationPrefix + string(listener.Name) + ListenerProtocolAnnotationSuffix
+	if override, ok := gateway.Annotations[annotationKey]; ok {
+		if validConsulListenerProtocols[strings.ToLower(override)] {
+			return strings.ToLower(override)
+		}
+	}
+	return listenerProtocolMap[strings.ToLower(string(listener.Protocol))]
+}
+
+func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1.Gateway, listener gwv1.Listener, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) (api.APIGatewayListener, bool) {
 	namespace := gateway.Namespace
 
 	var certificates []api.ResourceReference
 	var cipherSuites []string
 	var maxVersion, minVersion string
+	var sdsConfig *api.GatewayTLSSDSConfig
 
 	if listener.TLS != nil {
+		effectiveSDS := ResolveListenerTLSSDSConfig(gateway, listener, resources)
+		sdsConfig = effectiveSDS.Config
+
 		cipherSuitesVal := string(listener.TLS.Options[TLSCipherSuitesAnnotationKey])
 		if cipherSuitesVal != "" {
 			cipherSuites = strings.Split(cipherSuitesVal, ",")
@@ -128,9 +397,10 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 		Name:     string(listener.Name),
 		Hostname: DerefStringOr(listener.Hostname, ""),
 		Port:     ToContainerPort(listener.Port, portMapping),
-		Protocol: listenerProtocolMap[strings.ToLower(string(listener.Protocol))],
+		Protocol: resolveListenerProtocol(gateway, listener),
 		TLS: api.APIGatewayTLSConfiguration{
 			Certificates: certificates,
+			SDS:          sdsConfig,
 			CipherSuites: cipherSuites,
 			MaxVersion:   maxVersion,
 			MinVersion:   minVersion,
@@ -140,7 +410,7 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 	}, true
 }
 
-func ToContainerPort(portNumber gwv1beta1.PortNumber, mapPrivilegedContainerPorts int32) int {
+func ToContainerPort(portNumber gwv1.PortNumber, mapPrivilegedContainerPorts int32) int {
 	if portNumber >= 1024 {
 		// We don't care about privileged port-mapping, this is a non-privileged port
 		return int(portNumber)
@@ -180,6 +450,54 @@ func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.Rou
 
 	return &api.JWTFilter{
 		Providers: ConvertSliceFunc(routeJWTFilter.Spec.JWT.Providers, t.translateJWTProvider),
+	}
+}
+
+func (t ResourceTranslator) translateRouteExtProcFilter(routeExtProc *v1alpha1.RouteExtProc) api.ExtProcFilter {
+	filter := api.ExtProcFilter{
+		StatPrefix: routeExtProc.Spec.StatPrefix,
+		Mode:       routeExtProc.Spec.Mode,
+	}
+
+	if o := routeExtProc.Spec.Overrides; o != nil {
+		overrides := &api.ExtProcOverrides{
+			// MessageTimeout:   o.MessageTimeout,
+			// FailureModeAllow: o.FailureModeAllow,
+		}
+		if o.Processing != nil {
+			overrides.Processing = &api.ExtProcProcessing{
+				Request:  translateExtProcProcessingDirection(o.Processing.Request),
+				Response: translateExtProcProcessingDirection(o.Processing.Response),
+			}
+		}
+		filter.Overrides = overrides
+	}
+
+	return filter
+}
+
+func translateExtProcProcessingDirection(d *v1alpha1.RouteExtProcProcessingDirection) *api.ExtProcProcessingDirection {
+	if d == nil {
+		return nil
+	}
+	return &api.ExtProcProcessingDirection{
+		HeadersMode:  d.HeadersMode,
+		BodyMode:     d.BodyMode,
+		TrailersMode: d.TrailersMode,
+		MaxBodyBytes: d.MaxBodyBytes,
+	}
+}
+
+// translateRouteExtAuthzFilter translates the ext_authz portion of a
+// RouteAuthFilter into the Consul http-route ExtAuthz filter. Returns nil when
+// the RouteAuthFilter does not configure ext_authz.
+func (t ResourceTranslator) translateRouteExtAuthzFilter(routeAuthFilter *v1alpha1.RouteAuthFilter) *api.HTTPRouteExtAuthzFilter {
+	if routeAuthFilter.Spec.ExtAuthz == nil {
+		return nil
+	}
+
+	return &api.HTTPRouteExtAuthzFilter{
+		Enabled: routeAuthFilter.Spec.ExtAuthz.Enabled,
 	}
 }
 
@@ -236,7 +554,7 @@ func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.GatewayJWT
 	return &verifyClaim
 }
 
-func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
+func (t ResourceTranslator) ToHTTPRoute(route gwv1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
 	namespace := t.Namespace(route.Namespace)
 
 	// We don't translate parent refs.
@@ -244,7 +562,7 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 	hostnames := StringLikeSlice(route.Spec.Hostnames)
 	rules := ConvertSliceFuncIf(
 		route.Spec.Rules,
-		func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
+		func(rule gwv1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
 			return t.translateHTTPRouteRule(route, rule, resources)
 		})
 
@@ -264,10 +582,10 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 	return &configEntry
 }
 
-func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
+func (t ResourceTranslator) translateHTTPRouteRule(route gwv1.HTTPRoute, rule gwv1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
 	services := ConvertSliceFuncIf(
 		rule.BackendRefs,
-		func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
+		func(ref gwv1.HTTPBackendRef) (api.HTTPService, bool) {
 			return t.translateHTTPBackendRef(route, ref, resources)
 		})
 
@@ -275,8 +593,21 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 		return api.HTTPRouteRule{}, false
 	}
 
-	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
-	filters, responseFilters := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
+	// Build the set of header names to invert from a RouteHeaderMatchInvertFilter
+	// ExtensionRef, if one is present in this rule's filters.
+	invertedHeaders := t.invertedHeaderNamesForRule(rule.Filters, resources, route.Namespace)
+
+	matches := ConvertSliceFunc(rule.Matches, func(m gwv1.HTTPRouteMatch) api.HTTPMatch {
+		return t.translateHTTPMatchWithInvert(m, invertedHeaders)
+	})
+	filters, responseFilters, _ := t.translateHTTPFilters(rule.Filters, resources, route.Namespace, &route)
+
+	// A per-rule ExtAuthz filter (from a RouteAuthFilter ExtensionRef) wins. When
+	// no rule-level override is present, fall back to the route-wide ext_authz
+	// annotation so it applies to every rule in the route.
+	if filters.ExtAuthz == nil {
+		filters.ExtAuthz = routeExtAuthzFromAnnotations(route.Annotations)
+	}
 
 	return api.HTTPRouteRule{
 		Filters:         filters,
@@ -286,7 +617,7 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 	}, true
 }
 
-func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, ref gwv1beta1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
+func (t ResourceTranslator) translateHTTPBackendRef(route gwv1.HTTPRoute, ref gwv1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
 	id := types.NamespacedName{
 		Name:      string(ref.Name),
 		Namespace: DerefStringOr(ref.Namespace, route.Namespace),
@@ -295,7 +626,7 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
 
 	if isServiceRef && resources.HasService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters, responseFilters, tlsConfig := t.translateHTTPFilters(ref.Filters, resources, route.Namespace, &route)
 		service := resources.Service(id)
 		return api.HTTPService{
 			Name:            service.Name,
@@ -303,13 +634,15 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 			Partition:       t.ConsulPartition,
 			Filters:         filters,
 			ResponseFilters: responseFilters,
+			TLS:             tlsConfig,
 			Weight:          DerefIntOr(ref.Weight, 1),
+			Limits:          t.translateBackendRefLimits(ref.Filters, resources, route.Namespace),
 		}, true
 	}
 
 	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
 	if isMeshServiceRef && resources.HasMeshService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters, responseFilters, tlsConfig := t.translateHTTPFilters(ref.Filters, resources, route.Namespace, &route)
 		service := resources.MeshService(id)
 
 		return api.HTTPService{
@@ -318,31 +651,60 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 			Partition:       t.ConsulPartition,
 			Filters:         filters,
 			ResponseFilters: responseFilters,
+			TLS:             tlsConfig,
 			Weight:          DerefIntOr(ref.Weight, 1),
+			Limits:          t.translateBackendRefLimits(ref.Filters, resources, route.Namespace),
 		}, true
 	}
 
 	return api.HTTPService{}, false
 }
 
-var headerMatchTypeTranslation = map[gwv1beta1.HeaderMatchType]api.HTTPHeaderMatchType{
-	gwv1beta1.HeaderMatchExact:             api.HTTPHeaderMatchExact,
-	gwv1beta1.HeaderMatchRegularExpression: api.HTTPHeaderMatchRegularExpression,
+// translateBackendRefLimits scans a backendRef's filters for a
+// RouteUpstreamLimitsFilter extensionRef and, if present, returns the resolved
+// per-service upstream limits. It returns nil when no such filter is referenced.
+func (t ResourceTranslator) translateBackendRefLimits(filters []gwv1.HTTPRouteFilter, resources *ResourceMap, namespace string) *api.UpstreamLimits {
+	for _, filter := range filters {
+		if filter.Type != gwv1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+			continue
+		}
+		if filter.ExtensionRef.Kind != v1alpha1.RouteUpstreamLimitsFilterKind {
+			continue
+		}
+		crdFilter, exists := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+		if !exists {
+			continue
+		}
+		if limitsFilter, ok := crdFilter.(*v1alpha1.RouteUpstreamLimitsFilter); ok {
+			return toConsulUpstreamLimits(limitsFilter.Spec)
+		}
+	}
+	return nil
 }
 
-var headerPathMatchTypeTranslation = map[gwv1beta1.PathMatchType]api.HTTPPathMatchType{
-	gwv1beta1.PathMatchExact:             api.HTTPPathMatchExact,
-	gwv1beta1.PathMatchPathPrefix:        api.HTTPPathMatchPrefix,
-	gwv1beta1.PathMatchRegularExpression: api.HTTPPathMatchRegularExpression,
+var headerMatchTypeTranslation = map[gwv1.HeaderMatchType]api.HTTPHeaderMatchType{
+	gwv1.HeaderMatchExact:             api.HTTPHeaderMatchExact,
+	gwv1.HeaderMatchRegularExpression: api.HTTPHeaderMatchRegularExpression,
 }
 
-var queryMatchTypeTranslation = map[gwv1beta1.QueryParamMatchType]api.HTTPQueryMatchType{
-	gwv1beta1.QueryParamMatchExact:             api.HTTPQueryMatchExact,
-	gwv1beta1.QueryParamMatchRegularExpression: api.HTTPQueryMatchRegularExpression,
+var headerPathMatchTypeTranslation = map[gwv1.PathMatchType]api.HTTPPathMatchType{
+	gwv1.PathMatchExact:             api.HTTPPathMatchExact,
+	gwv1.PathMatchPathPrefix:        api.HTTPPathMatchPrefix,
+	gwv1.PathMatchRegularExpression: api.HTTPPathMatchRegularExpression,
 }
 
-func (t ResourceTranslator) translateHTTPMatch(match gwv1beta1.HTTPRouteMatch) api.HTTPMatch {
-	headers := ConvertSliceFunc(match.Headers, t.translateHTTPHeaderMatch)
+var queryMatchTypeTranslation = map[gwv1.QueryParamMatchType]api.HTTPQueryMatchType{
+	gwv1.QueryParamMatchExact:             api.HTTPQueryMatchExact,
+	gwv1.QueryParamMatchRegularExpression: api.HTTPQueryMatchRegularExpression,
+}
+
+// translateHTTPMatchWithInvert translates an HTTPRouteMatch into an api.HTTPMatch,
+// honouring invertedHeaders: a set of lowercase header names whose Invert flag
+// should be set to true in the translated output.
+func (t ResourceTranslator) translateHTTPMatchWithInvert(match gwv1.HTTPRouteMatch, invertedHeaders map[string]struct{}) api.HTTPMatch {
+	headers := ConvertSliceFunc(match.Headers, func(h gwv1.HTTPHeaderMatch) api.HTTPHeaderMatch {
+		return t.translateHTTPHeaderMatchWithInvert(h, invertedHeaders)
+	})
 	queries := ConvertSliceFunc(match.QueryParams, t.translateHTTPQueryMatch)
 
 	return api.HTTPMatch{
@@ -353,22 +715,54 @@ func (t ResourceTranslator) translateHTTPMatch(match gwv1beta1.HTTPRouteMatch) a
 	}
 }
 
-func (t ResourceTranslator) translateHTTPPathMatch(match gwv1beta1.HTTPPathMatch) api.HTTPPathMatch {
+func (t ResourceTranslator) translateHTTPPathMatch(match gwv1.HTTPPathMatch) api.HTTPPathMatch {
 	return api.HTTPPathMatch{
 		Match: DerefLookup(match.Type, headerPathMatchTypeTranslation),
 		Value: DerefStringOr(match.Value, ""),
 	}
 }
 
-func (t ResourceTranslator) translateHTTPHeaderMatch(match gwv1beta1.HTTPHeaderMatch) api.HTTPHeaderMatch {
+// translateHTTPHeaderMatchWithInvert translates a single HTTPHeaderMatch,
+// setting Invert=true when the header name (lowercased) appears in invertedHeaders.
+func (t ResourceTranslator) translateHTTPHeaderMatchWithInvert(match gwv1.HTTPHeaderMatch, invertedHeaders map[string]struct{}) api.HTTPHeaderMatch {
+	_, invert := invertedHeaders[strings.ToLower(string(match.Name))]
 	return api.HTTPHeaderMatch{
-		Name:  string(match.Name),
-		Value: match.Value,
-		Match: DerefLookup(match.Type, headerMatchTypeTranslation),
+		Name:   string(match.Name),
+		Value:  match.Value,
+		Match:  DerefLookup(match.Type, headerMatchTypeTranslation),
+		Invert: invert,
 	}
 }
 
-func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryParamMatch) api.HTTPQueryMatch {
+// invertedHeaderNamesForRule scans a rule's filters for a RouteHeaderMatchInvertFilter
+// ExtensionRef and returns a lowercase set of the header names it declares.
+// Returns nil when no such filter is present.
+func (t ResourceTranslator) invertedHeaderNamesForRule(filters []gwv1.HTTPRouteFilter, resources *ResourceMap, namespace string) map[string]struct{} {
+	for _, f := range filters {
+		if f.Type != gwv1.HTTPRouteFilterExtensionRef || f.ExtensionRef == nil {
+			continue
+		}
+		if string(f.ExtensionRef.Kind) != v1alpha1.RouteHeaderMatchInvertFilterKind {
+			continue
+		}
+		obj, ok := resources.GetExternalFilter(*f.ExtensionRef, namespace)
+		if !ok {
+			continue
+		}
+		invertFilter, ok := obj.(*v1alpha1.RouteHeaderMatchInvertFilter)
+		if !ok {
+			continue
+		}
+		set := make(map[string]struct{}, len(invertFilter.Spec.HeaderNames))
+		for _, name := range invertFilter.Spec.HeaderNames {
+			set[strings.ToLower(name)] = struct{}{}
+		}
+		return set
+	}
+	return nil
+}
+
+func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1.HTTPQueryParamMatch) api.HTTPQueryMatch {
 	return api.HTTPQueryMatch{
 		Name:  string(match.Name),
 		Value: match.Value,
@@ -376,7 +770,7 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 	}
 }
 
-func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
+func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string, route *gwv1.HTTPRoute) (api.HTTPFilters, api.HTTPResponseFilters, *api.GatewayServiceTLSConfig) {
 	var (
 		urlRewrite            *api.URLRewrite
 		retryFilter           *api.RetryFilter
@@ -384,6 +778,9 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		requestHeaderFilters  = []api.HTTPHeaderFilter{}
 		responseHeaderFilters = []api.HTTPHeaderFilter{}
 		jwtFilter             *api.JWTFilter
+		tlsConfig             *api.GatewayServiceTLSConfig
+		extProcFilters        []api.ExtProcFilter
+		extAuthzFilter        *api.HTTPRouteExtAuthzFilter
 	)
 
 	// Convert Gateway API filters to portions of the Consul request and response filters.
@@ -437,7 +834,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		// we drop any path rewrites that are not prefix matches as we don't support those
 		if filter.URLRewrite != nil &&
 			filter.URLRewrite.Path != nil &&
-			filter.URLRewrite.Path.Type == gwv1beta1.PrefixMatchHTTPPathModifier {
+			filter.URLRewrite.Path.Type == gwv1.PrefixMatchHTTPPathModifier {
 			urlRewrite = &api.URLRewrite{Path: DerefStringOr(filter.URLRewrite.Path.ReplacePrefixMatch, "")}
 		}
 
@@ -455,7 +852,28 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 			case v1alpha1.RouteTimeoutFilterKind:
 				timeoutFilter = t.translateRouteTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
 			case v1alpha1.RouteAuthFilterKind:
-				jwtFilter = t.translateRouteJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
+				authFilter := crdFilter.(*v1alpha1.RouteAuthFilter)
+				jwtFilter = t.translateRouteJWTFilter(authFilter)
+				if ea := t.translateRouteExtAuthzFilter(authFilter); ea != nil {
+					extAuthzFilter = ea
+				}
+			case v1alpha1.RouteTLSSDSFilterKind:
+				routeTLSFilter := crdFilter.(*v1alpha1.RouteTLSSDSFilter)
+				if routeTLSFilter.Spec.SDS != nil {
+					clusterName := routeTLSFilter.Spec.SDS.ClusterName
+					if strings.TrimSpace(clusterName) == "" && route != nil && resourceMap != nil {
+						if inheritedCluster, inherited := resourceMap.InheritedTLSSDSClusterForHTTPRoute(*route); inherited {
+							clusterName = inheritedCluster
+						}
+					}
+
+					tlsConfig = &api.GatewayServiceTLSConfig{SDS: &api.GatewayTLSSDSConfig{
+						ClusterName:  clusterName,
+						CertResource: routeTLSFilter.Spec.SDS.CertResource,
+					}}
+				}
+			case v1alpha1.RouteExtProcKind:
+				extProcFilters = append(extProcFilters, t.translateRouteExtProcFilter(crdFilter.(*v1alpha1.RouteExtProc)))
 			}
 		}
 	}
@@ -466,23 +884,24 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
 		JWT:           jwtFilter,
+		ExtAuthz:      extAuthzFilter,
 	}
 
 	responseFilter := api.HTTPResponseFilters{
 		Headers: responseHeaderFilters,
 	}
 
-	return requestFilter, responseFilter
+	return requestFilter, responseFilter, tlsConfig
 }
 
-func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *ResourceMap) *api.TCPRouteConfigEntry {
+func (t ResourceTranslator) ToTCPRoute(route gwv1.TCPRoute, resources *ResourceMap) *api.TCPRouteConfigEntry {
 	namespace := t.Namespace(route.Namespace)
 
 	// we don't translate parent refs
 
-	backendRefs := ConvertSliceFunc(route.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1beta1.BackendRef { return rule.BackendRefs })
+	backendRefs := ConvertSliceFunc(route.Spec.Rules, func(rule gwv1.TCPRouteRule) []gwv1.BackendRef { return rule.BackendRefs })
 	flattenedRefs := Flatten(backendRefs)
-	services := ConvertSliceFuncIf(flattenedRefs, func(ref gwv1beta1.BackendRef) (api.TCPService, bool) {
+	services := ConvertSliceFuncIf(flattenedRefs, func(ref gwv1.BackendRef) (api.TCPService, bool) {
 		return t.translateTCPRouteRule(route, ref, resources)
 	})
 
@@ -499,7 +918,7 @@ func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *Res
 	}
 }
 
-func (t ResourceTranslator) translateTCPRouteRule(route gwv1alpha2.TCPRoute, ref gwv1beta1.BackendRef, resources *ResourceMap) (api.TCPService, bool) {
+func (t ResourceTranslator) translateTCPRouteRule(route gwv1.TCPRoute, ref gwv1.BackendRef, resources *ResourceMap) (api.TCPService, bool) {
 	// we ignore weight for now
 
 	id := types.NamespacedName{

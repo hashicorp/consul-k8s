@@ -1,0 +1,14 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Self-contained second static-server deployment named "static-server-2".
+# Uses label app=static-server-2 (distinct from static-server) so that the
+# two services never share a pod selector.  Response body is "hello-s2";
+# connect-inject is enabled so it is a full mesh participant.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- deployment.yaml
+- service.yaml
+- serviceaccount.yaml

@@ -14,7 +14,6 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -53,6 +52,7 @@ type HelmCluster struct {
 	ChartPath string
 
 	ctx                environment.TestContext
+	cfg                *config.TestConfig
 	helmOptions        *helm.Options
 	releaseName        string
 	runtimeClient      client.Client
@@ -75,7 +75,7 @@ func NewHelmCluster(
 	}
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+		configurePSA(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
@@ -101,7 +101,8 @@ func NewHelmCluster(
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "15m", "--debug"},
+		"install": {"--timeout", "15m", "--debug", "--skip-crds"},
+		"upgrade": {"--timeout", "15m", "--debug", "--skip-crds"},
 		"delete":  {"--timeout", "15m", "--debug"},
 	}
 
@@ -114,6 +115,7 @@ func NewHelmCluster(
 	}
 	return &HelmCluster{
 		ctx:                ctx,
+		cfg:                cfg,
 		helmOptions:        opts,
 		releaseName:        releaseName,
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
@@ -123,6 +125,81 @@ func NewHelmCluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 	}
+}
+
+// NewHelmClusterFromReleasedChart returns a cluster that installs a published
+// consul-k8s chart from the HashiCorp Helm repository instead of the chart in
+// this working tree.
+//
+// It exists for upgrade tests, which must start on a real prior release and
+// then move to the local chart via UpgradeToLocalChart. The image overrides the
+// test flags normally inject are dropped so that the released chart's own
+// pinned image versions are used: an install that ran the locally built
+// control-plane image against an old chart would not be the prior release, and
+// would hide exactly the migration problems an upgrade test is meant to find.
+//
+// The enterprise Consul image is the one override that is kept, because the
+// released chart defaults to the CE image and an enterprise run would otherwise
+// silently install CE and leave its license secret unused.
+func NewHelmClusterFromReleasedChart(
+	t *testing.T,
+	helmValues map[string]string,
+	ctx environment.TestContext,
+	cfg *config.TestConfig,
+	releaseName string,
+	chartVersion string,
+) *HelmCluster {
+	cluster := NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	for _, key := range []string{"global.image", "global.imageK8S", "global.imageEnvoy", "global.imageConsulDataplane"} {
+		delete(cluster.helmOptions.SetValues, key)
+	}
+	if cfg.EnableEnterprise {
+		entImage, err := cfg.HelmValuesFromConfig()
+		require.NoError(t, err)
+		if image, ok := entImage["global.image"]; ok {
+			cluster.helmOptions.SetValues["global.image"] = image
+		}
+	}
+	cluster.helmOptions.Version = chartVersion
+	cluster.helmOptions.ExtraArgs["upgrade"] = append(
+		cluster.helmOptions.ExtraArgs["upgrade"], "--version", chartVersion,
+	)
+	return cluster
+}
+
+// UpgradeToLocalChart upgrades a release installed from a published chart to
+// the chart in this working tree, restoring the image overrides from the test
+// flags.
+//
+// Restoring global.imageK8S is what makes the upgrade meaningful: hooks and
+// controllers added by the local chart run subcommands that only exist in the
+// locally built control-plane image.
+func (h *HelmCluster) UpgradeToLocalChart(t *testing.T, helmValues map[string]string) {
+	t.Helper()
+
+	valuesFromConfig, err := h.cfg.HelmValuesFromConfig()
+	require.NoError(t, err)
+	for _, key := range []string{"global.image", "global.imageK8S", "global.imageEnvoy", "global.imageConsulDataplane"} {
+		if value, ok := valuesFromConfig[key]; ok {
+			h.helmOptions.SetValues[key] = value
+		}
+	}
+	h.helmOptions.Version = config.HelmChartPath
+	h.removeReleasedChartVersion()
+	h.Upgrade(t, helmValues)
+}
+
+func (h *HelmCluster) removeReleasedChartVersion() {
+	args := h.helmOptions.ExtraArgs["upgrade"]
+	filtered := args[:0]
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--version" && i+1 < len(args) {
+			i++
+			continue
+		}
+		filtered = append(filtered, args[i])
+	}
+	h.helmOptions.ExtraArgs["upgrade"] = filtered
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
@@ -152,10 +229,30 @@ func (h *HelmCluster) Create(t *testing.T) {
 		if err != nil {
 			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
 		}
+		// terratest's helm.UpgradeE ignores Options.Version, so `helm upgrade
+		// --install` would pull the latest published chart instead of the pinned
+		// one. Pass --version explicitly for this install and restore the args so
+		// a later UpgradeToLocalChart still targets the local chart path.
+		if h.helmOptions.Version != "" {
+			upgradeArgs := h.helmOptions.ExtraArgs["upgrade"]
+			h.helmOptions.ExtraArgs["upgrade"] = append(append([]string{}, upgradeArgs...), "--version", h.helmOptions.Version)
+			defer func() { h.helmOptions.ExtraArgs["upgrade"] = upgradeArgs }()
+		}
 	}
+	// terratest's helm.UpgradeE ignores Options.Version, so `helm upgrade
+    // --install` would pull the latest published chart instead of the pinned
+    // one. Pass --version explicitly for this install and restore the args so
+    // a later UpgradeToLocalChart still targets the local chart path. An empty
+    // version is left unpinned so it keeps resolving to the latest release.
+    if h.helmOptions.Version != "" {
+		upgradeArgs := h.helmOptions.ExtraArgs["upgrade"]
+		h.helmOptions.ExtraArgs["upgrade"] = append(append([]string{}, upgradeArgs...), "--version", h.helmOptions.Version)
+		defer func() { h.helmOptions.ExtraArgs["upgrade"] = upgradeArgs }()
+}
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
+
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
@@ -170,7 +267,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
-
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be
 	// deleted at this point, in which case these operations will fail on non-existent
@@ -179,9 +275,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Forcibly delete all gateway classes and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
 
-	var gatewayClassList gwv1beta1.GatewayClassList
+	var gatewayClassList gwv1.GatewayClassList
 	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
 	}) == nil {
@@ -470,6 +566,23 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
+// UpgradeE runs a Helm upgrade and returns its error instead of failing the
+// test. It is intended for tests that assert an upgrade is rejected, for
+// example when a post-upgrade hook Job is expected to fail.
+//
+// Unlike Upgrade it does not wait for Pods to become ready, because a rejected
+// upgrade may leave the release partially rolled out.
+func (h *HelmCluster) UpgradeE(t *testing.T, helmValues map[string]string) error {
+	t.Helper()
+
+	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
+	chartName := "hashicorp/consul"
+	if h.helmOptions.Version == config.HelmChartPath {
+		chartName = config.HelmChartPath
+	}
+	return helm.UpgradeE(t, h.helmOptions, chartName, h.releaseName)
+}
+
 // CreatePortForwardTunnel returns the local address:port of a tunnel to the consul server pod in the given release.
 func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, release ...string) string {
 	releaseName := h.releaseName
@@ -547,111 +660,48 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 	return consulClient, config.Address
 }
 
-// configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
-// and a role binding that binds the default service account in the helm installation namespace to the cluster role.
-// We bind the default service account for tests that are spinning up pods without a service account set so that
-// they will not be rejected by the kube pod security policy controller.
-func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
-	pspName := "test-psp"
+// PodSecurityPolicies are removed from the kubernetes API in v1.25.
+// Thus using the Pod Security Admission Controller with a privileged policy is the recommended path forward for testing in clusters with Kubernetes v1.25 and above.
 
-	// Pod Security Policy
-	{
-		// Check if the pod security policy with this name already exists
-		_, err := client.PolicyV1beta1().PodSecurityPolicies().Get(context.Background(), pspName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			// This pod security policy can be used by any tests resources.
-			// This policy is fairly simple and only prevents from running privileged containers.
-			psp := &policyv1beta.PodSecurityPolicy{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-psp",
-				},
-				Spec: policyv1beta.PodSecurityPolicySpec{
-					Privileged:          true,
-					AllowedCapabilities: []corev1.Capability{"NET_ADMIN"},
-					SELinux: policyv1beta.SELinuxStrategyOptions{
-						Rule: policyv1beta.SELinuxStrategyRunAsAny,
-					},
-					SupplementalGroups: policyv1beta.SupplementalGroupsStrategyOptions{
-						Rule: policyv1beta.SupplementalGroupsStrategyRunAsAny,
-					},
-					RunAsUser: policyv1beta.RunAsUserStrategyOptions{
-						Rule: policyv1beta.RunAsUserStrategyRunAsAny,
-					},
-					FSGroup: policyv1beta.FSGroupStrategyOptions{
-						Rule: policyv1beta.FSGroupStrategyRunAsAny,
-					},
-					Volumes: []policyv1beta.FSType{policyv1beta.All},
-				},
-			}
-			_, err = client.PolicyV1beta1().PodSecurityPolicies().Create(context.Background(), psp, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
+func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	// Create a privileged Pod Security Admission policy for the helm installation namespace.
+	ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	labels := ns.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
 	}
 
-	// Cluster role for the PSP.
-	{
-		// Check if we have a cluster role that authorizes the use of the pod security policy.
-		_, err := client.RbacV1().ClusterRoles().Get(context.Background(), pspName, metav1.GetOptions{})
+	labels["pod-security.kubernetes.io/enforce"] = "privileged"
+	labels["pod-security.kubernetes.io/audit"] = "privileged"
+	labels["pod-security.kubernetes.io/warn"] = "privileged"
 
-		// If it doesn't exist, create the clusterrole.
-		if errors.IsNotFound(err) {
-			pspClusterRole := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: pspName,
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						Verbs:         []string{"use"},
-						APIGroups:     []string{"policy"},
-						Resources:     []string{"podsecuritypolicies"},
-						ResourceNames: []string{pspName},
-					},
-				},
-			}
-			_, err = client.RbacV1().ClusterRoles().Create(context.Background(), pspClusterRole, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
-	}
+	ns.SetLabels(labels)
 
-	// A role binding to allow default service account in the installation namespace access to the PSP.
-	{
-		// Check if this cluster role binding already exists.
-		_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), pspName, metav1.GetOptions{})
-
-		if errors.IsNotFound(err) {
-			pspRoleBinding := &rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: pspName,
-				},
-				Subjects: []rbacv1.Subject{
-					{
-						Kind:      rbacv1.ServiceAccountKind,
-						Name:      "default",
-						Namespace: namespace,
-					},
-				},
-				RoleRef: rbacv1.RoleRef{
-					Kind: "ClusterRole",
-					Name: pspName,
-				},
-			}
-
-			_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), pspRoleBinding, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
-	}
+	_, err = client.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+	require.NoError(t, err)
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		_ = client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		_ = client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		// Remove the labels on the namespace.
+		ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+		if err != nil {
+			return
+		}
+
+		labels := ns.GetLabels()
+		if labels == nil {
+			return
+		}
+
+		delete(labels, "pod-security.kubernetes.io/enforce")
+		delete(labels, "pod-security.kubernetes.io/audit")
+		delete(labels, "pod-security.kubernetes.io/warn")
+
+		ns.SetLabels(labels)
+		_, _ = client.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 	})
+
 }
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {

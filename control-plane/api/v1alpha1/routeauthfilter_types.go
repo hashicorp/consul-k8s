@@ -44,6 +44,25 @@ type RouteAuthFilterSpec struct {
 	// This re-uses the JWT requirement type from Gateway Policy Types.
 	//+kubebuilder:validation:Optional
 	JWT *GatewayJWTRequirement `json:"jwt,omitempty"`
+
+	// ExtAuthz overrides the gateway-wide external authorization (ext_authz)
+	// posture for the route rule(s) that reference this filter. It takes
+	// precedence over the gateway-wide ext_authz toggle for the matched route.
+	//+kubebuilder:validation:Optional
+	ExtAuthz *RouteAuthFilterExtAuthz `json:"extAuthz,omitempty"`
+}
+
+// RouteAuthFilterExtAuthz controls the ext_authz HTTP filter at the route level.
+// It maps to the Consul http-route ExtAuthz filter and takes precedence over the
+// gateway-wide ext_authz toggle for the matched route.
+type RouteAuthFilterExtAuthz struct {
+	// Enabled controls whether Envoy runs the ext_authz check for the matched
+	// route. When true the check is force-enabled (rendered as
+	// ExtAuthzPerRoute{check_settings}); when false it is force-skipped
+	// (rendered as ExtAuthzPerRoute{disabled:true}). This takes precedence over
+	// the gateway-wide ext_authz toggle.
+	//+kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
 }
 
 // RouteAuthFilterStatus defines the observed state of the gateway.

@@ -39,7 +39,7 @@ func TestPeeringAcceptor_Validate(t *testing.T) {
 				Spec: PeeringAcceptorSpec{},
 			},
 			expectedErrMsgs: []string{
-				`spec.peer: Invalid value: "null": peer must be specified`,
+				`spec.peer: Invalid value: null: peer must be specified`,
 			},
 		},
 		"no secret specified": {
@@ -52,7 +52,7 @@ func TestPeeringAcceptor_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.peer.secret: Invalid value: "null": secret must be specified`,
+				`spec.peer.secret: Invalid value: null: secret must be specified`,
 			},
 		},
 		"invalid secret backend": {

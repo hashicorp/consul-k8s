@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // Test that Gateway works in a default and ACLsEnabled installations for X-Partition and in-partition networking.
@@ -253,7 +253,7 @@ func TestPartitions_Gateway(t *testing.T) {
 	var gatewayAddress string
 	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: staticServerNamespace}, &gateway)
 		require.NoError(r, err)
 
@@ -343,6 +343,27 @@ func TestPartitions_Gateway(t *testing.T) {
 
 		logger.Log(t, "patching route to target server")
 		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+
+		logger.Log(t, "logging gateway + route for debugging")
+
+		out, err := k8s.RunKubectlAndGetOutputE(
+			t,
+			secondaryPartitionClusterStaticServerOpts,
+			"get", "gateway", "gateway", "-o", "yaml",
+		)
+		require.NoError(t, err)
+		logger.Logf(t, "Gateway:\n%s", out)
+
+		out, err = k8s.RunKubectlAndGetOutputE(
+			t,
+			secondaryPartitionClusterStaticServerOpts,
+			"get", "httproute", "http-route", "-o", "yaml",
+		)
+		require.NoError(t, err)
+		logger.Logf(t, "HTTPRoute:\n%s", out)
+
+		logger.Log(t, "waiting for routing to stabilize")
+		time.Sleep(60 * time.Second)
 
 		logger.Log(t, "checking that the connection is not successful because there's no intention")
 		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, targetAddress)

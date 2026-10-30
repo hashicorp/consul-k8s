@@ -1,0 +1,21 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Gateway-wide ext_authz is ENABLED by default (no
+# consul.hashicorp.com/ext-authz annotation), so every route is subject to the
+# ext_authz check performed by oauth2-proxy.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  labels:
+    component: api-gateway
+spec:
+  gatewayClassName: gateway-class
+  listeners:
+  - protocol: HTTP
+    port: 8080
+    name: http
+    allowedRoutes:
+      namespaces:
+        from: "All"

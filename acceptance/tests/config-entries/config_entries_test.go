@@ -32,6 +32,11 @@ const (
 
 func TestController(t *testing.T) {
 	cfg := suite.Config()
+
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and controller is already tested with regular tproxy")
 	}
@@ -242,6 +247,21 @@ func TestController(t *testing.T) {
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.WriteRate)
+
+					// rate-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
+					require.NoError(r, err)
+					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+					require.NotNil(r, rateLimitConfigEntry.Config)
+					require.NotNil(r, rateLimitConfigEntry.Config.WriteRate)
+					require.NotNil(r, rateLimitConfigEntry.Config.ReadRate)
+					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.WriteRate)
+					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.ReadRate)
+					require.True(r, rateLimitConfigEntry.Config.Priority)
+					if len(rateLimitConfigEntry.Config.ExcludeEndpoints) > 0 {
+						require.ElementsMatch(r, []string{"Health.Check", "ConfigEntry.Apply"}, rateLimitConfigEntry.Config.ExcludeEndpoints)
+					}
 				})
 			}
 
@@ -290,6 +310,9 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "patching control-plane-request-limit custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "controlplanerequestlimit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
+
+				logger.Log(t, "patching rate-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ratelimit", "global", "-p", `{"spec": {"config": {"priority": false}}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -379,6 +402,13 @@ func TestController(t *testing.T) {
 					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
 					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
 					require.Equal(r, rateLimitIPConfigEntry.Mode, "disabled")
+
+					// rate-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
+					require.NoError(r, err)
+					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitConfigEntry")
+					require.Equal(r, rateLimitConfigEntry.Config.Priority, false)
 				})
 			}
 
@@ -419,6 +449,9 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "deleting control-plane-request-limit custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "controlplanerequestlimit", "controlplanerequestlimit")
+
+				logger.Log(t, "deleting rate-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ratelimit", "global")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -479,6 +512,11 @@ func TestController(t *testing.T) {
 
 					// control-plane-request-limit
 					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// rate-limit
+					_, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})
@@ -632,6 +670,17 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 	}
 	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
+	// feature-gate-set
+	featureGateSetRole := "feature-gate-set"
+	featureGateSetAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, featureGateSetRole),
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            featureGateSetRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, serverPKIConfig.PolicyName),
+	}
+	featureGateSetAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
 	// allow all components to access server ca
 	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
@@ -654,6 +703,7 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
 		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
 		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
+		"global.secretsBackend.vault.featureGateSetRole":   featureGateSetRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",

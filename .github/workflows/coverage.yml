@@ -1,0 +1,168 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Reusable workflow that runs unit tests with coverage for the critical Go
+# modules (control-plane, cli), merges the profiles, and publishes the results
+# via reusable-coverage-report.yml.
+
+name: coverage
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+      pr-number:
+        required: false
+        type: string
+
+jobs:
+  conditional-skip:
+    uses: ./.github/workflows/reusable-conditional-skip.yml
+
+  get-go-version:
+    needs: [conditional-skip]
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    uses: ./.github/workflows/reusable-get-go-version.yml
+
+  unit-tests-control-plane:
+    name: unit-tests (control-plane)
+    needs: [get-go-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: Install consul binary
+        # Several control-plane packages use testutil.NewTestServerConfigT which
+        # requires the consul binary on PATH to start a real test server.
+        run: |
+          CONSUL_VERSION="2.0.0"
+          curl -sSLO "https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip"
+          unzip -o "consul_${CONSUL_VERSION}_linux_amd64.zip" consul -d /usr/local/bin
+          rm "consul_${CONSUL_VERSION}_linux_amd64.zip"
+          consul version
+
+      - name: Run unit tests with coverage
+        # -p 1 disables parallelism to avoid port conflicts from shared
+        # default metrics / lifecycle server configuration.
+        run: cd control-plane && go test ./... -p 1 -coverprofile=coverage.txt -covermode=set
+
+      - name: Upload coverage profile
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: control-plane-coverage
+          path: control-plane/coverage.txt
+          if-no-files-found: ignore
+
+  unit-tests-cli:
+    name: unit-tests (cli)
+    needs: [get-go-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: Run unit tests with coverage
+        run: cd cli && go test ./... -p 1 -coverprofile=coverage.txt -covermode=set
+
+      - name: Upload coverage profile
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: cli-coverage
+          path: cli/coverage.txt
+          if-no-files-found: ignore
+
+  coverage-report:
+    needs:
+      - get-go-version
+      - unit-tests-control-plane
+      - unit-tests-cli
+    uses: ./.github/workflows/reusable-coverage-report.yml
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    with:
+      go-version: ${{ inputs.go-version }}
+      pr-number: ${{ inputs.pr-number }}
+
+  coverage-gate:
+    name: coverage-gate
+    needs: [coverage-report]
+    # Patch coverage measures the lines a PR adds/modifies, so it only applies
+    # to pull requests. Pushes to main call this workflow without a pr-number
+    # and have no "patch" to evaluate.
+    if: inputs.pr-number != ''
+    runs-on: ubuntu-latest
+    env:
+      # Minimum required coverage of the lines a PR adds/modifies (patch
+      # coverage). New/changed code must be at least this well tested.
+      PATCH_THRESHOLD: "90"
+    steps:
+      - name: Enforce patch coverage threshold
+        env:
+          PATCH: ${{ needs.coverage-report.outputs.patch }}
+          COVERED: ${{ needs.coverage-report.outputs.patch_covered }}
+          COVERABLE: ${{ needs.coverage-report.outputs.patch_coverable }}
+        run: |
+          set -euo pipefail
+
+          echo "Patch coverage:     ${PATCH:-<empty>}"
+          echo "Required threshold: ${PATCH_THRESHOLD}%"
+          echo "Changed lines:      ${COVERED:-0}/${COVERABLE:-0} covered"
+
+          # No coverable Go lines changed (e.g. docs-only or test-only PRs) -> nothing to gate.
+          # Fail closed: an empty PATCH means the reusable workflow could not
+          # compute patch coverage (no coverage profile produced, so the patch
+          # step was skipped). Don't let the gate pass unevaluated.
+          if [ -z "${PATCH}" ]; then
+            echo "::error::Patch coverage was not computed (no coverage profile produced). Failing closed."
+            {
+              echo "### ❌ Coverage gate failed"
+              echo ""
+              echo "Patch coverage could not be computed because no coverage profile was produced (unit tests may not have run or emitted coverage)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          if [ "${PATCH}" = "N/A" ]; then
+            echo "::notice::No coverable Go lines changed in this PR; patch-coverage gate skipped."
+            {
+              echo "### ✅ Coverage gate passed"
+              echo ""
+              echo "No coverable Go lines changed in this PR, so there is nothing to gate."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          PCT="${PATCH%\%}"
+
+          if awk "BEGIN { exit !(${PCT} >= ${PATCH_THRESHOLD}) }"; then
+            echo "::notice::Patch coverage ${PATCH} meets the ${PATCH_THRESHOLD}% threshold."
+            {
+              echo "### ✅ Coverage gate passed"
+              echo ""
+              echo "Patch coverage **${PATCH}** (${COVERED}/${COVERABLE} changed lines) ≥ required **${PATCH_THRESHOLD}%**."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Patch coverage ${PATCH} is below the required ${PATCH_THRESHOLD}% threshold."
+            {
+              echo "### ❌ Coverage gate failed"
+              echo ""
+              echo "Patch coverage **${PATCH}** (${COVERED}/${COVERABLE} changed lines) is below the required **${PATCH_THRESHOLD}%** threshold."
+              echo ""
+              echo "The lines this PR adds or modifies are not sufficiently covered by tests."
+              echo "Add tests for the new/changed code, or adjust \`PATCH_THRESHOLD\` in \`.github/workflows/coverage.yml\` (with reviewer sign-off)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,13 +19,18 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -47,6 +53,8 @@ const (
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
 	apiGateway         = "api-gateway"
+	apiGatewayConsul   = "api-gateway-consul"
+	inferenceGateway   = "inference-gateway"
 
 	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
 	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"
@@ -60,6 +68,11 @@ const (
 	// This address does not need to be routable as this node is ephemeral, and we're only providing it because
 	// Consul's API currently requires node address to be provided when registering a node.
 	consulNodeAddress = "127.0.0.1"
+
+	// endpointsLagRequeueInterval is how long to wait before retrying a reconcile when
+	// the Pod has a valid IP but the backing Endpoints object hasn't been populated yet.
+	// This handles the startup race where the Endpoints object lags behind Pod IP assignment.
+	endpointsLagRequeueInterval = 2 * time.Second
 )
 
 type Controller struct {
@@ -123,6 +136,11 @@ type Controller struct {
 	// with config to enable telemetry forwarding.
 	EnableTelemetryCollector bool
 
+	// IsEnterpriseDistribution indicates whether the connected Consul cluster
+	// reports a valid enterprise license. Multi-port service registrations are
+	// only supported on Consul Enterprise.
+	IsEnterpriseDistribution bool
+
 	MetricsConfig metrics.Config
 	Log           logr.Logger
 
@@ -134,11 +152,18 @@ type Controller struct {
 	NodeMeta             map[string]string
 }
 
-// Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
-// correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
+// +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
+
+// Reconcile reads the state of a Service's EndpointSlices and reconciles Consul
+// services which correspond to the Kubernetes Service. These events are driven
+// by changes to the Pods backing the Kube service.
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
-	var serviceEndpoints corev1.Endpoints
+
+	// requeueForEndpointsLag is set to true when registration is skipped because the
+	// EndpointSlice object hasn't yet been populated with a Pod's IP, even though the Pod
+	// already has one. This is a transient startup condition, so we requeue to retry.
+	requeueForEndpointsLag := false
 
 	// Ignore the request if the namespace of the endpoint is not allowed.
 	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
@@ -157,128 +182,195 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	err = r.Client.Get(ctx, req.NamespacedName, &serviceEndpoints)
+	serviceName := req.Name
+	serviceNamespace := req.Namespace
 
-	// If the endpoints object has been deleted (and we get an IsNotFound
-	// error), we need to deregister all instances in Consul for that service.
-	if k8serrors.IsNotFound(err) {
+	var endpointSliceList discoveryv1.EndpointSliceList
+	if err := r.Client.List(ctx, &endpointSliceList, client.InNamespace(req.Namespace), client.MatchingLabels{
+		discoveryv1.LabelServiceName: req.Name,
+	}); err != nil {
+		r.Log.Error(err, "failed to list EndpointSlices", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+
+	if len(endpointSliceList.Items) == 0 {
 		// Deregister all instances in Consul for this service. The function deregisterService handles
 		// the case where the Consul service name is different from the Kubernetes service name.
 		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil)
 		return ctrl.Result{RequeueAfter: requeueAfter}, err
-	} else if err != nil {
-		r.Log.Error(err, "failed to get Endpoints", "name", req.Name, "ns", req.Namespace)
-		return ctrl.Result{}, err
 	}
 
-	r.Log.Info("retrieved", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-
-	// If the endpoints object has the label "consul.hashicorp.com/service-ignore" set to true, deregister all instances in Consul for this service.
-	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
-	if isLabeledIgnore(serviceEndpoints.Labels) {
-		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
-		r.Log.Info("ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", req.Name, "namespace", req.Namespace)
-		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil)
-		return ctrl.Result{RequeueAfter: requeueAfter}, err
+	for _, endpointSlice := range endpointSliceList.Items {
+		if endpointSlice.Namespace != "" {
+			serviceNamespace = endpointSlice.Namespace
+		}
+		if endpointSlice.Labels[discoveryv1.LabelServiceName] != "" {
+			serviceName = endpointSlice.Labels[discoveryv1.LabelServiceName]
+		}
+		if isLabeledIgnore(endpointSlice.Labels) {
+			r.Log.Info("ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", serviceName, "namespace", serviceNamespace)
+			requeueAfter, err := r.deregisterService(ctx, apiClient, serviceName, serviceNamespace, nil)
+			return ctrl.Result{RequeueAfter: requeueAfter}, err
+		}
 	}
 
-	// deregisterEndpointAddress stores every IP that corresponds to a Pod in the Endpoints object. It is used to compare
+	r.Log.Info("retrieved", "name", serviceName, "ns", serviceNamespace)
+
+	// deregisterEndpointAddress stores every IP that corresponds to a Pod in the EndpointSlice objects. It is used to compare
 	// against service instances in Consul to deregister them if they are not in the map.
 	deregisterEndpointAddress := map[string]bool{}
 
-	// Register all addresses of this Endpoints object as service instances in Consul.
-	for _, subset := range serviceEndpoints.Subsets {
-		for address, healthStatus := range mapAddresses(subset) {
-			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
-				var pod corev1.Pod
-				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
-				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
-					// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
-					if k8serrors.IsNotFound(err) {
-						deregisterEndpointAddress[address.IP] = true
-						r.Log.Info("pod not found", "name", address.TargetRef.Name)
-					} else {
-						// If there was a different error fetching the pod, then log the error but don't deregister it
-						// since this could be a K8s API blip and we don't want to prematurely deregister.
-						deregisterEndpointAddress[address.IP] = false
-						r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
-						errs = multierror.Append(errs, err)
+	// Register all addresses of this service's EndpointSlices as service instances in Consul.
+	for _, endpointSlice := range endpointSliceList.Items {
+		for _, endpoint := range endpointSlice.Endpoints {
+			for _, addressIP := range endpoint.Addresses {
+				address := corev1.EndpointAddress{IP: addressIP, TargetRef: endpoint.TargetRef}
+				healthStatus := api.HealthPassing
+				if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready {
+					healthStatus = api.HealthCritical
+				}
+				if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
+					var pod corev1.Pod
+					objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
+					if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
+						// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
+						if k8serrors.IsNotFound(err) {
+							markForDeregistration(deregisterEndpointAddress, address.IP)
+							r.Log.Info("pod not found", "name", address.TargetRef.Name)
+						} else {
+							// If there was a different error fetching the pod, then log the error but don't deregister it
+							// since this could be a K8s API blip and we don't want to prematurely deregister.
+							deregisterEndpointAddress[address.IP] = false
+							r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
+							errs = multierror.Append(errs, err)
+						}
+						continue
 					}
-					continue
-				}
 
-				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
-				if ok && serviceEndpoints.Name != svcName {
-					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-					// Set up the deregisterEndpointAddress to deregister service instances that don't match the annotation.
-					deregisterEndpointAddress[address.IP] = true
-					continue
-				}
-
-				// Skip registration if node information is incomplete to prevent duplicate registrations.
-				if pod.Spec.NodeName == "" || address.IP == "" || pod.Status.HostIP == "" {
-					r.Log.Info("skipping pod registration due to incomplete node information",
-						"pod", pod.Name, "namespace", pod.Namespace,
-						"nodeName", pod.Spec.NodeName, "podIP", address.IP, "hostIP", pod.Status.HostIP)
-					// Don't set up for deregistration since we're not registering it
-					continue
-				}
-
-				if isTelemetryCollector(pod) {
-					if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
-						r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
-						errs = multierror.Append(errs, err)
+					// Pods in a terminal phase (e.g. evicted by the kubelet) never serve traffic again but remain in the
+					// API server until garbage collected, so deregister them as if they were deleted.
+					if isPodTerminal(pod) {
+						if hasBeenInjected(pod) && !isGateway(pod) && !isConsulDataplaneSupported(pod) {
+							// Legacy pods are registered on node-local Consul clients, which deregisterService can't remove,
+							// so mark the health check critical through the legacy path below.
+							healthStatus = api.HealthCritical
+						} else {
+							r.Log.Info("pod is in a terminal phase; deregistering", "name", pod.Name, "phase", pod.Status.Phase, "reason", pod.Status.Reason)
+							markForDeregistration(deregisterEndpointAddress, address.IP)
+							continue
+						}
 					}
-				}
 
-				if hasBeenInjected(pod) {
-					if isConsulDataplaneSupported(pod) {
-						if err = r.registerServicesAndHealthCheck(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
-							r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+					svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
+					if ok && serviceName != svcName {
+						r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceName, "ns", serviceNamespace)
+						// Set up the deregisterEndpointAddress to deregister service instances that don't match the annotation.
+						markForDeregistration(deregisterEndpointAddress, address.IP)
+						continue
+					}
+
+					// Skip registration if node information is incomplete to prevent duplicate registrations.
+					if pod.Spec.NodeName == "" || address.IP == "" || pod.Status.HostIP == "" {
+						// If the Endpoints address IP is empty but the Pod already has a valid IP,
+						// this is a transient startup race where the Endpoints object is lagging
+						// behind Pod IP assignment. Requeue so we retry once Endpoints catches up,
+						// instead of treating this as a terminal skip.
+						if address.IP == "" && pod.Status.PodIP != "" {
+							requeueForEndpointsLag = true
+							r.Log.Info("EndpointSlice address not yet populated for pod with valid IP; will requeue",
+								"pod", pod.Name, "namespace", pod.Namespace,
+								"nodeName", pod.Spec.NodeName, "podIP", pod.Status.PodIP, "hostIP", pod.Status.HostIP)
+							continue
+						}
+
+						r.Log.Info("skipping pod registration due to incomplete node information",
+							"pod", pod.Name, "namespace", pod.Namespace,
+							"nodeName", pod.Spec.NodeName, "podIP", address.IP, "hostIP", pod.Status.HostIP)
+						// Don't set up for deregistration since we're not registering it
+						continue
+					}
+
+					if isTelemetryCollector(pod) {
+						if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
+							r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
+							errs = multierror.Append(errs, err)
+						}
+					}
+
+					// Gateway pods (mesh/ingress/terminating/inference) are registered below via
+					// registerGateway and must not also go through the normal connect-proxy
+					// registration path. Most gateway kinds never reach hasBeenInjected(pod)==true,
+					// but inference-gateway pods do get consul-dataplane injected like a regular
+					// workload, so without this guard they'd be double-registered (once as
+					// ServiceKindConnectProxy here, once as ServiceKindInferenceGateway below),
+					// which then causes connect-init's gateway registration lookup to see multiple
+					// matching services for the same pod and fail.
+					if hasBeenInjected(pod) && !isGateway(pod) {
+						if isConsulDataplaneSupported(pod) {
+							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
+							if err = r.registerServicesAndHealthCheck(ctx, apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
+								r.Log.Error(err, "failed to register services or health check", "name", serviceName, "ns", serviceNamespace)
+								errs = multierror.Append(errs, err)
+							}
+							// Build the deregisterEndpointAddress map up for deregistering service instances later.
+							deregisterEndpointAddress[address.IP] = false
+						} else {
+							r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceName, "ns", serviceNamespace)
+							nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
+							if err != nil {
+								r.Log.Error(err, "failed to create node-local Consul API client", "name", serviceName, "ns", serviceNamespace)
+								errs = multierror.Append(errs, err)
+								continue
+							}
+							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
+							r.Log.Info("updating health check on the Consul client", "name", serviceName, "ns", serviceNamespace)
+							if err = r.updateHealthCheckOnConsulClient(nodeAgentClientCfg, pod, serviceEndpoints, healthStatus); err != nil {
+								r.Log.Error(err, "failed to update health check on Consul client", "name", serviceName, "ns", serviceNamespace, "consul-client-ip", pod.Status.HostIP)
+								errs = multierror.Append(errs, err)
+							}
+							// We want to skip the rest of the reconciliation because we only care about updating health checks for existing services
+							// in the case when Consul clients are running in the cluster. If endpoints are deleted, consul clients
+							// will detect that they are unhealthy, and we don't need to worry about keeping them up-to-date.
+							// This is so that health checks are still updated during an upgrade to consul-dataplane.
+							continue
+						}
+					}
+
+					if isGateway(pod) {
+						gatewayHealth, overridden := credentialGatewayHealth(pod, healthStatus)
+						if overridden {
+							r.Log.Info("Vault Agent sidecar not ready; credential-injection gateway stays healthy",
+								"name", pod.Name, "ns", pod.Namespace)
+						}
+						serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
+						if err = r.registerGateway(apiClient, pod, address.IP, serviceEndpoints, gatewayHealth); err != nil {
+							r.Log.Error(err, "failed to register gateway or health check", "name", serviceName, "ns", serviceNamespace)
 							errs = multierror.Append(errs, err)
 						}
 						// Build the deregisterEndpointAddress map up for deregistering service instances later.
 						deregisterEndpointAddress[address.IP] = false
-					} else {
-						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-						nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
-						if err != nil {
-							r.Log.Error(err, "failed to create node-local Consul API client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-							errs = multierror.Append(errs, err)
-							continue
-						}
-						r.Log.Info("updating health check on the Consul client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-						if err = r.updateHealthCheckOnConsulClient(nodeAgentClientCfg, pod, serviceEndpoints, healthStatus); err != nil {
-							r.Log.Error(err, "failed to update health check on Consul client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace, "consul-client-ip", pod.Status.HostIP)
-							errs = multierror.Append(errs, err)
-						}
-						// We want to skip the rest of the reconciliation because we only care about updating health checks for existing services
-						// in the case when Consul clients are running in the cluster. If endpoints are deleted, consul clients
-						// will detect that they are unhealthy, and we don't need to worry about keeping them up-to-date.
-						// This is so that health checks are still updated during an upgrade to consul-dataplane.
-						continue
 					}
-				}
+				} // end if address.TargetRef != nil
+			} // end for _, addressIP
+		} // end for _, endpoint
+	} // end for _, endpointSlice
 
-				if isGateway(pod) {
-					if err = r.registerGateway(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
-						r.Log.Error(err, "failed to register gateway or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-						errs = multierror.Append(errs, err)
-					}
-					// Build the deregisterEndpointAddress map up for deregistering service instances later.
-					deregisterEndpointAddress[address.IP] = false
-				}
-			}
-		}
+	// Compare service instances in Consul with addresses in EndpointSlices. If an address is not in EndpointSlices, deregister
+	// from Consul. This uses deregisterEndpointAddress which is populated with the addresses in the EndpointSlice objects to
+	// either deregister or keep during the registration codepath.
+	requeueAfter, err := r.deregisterService(ctx, apiClient, serviceName, serviceNamespace, deregisterEndpointAddress)
+	if err != nil {
+		r.Log.Error(err, "failed to deregister endpoints", "name", serviceName, "ns", serviceNamespace)
+		errs = multierror.Append(errs, err)
 	}
 
-	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
-	// from Consul. This uses deregisterEndpointAddress which is populated with the addresses in the Endpoints object to
-	// either deregister or keep during the registration codepath.
-	requeueAfter, err := r.deregisterService(ctx, apiClient, serviceEndpoints.Name, serviceEndpoints.Namespace, deregisterEndpointAddress)
-	if err != nil {
-		r.Log.Error(err, "failed to deregister endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-		errs = multierror.Append(errs, err)
+	// If we skipped registering a pod because its EndpointSlice address wasn't populated yet,
+	// requeue so we retry once the EndpointSlice object catches up. Use the shorter of the two
+	// intervals (the existing deregister requeue vs. our lag requeue) so neither is delayed.
+	if requeueForEndpointsLag {
+		if requeueAfter == 0 || endpointsLagRequeueInterval < requeueAfter {
+			requeueAfter = endpointsLagRequeueInterval
+		}
 	}
 
 	return ctrl.Result{RequeueAfter: requeueAfter}, errs
@@ -290,13 +382,35 @@ func (r *Controller) Logger(name types.NamespacedName) logr.Logger {
 
 func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Endpoints{}).
+		Named("endpointslice").
+		// Watch EndpointSlices but map each event to the service name (via the
+		// kubernetes.io/service-name label) so that req.Name in Reconcile is
+		// always the Service name, not the generated EndpointSlice name.
+		Watches(&discoveryv1.EndpointSlice{}, handler.EnqueueRequestsFromMapFunc(
+			func(_ context.Context, obj client.Object) []reconcile.Request {
+				svcName, ok := obj.GetLabels()[discoveryv1.LabelServiceName]
+				if !ok || svcName == "" {
+					return nil
+				}
+				return []reconcile.Request{{
+					NamespacedName: types.NamespacedName{
+						Name:      svcName,
+						Namespace: obj.GetNamespace(),
+					},
+				}}
+			},
+		)).
+		// Container readiness inside a credential-injection gateway pod can
+		// change without changing the pod's EndpointSlice readiness.
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForCredentialGatewayPod)).
+		// Pods evicted by the kubelet move to the Failed phase without necessarily changing their EndpointSlice.
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForTerminalPod)).
 		Complete(r)
 }
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
+func (r *Controller) registerServicesAndHealthCheck(ctx context.Context, apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
 	var managedByEndpointsController bool
 	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
@@ -304,7 +418,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	// For pods managed by this controller, create and register the service instance.
 	if managedByEndpointsController {
 		// Get information from the pod to create service instance registrations.
-		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, podIP, serviceEndpoints, healthStatus)
+		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(ctx, pod, podIP, serviceEndpoints, healthStatus)
 		if err != nil {
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
@@ -394,9 +508,15 @@ func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, podI
 // Changing the Consul service name via annotations is not supported for multi port services.
 func serviceName(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 	svcName := serviceEndpoints.Name
-	// If the annotation has a comma, it is a multi port Pod. In that case we always use the name of the endpoint.
-	if serviceNameFromAnnotation, ok := pod.Annotations[constants.AnnotationService]; ok && serviceNameFromAnnotation != "" && !strings.Contains(serviceNameFromAnnotation, ",") {
-		svcName = serviceNameFromAnnotation
+	if hasMultipleConnectServiceNames(pod) {
+		return svcName
+	}
+
+	for _, serviceNameFromAnnotation := range connectServiceAnnotationParts(pod) {
+		if serviceNameFromAnnotation != "" {
+			svcName = serviceNameFromAnnotation
+			break
+		}
 	}
 	return svcName
 }
@@ -429,23 +549,19 @@ func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
-	// If a port is specified, then we determine the value of that port
-	// and register that port for the host service.
+func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
+
+	// Determine the default service port and optional multi-port definitions.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
-	var consulServicePort int
-	if raw, ok := pod.Annotations[constants.AnnotationPort]; ok && raw != "" {
-		if multiPort := strings.Split(raw, ","); len(multiPort) > 1 {
-			// Figure out which index of the ports annotation to use by
-			// finding the index of the service names annotation.
-			raw = multiPort[getMultiPortIdx(pod, serviceEndpoints)]
-		}
-		if port, err := common.PortValue(pod, raw); port > 0 {
-			if err != nil {
-				return nil, nil, err
-			}
-			consulServicePort = int(port)
-		}
+	consulServicePort, consulServicePorts, err := r.servicePortsForRegistration(pod, serviceEndpoints)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Multi-port registrations are only supported on Consul Enterprise.
+	// On CE, fall back to single port registration using the default port.
+	if !r.IsEnterpriseDistribution && len(consulServicePorts) > 0 {
+		consulServicePorts = nil
 	}
 
 	var node corev1.Node
@@ -478,20 +594,88 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 			}
 		}
 	}
+	if len(consulServicePorts) > 1 {
+		if _, ok := meta["ports"]; !ok {
+			if portsMeta := legacyMultiportPortsMeta(consulServicePorts); portsMeta != "" {
+				meta["ports"] = portsMeta
+			}
+		}
+		for _, sp := range consulServicePorts {
+			if sp.Name == "" || sp.Port <= 0 {
+				continue
+			}
+			metaKey := "port-" + sp.Name
+			if _, ok := meta[metaKey]; !ok {
+				meta[metaKey] = strconv.Itoa(sp.Port)
+			}
+		}
+	}
 	tags := consulTags(pod)
 
+	// If this pod carries an AI role annotation, build the api.AgentServiceAI
+	// block so Consul receives the full ai{} block in the catalog registration.
+	// consul-enterprise xDS reads this block to inject the appropriate Envoy
+	// filters (mcp_router for mcp-server, inference ext_proc for inference-model,
+	// mcp egress listener for ai-agent).
+	//
+	// Port / field resolution precedence (later wins):
+	//   1. CRD defaults (AgentConfig / McpServerConfig) — Helm-installed cluster default
+	//   2. Pod annotations                              — per-service team override
+	//
+	// OBO sidecars and the dataplane credential broker are injected only for
+	// ai-agent. mcp-server registers ai{} for DCR and mcp_router, without OBO.
+	var serviceAI *api.AgentServiceAI
+	switch {
+	case common.IsAIAgent(pod):
+		var aiErr error
+		serviceAI, aiErr = common.AIConfigFromAgentCRD(ctx, r.Client, pod)
+		if aiErr != nil {
+			r.Log.Error(aiErr, "failed to build AI service block from AgentConfig CRD; omitting ai{} from registration",
+				"pod", pod.Name, "namespace", pod.Namespace)
+			// Non-fatal: proceed without the AI block rather than blocking registration.
+			serviceAI = nil
+		}
+	case common.IsMCPServer(pod):
+		// Build the AI.MCPServer block from pod annotations + McpServerConfig CRD
+		// defaults so consul-enterprise xDS injects the mcp_router filter into this
+		// pod's Envoy inbound listener. Without this block the mcp_router is absent
+		// and every MCP tools/call returns 500. This is also the DCR audience
+		// registration; OBO sidecars are not injected for this role.
+		mcpDefaults := v1alpha1.McpServerDefaults{}
+		var mcpCfg v1alpha1.McpServerConfig
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: "consul-mcp-server"}, &mcpCfg); err == nil {
+			mcpDefaults = mcpCfg.Spec.Defaults
+		} else {
+			r.Log.Info("McpServerConfig not found, using built-in defaults for mcp-server registration",
+				"pod", pod.Name, "namespace", pod.Namespace)
+		}
+		serviceAI = common.AIServiceFromMCPServerPod(pod, mcpDefaults)
+	case common.IsInferenceModel(pod):
+		// Build the AI.InferenceModel block from pod annotations so the
+		// InferenceGateway proxycfg discovers this service as a model upstream
+		// and renders an ollama cluster with consul.inference FilterMetadata.
+		serviceAI = common.AIServiceFromInferenceModelPod(pod)
+	}
+
 	consulNS := r.consulNamespace(pod.Namespace)
+	registrationPort := consulServicePort
+	if len(consulServicePorts) > 0 {
+		registrationPort = 0
+	}
 
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
-		Port:      consulServicePort,
+		Port:      registrationPort,
+		Ports:     consulServicePorts,
 		Address:   podIP,
 		Meta:      meta,
 		Namespace: consulNS,
 		Tags:      tags,
 		Locality:  locality,
+		AI:        serviceAI,
 	}
+
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
 		Address: pod.Status.HostIP,
@@ -549,7 +733,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		proxyConfig.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/connect-inject"
 	}
 
-	if consulServicePort > 0 {
+	if consulServicePort > 0 && len(consulServicePorts) == 0 {
 		proxyConfig.LocalServiceAddress = constants.Getv4orv6Str("127.0.0.1", "::1")
 		proxyConfig.LocalServicePort = consulServicePort
 	}
@@ -569,6 +753,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		ID:        proxySvcID,
 		Service:   proxySvcName,
 		Port:      proxyPort,
+		Ports:     consulServicePorts,
 		Address:   podIP,
 		Meta:      meta,
 		Namespace: consulNS,
@@ -576,6 +761,9 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		Tags:      tags,
 		// Sidecar locality (not proxied service locality) is used for locality-aware routing.
 		Locality: locality,
+		// AI carries the same block as the service registration so Consul can
+		// associate the proxy with the agent's MCP/interceptor/HITL ports.
+		AI: serviceAI,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.
@@ -603,9 +791,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		if parsedIP != nil {
 			taggedAddresses := make(map[string]api.ServiceAddress)
 
-			// When a service has multiple ports, we need to choose the port that is registered with Consul
-			// and only set that port as the tagged address because Consul currently does not support multiple ports
-			// on a single service.
+			// The virtual tagged address includes one service port, so we use the default registered service port.
 			var k8sServicePort int32
 			for _, sp := range k8sService.Spec.Ports {
 				targetPortValue, err := portValueFromIntOrString(pod, sp.TargetPort)
@@ -716,6 +902,18 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	return serviceRegistration, proxyServiceRegistration, nil
 }
 
+func legacyMultiportPortsMeta(servicePorts api.ServicePorts) string {
+	parts := make([]string, 0, len(servicePorts))
+	for _, sp := range servicePorts {
+		if sp.Name == "" || sp.Port <= 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s:%d", sp.Name, sp.Port))
+	}
+
+	return strings.Join(parts, ",")
+}
+
 // createGatewayRegistrations creates the gateway service registrations with the information from the Pod.
 func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, error) {
 	meta := map[string]string{
@@ -725,6 +923,15 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 		metaKeyManagedBy:         constants.ManagedByValue,
 		metaKeySyntheticNode:     "true",
 		constants.MetaKeyPodUID:  string(pod.UID),
+	}
+	for k, v := range pod.Annotations {
+		if strings.HasPrefix(k, constants.AnnotationMeta) && strings.TrimPrefix(k, constants.AnnotationMeta) != "" {
+			if v == "$POD_NAME" {
+				meta[strings.TrimPrefix(k, constants.AnnotationMeta)] = pod.Name
+			} else {
+				meta[strings.TrimPrefix(k, constants.AnnotationMeta)] = v
+			}
+		}
 	}
 
 	// Set the default values from the annotation, if possible.
@@ -822,8 +1029,36 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 	case apiGateway:
 		// Do nothing. This is only here so that API gateway pods have annotations
 		// consistent with other gateway types but don't return an error below.
+	case apiGatewayConsul:
+		// Do nothing. This is only here so that API gateway pods have annotations
+		// consistent with other gateway types but don't return an error below.
+	case inferenceGateway:
+		service.Kind = api.ServiceKindInferenceGateway
+		service.ID = pod.Namespace + "/" + pod.Name
+		if r.EnableConsulNamespaces {
+			consulNS = r.consulNamespace(pod.Namespace)
+			if ns := pod.Annotations[constants.AnnotationGatewayNamespace]; ns != "" {
+				consulNS = ns
+			}
+			service.Namespace = consulNS
+		}
+		// Use the port stamped on the pod by the controller (from spec.service.ports[0]).
+		// Fall back to 8443 if the annotation is absent or unparseable.
+		service.Port = 8443
+		if raw, ok := pod.Annotations[constants.AnnotationInferenceGatewayPort]; ok {
+			if p, err := strconv.Atoi(raw); err == nil && p > 0 {
+				service.Port = p
+			}
+		}
+		// Tell consul-enterprise xDS where the co-located ext_proc socket lives.
+		// InferenceExtProcSocketPath() (inference_gateway_socket.go) reads
+		// proxy.config["inference_ext_proc_socket"] first; if set it is used as-is
+		// and delivered as the local_ext_proc cluster endpoint over CDS.
+		// In K8s the socket is at a fixed path on the shared emptyDir volume,
+		// so one pod = one gateway = no collision; no derived hash needed.
+		service.Proxy.Config["inference_ext_proc_socket"] = "/run/consul/ext_proc.sock"
 	default:
-		return nil, fmt.Errorf("%s must be one of %s, %s, %s, or %s", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway)
+		return nil, fmt.Errorf("%s must be one of %s, %s, %s, %s, %s, or %s ", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway, apiGatewayConsul, inferenceGateway)
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
@@ -842,11 +1077,11 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 		},
 		Service: service,
 		Check: &api.AgentCheck{
-			CheckID:   consulHealthCheckID(pod.Namespace, pod.Name),
+			CheckID:   consulHealthCheckID(pod.Namespace, service.ID),
 			Name:      constants.ConsulKubernetesCheckName,
 			Type:      constants.ConsulKubernetesCheckType,
 			Status:    healthStatus,
-			ServiceID: pod.Name,
+			ServiceID: service.ID,
 			Namespace: consulNS,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
 		},
@@ -948,6 +1183,8 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // "k8s-service-name". So, we query Consul services by "k8s-service-name" metadata.
 // When querying by the k8s service name and namespace, the request will return service instances and
 // associated proxy service instances.
+// Independently of that map, instances that belong to a pod in a terminal phase are always deregistered, even when
+// the address is kept because a healthy replacement pod reuses the same IP or the pod is no longer in the EndpointSlice.
 // The argument deregisterEndpointAddress decides whether to deregister *all* service instances or selectively deregister
 // them only if they are not in deregisterEndpointAddress. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
@@ -977,7 +1214,17 @@ func (r *Controller) deregisterService(
 		// every service instance.
 		var serviceDeregistered bool
 
-		if deregister(svc.ServiceAddress, deregisterEndpointAddress) {
+		shouldDeregister := deregister(svc.ServiceAddress, deregisterEndpointAddress)
+		if !shouldDeregister {
+			terminal, err := r.isTerminalPodInstance(ctx, svc, k8sSvcNamespace)
+			if err != nil {
+				// Keep the registration and surface the error so the reconcile is retried.
+				errs = multierror.Append(errs, err)
+			}
+			shouldDeregister = terminal
+		}
+
+		if shouldDeregister {
 			// If graceful shutdown is enabled, continue to the next service instance and
 			// mark that an event requeue is needed. We should requeue at the longest time interval
 			// to prevent excessive re-queues. Also, updating the health status in Consul to Critical
@@ -1063,6 +1310,11 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 	// the node changed, since newer service instances should exist for the new node. In that case, it's not the old pod
 	// that is gracefully shutting down; the old pod is gone and we should deregister that old instance from Consul.
 	if string(pod.UID) != svc.ServiceMeta[constants.MetaKeyPodUID] || common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName) != svc.Node {
+		return 0, nil
+	}
+
+	// A pod in a terminal phase (e.g. evicted) has no containers left to drain, so skip graceful shutdown.
+	if isPodTerminal(pod) {
 		return 0, nil
 	}
 
@@ -1219,6 +1471,7 @@ func (r *Controller) processUpstreams(pod corev1.Pod, endpoints corev1.Endpoints
 	var upstreams []api.Upstream
 	if raw, ok := pod.Annotations[constants.AnnotationUpstreams]; ok && raw != "" {
 		for _, raw := range strings.Split(raw, ",") {
+			raw = strings.TrimSpace(raw)
 			var upstream api.Upstream
 
 			// parts separates out the port, and determines whether it's a prepared query or not, since parts[0] would
@@ -1240,7 +1493,11 @@ func (r *Controller) processUpstreams(pod corev1.Pod, endpoints corev1.Endpoints
 			}
 
 			if strings.TrimSpace(parts[0]) == "prepared_query" {
-				upstream = processPreparedQueryUpstream(pod, raw)
+				var err error
+				upstream, err = processPreparedQueryUpstream(pod, raw)
+				if err != nil {
+					return []api.Upstream{}, err
+				}
 			} else if labeledFormat {
 				var err error
 				upstream, err = r.processLabeledUpstream(pod, raw)
@@ -1379,35 +1636,60 @@ func (r *Controller) servicesForK8SServiceNameAndNamespace(apiClient *api.Client
 
 // processPreparedQueryUpstream processes an upstream in the format:
 // prepared_query:[query name]:[port].
-func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) api.Upstream {
+func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var preparedQuery string
 	var port int32
 	parts := strings.SplitN(rawUpstream, ":", 3)
-
-	port, _ = common.PortValue(pod, strings.TrimSpace(parts[2]))
-	preparedQuery = strings.TrimSpace(parts[1])
-	var upstream api.Upstream
-	if port > 0 {
-		upstream = api.Upstream{
-			DestinationType: api.UpstreamDestTypePreparedQuery,
-			DestinationName: preparedQuery,
-			LocalBindPort:   int(port),
-		}
+	if len(parts) < 3 {
+		return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 	}
-	return upstream
+
+	localBindPortToken := strings.TrimSpace(parts[2])
+	port, err := common.PortValue(pod, localBindPortToken)
+	if err != nil {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
+	preparedQuery = strings.TrimSpace(parts[1])
+	if preparedQuery == "" {
+		return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+	}
+
+	if port <= 0 {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
+
+	upstream := api.Upstream{
+		DestinationType: api.UpstreamDestTypePreparedQuery,
+		DestinationName: preparedQuery,
+		LocalBindPort:   int(port),
+	}
+	return upstream, nil
 }
 
 // processUnlabeledUpstream processes an upstream in the format:
 // [service-name].[service-namespace].[service-partition]:[port]:[optional datacenter].
+// Optional query-style options can be provided in the third segment, for example:
+// [service]:[port]:destination_port=<name>&local_bind_address=<addr>&mesh_gateway_mode=<mode>
+// [service]:[port]:<dc>?destination_port=<name>&local_bind_address=<addr>&mesh_gateway_mode=<mode>
 // There is no unlabeled field for peering.
 func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var datacenter, svcName, namespace, partition string
 	var port int32
-	var upstream api.Upstream
 
 	parts := strings.SplitN(rawUpstream, ":", 3)
+	if len(parts) < 2 {
+		return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+	}
 
-	port, _ = common.PortValue(pod, strings.TrimSpace(parts[1]))
+	localBindPortToken := strings.TrimSpace(parts[1])
+	parsedPort, err := common.PortValue(pod, localBindPortToken)
+	if err != nil {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
+	port = parsedPort
+	if port <= 0 {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
 
 	// If Consul Namespaces or Admin Partitions are enabled, attempt to parse the
 	// upstream for a namespace.
@@ -1427,21 +1709,31 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 		svcName = strings.TrimSpace(parts[0])
 	}
 
-	// parse the optional datacenter
+	// Parse optional datacenter and optional query-style options.
+	var options upstreamExtraFields
 	if len(parts) > 2 {
-		datacenter = strings.TrimSpace(parts[2])
-	}
-	if port > 0 {
-		upstream = api.Upstream{
-			DestinationType:      api.UpstreamDestTypeService,
-			DestinationPartition: partition,
-			DestinationPeer:      "",
-			DestinationNamespace: namespace,
-			DestinationName:      svcName,
-			Datacenter:           datacenter,
-			LocalBindPort:        int(port),
+		options, err = parseUnlabeledUpstreamExtraFields(parts[2], rawUpstream)
+		if err != nil {
+			return api.Upstream{}, err
 		}
+		datacenter = options.Datacenter
 	}
+
+	upstream := api.Upstream{
+		DestinationType:      api.UpstreamDestTypeService,
+		DestinationPartition: partition,
+		DestinationPeer:      "",
+		DestinationNamespace: namespace,
+		DestinationName:      svcName,
+		Datacenter:           datacenter,
+		DestinationPort:      options.DestinationPort,
+		LocalBindAddress:     options.LocalBindAddress,
+		LocalBindPort:        int(port),
+	}
+	if options.MeshGatewayMode != "" {
+		upstream.MeshGateway = api.MeshGatewayConfig{Mode: options.MeshGatewayMode}
+	}
+
 	return upstream, nil
 }
 
@@ -1449,14 +1741,27 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 // [service-name].svc.[service-namespace].ns.[service-peer].peer:[port]
 // [service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
 // [service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port].
+// Optional fields can be provided as a third segment:
+// [service-name].svc...:[port]:<destination-port>
+// [service-name].svc...:[port]:destination_port=<name>&local_bind_address=<addr>&mesh_gateway_mode=<mode>.
 func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var datacenter, svcName, namespace, partition, peer string
 	var port int32
-	var upstream api.Upstream
 
 	parts := strings.SplitN(rawUpstream, ":", 3)
+	if len(parts) < 2 {
+		return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+	}
 
-	port, _ = common.PortValue(pod, strings.TrimSpace(parts[1]))
+	localBindPortToken := strings.TrimSpace(parts[1])
+	parsedPort, err := common.PortValue(pod, localBindPortToken)
+	if err != nil {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
+	port = parsedPort
+	if port <= 0 {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
 
 	service := parts[0]
 
@@ -1511,18 +1816,133 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 		}
 	}
 
-	if port > 0 {
-		upstream = api.Upstream{
-			DestinationType:      api.UpstreamDestTypeService,
-			DestinationPartition: partition,
-			DestinationPeer:      peer,
-			DestinationNamespace: namespace,
-			DestinationName:      svcName,
-			Datacenter:           datacenter,
-			LocalBindPort:        int(port),
+	var options upstreamExtraFields
+	if len(parts) > 2 {
+		options, err = parseLabeledUpstreamExtraFields(parts[2], rawUpstream)
+		if err != nil {
+			return api.Upstream{}, err
+		}
+		if options.Datacenter != "" {
+			if datacenter != "" && datacenter != options.Datacenter {
+				return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+			}
+			datacenter = options.Datacenter
 		}
 	}
+
+	upstream := api.Upstream{
+		DestinationType:      api.UpstreamDestTypeService,
+		DestinationPartition: partition,
+		DestinationPeer:      peer,
+		DestinationNamespace: namespace,
+		DestinationName:      svcName,
+		Datacenter:           datacenter,
+		DestinationPort:      options.DestinationPort,
+		LocalBindAddress:     options.LocalBindAddress,
+		LocalBindPort:        int(port),
+	}
+	if options.MeshGatewayMode != "" {
+		upstream.MeshGateway = api.MeshGatewayConfig{Mode: options.MeshGatewayMode}
+	}
+
 	return upstream, nil
+}
+
+type upstreamExtraFields struct {
+	Datacenter       string
+	DestinationPort  string
+	LocalBindAddress string
+	MeshGatewayMode  api.MeshGatewayMode
+}
+
+func parseUnlabeledUpstreamExtraFields(rawExtra, rawUpstream string) (upstreamExtraFields, error) {
+	extra := strings.TrimSpace(rawExtra)
+	if extra == "" {
+		return upstreamExtraFields{}, nil
+	}
+
+	if idx := strings.Index(extra, "?"); idx != -1 {
+		prefix := strings.TrimSpace(extra[:idx])
+		query := strings.TrimSpace(extra[idx+1:])
+		if prefix == "" {
+			return parseUpstreamOptionString(query, rawUpstream)
+		}
+
+		fields, err := parseUpstreamOptionString(query, rawUpstream)
+		if err != nil {
+			return upstreamExtraFields{}, err
+		}
+		if fields.Datacenter == "" {
+			fields.Datacenter = prefix
+		}
+		return fields, nil
+	}
+
+	if strings.Contains(extra, "=") || strings.Contains(extra, "&") {
+		return parseUpstreamOptionString(extra, rawUpstream)
+	}
+
+	return upstreamExtraFields{Datacenter: extra}, nil
+}
+
+func parseLabeledUpstreamExtraFields(rawExtra, rawUpstream string) (upstreamExtraFields, error) {
+	extra := strings.TrimSpace(rawExtra)
+	if extra == "" {
+		return upstreamExtraFields{}, nil
+	}
+
+	if strings.Contains(extra, "=") || strings.Contains(extra, "&") || strings.Contains(extra, "?") {
+		return parseUpstreamOptionString(extra, rawUpstream)
+	}
+
+	// Backwards-compatible positional extension for labeled upstreams:
+	// <service>.svc...:<local-bind-port>:<destination-port>
+	return upstreamExtraFields{DestinationPort: extra}, nil
+}
+
+func parseUpstreamOptionString(rawOptions, rawUpstream string) (upstreamExtraFields, error) {
+	cleaned := strings.TrimSpace(rawOptions)
+	cleaned = strings.TrimPrefix(cleaned, "?")
+	cleaned = strings.ReplaceAll(cleaned, ";", "&")
+	if cleaned == "" {
+		return upstreamExtraFields{}, nil
+	}
+
+	values, err := url.ParseQuery(cleaned)
+	if err != nil {
+		return upstreamExtraFields{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+	}
+
+	fields := upstreamExtraFields{}
+	for k, v := range values {
+		if len(v) == 0 {
+			continue
+		}
+		value := strings.TrimSpace(v[0])
+		if value == "" {
+			continue
+		}
+
+		switch strings.TrimSpace(k) {
+		case "destination_port", "destination-port", "destinationPort", "port":
+			fields.DestinationPort = value
+		case "local_bind_address", "local-bind-address", "localBindAddress":
+			fields.LocalBindAddress = value
+		case "mesh_gateway_mode", "mesh-gateway-mode", "meshGatewayMode":
+			switch value {
+			case string(api.MeshGatewayModeNone), string(api.MeshGatewayModeLocal), string(api.MeshGatewayModeRemote):
+				fields.MeshGatewayMode = api.MeshGatewayMode(value)
+			default:
+				return upstreamExtraFields{}, fmt.Errorf("invalid upstream mesh gateway mode %q in %q", value, rawUpstream)
+			}
+		case "datacenter", "dc":
+			fields.Datacenter = value
+		default:
+			return upstreamExtraFields{}, fmt.Errorf("unsupported upstream option %q in %q", k, rawUpstream)
+		}
+	}
+
+	return fields, nil
 }
 
 // consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
@@ -1640,12 +2060,425 @@ func consulTags(pod corev1.Pod) []string {
 }
 
 func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
-	for i, name := range strings.Split(pod.Annotations[constants.AnnotationService], ",") {
+	for i, name := range connectServiceAnnotationParts(pod) {
 		if name == serviceName(pod, serviceEndpoints) {
 			return i
 		}
 	}
 	return -1
+}
+
+func connectServiceAnnotationParts(pod corev1.Pod) []string {
+	raw, ok := pod.Annotations[constants.AnnotationService]
+	if !ok {
+		return nil
+	}
+
+	parts := strings.Split(raw, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+
+	return parts
+}
+
+func hasMultipleConnectServiceNames(pod corev1.Pod) bool {
+	names := 0
+	for _, serviceName := range connectServiceAnnotationParts(pod) {
+		if serviceName != "" {
+			names++
+		}
+	}
+
+	return names > 1
+}
+
+func legacyServicePortForRegistration(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (int, error) {
+	raw, ok := pod.Annotations[constants.AnnotationPort]
+	if !ok || strings.TrimSpace(raw) == "" {
+		return 0, nil
+	}
+
+	token := strings.TrimSpace(raw)
+	if portTokens := strings.Split(raw, ","); len(portTokens) > 1 {
+		idx := getMultiPortIdx(pod, serviceEndpoints)
+		if idx < 0 || idx >= len(portTokens) {
+			return 0, nil
+		}
+		token = strings.TrimSpace(portTokens[idx])
+	}
+
+	if token == "" {
+		return 0, nil
+	}
+
+	port, err := common.PortValue(pod, token)
+	if err != nil {
+		return 0, err
+	}
+	if port <= 0 {
+		return 0, nil
+	}
+
+	return int(port), nil
+}
+
+func (r *Controller) servicePortsForRegistration(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (int, api.ServicePorts, error) {
+	if hasMultipleConnectServiceNames(pod) {
+		port, err := legacyServicePortForRegistration(pod, serviceEndpoints)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		return port, nil, nil
+	}
+
+	raw, ok := pod.Annotations[constants.AnnotationPort]
+	if !ok || strings.TrimSpace(raw) == "" {
+		endpointPorts := endpointPortsForRegistration(serviceEndpoints)
+		matchingIndexes := matchingServicePortIndexes(pod, serviceEndpoints, len(endpointPorts))
+		r.Log.Info("determined matching service port indexes from endpoints", "indexes", matchingIndexes)
+		if len(matchingIndexes) == 0 {
+			return 0, nil, nil
+		}
+
+		if err := validateMultiPortProtocolConsistency(endpointPorts, matchingIndexes); err != nil {
+			return 0, nil, err
+		}
+
+		defaultIdx := defaultEndpointPortIndexForRegistration(pod, endpointPorts, matchingIndexes)
+		servicePorts := make(api.ServicePorts, 0, len(matchingIndexes))
+		defaultPort := 0
+		seenNames := make(map[string]int)
+
+		for _, idx := range matchingIndexes {
+			if idx < 0 || idx >= len(endpointPorts) {
+				continue
+			}
+
+			endpointPort := endpointPorts[idx]
+			if endpointPort.Port <= 0 {
+				continue
+			}
+
+			token := endpointPort.Name
+			if token == "" {
+				token = strconv.Itoa(int(endpointPort.Port))
+			}
+
+			portName := servicePortNameForConsul(serviceEndpoints, token, int(endpointPort.Port), idx, seenNames)
+			servicePort := api.ServicePort{
+				Name:    portName,
+				Port:    int(endpointPort.Port),
+				Default: idx == defaultIdx,
+			}
+			if servicePort.Default {
+				defaultPort = servicePort.Port
+			}
+			servicePorts = append(servicePorts, servicePort)
+		}
+
+		if len(servicePorts) == 0 {
+			return 0, nil, nil
+		}
+
+		if len(servicePorts) == 1 {
+			return servicePorts[0].Port, nil, nil
+		}
+
+		if !servicePorts.HasDefault() {
+			servicePorts[0].Default = true
+			defaultPort = servicePorts[0].Port
+		}
+
+		if err := servicePorts.Validate(); err != nil {
+			return 0, nil, err
+		}
+
+		return defaultPort, servicePorts, nil
+	}
+
+	portTokens := strings.Split(raw, ",")
+	matchingIndexes := matchingServicePortIndexes(pod, serviceEndpoints, len(portTokens))
+	r.Log.Info("determined matching service port indexes", "indexes", matchingIndexes)
+	if len(matchingIndexes) == 0 {
+		return 0, nil, nil
+	}
+
+	if err := validateMultiPortProtocolConsistency(endpointPortsForRegistration(serviceEndpoints), matchingIndexes); err != nil {
+		return 0, nil, err
+	}
+
+	defaultIdx := defaultPortTokenIndexForRegistration(pod, portTokens, matchingIndexes)
+	servicePorts := make(api.ServicePorts, 0, len(matchingIndexes))
+	defaultPort := 0
+	seenNames := make(map[string]int)
+
+	for _, idx := range matchingIndexes {
+		if idx < 0 || idx >= len(portTokens) {
+			continue
+		}
+
+		token := strings.TrimSpace(portTokens[idx])
+		if token == "" {
+			continue
+		}
+
+		portVal, err := common.PortValue(pod, token)
+		if portVal <= 0 {
+			continue
+		}
+		if err != nil {
+			return 0, nil, err
+		}
+
+		portName := servicePortNameForConsul(serviceEndpoints, token, int(portVal), idx, seenNames)
+		servicePort := api.ServicePort{
+			Name:    portName,
+			Port:    int(portVal),
+			Default: idx == defaultIdx,
+		}
+		if servicePort.Default {
+			defaultPort = servicePort.Port
+		}
+		servicePorts = append(servicePorts, servicePort)
+	}
+
+	if len(servicePorts) == 0 {
+		return 0, nil, nil
+	}
+
+	if len(servicePorts) == 1 {
+		return servicePorts[0].Port, nil, nil
+	}
+
+	if !servicePorts.HasDefault() {
+		servicePorts[0].Default = true
+		defaultPort = servicePorts[0].Port
+	}
+
+	if err := servicePorts.Validate(); err != nil {
+		return 0, nil, err
+	}
+
+	return defaultPort, servicePorts, nil
+}
+
+func defaultEndpointPortIndexForRegistration(pod corev1.Pod, endpointPorts []corev1.EndpointPort, matchingIndexes []int) int {
+	defaultIdx := matchingIndexes[0]
+	desiredDefault := strings.TrimSpace(pod.Annotations[constants.AnnotationDefaultPort])
+	if desiredDefault == "" {
+		return defaultIdx
+	}
+
+	desiredPort, desiredPortErr := strconv.Atoi(desiredDefault)
+	for _, idx := range matchingIndexes {
+		if idx < 0 || idx >= len(endpointPorts) {
+			continue
+		}
+
+		endpointPort := endpointPorts[idx]
+		if strings.TrimSpace(endpointPort.Name) == desiredDefault {
+			return idx
+		}
+		if desiredPortErr == nil && int(endpointPort.Port) == desiredPort {
+			return idx
+		}
+	}
+
+	return defaultIdx
+}
+
+func defaultPortTokenIndexForRegistration(pod corev1.Pod, portTokens []string, matchingIndexes []int) int {
+	defaultIdx := matchingIndexes[0]
+	desiredDefault := strings.TrimSpace(pod.Annotations[constants.AnnotationDefaultPort])
+	if desiredDefault == "" {
+		return defaultIdx
+	}
+
+	desiredPort, desiredPortErr := strconv.Atoi(desiredDefault)
+	for _, idx := range matchingIndexes {
+		if idx < 0 || idx >= len(portTokens) {
+			continue
+		}
+
+		token := strings.TrimSpace(portTokens[idx])
+		if token == "" {
+			continue
+		}
+		if token == desiredDefault {
+			return idx
+		}
+		if desiredPortErr == nil {
+			resolvedPort, err := common.PortValue(pod, token)
+			if err == nil && int(resolvedPort) == desiredPort {
+				return idx
+			}
+		}
+	}
+
+	return defaultIdx
+}
+
+func endpointPortsForRegistration(serviceEndpoints corev1.Endpoints) []corev1.EndpointPort {
+	ports := make([]corev1.EndpointPort, 0)
+	for _, subset := range serviceEndpoints.Subsets {
+		ports = append(ports, subset.Ports...)
+	}
+	return ports
+}
+
+func validateMultiPortProtocolConsistency(endpointPorts []corev1.EndpointPort, matchingIndexes []int) error {
+	if len(matchingIndexes) <= 1 {
+		return nil
+	}
+
+	var expectedProtocol corev1.Protocol
+	hasExpected := false
+
+	for _, idx := range matchingIndexes {
+		if idx < 0 || idx >= len(endpointPorts) {
+			continue
+		}
+
+		protocol := endpointPorts[idx].Protocol
+		if protocol == "" {
+			protocol = corev1.ProtocolTCP
+		}
+
+		if !hasExpected {
+			expectedProtocol = protocol
+			hasExpected = true
+			continue
+		}
+
+		if protocol != expectedProtocol {
+			return fmt.Errorf("multi-port service registration requires all ports to use the same protocol, found %q and %q", expectedProtocol, protocol)
+		}
+	}
+
+	return nil
+}
+
+func matchingServicePortIndexes(pod corev1.Pod, serviceEndpoints corev1.Endpoints, portCount int) []int {
+	if portCount <= 0 {
+		return nil
+	}
+
+	indexes := make([]int, 0, portCount)
+	annotationService, hasAnnotationService := pod.Annotations[constants.AnnotationService]
+
+	if !hasAnnotationService || strings.TrimSpace(annotationService) == "" {
+		for i := range portCount {
+			indexes = append(indexes, i)
+		}
+		return indexes
+	}
+
+	serviceParts := strings.Split(annotationService, ",")
+	targetServiceName := serviceName(pod, serviceEndpoints)
+
+	if len(serviceParts) == portCount {
+		for i, servicePart := range serviceParts {
+			if strings.TrimSpace(servicePart) == targetServiceName {
+				indexes = append(indexes, i)
+			}
+		}
+		if len(indexes) > 0 {
+			return indexes
+		}
+	}
+
+	if len(serviceParts) == 1 && strings.TrimSpace(serviceParts[0]) == targetServiceName {
+		for i := 0; i < portCount; i++ {
+			indexes = append(indexes, i)
+		}
+		return indexes
+	}
+
+	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 && idx < portCount {
+		return []int{idx}
+	}
+
+	return nil
+}
+
+func servicePortNameForConsul(serviceEndpoints corev1.Endpoints, token string, port int, idx int, seenNames map[string]int) string {
+	portName := ""
+	for _, subset := range serviceEndpoints.Subsets {
+		for _, endpointPort := range subset.Ports {
+			if int(endpointPort.Port) == port && endpointPort.Name != "" {
+				portName = endpointPort.Name
+				break
+			}
+		}
+		if portName != "" {
+			break
+		}
+	}
+
+	if portName == "" {
+		if _, err := strconv.Atoi(token); err != nil {
+			portName = token
+		}
+	}
+
+	if portName == "" {
+		portName = fmt.Sprintf("port-%d", idx+1)
+	}
+
+	if seenNames[portName] == 0 {
+		seenNames[portName] = 1
+		return portName
+	}
+
+	seenNames[portName]++
+	return fmt.Sprintf("%s-%d", portName, seenNames[portName])
+}
+
+// isPodTerminal returns true if the pod has finished running and will never be restarted (Failed or Succeeded),
+// which includes pods evicted by the kubelet.
+func isPodTerminal(pod corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded
+}
+
+// isTerminalPodInstance returns true if the service instance was registered for a pod that is in a terminal phase
+// or no longer exists, i.e. the registration is stale. The pod is looked up from the instance's metadata rather than
+// from the EndpointSlices, which may no longer reference it. Instances registered without a pod UID are matched by pod name only. A failed lookup returns an
+// error and false so the instance is kept and the reconcile is retried.
+func (r *Controller) isTerminalPodInstance(ctx context.Context, svc *api.CatalogService, k8sNamespace string) (bool, error) {
+	podName := svc.ServiceMeta[constants.MetaKeyPodName]
+	if podName == "" {
+		return false, nil
+	}
+	if ns := svc.ServiceMeta[constants.MetaKeyKubeNS]; ns != "" {
+		k8sNamespace = ns
+	}
+
+	var pod corev1.Pod
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: podName, Namespace: k8sNamespace}, &pod); err != nil {
+		if k8serrors.IsNotFound(err) {
+			// A registration outlived its pod; do not preserve it just because a replacement reuses its address.
+			return true, nil
+		}
+		r.Log.Error(err, "failed to get pod for service instance", "name", podName, "ns", k8sNamespace)
+		return false, fmt.Errorf("failed to get pod %s/%s for service instance %s: %w", k8sNamespace, podName, svc.ServiceID, err)
+	}
+	if !isPodTerminal(pod) {
+		return false, nil
+	}
+	instanceUID := svc.ServiceMeta[constants.MetaKeyPodUID]
+	return instanceUID == "" || instanceUID == string(pod.UID), nil
+}
+
+// markForDeregistration flags an address for deregistration unless another endpoint sharing the same IP (e.g. a
+// replacement pod that reused the IP of a terminal pod) already marked it to be kept, so the outcome doesn't
+// depend on the order the endpoints are processed.
+func markForDeregistration(deregisterEndpointAddress map[string]bool, ip string) {
+	if shouldDeregister, ok := deregisterEndpointAddress[ip]; ok && !shouldDeregister {
+		return
+	}
+	deregisterEndpointAddress[ip] = true
 }
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly

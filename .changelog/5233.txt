@@ -1,0 +1,3 @@
+```release-note:improvement
+api-gateway: Added new templates for gateway crds under API group consul.hashicorp.com, added short hands for the same. For example, 'kubectl get chttproutes' fetches httproutes under the consul.hashicorp.com API group.
+```

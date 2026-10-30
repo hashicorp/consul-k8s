@@ -1,5 +1,10 @@
 {{- if or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) }}
-# The ClusterRole to enable the Connect injector to get, list, watch and patch MutatingWebhookConfiguration.
+# ClusterRole for the connect-injector controller.
+# Rule authoring conventions:
+#   • One rule block per API group / resource family.
+#   • Verbs are listed in alphabetical order.
+#   • Duplicate rules are intentionally absent — RBAC unions all matching
+#     rules so duplicates only create upgrade confusion.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -11,6 +16,8 @@ metadata:
     release: {{ .Release.Name }}
     component: connect-injector
 rules:
+
+# ── Consul CRDs (config-entry controllers) ───────────────────────────────────
 - apiGroups:
   - consul.hashicorp.com
   resources:
@@ -28,17 +35,22 @@ rules:
   - meshservices
   - samenessgroups
   - controlplanerequestlimits
+  - ratelimits
   - routeretryfilters
   - routetimeoutfilters
   - routeauthfilters
+  - routetlssdsfilters
+  - routeupstreamlimitsfilters
+  - routeextprocs
+  - routeheadermatchinvertfilters
   - gatewaypolicies
+  - customgatewaypolicies
   - registrations
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers
   {{- end }}
   - jwtproviders
-  - routeauthfilters
   verbs:
   - create
   - delete
@@ -47,6 +59,8 @@ rules:
   - patch
   - update
   - watch
+
+# Consul CRD status sub-resources
 - apiGroups:
   - consul.hashicorp.com
   resources:
@@ -62,6 +76,7 @@ rules:
   - terminatinggateways/status
   - samenessgroups/status
   - controlplanerequestlimits/status
+  - ratelimits/status
   - registrations/status
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors/status
@@ -69,79 +84,61 @@ rules:
   {{- end }}
   - jwtproviders/status
   - routeauthfilters/status
+  - routetlssdsfilters/status
+  - routeupstreamlimitsfilters/status
+  - routeextprocs/status
+  - routeheadermatchinvertfilters/status
   - gatewaypolicies/status
+  - customgatewaypolicies/status
   verbs:
   - get
   - patch
   - update
-- apiGroups: [""]
-  resources: ["secrets", "serviceaccounts", "services"]
-  verbs:
-    - get
-    - list
-    - watch
-    - delete
-    - create
-    - update
-- apiGroups: [ "" ]
-  resources: ["endpoints", "namespaces", "nodes"]
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups: [ "rbac.authorization.k8s.io" ]
-  resources: [ "roles", "rolebindings" ]
-  verbs:
-  - get
-  - list
-  - watch
-  - delete
-  - create
-  - update
-- apiGroups: [ "" ]
-  resources:
-  - pods
-  verbs:
-  - "get"
-  - "list"
-  - "watch"
-  - "update"
+
+# ── AI CRDs ───────────────────────────────────────────────────────────────────
+# Always present so the controller can manage finalizers and status even after
+# ai.enabled is flipped to false mid-cluster-lifecycle.
 - apiGroups:
-  - coordination.k8s.io
+  - consul.hashicorp.com
   resources:
-  - leases
+  - inferencemodelconfigs
+  - mcpserverconfigs
+  - agentconfigs
+  - inferencepoolconfigs
+  - inferencegateways
   verbs:
-  - create
   - get
   - list
   - update
-{{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName  .Values.global.secretsBackend.vault.connectInject.caCert.secretName)}}
+  - watch
+
+# AI CRD status sub-resources — syncStatus() calls r.Client.Status().Patch()
 - apiGroups:
-  - admissionregistration.k8s.io
+  - consul.hashicorp.com
   resources:
-  - mutatingwebhookconfigurations
-  - validatingwebhookconfigurations
+  - inferencemodelconfigs/status
+  - mcpserverconfigs/status
+  - agentconfigs/status
+  - inferencepoolconfigs/status
+  - inferencegateways/status
   verbs:
   - get
-  - list
-  - watch
   - patch
-{{- end }}
-{{- if .Values.global.peering.enabled }}
-- apiGroups: [ "" ]
-  resources: [ "secrets" ]
+  - update
+
+# AI CRD finalizer sub-resources — controllerutil.AddFinalizer/RemoveFinalizer
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - inferencemodelconfigs/finalizers
+  - mcpserverconfigs/finalizers
+  - agentconfigs/finalizers
+  - inferencepoolconfigs/finalizers
+  - inferencegateways/finalizers
   verbs:
-  - "get"
-  - "list"
-  - "watch"
-  - "create"
-  - "update"
-  - "delete"
-{{- end }}
-- apiGroups: [ "policy" ]
-  resources: [ "podsecuritypolicies" ]
-  verbs:
-  - use
+  - update
+
+# ── Gateway API (gateway.networking.k8s.io) ───────────────────────────────────
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
@@ -158,6 +155,7 @@ rules:
   - patch
   - update
   - watch
+
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
@@ -167,6 +165,7 @@ rules:
   - tcproutes/finalizers
   verbs:
   - update
+
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
@@ -178,38 +177,234 @@ rules:
   - get
   - patch
   - update
+
+# ── Custom Gateway API (consul.hashicorp.com) ─────────────────────────────────
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - customgatewayclasses
+  - cgateways
+  - chttproutes
+  - ctcproutes
+  - creferencegrants
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - customgatewayclasses/finalizers
+  - cgateways/finalizers
+  - chttproutes/finalizers
+  - ctcproutes/finalizers
+  verbs:
+  - update
+
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - customgatewayclasses/status
+  - cgateways/status
+  - chttproutes/status
+  - ctcproutes/status
+  verbs:
+  - get
+  - patch
+  - update
+
+# ── Kubernetes apps ───────────────────────────────────────────────────────────
+# Deployments — InferenceGatewayController + api-gateway controller own these.
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+# The multi-port conversion post-upgrade Job rewrites the Pod template of every
+# workload kind the connect-inject webhook admits Pods for. StatefulSets and
+# DaemonSets are read and updated only; nothing creates or deletes them.
 - apiGroups:
     - apps
   resources:
-    - deployments
+    - statefulsets
+    - daemonsets
   verbs:
-    - create
     - get
     - list
     - update
-    - watch
-    - delete
+# The same Job scans Pods for workloads it cannot rewrite and follows a Pod's
+# ReplicaSet one hop to name the Deployment that owns it. Read-only.
 - apiGroups:
-    - core
+    - apps
   resources:
-    - services
+    - replicasets
   verbs:
-    - watch
+    - get
     - list
-- apiGroups: [ "" ]
-  resources: [ "secrets" ]
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
   verbs:
-    - "get"
-    - "list"
-    - "watch"
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+# ── Kubernetes core ───────────────────────────────────────────────────────────
+# Events — controller-runtime event recorder.
+- apiGroups: [""]
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+
+# Services — InferenceGatewayController creates, patches, and deletes Services.
+# patch is required: reconcileService() calls r.Client.Patch().
+- apiGroups: [""]
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+# Secrets and ServiceAccounts
+- apiGroups: [""]
+  resources:
+  - secrets
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+
+# Read-only core resources
+- apiGroups: [""]
+  resources:
+  - endpoints
+  - namespaces
+  - nodes
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+
+# EndpointSlices — watched by the endpoints controller (migrated from core Endpoints).
+- apiGroups: ["discovery.k8s.io"]
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
+
+# Pods — sidecar-injection read/update.
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+
+# ── RBAC ──────────────────────────────────────────────────────────────────────
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+
+# ── Leader election ───────────────────────────────────────────────────────────
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
+
+# ── Policy ────────────────────────────────────────────────────────────────────
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+
+# ── Optional: Vault webhook CA rotation ──────────────────────────────────────
+{{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName) }}
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - patch
+  - watch
+{{- end }}
+
+# ── Optional: peering secrets ─────────────────────────────────────────────────
+{{- if .Values.global.peering.enabled }}
+- apiGroups: [""]
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+{{- end }}
+
+# ── Optional: OpenShift SCC ───────────────────────────────────────────────────
 {{- if .Values.global.openshift.enabled }}
 - apiGroups:
-    - security.openshift.io
+  - security.openshift.io
   resources:
-    - securitycontextconstraints
+  - securitycontextconstraints
   resourceNames:
-    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+  - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName | default "restricted-v2" }}
   verbs:
-    - use
-  {{- end }}
+  - use
+{{- end }}
+
 {{- end }}

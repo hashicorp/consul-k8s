@@ -1,0 +1,139 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Same-cluster intentions. Backend services accept traffic from BOTH gateways
+# (api-gateway = two-ext-proc, api-gateway-single = single-ext-proc). The gateway
+# processors (ext-proc-http, ext-proc-http-path) may call route-decider, and both
+# gateways may call their processors.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: service-a-intentions
+spec:
+  destination:
+    name: service-a
+  sources:
+    - name: api-gateway
+      action: allow
+    - name: api-gateway-single
+      action: allow
+    - name: service-e1
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: service-b-intentions
+spec:
+  destination:
+    name: service-b
+  sources:
+    - name: api-gateway
+      action: allow
+    - name: api-gateway-single
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: service-c-intentions
+spec:
+  destination:
+    name: service-c
+  sources:
+    - name: api-gateway
+      action: allow
+    - name: api-gateway-single
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: service-d1-intentions
+spec:
+  destination:
+    name: service-d1
+  sources:
+    - name: api-gateway
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: service-e1-intentions
+spec:
+  destination:
+    name: service-e1
+  sources:
+    - name: service-d1
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: service-f-intentions
+spec:
+  destination:
+    name: service-f
+  sources:
+    - name: service-e1
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: service-g-intentions
+spec:
+  destination:
+    name: service-g
+  sources:
+    - name: service-e1
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: ext-proc-http-intentions
+spec:
+  destination:
+    name: ext-proc-http
+  sources:
+    - name: api-gateway
+      action: allow
+    - name: api-gateway-single
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: ext-proc-http-path-intentions
+spec:
+  destination:
+    name: ext-proc-http-path
+  sources:
+    - name: api-gateway
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: route-decider-intentions
+spec:
+  destination:
+    name: route-decider
+  sources:
+    - name: ext-proc-http
+      action: allow
+    - name: ext-proc-http-path
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: http-decider-connect-proxy-intentions
+spec:
+  destination:
+    name: http-decider-connect-proxy
+  sources:
+    - name: service-e1
+      action: allow

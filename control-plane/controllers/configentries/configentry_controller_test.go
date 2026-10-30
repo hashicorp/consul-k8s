@@ -14,22 +14,25 @@ import (
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 const datacenterName = "datacenter"
@@ -415,8 +418,10 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
-					Client: client,
-					Log:    logger,
+					Client:           client,
+					Log:              logger,
+					ReleaseName:      "consul",
+					ReleaseNamespace: kubeNS,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
@@ -551,7 +556,18 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 
 				s := runtime.NewScheme()
 				s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-				fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
+				require.NoError(t, corev1.AddToScheme(s))
+
+				objects := []client.Object{c.configEntryResource}
+				if c.kubeKind == "TerminatingGateway" {
+					objects = append(objects, terminatingGatewayHelmValuesConfigMap(kubeNS))
+				}
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(s).
+					WithObjects(objects...).
+					WithStatusSubresource(c.configEntryResource).
+					Build()
 
 				var cb testutil.ServerConfigCallback
 				if secure {
@@ -1005,8 +1021,10 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
-					Client: client,
-					Log:    logger,
+					Client:           client,
+					Log:              logger,
+					ReleaseName:      "consul",
+					ReleaseNamespace: kubeNS,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
@@ -1088,7 +1106,18 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
+			require.NoError(t, corev1.AddToScheme(s))
+
+			objects := []client.Object{c.configEntryResource}
+			if c.kubeKind == "TerminatingGateway" {
+				objects = append(objects, terminatingGatewayHelmValuesConfigMap(kubeNS))
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(s).
+				WithObjects(objects...).
+				WithStatusSubresource(c.configEntryResource).
+				Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1470,8 +1499,10 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
-					Client: client,
-					Log:    logger,
+					Client:           client,
+					Log:              logger,
+					ReleaseName:      "consul",
+					ReleaseNamespace: kubeNS,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
@@ -1519,7 +1550,18 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResourceWithDeletion).WithStatusSubresource(c.configEntryResourceWithDeletion).Build()
+			require.NoError(t, corev1.AddToScheme(s))
+
+			objects := []client.Object{c.configEntryResourceWithDeletion}
+			if c.kubeKind == "TerminatingGateway" {
+				objects = append(objects, terminatingGatewayHelmValuesConfigMap(kubeNS))
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(s).
+				WithObjects(objects...).
+				WithStatusSubresource(c.configEntryResourceWithDeletion).
+				Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -2356,5 +2398,528 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 				require.False(t, c.expectErr)
 			}
 		})
+	}
+}
+
+func TestConstructDeploymentFromCRD(t *testing.T) {
+	t.Parallel()
+	baseHelmValues := func() *helmvalues.HelmValues {
+		return &helmvalues.HelmValues{
+			Global: helmvalues.GlobalConfig{
+				Name:                 "consul",
+				Datacenter:           "dc1",
+				ImageK8S:             "hashicorp/consul-k8s-control-plane:1.0.0",
+				ImageConsulDataplane: "hashicorp/consul-dataplane:1.0.0",
+				ImagePullPolicy:      "IfNotPresent",
+			},
+			Release: helmvalues.ReleaseConfig{
+				Name:      "consul",
+				Namespace: "consul",
+				Service:   "Helm",
+			},
+			TerminatingGateways: helmvalues.TerminatingGatewaysConfig{
+				Defaults: helmvalues.Defaults{
+					Replicas: 2,
+				},
+			},
+		}
+	}
+
+	baseTermGW := func() *v1alpha1.TerminatingGateway {
+		return &v1alpha1.TerminatingGateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-gateway",
+				Namespace: "consul",
+			},
+			Spec: v1alpha1.TerminatingGatewaySpec{
+				Deployment: v1alpha1.TerminatingGatewayDeploymentSpec{
+					GatewayName: "terminating-gateway",
+					LogLevel:    "info",
+					LogJSON:     ptr.To(false),
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name       string
+		termGW     func() *v1alpha1.TerminatingGateway
+		helmValues func() *helmvalues.HelmValues
+		validate   func(t *testing.T, deployment *appsv1.Deployment)
+	}{
+		{
+			name:       "basic deployment with defaults",
+			termGW:     baseTermGW,
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "consul-terminating-gateway", deployment.Name)
+				require.Equal(t, "consul", deployment.Namespace)
+				require.Equal(t, int32(2), *deployment.Spec.Replicas)
+				require.Equal(t, "terminating-gateway", deployment.Spec.Template.Labels["component"])
+			},
+		},
+		{
+			name: "custom replicas from CRD override helm defaults",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.Replicas = ptr.To(int32(5))
+				return gw
+			},
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, int32(5), *deployment.Spec.Replicas)
+			},
+		},
+		{
+			name: "with node selector",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.NodeSelector = map[string]string{
+					"kubernetes.io/os": "linux",
+				}
+				return gw
+			},
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "linux", deployment.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
+			},
+		},
+		{
+			name: "with tolerations",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.Tolerations = []corev1.Toleration{
+					{
+						Key:      "dedicated",
+						Operator: corev1.TolerationOpEqual,
+						Value:    "gateway",
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				}
+				return gw
+			},
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Len(t, deployment.Spec.Template.Spec.Tolerations, 1)
+				require.Equal(t, "dedicated", deployment.Spec.Template.Spec.Tolerations[0].Key)
+			},
+		},
+		{
+			name: "with custom resources",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+						corev1.ResourceCPU:    resource.MustParse("250m"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("512Mi"),
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+					},
+				}
+				return gw
+			},
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				mainContainer := deployment.Spec.Template.Spec.Containers[0]
+				require.Equal(t, resource.MustParse("256Mi"), mainContainer.Resources.Requests[corev1.ResourceMemory])
+				require.Equal(t, resource.MustParse("512Mi"), mainContainer.Resources.Limits[corev1.ResourceMemory])
+			},
+		},
+		{
+			name:   "with extra labels from helm values",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.ExtraLabels = map[string]string{
+					"environment": "production",
+					"team":        "platform",
+				}
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "production", deployment.Labels["environment"])
+				require.Equal(t, "platform", deployment.Labels["team"])
+			},
+		},
+		{
+			name: "with custom annotations",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.Annotations = map[string]string{
+					"custom-annotation": "custom-value",
+				}
+				return gw
+			},
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "custom-value", deployment.Spec.Template.Annotations["custom-annotation"])
+				require.Equal(t, "false", deployment.Spec.Template.Annotations["consul.hashicorp.com/connect-inject"])
+			},
+		},
+		{
+			name: "with consul namespaces enabled",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.ConsulNamespace = "custom-ns"
+				return gw
+			},
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.EnableConsulNamespaces = true
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "custom-ns", deployment.Spec.Template.Annotations["consul.hashicorp.com/gateway-namespace"])
+			},
+		},
+		{
+			name:   "with metrics enabled",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.Metrics.Enabled = true
+				hv.Global.Metrics.EnableGatewayMetrics = true
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "true", deployment.Spec.Template.Annotations["prometheus.io/scrape"])
+				require.Equal(t, "/metrics", deployment.Spec.Template.Annotations["prometheus.io/path"])
+				require.Equal(t, "20200", deployment.Spec.Template.Annotations["prometheus.io/port"])
+			},
+		},
+		{
+			name: "with priority class",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.PriorityClassName = "high-priority"
+				return gw
+			},
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "high-priority", deployment.Spec.Template.Spec.PriorityClassName)
+			},
+		},
+		{
+			name: "credentialInjection reserved vault token-volume annotation cannot be overridden by user annotations",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.EnableDeployment = ptr.To(true)
+				gw.Spec.Deployment.Annotations = map[string]string{
+					"vault.hashicorp.com/agent-service-account-token-volume-name": "attacker-volume",
+				}
+				gw.Spec.Services = []v1alpha1.LinkedService{{
+					Name:       "external-api",
+					CAFile:     "/etc/ssl/certs/ca-certificates.crt",
+					SNI:        "api.example.com",
+					Credential: &v1alpha1.LinkedServiceCredential{Mode: v1alpha1.CredentialModeInject, BindingID: "external-api"},
+				}}
+				gw.Spec.Deployment.CredentialInjection = &v1alpha1.TerminatingGatewayCredentialInjection{
+					Enabled:             true,
+					ProcessorImage:      "camp-auth-processor:test",
+					ProcessorConfigMap:  "camp-proc",
+					VaultAgentImage:     "hashicorp/vault:test",
+					VaultAgentConfigMap: "camp-agent",
+					VaultAddress:        "https://vault:8200",
+					TokenAudience:       "vault",
+				}
+				return gw
+			},
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.TLS.Enabled = true
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				// The reserved annotation is emitted after user annotations, so it wins.
+				require.Equal(t, "consul-auth-method-sa-token",
+					deployment.Spec.Template.Annotations["vault.hashicorp.com/agent-service-account-token-volume-name"])
+			},
+		},
+		{
+			name:   "vault namespace annotation is set from vaultNamespace",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.TLS.Enabled = true
+				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
+				hv.Global.SecretsBackend.Vault.AgentAnnotations = map[string]string{"vault.hashicorp.com/agent-pre-populate-only": "true"}
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "team-a", deployment.Spec.Template.Annotations["vault.hashicorp.com/namespace"])
+				require.Equal(t, "true", deployment.Spec.Template.Annotations["vault.hashicorp.com/agent-pre-populate-only"])
+			},
+		},
+		{
+			name:   "vault namespace from agentAnnotations takes precedence over vaultNamespace",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.TLS.Enabled = true
+				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
+				hv.Global.SecretsBackend.Vault.AgentAnnotations = map[string]string{"vault.hashicorp.com/namespace": "team-b"}
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "team-b", deployment.Spec.Template.Annotations["vault.hashicorp.com/namespace"])
+			},
+		},
+		{
+			name:   "vault namespace annotation is not set when vaultNamespace is empty",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.TLS.Enabled = true
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Equal(t, "true", deployment.Spec.Template.Annotations["vault.hashicorp.com/agent-inject"])
+				require.NotContains(t, deployment.Spec.Template.Annotations, "vault.hashicorp.com/namespace")
+			},
+		},
+		{
+			name:   "vault namespace annotation is not set when vault is disabled",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.TLS.Enabled = true
+				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.NotContains(t, deployment.Spec.Template.Annotations, "vault.hashicorp.com/namespace")
+			},
+		},
+		{
+			// Matches terminating-gateways-deployment.yaml, which only adds Vault Agent
+			// Injector annotations when both Vault and TLS are enabled.
+			name:   "no vault annotations when vault is enabled and TLS is disabled",
+			termGW: baseTermGW,
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				hv.Global.SecretsBackend.Vault.VaultNamespace = "team-a"
+				hv.Global.SecretsBackend.Vault.ConsulCARole = "consul-ca"
+				hv.Global.SecretsBackend.Vault.AgentAnnotations = map[string]string{"vault.hashicorp.com/agent-pre-populate-only": "true"}
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				for k := range deployment.Spec.Template.Annotations {
+					require.NotContains(t, k, "vault.hashicorp.com/", "unexpected Vault annotation %q", k)
+				}
+			},
+		},
+		{
+			// Credential injection disables the default ServiceAccount token automount.
+			// With TLS off the injector isn't requested, so no injector token volume is
+			// needed; requesting injection here would fail in vault-k8s with
+			// "failed to find service account volume mount".
+			name: "credentialInjection with vault enabled and TLS disabled does not request vault agent injection",
+			termGW: func() *v1alpha1.TerminatingGateway {
+				gw := baseTermGW()
+				gw.Spec.Deployment.EnableDeployment = ptr.To(true)
+				gw.Spec.Services = []v1alpha1.LinkedService{{
+					Name:       "external-api",
+					CAFile:     "/etc/ssl/certs/ca-certificates.crt",
+					SNI:        "api.example.com",
+					Credential: &v1alpha1.LinkedServiceCredential{Mode: v1alpha1.CredentialModeInject, BindingID: "external-api"},
+				}}
+				gw.Spec.Deployment.CredentialInjection = &v1alpha1.TerminatingGatewayCredentialInjection{
+					Enabled:             true,
+					ProcessorImage:      "camp-auth-processor:test",
+					ProcessorConfigMap:  "camp-proc",
+					VaultAgentImage:     "hashicorp/vault:test",
+					VaultAgentConfigMap: "camp-agent",
+					VaultAddress:        "https://vault:8200",
+					TokenAudience:       "vault",
+				}
+				return gw
+			},
+			helmValues: func() *helmvalues.HelmValues {
+				hv := baseHelmValues()
+				hv.Global.SecretsBackend.Vault.Enabled = true
+				return hv
+			},
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				annotations := deployment.Spec.Template.Annotations
+				require.NotContains(t, annotations, "vault.hashicorp.com/agent-inject")
+				require.NotContains(t, annotations, "vault.hashicorp.com/agent-service-account-token-volume-name")
+				for _, v := range deployment.Spec.Template.Spec.Volumes {
+					require.NotEqual(t, "consul-auth-method-sa-token", v.Name)
+				}
+			},
+		},
+		{
+			name:       "init container has correct configuration",
+			termGW:     baseTermGW,
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Len(t, deployment.Spec.Template.Spec.InitContainers, 1)
+				initContainer := deployment.Spec.Template.Spec.InitContainers[0]
+				require.Equal(t, "terminating-gateway-init", initContainer.Name)
+				require.Equal(t, "hashicorp/consul-k8s-control-plane:1.0.0", initContainer.Image)
+			},
+		},
+		{
+			name:       "main container has correct probes",
+			termGW:     baseTermGW,
+			helmValues: baseHelmValues,
+			validate: func(t *testing.T, deployment *appsv1.Deployment) {
+				require.NotNil(t, deployment)
+				require.Len(t, deployment.Spec.Template.Spec.Containers, 1)
+				mainContainer := deployment.Spec.Template.Spec.Containers[0]
+				require.Equal(t, "terminating-gateway", mainContainer.Name)
+				require.NotNil(t, mainContainer.LivenessProbe)
+				require.NotNil(t, mainContainer.ReadinessProbe)
+				require.Equal(t, int32(8443), mainContainer.LivenessProbe.TCPSocket.Port.IntVal)
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			_ = v1alpha1.AddToScheme(scheme)
+			_ = appsv1.AddToScheme(scheme)
+
+			r := &TerminatingGatewayController{
+				Scheme: scheme,
+			}
+
+			termGW := tc.termGW()
+			helmValues := tc.helmValues()
+
+			deployment, _ := r.constructDeploymentFromCRD(termGW, helmValues)
+			tc.validate(t, deployment)
+		})
+	}
+}
+
+func TestDeployTerminatingGatewayDeployment_DisabledNilOrFalse(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		enabled *bool
+	}{
+		{name: "nil", enabled: nil},
+		{name: "false", enabled: func() *bool { b := false; return &b }()},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, v1alpha1.AddToScheme(scheme))
+			require.NoError(t, appsv1.AddToScheme(scheme))
+
+			fc := fake.NewClientBuilder().WithScheme(scheme).Build()
+			r := &TerminatingGatewayController{
+				Client: fc,
+				Log:    logrtest.New(t),
+				Scheme: scheme,
+			}
+
+			termGW := &v1alpha1.TerminatingGateway{}
+			termGW.Spec.Deployment.EnableDeployment = tc.enabled
+
+			err := r.deployTerminatingGatewayDeployment(context.Background(), r.Log, termGW, &helmvalues.HelmValues{})
+			require.NoError(t, err)
+
+			var list appsv1.DeploymentList
+			require.NoError(t, fc.List(context.Background(), &list))
+			require.Len(t, list.Items, 0)
+		})
+	}
+}
+
+func terminatingGatewayHelmValuesConfigMap(namespace string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "helm-values",
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"values.json": fmt.Sprintf(`{
+  "release": {
+    "name": "consul",
+    "namespace": %q,
+    "service": "Helm"
+  },
+  "global": {
+    "name": "consul",
+    "enabled": true,
+    "logLevel": "info",
+    "logJSON": false,
+    "datacenter": "dc1",
+    "enableConsulNamespaces": false,
+    "adminPartitions": {
+      "enabled": false,
+      "name": "default"
+    },
+    "tls": {
+      "enabled": false,
+      "caCert": {
+        "secretName": ""
+      }
+    },
+    "acls": {
+      "manageSystemACLs": false
+    },
+    "metrics": {
+      "enabled": false,
+      "enableGatewayMetrics": false
+    },
+    "imageK8S": "hashicorp/consul-k8s-control-plane:1.0.0",
+    "imageConsulDataplane": "hashicorp/consul-dataplane:1.0.0",
+    "extraLabels": {},
+    "consulAPITimeout": "10s",
+    "imagePullPolicy": "IfNotPresent",
+    "enablePodSecurityPolicies": false,
+    "openShiftEnabled": false
+  },
+  "terminatingGateways": {
+    "enabled": true,
+    "logLevel": "",
+    "defaults": {
+      "replicas": 1,
+      "consulNamespace": "default",
+      "annotations": {}
+    }
+  },
+  "externalServers": {
+    "enabled": false,
+    "hosts": [],
+    "httpsPort": 443,
+    "grpcPort": 8502,
+    "tlsServerName": "",
+    "useSystemRoots": false,
+    "skipServerWatch": false
+  }
+}`, namespace),
+		},
 	}
 }

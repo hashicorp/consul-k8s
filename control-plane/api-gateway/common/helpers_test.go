@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func TestBothNilOrEqual(t *testing.T) {
@@ -116,17 +118,17 @@ func TestEnsureFinalizer(t *testing.T) {
 		finalizers []string
 	}{
 		"gateway no finalizer": {
-			object:     &gwv1beta1.Gateway{},
+			object:     &gwv1.Gateway{},
 			expected:   true,
 			finalizers: []string{GatewayFinalizer},
 		},
 		"gateway other finalizer": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other"}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other"}}},
 			expected:   true,
 			finalizers: []string{"other", GatewayFinalizer},
 		},
 		"gateway already has finalizer": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{GatewayFinalizer}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{GatewayFinalizer}}},
 			expected:   false,
 			finalizers: []string{GatewayFinalizer},
 		},
@@ -147,22 +149,22 @@ func TestRemoveFinalizer(t *testing.T) {
 		finalizers []string
 	}{
 		"gateway no finalizer": {
-			object:     &gwv1beta1.Gateway{},
+			object:     &gwv1.Gateway{},
 			expected:   false,
 			finalizers: []string{},
 		},
 		"gateway other finalizer": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other"}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other"}}},
 			expected:   false,
 			finalizers: []string{"other"},
 		},
 		"gateway multiple finalizers": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{GatewayFinalizer, GatewayFinalizer}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{GatewayFinalizer, GatewayFinalizer}}},
 			expected:   true,
 			finalizers: []string{},
 		},
 		"gateway mixed finalizers": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other", GatewayFinalizer}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other", GatewayFinalizer}}},
 			expected:   true,
 			finalizers: []string{"other"},
 		},
@@ -170,6 +172,72 @@ func TestRemoveFinalizer(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, tt.expected, RemoveFinalizer(tt.object))
 			require.Equal(t, tt.finalizers, tt.object.GetFinalizers())
+		})
+	}
+}
+
+func TestFilterIsExternalFilter(t *testing.T) {
+	t.Parallel()
+
+	extensionRefFilter := func(group gwv1.Group, kind gwv1.Kind) gwv1.HTTPRouteFilter {
+		return gwv1.HTTPRouteFilter{
+			Type: gwv1.HTTPRouteFilterExtensionRef,
+			ExtensionRef: &gwv1.LocalObjectReference{
+				Group: group,
+				Kind:  kind,
+				Name:  "my-filter",
+			},
+		}
+	}
+
+	consulGroup := gwv1.Group(v1alpha1.ConsulHashicorpGroup)
+
+	for name, tt := range map[string]struct {
+		filter   gwv1.HTTPRouteFilter
+		expected bool
+	}{
+		"ext_proc external filter": {
+			filter:   extensionRefFilter(consulGroup, v1alpha1.RouteExtProcKind),
+			expected: true,
+		},
+		"retry external filter": {
+			filter:   extensionRefFilter(consulGroup, v1alpha1.RouteRetryFilterKind),
+			expected: true,
+		},
+		"timeout external filter": {
+			filter:   extensionRefFilter(consulGroup, v1alpha1.RouteTimeoutFilterKind),
+			expected: true,
+		},
+		"auth external filter": {
+			filter:   extensionRefFilter(consulGroup, v1alpha1.RouteAuthFilterKind),
+			expected: true,
+		},
+		"tls sds external filter": {
+			filter:   extensionRefFilter(consulGroup, v1alpha1.RouteTLSSDSFilterKind),
+			expected: true,
+		},
+		"header match invert external filter": {
+			filter:   extensionRefFilter(consulGroup, v1alpha1.RouteHeaderMatchInvertFilterKind),
+			expected: true,
+		},
+		"ext_proc with wrong group": {
+			filter:   extensionRefFilter("wrong.group", v1alpha1.RouteExtProcKind),
+			expected: false,
+		},
+		"unknown kind in consul group": {
+			filter:   extensionRefFilter(consulGroup, "UnknownFilter"),
+			expected: false,
+		},
+		"not an extension ref": {
+			filter: gwv1.HTTPRouteFilter{
+				Type:                  gwv1.HTTPRouteFilterRequestHeaderModifier,
+				RequestHeaderModifier: &gwv1.HTTPHeaderFilter{},
+			},
+			expected: false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, FilterIsExternalFilter(tt.filter))
 		})
 	}
 }

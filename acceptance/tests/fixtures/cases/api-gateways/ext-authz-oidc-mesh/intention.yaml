@@ -1,0 +1,28 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Allows the API gateway to reach the static-server upstream over the mesh.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: static-server
+spec:
+  destination:
+    name: static-server
+  sources:
+    - name: gateway
+      action: allow
+---
+# Within-mesh variant: oauth2-proxy is a mesh service reached by the gateway's
+# ext_authz Check call over mTLS, so it needs its own intention. (In the
+# out-of-mesh scenario oauth2-proxy is a plain Service and needs no intention.)
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: oauth2-proxy
+spec:
+  destination:
+    name: oauth2-proxy
+  sources:
+    - name: gateway
+      action: allow

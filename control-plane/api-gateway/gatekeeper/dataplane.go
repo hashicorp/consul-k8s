@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -29,7 +29,7 @@ const (
 	volumeNameForTLSCerts          = "consul-gateway-tls-certificates"
 )
 
-func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
+func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -40,7 +40,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
+	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name, gateway.Annotations)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -151,9 +151,18 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	return container, nil
 }
 
-func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
+func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string, annotations map[string]string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
+
+	// Check to see if the user has overridden concurrency via an annotation.
+	if envoyConcurrencyAnnotation, ok := annotations[constants.AnnotationEnvoyProxyConcurrency]; ok {
+		val, err := strconv.ParseUint(envoyConcurrencyAnnotation, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse annotation %q: %w", constants.AnnotationEnvoyProxyConcurrency, err)
+		}
+		envoyConcurrency = int(val)
+	}
 
 	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")

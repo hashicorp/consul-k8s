@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix argocd sync issue with difference to helm hook and argocd hooks, causing infinte wait time for pvc
+```

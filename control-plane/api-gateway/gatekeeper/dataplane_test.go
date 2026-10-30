@@ -11,10 +11,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -30,7 +31,7 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 
 	testCases := []struct {
 		name                        string
-		gateway                     gwv1beta1.Gateway
+		gateway                     gwv1.Gateway
 		gcc                         v1alpha1.GatewayClassConfig
 		expectedCommand             []string
 		expectedHasEnvoyArg         bool
@@ -39,13 +40,13 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 	}{
 		{
 			name: "privileged port with mapping disabled",
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "https",
 							Port: PrivilegedPort443, // Privileged port
@@ -65,13 +66,13 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 		},
 		{
 			name: "privileged port with mapping enabled",
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "https",
 							Port: PrivilegedPort443, // Privileged port
@@ -91,13 +92,13 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 		},
 		{
 			name: "non-privileged port",
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "http",
 							Port: NonPrivilegedPort8080, // Non-privileged port
@@ -117,13 +118,13 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 		},
 		{
 			name: "multiple listeners with one privileged",
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "http",
 							Port: NonPrivilegedPort8080, // Non-privileged port
@@ -211,13 +212,13 @@ func TestConsulDataplaneContainer_SecurityContext(t *testing.T) {
 		},
 	}
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-gateway",
 			Namespace: "default",
 		},
-		Spec: gwv1beta1.GatewaySpec{
-			Listeners: []gwv1beta1.Listener{
+		Spec: gwv1.GatewaySpec{
+			Listeners: []gwv1.Listener{
 				{
 					Name: "http",
 					Port: NonPrivilegedPort8080,
@@ -268,13 +269,13 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 		},
 	}
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-gateway",
 			Namespace: "default",
 		},
-		Spec: gwv1beta1.GatewaySpec{
-			Listeners: []gwv1beta1.Listener{
+		Spec: gwv1.GatewaySpec{
+			Listeners: []gwv1.Listener{
 				{
 					Name: "http",
 					Port: NonPrivilegedPort8080,
@@ -349,4 +350,81 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 	require.Contains(t, argsStr, fmt.Sprintf("-grpc-port=%d", GRPCPort))
 	require.Contains(t, argsStr, "-log-level=DEBUG")
 	require.Contains(t, argsStr, "-log-json=true")
+}
+
+func TestConsulDataplaneContainer_EnvoyProxyConcurrencyAnnotation(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                string
+		annotations         map[string]string
+		expectedConcurrency string
+		expectErr           bool
+	}{
+		{
+			name:                "no annotation set uses default concurrency",
+			annotations:         nil,
+			expectedConcurrency: "-envoy-concurrency=1",
+		},
+		{
+			name: "valid annotation overrides default concurrency",
+			annotations: map[string]string{
+				constants.AnnotationEnvoyProxyConcurrency: "4",
+			},
+			expectedConcurrency: "-envoy-concurrency=4",
+		},
+		{
+			name: "invalid annotation returns an error",
+			annotations: map[string]string{
+				constants.AnnotationEnvoyProxyConcurrency: "not-a-number",
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics := common.MetricsConfig{}
+			config := common.HelmConfig{
+				ImageDataplane:        "consul-dataplane:test",
+				GlobalImagePullPolicy: "IfNotPresent",
+				LogLevel:              "INFO",
+				LogJSON:               false,
+				ConsulConfig: common.ConsulConfig{
+					Address:  "consul.default.svc.cluster.local",
+					GRPCPort: GRPCPort,
+				},
+			}
+
+			gateway := gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-gateway",
+					Namespace:   "default",
+					Annotations: tc.annotations,
+				},
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
+						{
+							Name: "http",
+							Port: NonPrivilegedPort8080,
+						},
+					},
+				},
+			}
+
+			gcc := v1alpha1.GatewayClassConfig{
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					MapPrivilegedContainerPorts: 0,
+				},
+			}
+
+			container, err := consulDataplaneContainer(metrics, config, gcc, gateway, []corev1.VolumeMount{})
+			if tc.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Contains(t, container.Args, tc.expectedConcurrency)
+		})
+	}
 }

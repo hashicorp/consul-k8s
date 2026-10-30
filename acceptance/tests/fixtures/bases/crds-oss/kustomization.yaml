@@ -14,3 +14,4 @@ resources:
 - jwtprovider.yaml
 - exportedservices.yaml
 - controlplanerequestlimit.yaml
+- ratelimit.yaml

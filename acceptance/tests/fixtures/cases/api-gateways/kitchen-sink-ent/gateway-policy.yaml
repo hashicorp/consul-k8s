@@ -9,7 +9,7 @@ spec:
   targetRef:
     name: gateway
     sectionName: http-auth
-    group: gateway.networking.k8s.io/v1beta1
+    group: gateway.networking.k8s.io/v1
     kind: Gateway
   override:
     jwt:

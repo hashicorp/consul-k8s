@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
@@ -18,7 +18,7 @@ const accessLogVolumeName = "envoy-access-logs"
 // mounts for the primary container in the Deployment. There are two volumes that are created:
 // - one empty volume for holding connect-inject data
 // - one volume holding all TLS certificates referenced by the Gateway.
-func volumesAndMounts(gateway v1beta1.Gateway) ([]corev1.Volume, []corev1.VolumeMount) {
+func volumesAndMounts(gateway gwv1.Gateway) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{
 		{
 			Name: volumeNameForConnectInject,

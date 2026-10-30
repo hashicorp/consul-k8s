@@ -10,12 +10,12 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-func GatewayStatusesEqual(a, b gwv1beta1.GatewayStatus) bool {
+func GatewayStatusesEqual(a, b gwv1.GatewayStatus) bool {
 	return slices.EqualFunc(a.Addresses, b.Addresses, gatewayStatusesAddressesEqual) &&
 		slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual) &&
 		slices.EqualFunc(a.Listeners, b.Listeners, gatewayStatusesListenersEqual)
@@ -29,19 +29,23 @@ func RouteAuthFilterStatusesEqual(a, b v1alpha1.RouteAuthFilterStatus) bool {
 	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
-func gatewayStatusesAddressesEqual(a, b gwv1beta1.GatewayAddress) bool {
+func RouteExtProcStatusesEqual(a, b v1alpha1.Status) bool {
+	return slices.EqualFunc(a.Conditions, b.Conditions, consulConditionsEqual)
+}
+
+func gatewayStatusesAddressesEqual(a, b gwv1.GatewayStatusAddress) bool {
 	return BothNilOrEqual(a.Type, b.Type) &&
 		a.Value == b.Value
 }
 
-func gatewayStatusesListenersEqual(a, b gwv1beta1.ListenerStatus) bool {
+func gatewayStatusesListenersEqual(a, b gwv1.ListenerStatus) bool {
 	return a.AttachedRoutes == b.AttachedRoutes &&
 		a.Name == b.Name &&
 		slices.EqualFunc(a.SupportedKinds, b.SupportedKinds, routeGroupKindsEqual) &&
 		slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
-func routeGroupKindsEqual(a, b gwv1beta1.RouteGroupKind) bool {
+func routeGroupKindsEqual(a, b gwv1.RouteGroupKind) bool {
 	return BothNilOrEqual(a.Group, b.Group) &&
 		a.Kind == b.Kind
 }
@@ -54,6 +58,16 @@ func conditionsEqual(a, b metav1.Condition) bool {
 		a.Reason == b.Reason &&
 		a.Message == b.Message &&
 		a.ObservedGeneration == b.ObservedGeneration
+}
+
+// consulConditionsEqual compares the consul-k8s Condition type used by resources
+// that embed the common Status. It intentionally ignores LastTransitionTime so we
+// don't always fail a conditional check per-reconciliation.
+func consulConditionsEqual(a, b v1alpha1.Condition) bool {
+	return a.Type == b.Type &&
+		a.Status == b.Status &&
+		a.Reason == b.Reason &&
+		a.Message == b.Message
 }
 
 func EntriesEqual(a, b api.ConfigEntry) bool {
@@ -104,7 +118,14 @@ func (e entryComparator) apiGatewaysEqual(a, b api.APIGatewayConfigEntry) bool {
 		e.namespaceA == e.namespaceB &&
 		e.partitionA == e.partitionB &&
 		maps.Equal(a.Meta, b.Meta) &&
-		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual)
+		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual) &&
+		a.TLS.Enabled == b.TLS.Enabled &&
+		e.upstreamLimitsEqual(a.Defaults, b.Defaults) &&
+		bothNilOrEqualFunc(a.ExtAuthz, b.ExtAuthz, gatewayExtAuthzEqual)
+}
+
+func gatewayExtAuthzEqual(a, b api.APIGatewayExtAuthz) bool {
+	return a.Enabled == b.Enabled
 }
 
 func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) bool {
@@ -187,8 +208,19 @@ func equalClaims(a, b *api.APIGatewayJWTClaimVerification) bool {
 func (e entryComparator) apiGatewayListenerTLSConfigurationsEqual(a, b api.APIGatewayTLSConfiguration) bool {
 	return a.MaxVersion == b.MaxVersion &&
 		a.MinVersion == b.MinVersion &&
+		e.gatewayTLSSDSConfigsEqual(a.SDS, b.SDS) &&
 		slices.Equal(a.CipherSuites, b.CipherSuites) &&
 		slices.EqualFunc(a.Certificates, b.Certificates, e.resourceReferencesEqual)
+}
+
+func (e entryComparator) gatewayTLSSDSConfigsEqual(a, b *api.GatewayTLSSDSConfig) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.ClusterName == b.ClusterName && a.CertResource == b.CertResource
 }
 
 func (e entryComparator) resourceReferencesEqual(a, b api.ResourceReference) bool {
@@ -231,7 +263,13 @@ func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual)
+		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual) &&
+		slices.EqualFunc(a.Filters.ExtProc, b.Filters.ExtProc, e.extProcFiltersEqual) &&
+		bothNilOrEqualFunc(a.Filters.ExtAuthz, b.Filters.ExtAuthz, extAuthzFiltersEqual)
+}
+
+func extAuthzFiltersEqual(a, b api.HTTPRouteExtAuthzFilter) bool {
+	return a.Enabled == b.Enabled
 }
 
 func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
@@ -241,7 +279,8 @@ func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
 		orDefault(a.Partition, e.partitionA) == orDefault(b.Partition, e.partitionB) &&
 		slices.EqualFunc(a.Filters.Headers, b.Filters.Headers, e.httpHeaderFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.URLRewrite, b.Filters.URLRewrite, e.urlRewritesEqual) &&
-		slices.EqualFunc(a.ResponseFilters.Headers, b.ResponseFilters.Headers, e.httpHeaderFiltersEqual)
+		slices.EqualFunc(a.ResponseFilters.Headers, b.ResponseFilters.Headers, e.httpHeaderFiltersEqual) &&
+		e.upstreamLimitsEqual(a.Limits, b.Limits)
 }
 
 func (e entryComparator) httpMatchesEqual(a, b api.HTTPMatch) bool {
@@ -256,7 +295,7 @@ func (e entryComparator) httpPathMatchesEqual(a, b api.HTTPPathMatch) bool {
 }
 
 func (e entryComparator) httpHeaderMatchesEqual(a, b api.HTTPHeaderMatch) bool {
-	return a.Match == b.Match && a.Name == b.Name && a.Value == b.Value
+	return a.Match == b.Match && a.Name == b.Name && a.Value == b.Value && a.Invert == b.Invert
 }
 
 func (e entryComparator) httpQueryMatchesEqual(a, b api.HTTPQueryMatch) bool {
@@ -282,6 +321,31 @@ func (e entryComparator) retryFiltersEqual(a, b api.RetryFilter) bool {
 
 func (e entryComparator) timeoutFiltersEqual(a, b api.TimeoutFilter) bool {
 	return a.RequestTimeout == b.RequestTimeout && a.IdleTimeout == b.IdleTimeout
+}
+
+func (e entryComparator) extProcFiltersEqual(a, b api.ExtProcFilter) bool {
+	return a.StatPrefix == b.StatPrefix &&
+		a.Mode == b.Mode &&
+		bothNilOrEqualFunc(a.Overrides, b.Overrides, e.extProcOverridesEqual)
+}
+
+func (e entryComparator) extProcOverridesEqual(a, b api.ExtProcOverrides) bool {
+	// return a.MessageTimeout == b.MessageTimeout &&
+	// 	bothNilOrEqualFunc(a.FailureModeAllow, b.FailureModeAllow, func(x, y bool) bool { return x == y }) &&
+	// 	bothNilOrEqualFunc(a.Processing, b.Processing, e.extProcProcessingEqual)
+	return bothNilOrEqualFunc(a.Processing, b.Processing, e.extProcProcessingEqual)
+}
+
+func (e entryComparator) extProcProcessingEqual(a, b api.ExtProcProcessing) bool {
+	return bothNilOrEqualFunc(a.Request, b.Request, e.extProcProcessingDirectionEqual) &&
+		bothNilOrEqualFunc(a.Response, b.Response, e.extProcProcessingDirectionEqual)
+}
+
+func (e entryComparator) extProcProcessingDirectionEqual(a, b api.ExtProcProcessingDirection) bool {
+	return a.HeadersMode == b.HeadersMode &&
+		a.BodyMode == b.BodyMode &&
+		a.TrailersMode == b.TrailersMode &&
+		a.MaxBodyBytes == b.MaxBodyBytes
 }
 
 // jwtFiltersEqual compares the contents of the list of providers on the JWT filters for a route, returning true if the
@@ -344,6 +408,33 @@ func (e entryComparator) certificatesEqual(a, b api.FileSystemCertificateConfigE
 		maps.Equal(a.Meta, b.Meta) &&
 		a.Certificate == b.Certificate &&
 		a.PrivateKey == b.PrivateKey
+}
+
+func (e entryComparator) upstreamLimitsEqual(a, b *api.UpstreamLimits) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return BothNilOrEqual(a.MaxConnections, b.MaxConnections) &&
+		BothNilOrEqual(a.MaxPendingRequests, b.MaxPendingRequests) &&
+		BothNilOrEqual(a.MaxConcurrentRequests, b.MaxConcurrentRequests) &&
+		e.passiveHealthCheckEqual(a.PassiveHealthCheck, b.PassiveHealthCheck)
+}
+
+func (e entryComparator) passiveHealthCheckEqual(a, b *api.PassiveHealthCheck) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Interval == b.Interval &&
+		a.MaxFailures == b.MaxFailures &&
+		BothNilOrEqual(a.EnforcingConsecutive5xx, b.EnforcingConsecutive5xx) &&
+		BothNilOrEqual(a.MaxEjectionPercent, b.MaxEjectionPercent) &&
+		BothNilOrEqual(a.BaseEjectionTime, b.BaseEjectionTime)
 }
 
 func bothNilOrEqualFunc[T any](one, two *T, fn func(T, T) bool) bool {

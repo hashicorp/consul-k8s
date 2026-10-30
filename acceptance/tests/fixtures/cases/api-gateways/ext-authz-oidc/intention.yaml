@@ -1,0 +1,16 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Allows the API gateway to reach the static-server upstream over the mesh.
+# (oauth2-proxy and Dex are plain, non-mesh Services reached directly by Envoy's
+# ext_authz cluster, so they do not need an intention.)
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: static-server
+spec:
+  destination:
+    name: static-server
+  sources:
+    - name: gateway
+      action: allow

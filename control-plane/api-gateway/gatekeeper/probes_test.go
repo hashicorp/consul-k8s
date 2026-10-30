@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func TestProbesFromGateway_NoAnnotations(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 		},
@@ -29,7 +29,7 @@ func TestProbesFromGateway_NoAnnotations(t *testing.T) {
 func TestProbesFromGateway_ValidHTTPGet(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -60,7 +60,7 @@ func TestProbesFromGateway_ValidHTTPGet(t *testing.T) {
 func TestProbesFromGateway_ValidTCPSocket(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -87,7 +87,7 @@ func TestProbesFromGateway_ValidTCPSocket(t *testing.T) {
 func TestProbesFromGateway_ValidExec(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -115,7 +115,7 @@ func TestProbesFromGateway_ValidExec(t *testing.T) {
 func TestProbesFromGateway_AllThreeProbes(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -143,7 +143,7 @@ func TestProbesFromGateway_AllThreeProbes(t *testing.T) {
 func TestProbesFromGateway_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -160,7 +160,7 @@ func TestProbesFromGateway_InvalidJSON(t *testing.T) {
 func TestProbesFromGateway_MultipleHandlers(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -180,7 +180,7 @@ func TestProbesFromGateway_MultipleHandlers(t *testing.T) {
 func TestProbesFromGateway_NoHandler(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -199,7 +199,7 @@ func TestProbesFromGateway_NoHandler(t *testing.T) {
 func TestProbesFromGateway_SanitizeLivenessSuccessThreshold(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -220,7 +220,7 @@ func TestProbesFromGateway_SanitizeLivenessSuccessThreshold(t *testing.T) {
 func TestProbesFromGateway_SanitizeStartupSuccessThreshold(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -241,7 +241,7 @@ func TestProbesFromGateway_SanitizeStartupSuccessThreshold(t *testing.T) {
 func TestProbesFromGateway_ReadinessKeepsSuccessThreshold(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -262,7 +262,7 @@ func TestProbesFromGateway_ReadinessKeepsSuccessThreshold(t *testing.T) {
 func TestProbesFromGateway_EmptyAnnotationValue(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{

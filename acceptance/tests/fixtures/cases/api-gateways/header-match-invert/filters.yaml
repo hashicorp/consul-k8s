@@ -1,0 +1,25 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Day-1 filter: negate the x-canary header match.
+# Routes traffic to "canary-absent" backend when the X-Canary header is NOT present.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteHeaderMatchInvertFilter
+metadata:
+  name: invert-filter-v1
+spec:
+  headerNames:
+    - x-canary
+
+---
+
+# Day-2 filter: negate the x-version header match.
+# Used in the lifecycle test to verify that swapping the ExtensionRef causes
+# the Consul config entry to be re-written with the new header name.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteHeaderMatchInvertFilter
+metadata:
+  name: invert-filter-v2
+spec:
+  headerNames:
+    - x-version

@@ -6,7 +6,7 @@ package metrics
 import (
 	"strconv"
 
-	"github.com/armon/go-metrics"
+	"github.com/hashicorp/go-metrics"
 	metricsutil "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 

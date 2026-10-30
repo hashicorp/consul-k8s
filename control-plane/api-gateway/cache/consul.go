@@ -84,14 +84,14 @@ type Cache struct {
 	subscribers     map[string][]*Subscription
 	subscriberMutex *sync.Mutex
 
-	gatewayNameToACLPolicy map[string]*api.ACLPolicy
-	policyMutex            *sync.Mutex
+	gatewayToACLPolicy map[string]*api.ACLPolicy
+	policyMutex        *sync.Mutex
 
-	gatewayNameToACLRole map[string]*api.ACLRole
-	aclRoleMutex         *sync.Mutex
+	gatewayToACLRole map[string]*api.ACLRole
+	aclRoleMutex     *sync.Mutex
 
-	gatewayNameToACLBindingRule map[string]*api.ACLBindingRule
-	bindingRuleMutex            *sync.Mutex
+	gatewayToACLBindingRule map[string]*api.ACLBindingRule
+	bindingRuleMutex        *sync.Mutex
 
 	namespacesEnabled       bool
 	crossNamespaceACLPolicy string
@@ -112,24 +112,24 @@ func New(config Config) *Cache {
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
-		config:                      config.ConsulClientConfig,
-		serverMgr:                   config.ConsulServerConnMgr,
-		namespacesEnabled:           config.NamespacesEnabled,
-		cache:                       cache,
-		cacheMutex:                  &sync.Mutex{},
-		subscribers:                 make(map[string][]*Subscription),
-		subscriberMutex:             &sync.Mutex{},
-		gatewayNameToACLPolicy:      make(map[string]*api.ACLPolicy),
-		policyMutex:                 &sync.Mutex{},
-		gatewayNameToACLRole:        make(map[string]*api.ACLRole),
-		aclRoleMutex:                &sync.Mutex{},
-		gatewayNameToACLBindingRule: make(map[string]*api.ACLBindingRule),
-		bindingRuleMutex:            &sync.Mutex{},
-		kinds:                       Kinds,
-		synced:                      make(chan struct{}, len(Kinds)),
-		logger:                      config.Logger,
-		crossNamespaceACLPolicy:     config.CrossNamespaceACLPolicy,
-		datacenter:                  config.Datacenter,
+		config:                  config.ConsulClientConfig,
+		serverMgr:               config.ConsulServerConnMgr,
+		namespacesEnabled:       config.NamespacesEnabled,
+		cache:                   cache,
+		cacheMutex:              &sync.Mutex{},
+		subscribers:             make(map[string][]*Subscription),
+		subscriberMutex:         &sync.Mutex{},
+		gatewayToACLPolicy:      make(map[string]*api.ACLPolicy),
+		policyMutex:             &sync.Mutex{},
+		gatewayToACLRole:        make(map[string]*api.ACLRole),
+		aclRoleMutex:            &sync.Mutex{},
+		gatewayToACLBindingRule: make(map[string]*api.ACLBindingRule),
+		bindingRuleMutex:        &sync.Mutex{},
+		kinds:                   Kinds,
+		synced:                  make(chan struct{}, len(Kinds)),
+		logger:                  config.Logger,
+		crossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
+		datacenter:              config.Datacenter,
 	}
 }
 
@@ -354,12 +354,13 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	return nil
 }
 
-func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, error) {
+func (c *Cache) ensurePolicy(client *api.Client, gatewayName, namespace string) (string, error) {
+	gatewayCacheKey := fmt.Sprintf("%s-%s", gatewayName, namespace)
 	c.policyMutex.Lock()
 	defer c.policyMutex.Unlock()
 
 	createPolicy := func() (string, error) {
-		policy := c.gatewayPolicy(gatewayName)
+		policy := c.gatewayPolicy(gatewayName, namespace)
 
 		created, _, err := client.ACL().PolicyCreate(&policy, &api.WriteOptions{})
 
@@ -370,7 +371,7 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 			}
 
 			// on an upgrade the cache will be empty so we need to write the policy to the cache
-			c.gatewayNameToACLPolicy[gatewayName] = existing
+			c.gatewayToACLPolicy[gatewayCacheKey] = existing
 			return existing.ID, nil
 		}
 
@@ -378,11 +379,11 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 			return "", err
 		}
 
-		c.gatewayNameToACLPolicy[gatewayName] = created
+		c.gatewayToACLPolicy[gatewayCacheKey] = created
 		return created.ID, nil
 	}
 
-	cachedPolicy, found := c.gatewayNameToACLPolicy[gatewayName]
+	cachedPolicy, found := c.gatewayToACLPolicy[gatewayCacheKey]
 
 	if !found {
 		return createPolicy()
@@ -399,16 +400,17 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 	}
 
 	// update cache with existing policy
-	c.gatewayNameToACLPolicy[gatewayName] = existing
+	c.gatewayToACLPolicy[gatewayCacheKey] = existing
 	return existing.ID, nil
 }
 
-func getACLRoleName(gatewayName string) string {
-	return fmt.Sprint("managed-gateway-acl-role-", gatewayName)
+func getACLRoleName(gatewayName, namespace string) string {
+	return fmt.Sprint("managed-gateway-acl-role-", gatewayName, "-", namespace)
 }
 
-func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, error) {
-	policyID, err := c.ensurePolicy(client, gatewayName)
+func (c *Cache) ensureRole(client *api.Client, gatewayName string, namespace string) (string, error) {
+	gatewayCacheKey := fmt.Sprintf("%s-%s", gatewayName, namespace)
+	policyID, err := c.ensurePolicy(client, gatewayName, namespace)
 	if err != nil {
 		return "", err
 	}
@@ -417,7 +419,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 	defer c.aclRoleMutex.Unlock()
 
 	createRole := func() (string, error) {
-		aclRoleName := getACLRoleName(gatewayName)
+		aclRoleName := getACLRoleName(gatewayName, namespace)
 		role := &api.ACLRole{
 			Name:        aclRoleName,
 			Description: "ACL Role for Managed API Gateways",
@@ -442,15 +444,15 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 				return "", err
 			}
 
-			c.gatewayNameToACLRole[gatewayName] = role
+			c.gatewayToACLRole[gatewayCacheKey] = role
 			return aclRoleName, err
 		}
 
-		c.gatewayNameToACLRole[gatewayName] = role
+		c.gatewayToACLRole[gatewayCacheKey] = role
 		return aclRoleName, nil
 	}
 
-	cachedRole, found := c.gatewayNameToACLRole[gatewayName]
+	cachedRole, found := c.gatewayToACLRole[gatewayCacheKey]
 
 	if !found {
 		return createRole()
@@ -462,18 +464,19 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 	}
 
 	if aclRole != nil {
-		c.gatewayNameToACLRole[gatewayName] = aclRole
+		c.gatewayToACLRole[gatewayCacheKey] = aclRole
 		return aclRole.Name, nil
 	}
 
 	return createRole()
 }
 
-func (c *Cache) gatewayPolicy(gatewayName string) api.ACLPolicy {
+func (c *Cache) gatewayPolicy(gatewayServiceName, gatewayNamespace string) api.ACLPolicy {
+	gatewayCacheKey := fmt.Sprintf("%s-%s", gatewayServiceName, gatewayNamespace)
 	var data bytes.Buffer
 	if err := gatewayTpl.Execute(&data, templateArgs{
 		EnableNamespaces: c.namespacesEnabled,
-		APIGatewayName:   gatewayName,
+		APIGatewayName:   gatewayServiceName,
 	}); err != nil {
 		// just panic if we can't compile the simple template
 		// as it means something else is going severly wrong.
@@ -481,7 +484,7 @@ func (c *Cache) gatewayPolicy(gatewayName string) api.ACLPolicy {
 	}
 
 	return api.ACLPolicy{
-		Name:        fmt.Sprint("api-gateway-policy-for-", gatewayName),
+		Name:        fmt.Sprint("api-gateway-policy-for-", gatewayCacheKey),
 		Description: "API Gateway token Policy",
 		Rules:       data.String(),
 	}
@@ -544,12 +547,13 @@ func (c *Cache) List(kind string) []api.ConfigEntry {
 }
 
 func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
+	serviceCacheKey := fmt.Sprintf("%s-%s", service, namespace)
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 	if err != nil {
 		return err
 	}
 
-	role, err := c.ensureRole(client, service)
+	role, err := c.ensureRole(client, service, namespace)
 	if err != nil {
 		return ignoreACLsDisabled(err)
 	}
@@ -581,7 +585,7 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 
 		c.bindingRuleMutex.Lock()
 		defer c.bindingRuleMutex.Unlock()
-		c.gatewayNameToACLBindingRule[service] = bindingRule
+		c.gatewayToACLBindingRule[serviceCacheKey] = bindingRule
 
 		return nil
 	}
@@ -592,7 +596,7 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 
 	c.bindingRuleMutex.Lock()
 	defer c.bindingRuleMutex.Unlock()
-	c.gatewayNameToACLBindingRule[service] = bindingRule
+	c.gatewayToACLBindingRule[serviceCacheKey] = bindingRule
 
 	return nil
 }
@@ -605,6 +609,7 @@ var (
 )
 
 func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
+	serviceCacheKey := fmt.Sprintf("%s-%s", service, namespace)
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 	if err != nil {
 		return err
@@ -622,16 +627,16 @@ func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
 
 	deleteFns := make([]func() error, 0, 3)
 
-	if rule, ok := c.gatewayNameToACLBindingRule[service]; ok {
-		deleteFns = append(deleteFns, c.bindingRuleDelete(client, rule, service))
+	if rule, ok := c.gatewayToACLBindingRule[serviceCacheKey]; ok {
+		deleteFns = append(deleteFns, c.bindingRuleDelete(client, rule, serviceCacheKey))
 	}
 
-	if role, ok := c.gatewayNameToACLRole[service]; ok {
-		deleteFns = append(deleteFns, c.roleDelete(client, role, service))
+	if role, ok := c.gatewayToACLRole[serviceCacheKey]; ok {
+		deleteFns = append(deleteFns, c.roleDelete(client, role, serviceCacheKey))
 	}
 
-	if policy, ok := c.gatewayNameToACLPolicy[service]; ok {
-		deleteFns = append(deleteFns, c.policyDelete(client, policy, service))
+	if policy, ok := c.gatewayToACLPolicy[serviceCacheKey]; ok {
+		deleteFns = append(deleteFns, c.policyDelete(client, policy, serviceCacheKey))
 	}
 
 	for _, fn := range deleteFns {
@@ -647,65 +652,65 @@ func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
 	return nil
 }
 
-func (c *Cache) bindingRuleDelete(client *api.Client, rule *api.ACLBindingRule, service string) func() error {
+func (c *Cache) bindingRuleDelete(client *api.Client, rule *api.ACLBindingRule, serviceCacheKey string) func() error {
 	return func() error {
 		_, err := client.ACL().BindingRuleDelete(rule.ID, &api.WriteOptions{})
 		if err != nil {
 			if ignoreNotFound(err) == nil {
-				delete(c.gatewayNameToACLBindingRule, service)
+				delete(c.gatewayToACLBindingRule, serviceCacheKey)
 				return nil
 			}
 
 			if ignoreACLsDisabled(err) == nil {
-				delete(c.gatewayNameToACLBindingRule, service)
+				delete(c.gatewayToACLBindingRule, serviceCacheKey)
 				return ErrACLSDisabled
 			}
 			return fmt.Errorf("%w: %s", ErrFailedToDeleteBindingRule, err)
 		}
 
-		delete(c.gatewayNameToACLBindingRule, service)
+		delete(c.gatewayToACLBindingRule, serviceCacheKey)
 
 		return nil
 	}
 }
 
-func (c *Cache) roleDelete(client *api.Client, role *api.ACLRole, service string) func() error {
+func (c *Cache) roleDelete(client *api.Client, role *api.ACLRole, serviceCacheKey string) func() error {
 	return func() error {
 		_, err := client.ACL().RoleDelete(role.ID, &api.WriteOptions{})
 		if err != nil {
 			if ignoreNotFound(err) == nil {
-				delete(c.gatewayNameToACLRole, service)
+				delete(c.gatewayToACLRole, serviceCacheKey)
 				return nil
 			}
 
 			if ignoreACLsDisabled(err) == nil {
-				delete(c.gatewayNameToACLBindingRule, service)
+				delete(c.gatewayToACLBindingRule, serviceCacheKey)
 				return ErrACLSDisabled
 			}
 			return fmt.Errorf("%w: %s", ErrFailedToDeleteRole, err)
 		}
-		delete(c.gatewayNameToACLRole, service)
+		delete(c.gatewayToACLRole, serviceCacheKey)
 
 		return nil
 	}
 }
 
-func (c *Cache) policyDelete(client *api.Client, policy *api.ACLPolicy, service string) func() error {
+func (c *Cache) policyDelete(client *api.Client, policy *api.ACLPolicy, serviceCacheKey string) func() error {
 	return func() error {
 		_, err := client.ACL().PolicyDelete(policy.ID, &api.WriteOptions{})
 		if err != nil {
 			if ignoreNotFound(err) == nil {
-				delete(c.gatewayNameToACLPolicy, service)
+				delete(c.gatewayToACLPolicy, serviceCacheKey)
 				return nil
 			}
 
 			if ignoreACLsDisabled(err) == nil {
-				delete(c.gatewayNameToACLBindingRule, service)
+				delete(c.gatewayToACLPolicy, serviceCacheKey)
 				return ErrACLSDisabled
 			}
 			return fmt.Errorf("%w: %s", ErrFailedToDeletePolicy, err)
 		}
-		delete(c.gatewayNameToACLPolicy, service)
+		delete(c.gatewayToACLPolicy, serviceCacheKey)
 
 		return nil
 	}

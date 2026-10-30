@@ -1,0 +1,48 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Applies the builtin/ext-authz Envoy extension to the API gateway proxy, using
+# an HTTP authorization service (oauth2-proxy) reached OVER THE MESH.
+#
+# ProxyType: api-gateway is an Enterprise-only capability.
+#
+# This is the within-mesh counterpart of ext-authz-oidc/servicedefaults.yaml:
+# instead of Target.URI (a direct address), the target is a Consul mesh service
+# (Target.Service), so the gateway dials oauth2-proxy over mTLS. This requires an
+# intention allowing gateway -> oauth2-proxy (see intention.yaml).
+#
+# The gateway's Envoy calls oauth2-proxy's root path for every request:
+#   - a valid OIDC bearer token  -> oauth2-proxy returns 200 (allow).
+#   - no / invalid token         -> oauth2-proxy returns a 302 redirect to Dex,
+#     which Envoy treats as a DENY.
+#
+# AllowedClientHeadersOnSuccess copies the authenticated identity
+# (x-auth-request-email) onto the downstream response so a client can observe
+# who Dex authenticated without an echo upstream.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: gateway
+spec:
+  protocol: http
+  envoyExtensions:
+    - name: builtin/ext-authz
+      required: true
+      arguments:
+        ProxyType: api-gateway
+        Config:
+          HttpService:
+            Target:
+              Service:
+                Name: oauth2-proxy
+              Timeout: 5s
+            AuthorizationRequest:
+              AllowedHeaders:
+                - Exact: authorization
+                - Exact: cookie
+            AuthorizationResponse:
+              AllowedUpstreamHeaders:
+                - Exact: x-auth-request-user
+                - Exact: x-auth-request-email
+              AllowedClientHeadersOnSuccess:
+                - Exact: x-auth-request-email

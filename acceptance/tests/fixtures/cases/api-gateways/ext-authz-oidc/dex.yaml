@@ -1,0 +1,94 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Dex is a minimal OpenID Connect (OIDC) identity provider. For this test it is
+# configured with:
+#   - an in-memory store (ephemeral; fine for a test),
+#   - a single static client ("oauth2-proxy") that oauth2-proxy authenticates as,
+#   - a single static user (alice@example.com / password "password"),
+#   - the local password connector enabled for the OAuth2 password grant, so the
+#     test can mint an id_token headlessly with a single curl call:
+#
+#       curl -u oauth2-proxy:oauth2-proxy-secret \
+#         -d grant_type=password -d username=alice@example.com -d password=password \
+#         -d scope="openid email profile" http://dex:5556/dex/token
+#
+# Dex is a plain (non-mesh) Service reached only in-cluster by oauth2-proxy and
+# the test client, so it does NOT get a Connect sidecar.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dex-config
+data:
+  config.yaml: |
+    issuer: http://dex:5556/dex
+    storage:
+      type: memory
+    web:
+      http: 0.0.0.0:5556
+    oauth2:
+      passwordConnector: local
+      skipApprovalScreen: true
+    enablePasswordDB: true
+    staticPasswords:
+      - email: "alice@example.com"
+        # bcrypt hash of the password "password".
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "alice"
+        userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"
+    staticClients:
+      - id: oauth2-proxy
+        name: oauth2-proxy
+        secret: oauth2-proxy-secret
+        public: false
+        redirectURIs:
+          - http://oauth2-proxy:4180/oauth2/callback
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex
+  labels:
+    app: dex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dex
+  template:
+    metadata:
+      labels:
+        app: dex
+    spec:
+      containers:
+        - name: dex
+          image: ghcr.io/dexidp/dex:v2.41.1
+          imagePullPolicy: IfNotPresent
+          args: ["dex", "serve", "/etc/dex/config.yaml"]
+          ports:
+            - containerPort: 5556
+          readinessProbe:
+            httpGet:
+              path: /dex/.well-known/openid-configuration
+              port: 5556
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          volumeMounts:
+            - name: config
+              mountPath: /etc/dex
+      volumes:
+        - name: config
+          configMap:
+            name: dex-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+spec:
+  selector:
+    app: dex
+  ports:
+    - port: 5556
+      targetPort: 5556

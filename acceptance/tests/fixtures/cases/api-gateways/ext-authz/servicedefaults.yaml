@@ -1,0 +1,22 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Applies the builtin/ext-authz Envoy extension to the API gateway proxy.
+# ProxyType: api-gateway is an Enterprise-only capability. Producing this
+# service-defaults config entry with the extension is what activates the
+# gateway-wide and per-route ext_authz toggles at the data plane.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: gateway
+spec:
+  protocol: http
+  envoyExtensions:
+    - name: builtin/ext-authz
+      required: true
+      arguments:
+        ProxyType: api-gateway
+        Config:
+          GrpcService:
+            Target:
+              URI: localhost:9191

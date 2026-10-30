@@ -158,6 +158,14 @@ func (c *Controller) LastSyncResourceVersion() string {
 	return c.informer.LastSyncResourceVersion()
 }
 
+// HasSyncedChecker implements cache.Controller.
+func (c *Controller) HasSyncedChecker() cache.DoneChecker {
+	if c.informer == nil {
+		return nil
+	}
+	return c.informer.HasSyncedChecker()
+}
+
 func (c *Controller) processSingle(
 	queue workqueue.RateLimitingInterface,
 	informer cache.SharedIndexInformer,
@@ -229,4 +237,8 @@ func (c *Controller) informerDeleteHandler(queue workqueue.RateLimitingInterface
 			}
 		}
 	}
+}
+
+func (c *Controller) RunWithContext(ctx context.Context) {
+	c.Run(ctx.Done())
 }

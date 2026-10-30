@@ -78,6 +78,7 @@ func TestControllerNamespaces(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
+			releaseName := helpers.RandomName()
 
 			helmValues := map[string]string{
 				"global.enableConsulNamespaces":  "true",
@@ -96,7 +97,10 @@ func TestControllerNamespaces(t *testing.T) {
 				"terminatingGateways.gateways[0].replicas": "1",
 			}
 
-			releaseName := helpers.RandomName()
+			if c.secure {
+				helmValues["connectInject.globalConfigACLToken.secretName"] = fmt.Sprintf("%s-consul-bootstrap-acl-token", releaseName)
+				helmValues["connectInject.globalConfigACLToken.secretKey"] = "token"
+			}
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
@@ -230,6 +234,18 @@ func TestControllerNamespaces(t *testing.T) {
 					require.Equal(r, 45, jwtProviderConfigEntry.ClockSkewSeconds)
 					require.Equal(r, 15, jwtProviderConfigEntry.CacheConfig.Size)
 
+					// rate-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", defaultOpts)
+					require.NoError(r, err)
+					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.WriteRate)
+					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.ReadRate)
+					require.True(r, rateLimitConfigEntry.Config.Priority)
+					if len(rateLimitConfigEntry.Config.ExcludeEndpoints) > 0 {
+						require.ElementsMatch(r, []string{"Health.Check", "ConfigEntry.Apply"}, rateLimitConfigEntry.Config.ExcludeEndpoints)
+					}
+
 					// exported-services
 					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
 					require.NoError(r, err)
@@ -324,6 +340,9 @@ func TestControllerNamespaces(t *testing.T) {
 				logger.Log(t, "patching control-plane-request-limit custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "controlplanerequestlimit", "controlplanerequestlimit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
 
+				logger.Log(t, "patching rate-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "ratelimit", "global", "-p", `{"spec": {"config": {"priority": false}}}`, "--type=merge")
+
 				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
@@ -411,6 +430,13 @@ func TestControllerNamespaces(t *testing.T) {
 					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
 					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
 					require.Equal(r, rateLimitIPConfigEntry.Mode, "disabled")
+
+					// rate-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", defaultOpts)
+					require.NoError(r, err)
+					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitConfigEntry")
+					require.Equal(r, rateLimitConfigEntry.Config.Priority, false)
 				})
 			}
 
@@ -451,6 +477,9 @@ func TestControllerNamespaces(t *testing.T) {
 
 				logger.Log(t, "deleting control-plane-request-limit custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "controlplanerequestlimit", "controlplanerequestlimit")
+
+				logger.Log(t, "deleting rate-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "ratelimit", "global")
 
 				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -511,6 +540,11 @@ func TestControllerNamespaces(t *testing.T) {
 
 					// control-plane-request-limit
 					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", defaultOpts)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// rate-limit
+					_, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", defaultOpts)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})

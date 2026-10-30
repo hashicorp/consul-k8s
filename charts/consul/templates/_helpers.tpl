@@ -15,6 +15,76 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{/*
+Base name that all Kubernetes auth methods managed by this chart are derived from.
+Defaults to the release fullname so that existing installations keep their auth
+method names. Set global.acls.authMethod.name to a value that is unique per
+Kubernetes cluster when several clusters share a single Consul control plane,
+otherwise the clusters overwrite each other's auth methods.
+*/}}
+{{- define "consul.authMethodPrefix" -}}
+{{- default (include "consul.fullname" .) .Values.global.acls.authMethod.name -}}
+{{- end -}}
+
+{{/*
+Auth method that Consul components use to issue a `consul login` for local tokens.
+*/}}
+{{- define "consul.localComponentAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-component-auth-method
+{{- end -}}
+
+{{/*
+Auth method that Consul components use to issue a `consul login` for global tokens.
+Only created in secondary datacenters when federation is enabled, which is why it
+is suffixed with the datacenter name to keep it distinct from the local one.
+*/}}
+{{- define "consul.globalComponentAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+{{- end -}}
+
+{{/*
+Auth method that service mesh workloads use to issue a `consul login`.
+*/}}
+{{- define "consul.connectInjectAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-auth-method
+{{- end -}}
+
+{{/*
+Resolve the Consul namespace that a terminating gateway service should be
+registered into. Resolution order:
+  1. Per-gateway consulNamespace.
+  2. terminatingGateways.defaults.consulNamespace, unless it is the bare
+     "default" sentinel (treated as unset so mirroring can take precedence).
+  3. The mirrored Consul namespace derived from the release namespace when
+     namespace mirroring is enabled.
+  4. The terminatingGateways.defaults.consulNamespace value (i.e. "default").
+
+Note: This intentionally does NOT consult
+connectInject.consulNamespaces.consulDestinationNamespace. Terminating gateways have
+historically only resolved their namespace from terminatingGateways.defaults.consulNamespace
+/ the per-gateway consulNamespace, and the gateway's ACL policy (created by server-acl-init)
+is scoped to that same namespace. Following the connect destination namespace here would
+register the service into a namespace its ACL token is not authorized for. Mirroring is the
+only additional case we resolve, matching connect-injected services and the API gateway.
+
+Usage:
+  {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
+*/}}
+{{- define "consul.terminatingGatewayNamespace" -}}
+{{- $root := .root -}}
+{{- $gatewayNamespace := .gatewayNamespace -}}
+{{- $defaultsNamespace := .defaultsNamespace -}}
+{{- if $gatewayNamespace -}}
+{{- $gatewayNamespace -}}
+{{- else if (and $defaultsNamespace (ne $defaultsNamespace "default")) -}}
+{{- $defaultsNamespace -}}
+{{- else if $root.Values.connectInject.consulNamespaces.mirroringK8S -}}
+{{- printf "%s%s" $root.Values.connectInject.consulNamespaces.mirroringK8SPrefix $root.Release.Namespace -}}
+{{- else -}}
+{{- default "default" $defaultsNamespace -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "consul.restrictedSecurityContext" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:
@@ -39,6 +109,13 @@ and consul-k8s-control-plane images.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.podSecurityContext" -}}
+{{- if and .Values.global.podSecurityContext.enabled (not .Values.global.openshift.enabled) -}}
+securityContext:
+  fsGroup: 100
+  fsGroupChangePolicy: OnRootMismatch
+{{- end -}}
+{{- end -}}
 
 {{- define "consul.restrictedSecurityContextWithNetBindService" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
@@ -175,6 +252,48 @@ is passed to consul as a -config-file param on command line.
               [ -n "${HOST_IP}" ] && sed -Ei "s|HOST_IP|${HOST_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${POD_IP}" ] && sed -Ei "s|POD_IP|${POD_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
+{{- end -}}
+
+{{/*
+Rehashes the CA certificates written to /trusted-cas so that OpenSSL-based clients
+can discover them via SSL_CERT_DIR. OpenSSL only looks up CAs in a certificate
+directory by their subject hash (<hash>.N), so the .pem files alone are ignored.
+
+Notes on the implementation:
+  - Certificates that share a subject (for example an old and a new revision of the
+    same CA during a rotation) share a subject hash, so suffixes are allocated
+    sequentially instead of always using .0. Otherwise all but the last would be
+    silently dropped.
+  - Pre-existing symlinks are cleared first so that a container restart, which
+    reuses the same emptyDir, does not keep appending duplicate links.
+  - The whole block is a no-op when openssl is not present in the image (the
+    consul-telemetry-collector image does not ship it). The command runs under
+    `sh -ec`, so an unguarded openssl call would abort container startup.
+
+Callers are expected to indent this with nindent.
+*/}}
+{{- define "consul.trustedCAsRehash" -}}
+if command -v openssl > /dev/null 2>&1; then
+  for CERT_LINK in /trusted-cas/*; do
+    if [ -L "${CERT_LINK}" ]; then
+      rm -f "${CERT_LINK}"
+    fi
+  done
+  for CERT_FILE in /trusted-cas/custom-ca-*.pem; do
+    if [ ! -e "${CERT_FILE}" ]; then
+      continue
+    fi
+    CERT_HASH=$(openssl x509 -subject_hash -noout -in "${CERT_FILE}" 2> /dev/null) || CERT_HASH=""
+    if [ -z "${CERT_HASH}" ]; then
+      continue
+    fi
+    CERT_SUFFIX=0
+    while [ -e "/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}" ]; do
+      CERT_SUFFIX=$((CERT_SUFFIX + 1))
+    done
+    ln -sf "${CERT_FILE}" "/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}"
+  done
+fi
 {{- end -}}
 
 {{/*
@@ -643,4 +762,303 @@ Usage: {{ template "consul.ingressGatewayHasPrivilegedPorts" (dict "service" .se
   {{- end -}}
 {{- end -}}
 {{- $hasPrivilegedPorts -}}
+{{- end -}}
+
+{{/*
+Validates the ai.* section of values.yaml.
+
+The entire template is a no-op unless BOTH of these are true:
+  - ai.enabled=true
+  - connectInject.enabled=true  (or connectInject.enabled="-" with global.enabled=true)
+
+This means:
+  - No ai block in values.yaml at all → skipped (ai.enabled is nil/falsy)
+  - ai.enabled=false                  → skipped
+  - ai.enabled=true, connectInject=false → skipped (the connectInject gate
+    is checked at the template level; the error from the _helpers rule below
+    fires instead via the ai-validate.yaml trigger)
+
+Cross-field rules validated when both gates pass:
+  1. No AI port may be 20000 (reserved for the Envoy sidecar proxy).
+  2. All three ai.agent.defaults ports must be distinct from each other.
+
+Each port is resolved through `default` matching values.yaml defaults:
+  inferenceModel.interceptorPort  default 21101
+  mcpServer.interceptorPort       default 21102
+  agent.interceptorPort           default 21101
+  agent.mcpPort                   default 15101
+  agent.hitl.port                 default 16101
+
+Usage: {{ template "consul.validateAIConfig" . }}
+*/}}
+{{- define "consul.validateAIConfig" -}}
+{{- $ciEnabled       := (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) -}}
+{{- $ciGlobalEnabled := (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) -}}
+{{- $connectInject   := (or $ciEnabled $ciGlobalEnabled) -}}
+{{- if and .Values.ai .Values.ai.enabled $connectInject -}}
+
+  {{- /* Resolve every port with its values.yaml default so partially-omitted
+         ai blocks never cause a nil-dereference inside the template engine. */}}
+  {{- $imcPort   := int (default 21101 .Values.ai.inferenceModel.defaults.interceptorPort) }}
+  {{- $mcpPort   := int (default 21102 .Values.ai.mcpServer.defaults.interceptorPort) }}
+  {{- $agentInt  := int (default 21101 .Values.ai.agent.defaults.interceptorPort) }}
+  {{- $agentMcp  := int (default 15101 .Values.ai.agent.defaults.mcpPort) }}
+  {{- $agentHitl := int (default 16101 .Values.ai.agent.defaults.hitl.port) }}
+
+  {{- /* 1. No port may be 20000 (reserved for the Envoy sidecar proxy) */}}
+  {{- if eq $imcPort 20000 }}
+    {{- fail "ai.inferenceModel.defaults.interceptorPort must not be 20000 (reserved for the Envoy proxy). Default: 21101." }}
+  {{- end }}
+  {{- if eq $mcpPort 20000 }}
+    {{- fail "ai.mcpServer.defaults.interceptorPort must not be 20000 (reserved for the Envoy proxy). Default: 21102." }}
+  {{- end }}
+  {{- if eq $agentInt 20000 }}
+    {{- fail "ai.agent.defaults.interceptorPort must not be 20000 (reserved for the Envoy proxy). Default: 21101." }}
+  {{- end }}
+  {{- if eq $agentMcp 20000 }}
+    {{- fail "ai.agent.defaults.mcpPort must not be 20000 (reserved for the Envoy proxy). Default: 15101." }}
+  {{- end }}
+  {{- if eq $agentHitl 20000 }}
+    {{- fail "ai.agent.defaults.hitl.port must not be 20000 (reserved for the Envoy proxy). Default: 16101." }}
+  {{- end }}
+
+  {{- /* 2. All three agent ports must be distinct from each other */}}
+  {{- if eq $agentInt $agentMcp }}
+    {{- fail (cat "ai.agent.defaults.interceptorPort (" $agentInt ") and ai.agent.defaults.mcpPort (" $agentMcp ") must be different ports. Defaults: 21101 / 15101.") }}
+  {{- end }}
+  {{- if eq $agentInt $agentHitl }}
+    {{- fail (cat "ai.agent.defaults.interceptorPort (" $agentInt ") and ai.agent.defaults.hitl.port (" $agentHitl ") must be different ports. Defaults: 21101 / 16101.") }}
+  {{- end }}
+  {{- if eq $agentMcp $agentHitl }}
+    {{- fail (cat "ai.agent.defaults.mcpPort (" $agentMcp ") and ai.agent.defaults.hitl.port (" $agentHitl ") must be different ports. Defaults: 15101 / 16101.") }}
+  {{- end }}
+
+{{- end -}}
+{{- end -}}
+
+{{- /*
+consul.validateTerminatingGatewayCredentialInjection fails `helm template/install`
+when an enabled spec.credentialInjection block is incomplete or invalid, mirroring
+the CRD/controller validation so bad input is rejected before a workload is
+submitted (Helm renders without admission/controller validation otherwise).
+Input dict: ci (effective merged config), name (gateway name for messages).
+*/ -}}
+{{- define "consul.validateTerminatingGatewayCredentialInjection" -}}
+{{- $ci := .ci -}}
+{{- $prefix := printf "terminatingGateways gateway %q credentialInjection" .name -}}
+{{- if empty $ci.processorImage }}{{ fail (printf "%s: processorImage is required when enabled" $prefix) }}{{ end -}}
+{{- if empty $ci.processorConfigMap }}{{ fail (printf "%s: processorConfigMap is required when enabled" $prefix) }}{{ end -}}
+{{- if contains "*" (default "" $ci.processorConfigMap) }}{{ fail (printf "%s: processorConfigMap must not contain the wildcard character \"*\"" $prefix) }}{{ end -}}
+{{- /* Drain bounds are source-independent: a negative value renders an invalid
+       drain-wait / terminationGracePeriodSeconds, and camp-auth-processor's
+       drain-wait rejects durations over 300s (the preStop hook would exit
+       immediately instead of waiting). Zero disables the drain hook. */ -}}
+{{- if and (not (kindIs "invalid" $ci.drainSeconds)) (lt (int $ci.drainSeconds) 0) }}{{ fail (printf "%s: drainSeconds must not be negative" $prefix) }}{{ end -}}
+{{- if and (not (kindIs "invalid" $ci.drainSeconds)) (gt (int $ci.drainSeconds) 300) }}{{ fail (printf "%s: drainSeconds must not exceed 300" $prefix) }}{{ end -}}
+{{- $source := default "vault" $ci.source -}}
+{{- if and (ne $source "vault") (ne $source "kubernetesSecret") }}{{ fail (printf "%s: source must be \"vault\" or \"kubernetesSecret\"" $prefix) }}{{ end -}}
+{{- if eq $source "kubernetesSecret" -}}
+  {{- if empty $ci.secretName }}{{ fail (printf "%s: secretName is required when source is kubernetesSecret" $prefix) }}{{ end -}}
+  {{- if contains "*" (default "" $ci.secretName) }}{{ fail (printf "%s: secretName must not contain the wildcard character \"*\"" $prefix) }}{{ end -}}
+{{- else -}}
+  {{- if empty $ci.vaultAgentImage }}{{ fail (printf "%s: vaultAgentImage is required when enabled" $prefix) }}{{ end -}}
+  {{- if empty $ci.vaultAgentConfigMap }}{{ fail (printf "%s: vaultAgentConfigMap is required when enabled" $prefix) }}{{ end -}}
+  {{- if empty $ci.vaultAddress }}{{ fail (printf "%s: vaultAddress is required when enabled" $prefix) }}{{ end -}}
+  {{- /* Parsed like the Go API check (url.Parse): an https:// URL with a DNS
+         name, IPv4 address, or bracketed IPv6 literal host. */ -}}
+  {{- if not (regexMatch "^https://([a-zA-Z0-9._-]+|\\[[0-9a-fA-F:.]+(%[a-zA-Z0-9._~-]+)?\\])(:[0-9]+)?(/.*)?$" (default "" $ci.vaultAddress)) }}{{ fail (printf "%s: vaultAddress must be a valid absolute https:// URL with a host" $prefix) }}{{ end -}}
+  {{- if empty $ci.tokenAudience }}{{ fail (printf "%s: tokenAudience is required when enabled" $prefix) }}{{ end -}}
+  {{- if not (kindIs "invalid" $ci.tokenExpirationSeconds) -}}
+    {{- $exp := int $ci.tokenExpirationSeconds -}}
+    {{- if or (lt $exp 600) (gt $exp 43200) }}{{ fail (printf "%s: tokenExpirationSeconds must be between 600 and 43200 seconds" $prefix) }}{{ end -}}
+  {{- end -}}
+  {{- if and (not (kindIs "invalid" $ci.drainSeconds)) (not (kindIs "invalid" $ci.tokenExpirationSeconds)) (gt (int $ci.drainSeconds) (int $ci.tokenExpirationSeconds)) }}{{ fail (printf "%s: drainSeconds must not exceed tokenExpirationSeconds" $prefix) }}{{ end -}}
+  {{- range $field := list "vaultNamespace" "vaultCAConfigMap" "vaultAgentConfigMap" "tokenAudience" -}}
+    {{- if contains "*" (default "" (index $ci $field)) }}{{ fail (printf "%s: %s must not contain the wildcard character \"*\"" $prefix $field) }}{{ end -}}
+  {{- end -}}
+  {{- if and (not (empty $ci.vaultAgentConfigMap)) (eq $ci.processorConfigMap $ci.vaultAgentConfigMap) }}{{ fail (printf "%s: vaultAgentConfigMap must reference a different ConfigMap than processorConfigMap" $prefix) }}{{ end -}}
+{{- end -}}
+{{- end -}}
+
+{{- /*
+consul.terminatingGatewayCredentialVaultAgent renders a Vault Agent container
+(init or sidecar) for terminating-gateway credential injection. It authenticates
+to Vault with the projected Kubernetes service-account token, verifies the Vault
+server via VAULT_CACERT (when a CA ConfigMap is configured, using its ca.crt key),
+keeps its token sink private, and renders external-model credentials into the
+shared memory volume.
+It carries no secret material. Input dict: name, exitAfterAuth (bool), ci, root.
+*/ -}}
+{{- define "consul.terminatingGatewayCredentialVaultAgent" -}}
+- name: {{ .name }}
+  image: {{ .ci.vaultAgentImage | quote }}
+  {{- with (include "consul.imagePullPolicy" .root | trim) }}
+  {{ . }}
+  {{- end }}
+  command:
+  - "vault"
+  args:
+  - "agent"
+  - "-config=/consul/vault-agent-config"
+  {{- if .exitAfterAuth }}
+  - "-exit-after-auth"
+  {{- end }}
+  env:
+  - name: VAULT_ADDR
+    value: {{ .ci.vaultAddress | quote }}
+  {{- if .ci.vaultNamespace }}
+  - name: VAULT_NAMESPACE
+    value: {{ .ci.vaultNamespace | quote }}
+  {{- end }}
+  {{- if .ci.vaultCAConfigMap }}
+  - name: VAULT_CACERT
+    value: /consul/vault-ca/ca.crt
+  {{- end }}
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+    runAsNonRoot: true
+    # The upstream Vault image defaults to root (uid 0); running `vault agent`
+    # directly bypasses the entrypoint that would drop privileges, so pin the
+    # non-root vault user (uid 100) to satisfy runAsNonRoot. Shared file access to
+    # the rendered-credential volume is provided by the pod fsGroup.
+    runAsUser: 100
+    seccompProfile:
+      type: RuntimeDefault
+  volumeMounts:
+  - name: camp-vault-token
+    mountPath: /consul/vault-token
+    readOnly: true
+  - name: camp-vault-agent-config
+    mountPath: /consul/vault-agent-config
+    readOnly: true
+  - name: camp-vault-rendered
+    mountPath: /consul/vault-rendered
+  - name: camp-vault-agent-private
+    mountPath: /consul/vault-agent-private
+  {{- if .ci.vaultCAConfigMap }}
+  - name: camp-vault-ca
+    mountPath: /consul/vault-ca
+    readOnly: true
+  {{- end }}
+{{- end -}}
+
+{{- /*
+consul.terminatingGatewayCredentialAuthProcessor renders the camp-auth-processor
+sidecar for terminating-gateway credential injection. It reads the Vault
+Agent-rendered credentials read-only, serves the ext_proc UDS on a writable
+socket volume, and loads its non-secret binding config read-only. It must NOT
+mount the Vault token or the private Agent token sink. Input dict: ci, logLevel,
+drainSeconds, root.
+*/ -}}
+{{- define "consul.terminatingGatewayCredentialAuthProcessor" -}}
+- name: camp-auth-processor
+  image: {{ .ci.processorImage | quote }}
+  {{- with (include "consul.imagePullPolicy" .root | trim) }}
+  {{ . }}
+  {{- end }}
+  command:
+  - "camp-auth-processor"
+  args:
+  - "-config-file=/consul/processor-config/config.json"
+  - "-uds-path=/consul/auth-socket/auth.sock"
+  {{- /* camp-auth-processor accepts debug/info/warn/error; Consul's trace
+         level maps to its most verbose level. */}}
+  - "-log-level={{ if eq (lower .logLevel) "trace" }}debug{{ else }}{{ .logLevel }}{{ end }}"
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  volumeMounts:
+  - name: camp-vault-rendered
+    mountPath: /consul/vault-rendered
+    readOnly: true
+  - name: camp-auth-socket
+    mountPath: /consul/auth-socket
+  - name: camp-auth-processor-config
+    mountPath: /consul/processor-config
+    readOnly: true
+  readinessProbe:
+    exec:
+      command:
+      - "camp-auth-processor"
+      - "health"
+      - "-uds-path=/consul/auth-socket/auth.sock"
+      - "-ready"
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+  livenessProbe:
+    exec:
+      command:
+      - "camp-auth-processor"
+      - "health"
+      - "-uds-path=/consul/auth-socket/auth.sock"
+      - "-live"
+    # Liveness only checks that the process is alive; it stays tolerant of
+    # recoverable Vault/file errors (credential unavailability is surfaced via
+    # readiness, not liveness) so transient issues don't restart the container.
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 6
+    timeoutSeconds: 5
+  {{- if gt (int .drainSeconds) 0 }}
+  lifecycle:
+    preStop:
+      exec:
+        command:
+        - "camp-auth-processor"
+        - "drain-wait"
+        - "-duration={{ .drainSeconds }}s"
+  {{- end }}
+  resources:
+    requests:
+      memory: "50Mi"
+      cpu: "50m"
+    limits:
+      memory: "50Mi"
+      cpu: "50m"
+{{- end -}}
+
+{{/*
+Renders an annotations value as a JSON object for the helm-values ConfigMap
+read by the TerminatingGateway controller. Annotation values are documented as
+multi-line YAML strings (and may contain template expressions), so they are
+rendered with tpl and parsed with fromYaml. Map values are passed through.
+
+Usage: {{ template "consul.helmValuesAnnotationsJSON" (dict "root" $ "value" .Values.some.annotations "name" "some.annotations") }}
+*/}}
+{{- define "consul.helmValuesAnnotationsJSON" -}}
+{{- $value := .value -}}
+{{- if not $value -}}
+{}
+{{- else if kindIs "string" $value -}}
+{{- $parsed := tpl $value .root | fromYaml -}}
+{{- if hasKey $parsed "Error" -}}
+{{- fail (printf "%s must be a YAML map of annotations: %s" .name (get $parsed "Error")) -}}
+{{- end -}}
+{{- $parsed | toJson -}}
+{{- else -}}
+{{- $value | toJson -}}
+{{- end -}}
+{{- end -}}
+{{/*
+Whether external server discovery uses the Kubernetes provider.
+*/}}
+{{- define "consul.featureGateKubernetesDiscovery" -}}
+{{- if and .Values.externalServers.enabled .Values.externalServers.hosts -}}
+{{- $addresses := first .Values.externalServers.hosts -}}
+{{- if and (not (hasPrefix "exec=" $addresses)) (regexMatch `(^|[[:space:]])provider="?k8s"?([[:space:]]|$)` $addresses) -}}
+true
+{{- end -}}
+{{- end -}}
 {{- end -}}

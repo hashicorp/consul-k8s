@@ -68,7 +68,7 @@ type Secret struct {
 // PeeringAcceptorStatus defines the observed state of PeeringAcceptor.
 type PeeringAcceptorStatus struct {
 	// LatestPeeringVersion is the latest version of the resource that was reconciled.
-	LatestPeeringVersion *uint64 `json:"latestPeeringVersion,omitempty"`
+	LatestPeeringVersion *int64 `json:"latestPeeringVersion,omitempty"`
 	// SecretRef shows the status of the secret.
 	// +optional
 	SecretRef *SecretRefStatus `json:"secret,omitempty"`

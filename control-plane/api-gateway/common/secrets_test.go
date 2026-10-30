@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 func TestValidateKeyLength(t *testing.T) {
@@ -81,6 +83,13 @@ DjN2iMsYFz4WHS94W5UYl6/35ye25KsHuS9vnNeidhFAvYgC1nIkh4mFhLoSeSCG
 GODy2KwC2ssLuUHb6WoJ6A==
 -----END PRIVATE KEY-----`
 
+	// FIPS builds constrain RSA keys to exactly 2048/3072/4096-bit and return a
+	// FIPS-specific error, so the expected "too short" error differs by build.
+	tooShortErr := errKeyLengthTooShort
+	if version.IsFIPS() {
+		tooShortErr = errKeyLengthTooShortFIPS
+	}
+
 	testCases := map[string]struct {
 		key           string
 		expectedError error
@@ -91,7 +100,7 @@ GODy2KwC2ssLuUHb6WoJ6A==
 		},
 		"key is RSA and too short": {
 			key:           tooShortPrivateKey,
-			expectedError: errKeyLengthTooShort,
+			expectedError: tooShortErr,
 		},
 		"key is non-traditional RSA key": {
 			key:           nonTraditionalRSAKey,

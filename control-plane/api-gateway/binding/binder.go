@@ -9,9 +9,9 @@ import (
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -42,13 +42,13 @@ type BinderConfig struct {
 	// state that we may have set on the Gateway, its corresponding Routes or in
 	// Consul, because we should no longer be managing the Gateway (its association
 	// to our controller is through a parameter on the GatewayClass).
-	GatewayClass *gwv1beta1.GatewayClass
+	GatewayClass *gwv1.GatewayClass
 	// Gateway is the Gateway being reconciled that we want to bind routes to.
-	Gateway gwv1beta1.Gateway
+	Gateway gwv1.Gateway
 	// HTTPRoutes is a list of HTTPRoute objects that ought to be bound to the Gateway.
-	HTTPRoutes []gwv1beta1.HTTPRoute
+	HTTPRoutes []gwv1.HTTPRoute
 	// TCPRoutes is a list of TCPRoute objects that ought to be bound to the Gateway.
-	TCPRoutes []gwv1alpha2.TCPRoute
+	TCPRoutes []gwv1.TCPRoute
 	// Pods are any pods that are part of the Gateway deployment.
 	Pods []corev1.Pod
 	// Service is the deployed service associated with the Gateway deployment.
@@ -127,16 +127,17 @@ func (b *Binder) Snapshot() *Snapshot {
 	var listenerValidation listenerValidationResults
 	var policyValidation gatewayPolicyValidationResults
 	var authFilterValidation authFilterValidationResults
+	var extProcFilterValidation extProcFilterValidationResults
 
 	authFilters := b.config.Resources.GetExternalAuthFilters()
+	extProcFilters := b.config.Resources.GetExternalExtProcFilters()
 	if !isGatewayDeleted {
-		var updated bool
+		var updatedGwcc bool
 
-		gatewayClassConfig, updated = serializeGatewayClassConfig(&b.config.Gateway, gatewayClassConfig)
-
+		gatewayClassConfig, updatedGwcc = serializeGatewayClassConfig(&b.config.Gateway, gatewayClassConfig)
 		// we don't have a deletion but if we add a finalizer for the gateway, then just add it and return
 		// otherwise try and resolve as much as possible
-		if common.EnsureFinalizer(&b.config.Gateway) || updated {
+		if common.EnsureFinalizer(&b.config.Gateway) || updatedGwcc {
 			// if we've added the finalizer or serialized the class config, then update
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
 			return snapshot
@@ -144,15 +145,32 @@ func (b *Binder) Snapshot() *Snapshot {
 
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
-		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, b.config.GatewayClassConfig)
+		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, gatewayClassConfig)
+
+		// Warn about any listener-protocol annotations whose embedded section name
+		// does not match any listener in spec.listeners. These annotations are silently
+		// ignored by resolveListenerProtocol, so a typo produces no Consul protocol
+		// override and no other visible feedback. The warning makes the
+		// misconfiguration discoverable in controller logs.
+		if orphans := orphanedProtocolAnnotations(b.config.Gateway); len(orphans) > 0 {
+			b.config.Logger.Info(
+				"gateway has listener-protocol annotations that do not match any listener name "+
+					"and will be ignored; check that the annotation key contains the exact listener sectionName",
+				"gateway", b.config.Gateway.Name,
+				"namespace", b.config.Gateway.Namespace,
+				"orphanedAnnotationKeys", orphans,
+			)
+		}
+
 		policyValidation = validateGatewayPolicies(b.config.Gateway, b.config.Policies, b.config.Resources)
 		authFilterValidation = validateAuthFilters(authFilters, b.config.Resources)
+		extProcFilterValidation = validateExtProcFilters(extProcFilters)
 	}
 
 	// used for tracking how many routes have successfully bound to which listeners
 	// on a gateway for reporting the number of bound routes in a gateway listener's
 	// status
-	boundCounts := make(map[gwv1beta1.SectionName]int)
+	boundCounts := make(map[gwv1.SectionName]int)
 
 	// attempt to bind all routes
 
@@ -223,15 +241,16 @@ func (b *Binder) Snapshot() *Snapshot {
 		}
 
 		// calculate the status for the gateway
-		var status gwv1beta1.GatewayStatus
+		var status gwv1.GatewayStatus
 		for i, listener := range b.config.Gateway.Spec.Listeners {
-			status.Listeners = append(status.Listeners, gwv1beta1.ListenerStatus{
+			status.Listeners = append(status.Listeners, gwv1.ListenerStatus{
 				Name:           listener.Name,
 				SupportedKinds: supportedKinds(listener),
 				AttachedRoutes: int32(boundCounts[listener.Name]),
 				Conditions:     listenerValidation.Conditions(b.config.Gateway.Generation, i),
 			})
 		}
+
 		status.Conditions = b.config.Gateway.Status.Conditions
 
 		// we do this loop to not accidentally override any additional statuses that
@@ -249,7 +268,6 @@ func (b *Binder) Snapshot() *Snapshot {
 		}
 
 		for idx, policy := range b.config.Policies {
-			policy := policy
 
 			var policyStatus v1alpha1.GatewayPolicyStatus
 
@@ -277,6 +295,23 @@ func (b *Binder) Snapshot() *Snapshot {
 				snapshot.Kubernetes.StatusUpdates.Add(authFilter)
 			}
 		}
+
+		for idx, extProcFilter := range extProcFilters {
+			if extProcFilter == nil {
+				continue
+			}
+			extProcFilter := extProcFilter
+
+			var filterStatus v1alpha1.Status
+			filterStatus.Conditions = extProcFilterValidation.Conditions(extProcFilter.Generation, idx)
+			filterStatus.LastSyncedTime = extProcFilter.Status.LastSyncedTime
+
+			// only mark the filter as needing a status update if there's a diff with its old status
+			if !common.RouteExtProcStatusesEqual(filterStatus, extProcFilter.Status) {
+				extProcFilter.Status = filterStatus
+				snapshot.Kubernetes.StatusUpdates.Add(extProcFilter)
+			}
+		}
 	} else {
 		// if the gateway has been deleted, unset whatever we've set on it
 		snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, b.nonNormalizedConsulKey)
@@ -302,7 +337,7 @@ func (b *Binder) Snapshot() *Snapshot {
 	return snapshot
 }
 
-func secretsForGateway(gateway gwv1beta1.Gateway, resources *common.ResourceMap) mapset.Set {
+func secretsForGateway(gateway gwv1.Gateway, resources *common.ResourceMap) mapset.Set {
 	set := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
@@ -323,7 +358,7 @@ func secretsForGateway(gateway gwv1beta1.Gateway, resources *common.ResourceMap)
 	return set
 }
 
-func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1beta1.GatewayAddress {
+func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1.GatewayStatusAddress {
 	if service == nil {
 		return addressesFromPods(pods)
 	}
@@ -344,22 +379,22 @@ func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1beta1
 		return addressesFromPodHosts(pods)
 	}
 
-	return []gwv1beta1.GatewayAddress{}
+	return []gwv1.GatewayStatusAddress{}
 }
 
-func addressesFromLoadBalancer(service *corev1.Service) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromLoadBalancer(service *corev1.Service) []gwv1.GatewayStatusAddress {
+	addresses := []gwv1.GatewayStatusAddress{}
 
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
 		if ingress.IP != "" {
-			addresses = append(addresses, gwv1beta1.GatewayAddress{
-				Type:  common.PointerTo(gwv1beta1.IPAddressType),
+			addresses = append(addresses, gwv1.GatewayStatusAddress{
+				Type:  common.PointerTo(gwv1.IPAddressType),
 				Value: ingress.IP,
 			})
 		}
 		if ingress.Hostname != "" {
-			addresses = append(addresses, gwv1beta1.GatewayAddress{
-				Type:  common.PointerTo(gwv1beta1.HostnameAddressType),
+			addresses = append(addresses, gwv1.GatewayStatusAddress{
+				Type:  common.PointerTo(gwv1.HostnameAddressType),
 				Value: ingress.Hostname,
 			})
 		}
@@ -368,12 +403,12 @@ func addressesFromLoadBalancer(service *corev1.Service) []gwv1beta1.GatewayAddre
 	return addresses
 }
 
-func addressesFromClusterIP(service *corev1.Service) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromClusterIP(service *corev1.Service) []gwv1.GatewayStatusAddress {
+	addresses := []gwv1.GatewayStatusAddress{}
 
 	if service.Spec.ClusterIP != "" {
-		addresses = append(addresses, gwv1beta1.GatewayAddress{
-			Type:  common.PointerTo(gwv1beta1.IPAddressType),
+		addresses = append(addresses, gwv1.GatewayStatusAddress{
+			Type:  common.PointerTo(gwv1.IPAddressType),
 			Value: service.Spec.ClusterIP,
 		})
 	}
@@ -381,15 +416,15 @@ func addressesFromClusterIP(service *corev1.Service) []gwv1beta1.GatewayAddress 
 	return addresses
 }
 
-func addressesFromPods(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromPods(pods []corev1.Pod) []gwv1.GatewayStatusAddress {
+	addresses := []gwv1.GatewayStatusAddress{}
 	seenIPs := make(map[string]struct{})
 
 	for _, pod := range pods {
 		if pod.Status.PodIP != "" {
 			if _, found := seenIPs[pod.Status.PodIP]; !found {
-				addresses = append(addresses, gwv1beta1.GatewayAddress{
-					Type:  common.PointerTo(gwv1beta1.IPAddressType),
+				addresses = append(addresses, gwv1.GatewayStatusAddress{
+					Type:  common.PointerTo(gwv1.IPAddressType),
 					Value: pod.Status.PodIP,
 				})
 				seenIPs[pod.Status.PodIP] = struct{}{}
@@ -400,15 +435,15 @@ func addressesFromPods(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
 	return addresses
 }
 
-func addressesFromPodHosts(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromPodHosts(pods []corev1.Pod) []gwv1.GatewayStatusAddress {
+	addresses := []gwv1.GatewayStatusAddress{}
 	seenIPs := make(map[string]struct{})
 
 	for _, pod := range pods {
 		if pod.Status.HostIP != "" {
 			if _, found := seenIPs[pod.Status.HostIP]; !found {
-				addresses = append(addresses, gwv1beta1.GatewayAddress{
-					Type:  common.PointerTo(gwv1beta1.IPAddressType),
+				addresses = append(addresses, gwv1.GatewayStatusAddress{
+					Type:  common.PointerTo(gwv1.IPAddressType),
 					Value: pod.Status.HostIP,
 				})
 				seenIPs[pod.Status.HostIP] = struct{}{}
@@ -424,14 +459,26 @@ func isDeleted(object client.Object) bool {
 	return !object.GetDeletionTimestamp().IsZero()
 }
 
-func supportedKinds(listener gwv1beta1.Listener) []gwv1beta1.RouteGroupKind {
-	if listener.AllowedRoutes != nil && listener.AllowedRoutes.Kinds != nil {
-		return common.Filter(listener.AllowedRoutes.Kinds, func(kind gwv1beta1.RouteGroupKind) bool {
-			if _, ok := allSupportedRouteKinds[kind.Kind]; !ok {
-				return true
-			}
-			return !common.NilOrEqual(kind.Group, gwv1beta1.GroupVersion.Group)
-		})
+func supportedKinds(listener gwv1.Listener) []gwv1.RouteGroupKind {
+	switch listener.Protocol {
+
+	case gwv1.HTTPProtocolType, gwv1.HTTPSProtocolType:
+		return []gwv1.RouteGroupKind{
+			{
+				Group: ptr.To(gwv1.Group("gateway.networking.k8s.io")),
+				Kind:  gwv1.Kind("HTTPRoute"),
+			},
+		}
+
+	case gwv1.TCPProtocolType:
+		return []gwv1.RouteGroupKind{
+			{
+				Group: ptr.To(gwv1.Group("gateway.networking.k8s.io")),
+				Kind:  gwv1.Kind("TCPRoute"),
+			},
+		}
+
+	default:
+		return []gwv1.RouteGroupKind{}
 	}
-	return supportedKindsForProtocol[listener.Protocol]
 }

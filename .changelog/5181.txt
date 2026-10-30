@@ -1,0 +1,6 @@
+```release-note:feature
+api-gateway: add a dual-controller architecture that runs a custom controller alongside the old-stable controller, limit controller watches to Consul-managed Gateways, and add a Helm flag (`enableTcpRoute`) to enable or disable TCPRoute GVK watch/reconciliation in the old-stable controller.
+```
+```release-note:breaking-change
+api-gateway: upgrade the old-stable controller to use `gateway.networking.k8s.io` v1.5.1.
+```

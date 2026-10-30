@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: add `RouteHeaderMatchInvertFilter` CRD to support negated HTTP header match conditions (Invert=true) on API Gateway `HTTPRoute` rules, enabling "route when header is absent" and "route when header value does NOT match" patterns via an `ExtensionRef` filter.
+```

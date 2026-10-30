@@ -1,0 +1,34 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# SINGLE gateway ext-proc (HTTP). One builtin/ext-proc instance on the
+# api-gateway-single inbound listener in HTTP mode. statPrefix is left empty, so
+# Consul emits the un-suffixed envoy.filters.http.ext_proc filter (no /base or
+# /path suffix) and the HTTPRoutes need no RouteExtProc filters — there is a
+# single always-on instance. Before routing, Envoy POSTs the request headers to
+# ext-proc-http /decide, which consults route-decider and returns x-route-target
+# (CONTINUE_AND_REPLACE + clear route cache). The header-matched routes then
+# forward to the chosen MeshService.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: api-gateway-single
+spec:
+  protocol: http
+  envoyExtensions:
+    - name: builtin/ext-proc
+      required: true
+      arguments:
+        proxyType: api-gateway
+        listenerType: inbound
+        config:
+          # Empty statPrefix on purpose: exercises a single ext-proc instance
+          # with no per-instance key. The resulting Envoy filter is the
+          # un-suffixed "envoy.filters.http.ext_proc".
+          statPrefix: ""
+          routeCacheAction: CLEAR
+          httpService:
+            target:
+              service:
+                name: ext-proc-http
+            path: /decide

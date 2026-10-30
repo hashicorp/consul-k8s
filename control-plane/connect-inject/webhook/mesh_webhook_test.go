@@ -15,7 +15,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -1265,7 +1265,7 @@ func TestHandlerHandle(t *testing.T) {
 	}
 }
 
-// This test validates that overwrite probes match the iptables configuration fromiptablesConfigJSON()
+// This test validates that overwrite probes match the nft configuration from nftablesConfigJSON()
 // Because they happen at different points in the injection, the port numbers can get out of sync.
 func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 	t.Parallel()
@@ -1436,13 +1436,13 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 				return
 			}
 
-			var iptablesCfg iptables.Config
+			var nftCfg nftables.Config
 			var overwritePorts []string
 			actual := resp.Patches
 			if len(actual) > 0 {
 				for i := range actual {
 
-					// We want to grab the iptables configuration from the connect-init container's
+					// We want to grab the nft configuration from the connect-init container's
 					// environment.
 					if actual[i].Path == "/spec/initContainers" {
 						value := actual[i].Value.([]any)
@@ -1450,14 +1450,14 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 						envs := valueMap["env"].([]any)
 						redirectEnv := envs[9].(map[string]any)
 						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
-						iptablesJson := redirectEnv["value"].(string)
+						nftCfgJSON := redirectEnv["value"].(string)
 
-						err := json.Unmarshal([]byte(iptablesJson), &iptablesCfg)
+						err := json.Unmarshal([]byte(nftCfgJSON), &nftCfg)
 						require.NoError(t, err)
 					}
 
 					// We want to accumulate the httpGet Probes from the application container to
-					// compare them to the iptables rules. This is now the second container in the spec
+					// compare them to the nft rules. This is now the second container in the spec
 					if strings.Contains(actual[i].Path, "/spec/containers/1") {
 						valueMap, ok := actual[i].Value.(map[string]any)
 						require.True(t, ok)
@@ -1468,9 +1468,16 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 								httpProbe := probe["httpGet"]
 								httpProbeMap := httpProbe.(map[string]any)
 								port := httpProbeMap["port"]
-								portNum := port.(float64)
-
-								overwritePorts = append(overwritePorts, strconv.Itoa(int(portNum)))
+								switch p := port.(type) {
+								case float64:
+									overwritePorts = append(overwritePorts, strconv.Itoa(int(p)))
+								case json.Number:
+									portInt, err := p.Int64()
+									require.NoError(t, err)
+									overwritePorts = append(overwritePorts, strconv.Itoa(int(portInt)))
+								default:
+									require.Failf(t, "unexpected probe port type", "got %T", port)
+								}
 							}
 						}
 					}
@@ -1479,8 +1486,8 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 					actual[i].Value = nil
 				}
 			}
-			// Make sure the iptables excluded ports match the ports on the container
-			require.ElementsMatch(t, iptablesCfg.ExcludeInboundPorts, overwritePorts)
+			// Make sure the nft excluded ports match the ports on the container
+			require.ElementsMatch(t, nftCfg.ExcludeInboundPorts, overwritePorts)
 			require.ElementsMatch(t, tt.Patches, actual)
 		})
 	}
@@ -1497,7 +1504,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			"empty",
 			&corev1.Pod{},
 			map[string]string{
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":null},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1519,7 +1526,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1548,7 +1555,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				"consul.hashicorp.com/connect-service":     "foo",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1578,7 +1585,44 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				constants.AnnotationPort:                   "http",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
+			},
+			"",
+		},
+
+		{
+			"basic pod, with multiple named ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: 8080,
+								},
+								{
+									Name:          "metrics",
+									ContainerPort: 9090,
+								},
+								{
+									Name:          "admin",
+									ContainerPort: 9292,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				constants.AnnotationPort:                   "http,metrics,admin",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080},{\"name\":\"metrics\",\"containerPort\":9090},{\"name\":\"admin\",\"containerPort\":9292}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1606,7 +1650,41 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				constants.AnnotationPort:                   "8080",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
+			},
+			"",
+		},
+
+		{
+			"basic pod, with multiple unnamed ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 8080,
+								},
+								{
+									ContainerPort: 9090,
+								},
+								{
+									ContainerPort: 9292,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				constants.AnnotationPort:                   "8080,9090,9292",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080},{\"containerPort\":9090},{\"containerPort\":9292}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1633,7 +1711,41 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			if len(actual) == 0 {
 				actual = nil
 			}
-			require.Equal(t, tt.Expected, actual)
+
+			// The original pod annotation is stored as a JSON string. Compare it
+			// semantically to avoid flakes caused by equivalent JSON encodings.
+			expectedOriginal, expectedHasOriginal := tt.Expected[constants.AnnotationOriginalPod]
+			actualOriginal, actualHasOriginal := actual[constants.AnnotationOriginalPod]
+			require.Equal(t, expectedHasOriginal, actualHasOriginal)
+			if expectedHasOriginal {
+				normalizeOriginalPod := func(raw string) map[string]any {
+					var out map[string]any
+					require.NoError(t, json.Unmarshal([]byte(raw), &out))
+
+					if metadata, ok := out["metadata"].(map[string]any); ok {
+						if v, has := metadata["creationTimestamp"]; has && v == nil {
+							delete(metadata, "creationTimestamp")
+						}
+					}
+
+					return out
+				}
+
+				require.Equal(t, normalizeOriginalPod(expectedOriginal), normalizeOriginalPod(actualOriginal))
+			}
+
+			expectedCopy := make(map[string]string, len(tt.Expected))
+			for k, v := range tt.Expected {
+				expectedCopy[k] = v
+			}
+			actualCopy := make(map[string]string, len(actual))
+			for k, v := range actual {
+				actualCopy[k] = v
+			}
+			delete(expectedCopy, constants.AnnotationOriginalPod)
+			delete(actualCopy, constants.AnnotationOriginalPod)
+
+			require.Equal(t, expectedCopy, actualCopy)
 		})
 	}
 }
@@ -2410,17 +2522,17 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 		{
 			name:        "tproxy",
 			annotations: map[string]string{constants.KeyTransparentProxy: "true"},
-			expErr:      "multi port services are not compatible with transparent proxy",
+			expErr:      "multi protocol multi port services are not compatible with transparent proxy",
 		},
 		{
 			name:        "metrics",
 			annotations: map[string]string{constants.AnnotationEnableMetrics: "true"},
-			expErr:      "multi port services are not compatible with metrics",
+			expErr:      "multi protocol multi port services are not compatible with metrics",
 		},
 		{
 			name:        "metrics merging",
 			annotations: map[string]string{constants.AnnotationEnableMetricsMerging: "true"},
-			expErr:      "multi port services are not compatible with metrics merging",
+			expErr:      "multi protocol multi port services are not compatible with metrics merging",
 		},
 	}
 	for _, tt := range cases {

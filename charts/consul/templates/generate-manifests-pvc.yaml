@@ -1,0 +1,26 @@
+{{- if and .Values.connectInject.enabled .Values.global.generateManifests }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "consul.fullname" . }}-gatewayapi-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: generate-manifests
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-9"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  {{- if .Values.global.generateManifestsStorageClassName }}
+  storageClassName: {{ .Values.global.generateManifestsStorageClassName }}
+  {{- end }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.global.generateManifestsStorage | default "1Gi" }}
+{{- end }}

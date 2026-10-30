@@ -18,12 +18,19 @@
 # either).
 ARG GOLANG_VERSION
 FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
-RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@40c38fd658f0fd07ce74f2ee51b8abd3bfed01b3
+# Build go-discover in a synthetic module so we can pin patched versions of
+# golang.org/x/crypto (>=v0.52.0) and golang.org/x/net (>=v0.60.0) via MVS,
+# overriding the older versions bundled with go-discover v1.5.0.
+RUN mkdir /build && cd /build && \
+    go mod init godisc_builder && \
+    go get github.com/hashicorp/go-discover/cmd/discover@v1.5.0 && \
+    go get golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.60.0 google.golang.org/grpc@v1.84.0 && \
+    CGO_ENABLED=0 GOFLAGS=-mod=mod go build -o /go/bin/discover github.com/hashicorp/go-discover/cmd/discover
 
 # dev copies the binary from a local build
 # -----------------------------------
 # BIN_NAME is a requirement in the hashicorp docker github action 
-FROM alpine:3.23 AS dev
+FROM alpine:3.24 AS dev
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
@@ -35,13 +42,13 @@ ARG TARGETOS
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=${BIN_NAME} \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=${VERSION} \
-      release=${VERSION} \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=${VERSION} \
+    release=${VERSION} \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
@@ -50,7 +57,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables zlib
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -80,7 +87,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM alpine:3.23 AS release-default
+FROM alpine:3.24 AS release-default
 
 ARG BIN_NAME=consul-k8s-control-plane
 ARG CNI_BIN_NAME=consul-cni
@@ -88,13 +95,13 @@ ARG PRODUCT_VERSION
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=${BIN_NAME} \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=${PRODUCT_VERSION} \
-      release=${PRODUCT_VERSION} \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=${PRODUCT_VERSION} \
+    release=${PRODUCT_VERSION} \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
@@ -103,7 +110,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ nftables zlib
 
 # for FIPS CGO glibc compatibility in alpine
 # see https://github.com/golang/go/issues/59305
@@ -154,13 +161,13 @@ ENV PRODUCT_VERSION=$PRODUCT_VERSION
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=$PRODUCT_NAME \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=$PRODUCT_VERSION \
-      release=$PRODUCT_VERSION \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=$PRODUCT_VERSION \
+    release=$PRODUCT_VERSION \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
@@ -176,15 +183,14 @@ ARG TARGETARCH
 COPY LICENSE /licenses/mozilla.txt
 
 RUN microdnf update -y && \
-    microdnf install -y ca-certificates libcap openssl shadow-utils iptables && \
+    microdnf install -y ca-certificates libcap openssl shadow-utils nftables && \
     microdnf clean all
 
 # Create a non-root user to run the software. On OpenShift, this
 # will not matter since the container is run as a random user and group
 # but this is kept for consistency with our other images.
 RUN groupadd --gid 1000 ${BIN_NAME} && \
-    adduser --uid 100 --system -g ${BIN_NAME} ${BIN_NAME} && \
-    usermod -a -G root ${BIN_NAME}
+    adduser --uid 100 --system -g ${BIN_NAME} ${BIN_NAME}
 
 COPY --from=go-discover /go/bin/discover /bin/
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
