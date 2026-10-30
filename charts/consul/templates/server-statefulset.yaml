@@ -623,7 +623,8 @@ spec:
                   {{- end }}
                   2>/dev/null | grep -E '".+"'
             failureThreshold: {{ default 2 .Values.server.readinessProbe.failureThreshold }}
-            initialDelaySeconds: {{ default 5 .Values.server.readinessProbe.initialDelaySeconds }}
+            {{- /* hasKey, not default: 0 is a valid initialDelaySeconds */}}
+            initialDelaySeconds: {{ if hasKey .Values.server.readinessProbe "initialDelaySeconds" }}{{ .Values.server.readinessProbe.initialDelaySeconds }}{{ else }}5{{ end }}
             periodSeconds: {{ default 3 .Values.server.readinessProbe.periodSeconds }}
             successThreshold: {{ default 1 .Values.server.readinessProbe.successThreshold }}
             timeoutSeconds: {{ default 5 .Values.server.readinessProbe.timeoutSeconds }}

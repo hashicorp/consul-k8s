@@ -1,3 +1,3 @@
-```release-note:feature
-Updated server-statefullset to allow overriding readiness probe settings
+```release-note:improvement
+helm: Add `server.readinessProbe` to override the Consul server readiness probe timings (`failureThreshold`, `initialDelaySeconds`, `periodSeconds`, `successThreshold`, `timeoutSeconds`).
 ```
