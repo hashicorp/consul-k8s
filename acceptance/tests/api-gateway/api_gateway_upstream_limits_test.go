@@ -100,7 +100,7 @@ func TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck(t *testing.T) {
 
 	// Deploy the backend service that the gateway will route to.
 	logger.Log(t, "deploying static-server backend")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployStaticWorkload(t, ctx.KubectlOptions(t), cfg, "../fixtures/cases/static-server-inject")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", "deploy/static-server")
 
 	// Allow the gateway to call the backend.
@@ -137,7 +137,7 @@ func TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck(t *testing.T) {
 	retryCheckWithWait(t, 120, 2*time.Second, func(r *retry.R) {
 		var gw gwv1.Gateway
 		require.NoError(r, k8sClient.Get(context.Background(),
-			types.NamespacedName{Name: "limits-gateway", Namespace: "default"}, &gw))
+			types.NamespacedName{Name: "limits-gateway", Namespace: ctx.KubectlOptions(t).Namespace}, &gw))
 
 		checkStatusCondition(r, gw.Status.Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, gw.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
@@ -196,7 +196,7 @@ func TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck(t *testing.T) {
 		var limitsFilter v1alpha1.RouteUpstreamLimitsFilter
 		retryCheckWithWait(t, 20, 2*time.Second, func(r *retry.R) {
 			require.NoError(r, k8sClient.Get(context.Background(),
-				types.NamespacedName{Name: "static-server-limits", Namespace: "default"}, &limitsFilter))
+				types.NamespacedName{Name: "static-server-limits", Namespace: ctx.KubectlOptions(t).Namespace}, &limitsFilter))
 		})
 
 		newMaxConnections := 75
@@ -246,7 +246,7 @@ func TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck(t *testing.T) {
 		retryCheckWithWait(t, 20, 2*time.Second, func(r *retry.R) {
 			var gw gwv1.Gateway
 			require.NoError(r, k8sClient.Get(context.Background(),
-				types.NamespacedName{Name: "limits-gateway", Namespace: "default"}, &gw))
+				types.NamespacedName{Name: "limits-gateway", Namespace: ctx.KubectlOptions(t).Namespace}, &gw))
 
 			if gw.Annotations == nil {
 				gw.Annotations = make(map[string]string)
@@ -286,7 +286,7 @@ func TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck(t *testing.T) {
 		retryCheckWithWait(t, 20, 2*time.Second, func(r *retry.R) {
 			var gw gwv1.Gateway
 			require.NoError(r, k8sClient.Get(context.Background(),
-				types.NamespacedName{Name: "limits-gateway", Namespace: "default"}, &gw))
+				types.NamespacedName{Name: "limits-gateway", Namespace: ctx.KubectlOptions(t).Namespace}, &gw))
 
 			gw.Annotations["api-gateway.consul.hashicorp.com/default-max-connections"] = "80"
 			gw.Annotations["api-gateway.consul.hashicorp.com/default-passive-health-check-max-failures"] = "9"
@@ -321,7 +321,7 @@ func TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck(t *testing.T) {
 		retryCheckWithWait(t, 20, 2*time.Second, func(r *retry.R) {
 			var gw gwv1.Gateway
 			require.NoError(r, k8sClient.Get(context.Background(),
-				types.NamespacedName{Name: "limits-gateway", Namespace: "default"}, &gw))
+				types.NamespacedName{Name: "limits-gateway", Namespace: ctx.KubectlOptions(t).Namespace}, &gw))
 			if gw.Annotations == nil {
 				gw.Annotations = make(map[string]string)
 			}
@@ -345,7 +345,7 @@ func TestAPIGateway_UpstreamLimits_And_PassiveHealthCheck(t *testing.T) {
 		var limitsFilter v1alpha1.RouteUpstreamLimitsFilter
 		retryCheckWithWait(t, 20, 2*time.Second, func(r *retry.R) {
 			require.NoError(r, k8sClient.Get(context.Background(),
-				types.NamespacedName{Name: "static-server-limits", Namespace: "default"}, &limitsFilter))
+				types.NamespacedName{Name: "static-server-limits", Namespace: ctx.KubectlOptions(t).Namespace}, &limitsFilter))
 		})
 		newMax := 100
 		limitsFilter.Spec.MaxConnections = &newMax

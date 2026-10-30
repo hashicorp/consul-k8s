@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/apps/v1"
@@ -20,6 +21,96 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
+
+func MarkAcceptanceNamespace(t *testing.T, options *k8s.KubectlOptions, cfg *config.TestConfig, namespace string) {
+	t.Helper()
+	MarkAcceptanceResource(t, options, cfg, "namespace", namespace)
+}
+
+func MarkAcceptanceResource(t *testing.T, options *k8s.KubectlOptions, cfg *config.TestConfig, resource, name string) {
+	t.Helper()
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		RunKubectl(t, options, "label", resource, name, "consul.hashicorp.com/acceptance-namespace="+options.Namespace, "--overwrite")
+	}
+}
+
+func ApplyOpenShiftCNINetworkAttachment(t *testing.T, options *k8s.KubectlOptions, cfg *config.TestConfig) {
+	t.Helper()
+	if !(cfg.EnableOpenshift || cfg.UseOpenshift) || !cfg.EnableCNI {
+		return
+	}
+	output, err := RunKubectlAndGetOutputE(t, options, "get", "network-attachment-definitions.k8s.cni.cncf.io", "consul-cni", "--ignore-not-found", "-o", "name")
+	require.NoError(t, err)
+	if strings.TrimSpace(output) != "" {
+		return
+	}
+	KubectlApply(t, options, "../fixtures/bases/openshift/")
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		RunKubectl(t, options, "delete", "--ignore-not-found", "-f", "../fixtures/bases/openshift/")
+	})
+}
+
+// GrantOpenShiftPrivilegedSCC binds the privileged SCC to service accounts in
+// options.Namespace on OpenShift, like the privileged-scc-rolebinding.yaml that
+// the shared static-server and static-client bases include. Fixtures whose
+// workloads use their own service account need it because otherwise the pods
+// only get the restricted-v2 SCC, which rejects their fixed user ID and the
+// injected transparent proxy init container.
+func GrantOpenShiftPrivilegedSCC(t *testing.T, options *k8s.KubectlOptions, cfg *config.TestConfig, serviceAccounts ...string) {
+	t.Helper()
+	if !cfg.EnableOpenshift && !cfg.UseOpenshift {
+		return
+	}
+	require.NotEmpty(t, options.Namespace, "kubectl options must set the namespace of the service accounts")
+	for _, serviceAccount := range serviceAccounts {
+		name := serviceAccount + "-openshift-privileged"
+		output, err := RunKubectlAndGetOutputE(t, options, "get", "rolebinding", name, "--ignore-not-found", "-o", "name")
+		require.NoError(t, err, output)
+		if strings.TrimSpace(output) == "" {
+			RunKubectl(t, options, "create", "rolebinding", name,
+				"--clusterrole=system:openshift:scc:privileged",
+				"--serviceaccount="+options.Namespace+":"+serviceAccount)
+		}
+		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			RunKubectl(t, options, "delete", "rolebinding", name, "--ignore-not-found")
+		})
+	}
+}
+
+// DeployStaticWorkload deploys a static-server or static-client kustomize fixture
+// like DeployKustomize. On OpenShift it deploys the fixture's OpenShift variant,
+// which lets the restricted SCC assign the user ID, and with CNI attaches the
+// pods to the consul-cni network.
+func DeployStaticWorkload(t *testing.T, options *k8s.KubectlOptions, cfg *config.TestConfig, kustomizeDir string) {
+	t.Helper()
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		ApplyOpenShiftCNINetworkAttachment(t, options, cfg)
+		kustomizeDir = openShiftStaticWorkloadFixture(kustomizeDir, cfg.EnableCNI)
+	}
+	DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, kustomizeDir)
+}
+
+func openShiftStaticWorkloadFixture(kustomizeDir string, cni bool) string {
+	switch kustomizeDir {
+	case "../fixtures/cases/static-server-inject":
+		kustomizeDir = "../fixtures/cases/static-server-openshift"
+	case "../fixtures/cases/static-client-inject":
+		kustomizeDir = "../fixtures/cases/static-client-openshift-inject"
+	case "../fixtures/cases/static-client-tproxy":
+		kustomizeDir = "../fixtures/cases/static-client-openshift-tproxy"
+	case "../fixtures/bases/static-server-tcp":
+		if cni {
+			return "../fixtures/cases/static-server-tcp-openshift-cni"
+		}
+		return kustomizeDir
+	default:
+		return kustomizeDir
+	}
+	if cni {
+		kustomizeDir += "-cni"
+	}
+	return kustomizeDir
+}
 
 // Deploy creates a Kubernetes deployment by applying configuration stored at filepath,
 // sets up a cleanup function and waits for the deployment to become available.

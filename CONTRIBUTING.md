@@ -688,6 +688,79 @@ that can be used to quickly bring up a GKE cluster and configure
 cluster for acceptance tests. Unit tests _do not_ require a running Kubernetes
 cluster.
 
+##### Running on one OpenShift cluster
+
+From the repository root, set `KUBE_CONTEXT` to the intended OpenShift context
+and export a valid `CONSUL_ENT_LICENSE`. Use a dedicated, disposable namespace:
+the pre-test cleanup deletes that namespace and Consul resources owned by its
+Helm releases. To authorize cleanup of an existing test namespace, label it:
+
+```shell
+kubectl --context "$KUBE_CONTEXT" label namespace consul consul.hashicorp.com/acceptance-tests=true
+DEBUG_DIRECTORY=/tmp/rosa-tests-oct ./hack/run-ocp-acceptance.sh
+```
+
+The runner cleans up before each package, runs serially, and stops at the first
+failure while retaining failed test resources and logs. It does not enable
+multi-cluster tests. Packages that require two or four clusters are excluded;
+multi-cluster cases inside otherwise single-cluster packages skip themselves.
+The separate Datadog operator integration suite and the inactive example
+template are not part of this OCP runner.
+
+Pass package names to run a subset, for example:
+
+```shell
+DEBUG_DIRECTORY=/tmp/rosa-tests-oct ./hack/run-ocp-acceptance.sh basic connect
+ENABLE_CNI=true DEBUG_DIRECTORY=/tmp/rosa-tests-ocp-cni ./hack/run-ocp-acceptance.sh connect
+ENABLE_TRANSPARENT_PROXY=false DEBUG_DIRECTORY=/tmp/rosa-tests-ocp-server ./hack/run-ocp-acceptance.sh server
+```
+
+Transparent proxy is enabled by default. The `server` package skips its test
+when transparent proxy is enabled, so run it with `ENABLE_TRANSPARENT_PROXY=false`.
+
+Optional environment variables are `KUBE_NAMESPACE` (default `consul`),
+`KUBECONFIG_FILE`, `TEST_RUN` (a Go test selector), `CONSUL_IMAGE`,
+`CONSUL_K8S_IMAGE`, and `CONSUL_DATAPLANE_IMAGE`. For the `cli` package the runner
+builds the current CLI into the debug directory and uses it instead of an
+unrelated binary already installed on `PATH`.
+OpenShift runs opt out of Helm's client-side OpenAPI download with
+`CONSUL_K8S_SKIP_OPENAPI_VALIDATION=true`; Kubernetes still validates resources
+on admission. The CLI keeps client-side validation enabled by default.
+
+Tests that start from a published chart, such as
+`TestConnectInject_MultiportConversionFromPriorRelease`, pull that release's
+images by their `docker.io` names on OpenShift, because OpenShift resolves short
+names such as `hashicorp/consul` to the Red Hat registry. That test compares the
+upgraded control plane image with `-consul-k8s-image`, so set `CONSUL_K8S_IMAGE`
+when running it, for example to the local chart's `global.imageK8S`.
+
+To inspect cleanup without changing the cluster:
+
+```shell
+./hack/cleanup-ocp-tests.sh --context "$KUBE_CONTEXT" --namespace consul --dry-run
+```
+
+Cleanup never deletes OpenShift-managed Gateway API CRDs or force-finalizes
+namespaces. Auxiliary test namespaces and explicitly labeled test resources in
+the default namespace are cleaned up, but the default namespace is never
+deleted. Before deleting Consul CRDs owned by the test namespace's Helm releases,
+cleanup clears finalizers on their remaining instances, because the uninstalled
+Consul controller can no longer remove them. It also removes Consul-controlled
+GatewayClasses that failed tests leave behind, unless Consul is also installed
+outside the test namespaces. Transient API connection errors
+during cleanup are retried up to three times. Helm release-Secret storage
+timeouts are retried at most three times; workload readiness, ownership and
+authentication failures are not blindly retried.
+
+OpenShift DNS tests restore the DNS Operator's forwarding configuration even
+when failed test resources are retained, preserving unrelated changes. If a test
+process is interrupted before restoration, rerun cleanup with the same
+`--debug-directory` to recover its context-checked DNS backup before testing.
+On OCP 4.19 and later, the standard Gateway API suite omits TCPRoute coverage
+because those CRDs are owned by OpenShift. The `custom-api-gateway` suite keeps
+TCPRoute coverage using the chart's Consul-scoped CRDs instead, and runs only
+when `-enable-openshift` or `-use-openshift` is set.
+
 ##### Testing a dependent Consul change in CI
 
 Normal pull requests use the Consul images selected by the acceptance

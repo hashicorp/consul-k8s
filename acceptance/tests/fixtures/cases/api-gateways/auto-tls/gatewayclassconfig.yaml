@@ -6,4 +6,5 @@ kind: GatewayClassConfig
 metadata:
   name: auto-tls-gateway-class-config
 spec:
+  openshiftSCCName: restricted-v2
   mapPrivilegedContainerPorts: 8000

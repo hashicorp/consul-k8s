@@ -50,13 +50,13 @@ func TestAPIGateway_HeaderMatchInvert_Lifecycle(t *testing.T) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 
-	defaultNamespace := "default"
+	defaultNamespace := ctx.KubectlOptions(t).Namespace
 
 	// -------------------------------------------------------------------------
 	// Infrastructure: backend service
 	// -------------------------------------------------------------------------
 	logger.Log(t, "deploying static-server backend")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployStaticWorkload(t, ctx.KubectlOptions(t), cfg, "../fixtures/cases/static-server-inject")
 
 	// -------------------------------------------------------------------------
 	// Infrastructure: GatewayClassConfig + GatewayClass
@@ -66,6 +66,9 @@ func TestAPIGateway_HeaderMatchInvert_Lifecycle(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: gatewayClassConfigName,
 		},
+	}
+	if cfg.EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
 	}
 	logger.Log(t, "creating GatewayClassConfig")
 	require.NoError(t, k8sClient.Create(context.Background(), gatewayClassConfig))

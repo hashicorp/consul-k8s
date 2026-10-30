@@ -141,6 +141,7 @@ func TestAPIGateway_MultiListenerProtocol(t *testing.T) {
 
 	// ── Deploy shared infrastructure ─────────────────────────────────────────
 	logger.Log(t, "deploying multi-listener-protocol shared fixtures")
+	k8s.GrantOpenShiftPrivilegedSCC(t, k8sOpts, cfg, "http-server", "grpc-server", "h2-server")
 	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOpts, "apply", "-k", fixturePath)
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {

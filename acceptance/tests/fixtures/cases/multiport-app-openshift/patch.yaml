@@ -1,0 +1,12 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# OpenShift appends a <sa>-dockercfg-* pull secret to every service account,
+# and the connect-inject webhook mounts the first listed secret as the login
+# token of each additional multiport service. List the token secrets first.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: multiport
+secrets:
+- name: multiport
