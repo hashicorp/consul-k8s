@@ -90,6 +90,6 @@ jobs:
         with:
           workflow: test.yml
           repo: hashicorp/consul-k8s-workflows
-          ref: shashank/test-oct-ocp
+          ref: binilvrgs/test-oct-ocp
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
           inputs: ${{ steps.workflow-inputs.outputs.inputs }}
