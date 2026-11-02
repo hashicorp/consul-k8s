@@ -167,19 +167,24 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 func (c *ConnectHelper) CreateNamespace(t *testing.T, namespace string) {
 	opts := c.Ctx.KubectlOptions(t)
-	output, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
-	alreadyExists := err != nil && strings.Contains(err.Error(), "AlreadyExists")
 	if c.Cfg.EnableOpenshift || c.Cfg.UseOpenshift {
-		// kubectl reports AlreadyExists in its output, not in the exit error.
-		alreadyExists = alreadyExists || (err != nil && strings.Contains(output, "AlreadyExists"))
+		if !k8s.EnsureOpenShiftNamespace(t, c.Ctx.KubernetesClient(t), namespace) {
+			return
+		}
+	} else {
+		_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
+		if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
+			return
+		}
+		require.NoError(t, err)
 	}
-	if alreadyExists {
-		return
-	}
-	require.NoError(t, err)
 	k8s.MarkAcceptanceNamespace(t, opts, c.Cfg, namespace)
 	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, opts, "delete", "ns", namespace)
+		args := []string{"delete", "ns", namespace}
+		if c.Cfg.EnableOpenshift || c.Cfg.UseOpenshift {
+			args = append(args, "--timeout=3m")
+		}
+		k8s.RunKubectl(t, opts, args...)
 	})
 }
 

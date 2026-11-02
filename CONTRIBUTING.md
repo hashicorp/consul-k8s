@@ -756,10 +756,34 @@ OpenShift DNS tests restore the DNS Operator's forwarding configuration even
 when failed test resources are retained, preserving unrelated changes. If a test
 process is interrupted before restoration, rerun cleanup with the same
 `--debug-directory` to recover its context-checked DNS backup before testing.
+With namespace mirroring, API Gateway DNS queries include the `.ns` marker
+(`static-server.api-gateway.<namespace>.ns.consul`), unlike the certificate SAN.
+The OCP AutoTLS test checks that DNS resolves to the actual gateway address,
+using the test client's available `getent` resolver.
 On OCP 4.19 and later, the standard Gateway API suite omits TCPRoute coverage
 because those CRDs are owned by OpenShift. The `custom-api-gateway` suite keeps
 TCPRoute coverage using the chart's Consul-scoped CRDs instead, and runs only
 when `-enable-openshift` or `-use-openshift` is set.
+
+For multi-cluster OpenShift runs, clean up the dedicated acceptance namespace
+on **each** Kubernetes context before rerunning retained failures. Cleaning only
+the primary cluster leaves secondary-cluster namespaces and Gateway API
+resources behind. Auxiliary namespaces created by the partition and WAN
+federation tests are labeled so `cleanup-ocp-tests.sh` can find them. A namespace
+that is still terminating is not reusable: the OCP helpers wait up to three
+minutes for its deletion and report its remaining conditions rather than
+ignoring `AlreadyExists` or force-finalizing it.
+WAN failover helpers also retain their Helm namespace settings so intentions
+target the mirrored Consul namespaces.
+
+The OCP API Gateway lifecycle test uses an isolated application namespace and
+waits for its gateway classes to be deleted while the controller is still
+running. Gateway fixture cleanup removes only Consul's HTTPRoute finalizer
+after the test assertions, including routes switched to an uncontrolled parent.
+Other controllers' finalizers are preserved. Cleanup preserves OpenShift-managed
+Gateway API CRDs and other releases' generated image-pull secrets. Enterprise
+runs require an active `CONSUL_ENT_LICENSE`; an expired license prevents the Consul server from
+starting, even if the license Secret was created successfully.
 
 ##### Testing a dependent Consul change in CI
 

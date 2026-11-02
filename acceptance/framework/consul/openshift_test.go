@@ -303,3 +303,77 @@ func TestEnsureNamespaceExists(t *testing.T) {
 	require.Len(t, namespaces.Items, 1)
 	require.Equal(t, "consul", namespaces.Items[0].Name)
 }
+
+func TestIsReleaseSecret(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		secret      corev1.Secret
+		wantOCP     bool
+		wantDefault bool
+	}{
+		{
+			name:        "TLS secret",
+			secret:      corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "consul-ca-cert"}},
+			wantOCP:     true,
+			wantDefault: true,
+		},
+		{
+			name:        "Helm release secret",
+			secret:      corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "sh.helm.release.v1.consul.v1"}},
+			wantOCP:     true,
+			wantDefault: true,
+		},
+		{
+			name:        "own generated dockercfg",
+			secret:      corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "consul-tls-init-dockercfg-abcde"}},
+			wantOCP:     true,
+			wantDefault: true,
+		},
+		{
+			name:        "other release generated dockercfg",
+			secret:      corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "test-other-consul-tls-init-dockercfg-abcde"}},
+			wantDefault: true,
+		},
+		{
+			name: "explicitly owned secret",
+			secret: corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				Name: "custom-name", Labels: map[string]string{"release": "consul"},
+			}},
+			wantOCP: true,
+		},
+		{
+			name: "other release with overlapping name",
+			secret: corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				Name: "consul-other-ca-cert", Labels: map[string]string{"release": "consul-other"},
+			}},
+			wantDefault: true,
+		},
+		{
+			name: "Helm ownership in another namespace",
+			secret: corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				Name: "consul-ca-cert", Annotations: map[string]string{
+					"meta.helm.sh/release-name": "consul", "meta.helm.sh/release-namespace": "other",
+				},
+			}},
+			wantDefault: true,
+		},
+		{
+			name:   "license",
+			secret: corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: config.LicenseSecretName}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := &HelmCluster{
+				releaseName: "consul",
+				helmOptions: &helm.Options{KubectlOptions: &terratestk8s.KubectlOptions{Namespace: "consul"}},
+				cfg:         &config.TestConfig{},
+			}
+			require.Equal(t, tc.wantDefault, cluster.isReleaseSecret(tc.secret))
+			cluster.cfg.EnableOpenshift = true
+			require.Equal(t, tc.wantOCP, cluster.isReleaseSecret(tc.secret))
+			cluster.cfg.EnableOpenshift = false
+			cluster.cfg.UseOpenshift = true
+			require.Equal(t, tc.wantOCP, cluster.isReleaseSecret(tc.secret))
+		})
+	}
+}

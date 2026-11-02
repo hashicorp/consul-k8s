@@ -90,6 +90,7 @@ func TestAPIGateway_ExtAuthz_OIDC_Mesh(t *testing.T) {
 	routeManifest := fixturePath + "/httproute.yaml"
 	fixturePath = k8s.OpenShiftStaticServerOverlay(t, cfg, fixturePath, k8sNamespace)
 	k8s.ApplyOpenShiftCNINetworkAttachment(t, k8sOptions, cfg)
+	k8s.GrantOpenShiftPrivilegedSCC(t, k8sOptions, cfg, "oauth2-proxy")
 
 	logger.Log(t, "creating within-mesh oidc ext-authz api-gateway resources")
 	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "apply", "-k", fixturePath)

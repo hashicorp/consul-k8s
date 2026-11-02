@@ -482,7 +482,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 		require.NoError(r, err)
 		for _, secret := range secrets.Items {
-			if strings.Contains(secret.Name, h.releaseName) {
+			if h.isReleaseSecret(secret) {
 				err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), secret.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
 					require.NoError(r, err)
@@ -592,7 +592,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		secrets, err = h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 		require.NoError(r, err)
 		for _, secret := range secrets.Items {
-			if strings.Contains(secret.Name, h.releaseName) {
+			if h.isReleaseSecret(secret) {
 				r.Errorf("Found secret which should have been deleted: %s", secret.Name)
 			}
 		}

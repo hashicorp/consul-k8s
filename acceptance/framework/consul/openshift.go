@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -196,21 +195,29 @@ func isShortImageName(image string) bool {
 	return !found || (!strings.ContainsAny(registry, ".:") && registry != "localhost")
 }
 
+func (h *HelmCluster) isReleaseSecret(secret corev1.Secret) bool {
+	if !h.cfg.EnableOpenshift && !h.cfg.UseOpenshift {
+		return strings.Contains(secret.Name, h.releaseName)
+	}
+	if h.releaseName == "" {
+		return false
+	}
+	if release, ok := secret.Labels["release"]; ok {
+		return release == h.releaseName
+	}
+	if release, ok := secret.Annotations["meta.helm.sh/release-name"]; ok {
+		return release == h.releaseName &&
+			secret.Annotations["meta.helm.sh/release-namespace"] == h.helmOptions.KubectlOptions.Namespace
+	}
+	// OpenShift recreates dockercfg secrets while their service accounts exist.
+	// A release named "consul" must not match another release's "*-consul-*" secrets.
+	return strings.HasPrefix(secret.Name, h.releaseName+"-") ||
+		strings.HasPrefix(secret.Name, "sh.helm.release.v1."+h.releaseName+".")
+}
+
 func ensureNamespaceExists(t *testing.T, client kubernetes.Interface, namespace string) {
 	t.Helper()
-
-	retry.RunWith(openShiftAPIRetry(), t, func(r *retry.R) {
-		_, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			_, err = client.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: namespace},
-			}, metav1.CreateOptions{})
-			if apierrors.IsAlreadyExists(err) {
-				return
-			}
-		}
-		require.NoError(r, err)
-	})
+	k8s.EnsureOpenShiftNamespace(t, client, namespace)
 }
 
 // openShiftAPIRetry rides out transient managed OpenShift API errors such as

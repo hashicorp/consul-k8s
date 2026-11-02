@@ -277,11 +277,7 @@ func createNamespace(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	namespace := helpers.RandomName()
 
 	logger.Logf(t, "creating Kubernetes namespace %s", namespace)
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", namespace)
-	k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, namespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", namespace)
-	})
+	k8s.CreateNamespaces(t, ctx, cfg, namespace)
 
 	return namespace, &terratestk8s.KubectlOptions{
 		ContextName: ctx.KubectlOptions(t).ContextName,

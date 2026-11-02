@@ -7,13 +7,19 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -50,4 +56,48 @@ func CreateReferenceGrant(t *testing.T, kubernetesClient client.Client, cfg *con
 	object, err := referenceGrantForCluster(kubernetesClient.RESTMapper(), grant)
 	require.NoError(t, err)
 	require.NoError(t, kubernetesClient.Create(context.Background(), object))
+}
+
+// DeleteOpenShiftHTTPRoute removes a test fixture without deleting OCP-managed
+// CRDs or leaving Consul's finalizer on a route with an uncontrolled parent.
+func DeleteOpenShiftHTTPRoute(t *testing.T, kubernetesClient client.Client, namespace, name string) {
+	t.Helper()
+	logger.Logf(t, "deleting fixture HTTPRoute %s/%s and clearing only its Consul finalizer", namespace, name)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	require.NoError(t, deleteOpenShiftHTTPRoute(ctx, kubernetesClient, namespace, name))
+}
+
+func deleteOpenShiftHTTPRoute(ctx context.Context, kubernetesClient client.Client, namespace, name string) error {
+	route := &gwv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
+	if err := kubernetesClient.Delete(ctx, route); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("deleting fixture HTTPRoute %s/%s: %w", namespace, name, err)
+	}
+	var finalizers []string
+	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		var current gwv1.HTTPRoute
+		if err := kubernetesClient.Get(ctx, client.ObjectKeyFromObject(route), &current); err != nil {
+			return apierrors.IsNotFound(err), client.IgnoreNotFound(err)
+		}
+		if gatewaycommon.RemoveFinalizer(&current) {
+			if err := kubernetesClient.Update(ctx, &current); err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				if apierrors.IsConflict(err) {
+					return false, nil
+				}
+				return false, err
+			}
+		}
+		finalizers = current.Finalizers
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("waiting for fixture HTTPRoute %s/%s deletion (remaining finalizers: %v): %w", namespace, name, finalizers, err)
+	}
+	return nil
 }

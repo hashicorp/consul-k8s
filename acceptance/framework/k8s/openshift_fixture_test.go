@@ -21,7 +21,7 @@ func TestOpenShiftStaticServerOverlay(t *testing.T) {
 	if err != nil {
 		t.Skip("kubectl is required to validate local kustomize rendering")
 	}
-	for _, fixture := range []string{"kitchen-sink", "kitchen-sink-ent", "ext-authz-oidc-mesh"} {
+	for _, fixture := range []string{"kitchen-sink", "kitchen-sink-ent", "ext-authz-oidc-mesh", "auto-tls"} {
 		for _, cni := range []bool{false, true} {
 			name := fixture
 			if cni {
