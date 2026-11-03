@@ -68,6 +68,30 @@ load _helpers
 
 
 #--------------------------------------------------------------------
+# priorityClassName
+
+@test "dnsProxy/Deployment: no priorityClassName by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "dnsProxy/Deployment: can set a priorityClassName" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'dns.proxy.priorityClassName=system-cluster-critical' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.priorityClassName' | tee /dev/stderr)
+  [ "${actual}" = "system-cluster-critical" ]
+}
+
+#--------------------------------------------------------------------
 # nodeSelector
 
 @test "dnsProxy/Deployment: nodeSelector is not set by default" {
@@ -78,6 +102,149 @@ load _helpers
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
   [ "${actual}" = "null" ]
+}
+
+@test "dnsProxy/Deployment: can set a nodeSelector" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'dns.proxy.nodeSelector=node/role: system
+kubernetes.io/os: linux' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.nodeSelector == {"node/role": "system", "kubernetes.io/os": "linux"}' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "dnsProxy/Deployment: nodeSelector supports templating" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --namespace system \
+      --set 'dns.proxy.enabled=true' \
+      --set 'dns.proxy.nodeSelector=node/role: {{ .Release.Namespace }}
+kubernetes.io/os: linux' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.nodeSelector == {"node/role": "system", "kubernetes.io/os": "linux"}' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# affinity
+
+@test "dnsProxy/Deployment: affinity is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.affinity' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "dnsProxy/Deployment: can set affinity" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'dns.proxy.affinity=podAntiAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchLabels:
+          component: dns-proxy
+      topologyKey: kubernetes.io/hostname' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.affinity == {"podAntiAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{"labelSelector": {"matchLabels": {"component": "dns-proxy"}}, "topologyKey": "kubernetes.io/hostname"}]}}' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "dnsProxy/Deployment: affinity supports templating" {
+  cd `chart_dir`
+  local actual=$(helm template consul \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'dns.proxy.affinity=podAntiAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchLabels:
+          release: {{ .Release.Name }}
+      topologyKey: kubernetes.io/hostname' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.affinity == {"podAntiAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{"labelSelector": {"matchLabels": {"release": "consul"}}, "topologyKey": "kubernetes.io/hostname"}]}}' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# tolerations
+
+@test "dnsProxy/Deployment: tolerations are not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "dnsProxy/Deployment: can set tolerations" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'dns.proxy.tolerations=- key: name
+  operator: Equal
+  value: system
+  effect: NoSchedule' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.tolerations == [{"key": "name", "operator": "Equal", "value": "system", "effect": "NoSchedule"}]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "dnsProxy/Deployment: tolerations support templating" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'global.datacenter=dc2' \
+      --set 'dns.proxy.tolerations=- key: datacenter
+  operator: Equal
+  value: {{ .Values.global.datacenter }}
+  effect: NoSchedule' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.tolerations == [{"key": "datacenter", "operator": "Equal", "value": "dc2", "effect": "NoSchedule"}]' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# scheduling
+
+@test "dnsProxy/Deployment: scheduling values are omitted when null" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'dns.proxy.priorityClassName=null' \
+      --set 'dns.proxy.nodeSelector=null' \
+      --set 'dns.proxy.affinity=null' \
+      --set 'dns.proxy.tolerations=null' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | [has("priorityClassName"), has("nodeSelector"), has("affinity"), has("tolerations")] | any' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "dnsProxy/Deployment: scheduling values are omitted when empty" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set-string 'dns.proxy.priorityClassName=' \
+      --set-string 'dns.proxy.nodeSelector=' \
+      --set-string 'dns.proxy.affinity=' \
+      --set-string 'dns.proxy.tolerations=' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec | [has("priorityClassName"), has("nodeSelector"), has("affinity"), has("tolerations")] | any' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 
