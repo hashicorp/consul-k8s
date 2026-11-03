@@ -1,6 +1,9 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+# This fixture is for OpenShift WITHOUT CNI enabled.
+# For OpenShift WITH CNI, use static-server-openshift-cni instead.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -10,7 +13,6 @@ spec:
     metadata:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "k8s.v1.cni.cncf.io/networks": '[{ "name":"consul-cni" }]'
     spec:
       containers:
         - name: static-server
