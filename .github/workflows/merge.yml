@@ -23,6 +23,13 @@ jobs:
     needs:
       - get-go-version
     uses: ./.github/workflows/coverage.yml
+    # The workflow token defaults to read-only here; coverage-report needs write
+    # access to publish the badge and baseline (and OIDC for Codecov). Without
+    # this the whole workflow fails to start.
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     with:
       go-version: ${{ needs.get-go-version.outputs.go-version }}
 
