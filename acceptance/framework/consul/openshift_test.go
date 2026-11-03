@@ -6,20 +6,26 @@ package consul
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -28,6 +34,7 @@ import (
 	kubernetesfake "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func TestOpenShiftReleaseStorageTimeout(t *testing.T) {
@@ -94,7 +101,7 @@ func TestCleanupOpenShiftCustomGatewayClasses(t *testing.T) {
 		runtimeClient: kubernetesClient,
 		helmOptions:   &helm.Options{KubectlOptions: &terratestk8s.KubectlOptions{Namespace: "consul"}},
 	}
-	cluster.cleanupOpenShiftCustomGatewayClasses(t)
+	require.NoError(t, cluster.cleanupOpenShiftCustomGatewayClasses(t))
 	var classes customgwv1beta1.CustomGatewayClassList
 	require.NoError(t, kubernetesClient.List(context.Background(), &classes))
 	require.Len(t, classes.Items, 2)
@@ -102,6 +109,141 @@ func TestCleanupOpenShiftCustomGatewayClasses(t *testing.T) {
 		require.Contains(t, []string{"other-release", "other-namespace"}, gatewayClass.Name)
 		require.NotEmpty(t, gatewayClass.Finalizers)
 		require.NoError(t, kubernetesClient.Get(context.Background(), client.ObjectKey{Name: gatewayClass.Name}, &gatewayClass))
+	}
+}
+
+func TestOpenShiftCleanupRetriesDiscoveryTimeout(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, customgwv1beta1.Install(scheme))
+	calls := 0
+	kubernetesClient := clientfake.NewClientBuilder().WithScheme(scheme).
+		WithInterceptorFuncs(interceptor.Funcs{
+			List: func(ctx context.Context, underlying client.WithWatch, list client.ObjectList, options ...client.ListOption) error {
+				calls++
+				if calls == 1 {
+					return fmt.Errorf("failed to get server groups: %w", syscall.ETIMEDOUT)
+				}
+				return underlying.List(ctx, list, options...)
+			},
+		}).Build()
+	cluster := &HelmCluster{
+		runtimeClient: kubernetesClient,
+		helmOptions:   &helm.Options{KubectlOptions: &terratestk8s.KubectlOptions{Namespace: "consul"}},
+	}
+	require.NoError(t, cluster.cleanupOpenShiftCustomGatewayClasses(t))
+	require.Equal(t, 2, calls)
+}
+
+func TestOpenShiftAPIOperationRequestDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	require.NoError(t, runOpenShiftAPIOperation(ctx, func(requestContext context.Context) error {
+		deadline, ok := requestContext.Deadline()
+		require.True(t, ok)
+		require.InDelta(t, 30, time.Until(deadline).Seconds(), 1)
+		return nil
+	}))
+}
+
+func TestOpenShiftUninstallAbsentRelease(t *testing.T) {
+	directory := t.TempDir()
+	calls := filepath.Join(directory, "calls")
+	t.Setenv("OCP_HELM_CALLS", calls)
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+	script := "#!/bin/sh\necho \"$*\" >> \"$OCP_HELM_CALLS\"\necho 'Error: uninstall: Release not loaded: test-never-installed: release: not found' >&2\nexit 1\n"
+	require.NoError(t, os.WriteFile(filepath.Join(directory, "helm"), []byte(script), 0700))
+	require.NoError(t, uninstallOpenShiftRelease(t, &helm.Options{}, "test-never-installed"))
+	output, err := os.ReadFile(calls)
+	require.NoError(t, err)
+	require.Equal(t, 1, strings.Count(string(output), "uninstall test-never-installed"))
+	require.False(t, isOpenShiftReleaseNotFound("test-never-installed", "Error: uninstall: failed to get server groups", errors.New("unauthorized")))
+}
+
+func TestOpenShiftOrphanedCRDRecovery(t *testing.T) {
+	const oldRelease = "test-strfhh"
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, apiextensionsv1.AddToScheme(scheme))
+	require.NoError(t, v1alpha1.AddToScheme(scheme))
+	for _, tc := range []struct {
+		name             string
+		authorized       bool
+		activePod        bool
+		foreignCRD       bool
+		foreignInstance  bool
+		foreignFinalizer bool
+		wantRemoved      bool
+		wantError        string
+	}{
+		{name: "observed orphaned gateway CRD", authorized: true, wantRemoved: true},
+		{name: "unmarked namespace"},
+		{name: "live Consul installation", authorized: true, activePod: true},
+		{name: "foreign CRD ownership", authorized: true, foreignCRD: true},
+		{name: "foreign instance", authorized: true, foreignInstance: true, wantError: "no acceptance ownership"},
+		{name: "foreign finalizer", authorized: true, foreignFinalizer: true, wantError: "foreign finalizer"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "consul"}}
+			if tc.authorized {
+				namespace.Labels = map[string]string{"consul.hashicorp.com/acceptance-tests": "true"}
+			}
+			crd := &apiextensionsv1.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "gatewayclassconfigs.consul.hashicorp.com",
+					Labels: map[string]string{"release": oldRelease},
+					Annotations: map[string]string{
+						"meta.helm.sh/release-name": oldRelease, "meta.helm.sh/release-namespace": "consul",
+					},
+				},
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Group: "consul.hashicorp.com",
+					Names: apiextensionsv1.CustomResourceDefinitionNames{
+						Kind: "GatewayClassConfig", ListKind: "GatewayClassConfigList", Plural: "gatewayclassconfigs",
+					},
+					Scope:    apiextensionsv1.ClusterScoped,
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{Name: "v1alpha1", Served: true, Storage: true}},
+				},
+			}
+			if tc.foreignCRD {
+				crd.Annotations["meta.helm.sh/release-namespace"] = "another-namespace"
+			}
+			gatewayConfig := &v1alpha1.GatewayClassConfig{ObjectMeta: metav1.ObjectMeta{
+				Name: "consul-api-gateway", Labels: map[string]string{"release": oldRelease},
+				Finalizers: []string{"gateway-class-exists-finalizer.consul.hashicorp.com"},
+			}}
+			if tc.foreignInstance {
+				gatewayConfig.Labels = nil
+			}
+			if tc.foreignFinalizer {
+				gatewayConfig.Finalizers = append(gatewayConfig.Finalizers, "another-controller.example/finalizer")
+			}
+			objects := []client.Object{namespace, crd, gatewayConfig}
+			if tc.activePod {
+				objects = append(objects, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+					Name: "production-server", Namespace: "another-namespace", Labels: map[string]string{"app": "consul"},
+				}})
+			}
+			kubernetesClient := clientfake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+			cluster := &HelmCluster{
+				runtimeClient: kubernetesClient,
+				helmOptions:   &helm.Options{KubectlOptions: &terratestk8s.KubectlOptions{Namespace: "consul"}},
+			}
+			err := cluster.cleanupOpenShiftOrphanedCRDs(t)
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
+			}
+			crdError := kubernetesClient.Get(context.Background(), client.ObjectKeyFromObject(crd), crd)
+			if tc.wantRemoved {
+				require.True(t, apierrors.IsNotFound(crdError))
+				require.True(t, apierrors.IsNotFound(kubernetesClient.Get(context.Background(), client.ObjectKeyFromObject(gatewayConfig), gatewayConfig)))
+			} else {
+				require.NoError(t, crdError)
+				require.NoError(t, kubernetesClient.Get(context.Background(), client.ObjectKeyFromObject(gatewayConfig), gatewayConfig))
+				require.NotEmpty(t, gatewayConfig.Finalizers)
+			}
+		})
 	}
 }
 

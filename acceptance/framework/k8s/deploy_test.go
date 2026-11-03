@@ -6,6 +6,10 @@ package k8s
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
+	"net/url"
+	"syscall"
 	"testing"
 	"time"
 
@@ -66,6 +70,7 @@ func TestEnsureOpenShiftNamespace(t *testing.T) {
 				now := metav1.Now()
 				return true, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1", DeletionTimestamp: &now}}, nil
 			}
+
 			return false, nil, nil
 		})
 		require.True(t, EnsureOpenShiftNamespace(t, client, "ns1"))
@@ -138,4 +143,32 @@ func TestEnsureOpenShiftNamespace(t *testing.T) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.ErrorContains(t, err, "HTTPRoutes still have finalizers")
 	})
+}
+
+func TestIsRetryableOpenShiftAPIError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil"},
+		{
+			name: "observed wrapped discovery timeout",
+			err: fmt.Errorf("failed to get server groups: %w", &url.Error{
+				Op: "Get", URL: "https://api.example.invalid/api",
+				Err: &net.OpError{Op: "read", Net: "tcp", Err: syscall.ETIMEDOUT},
+			}),
+			want: true,
+		},
+		{name: "connection reset", err: fmt.Errorf("request failed: %w", syscall.ECONNRESET), want: true},
+		{name: "observed CLI timeout", err: errors.New("read tcp: read: connection timed out"), want: true},
+		{name: "TLS handshake timeout", err: errors.New("net/http: TLS handshake timeout"), want: true},
+		{name: "unauthorized", err: apierrors.NewUnauthorized("login expired")},
+		{name: "ownership conflict", err: errors.New("CRD exists with invalid ownership metadata")},
+		{name: "invalid input", err: errors.New("invalid namespace name")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, IsRetryableOpenShiftAPIError(tc.err))
+		})
+	}
 }

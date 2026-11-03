@@ -36,6 +36,8 @@ var openShiftKubeAPIConnectErrs = append([]string{
 	"net/http: TLS handshake timeout",
 	"connection reset by peer",
 	"read: operation timed out",
+	"read: connection timed out",
+	"i/o timeout",
 	"Client.Timeout exceeded while awaiting headers",
 	"http2: client connection lost",
 }, kubeAPIConnectErrs...)

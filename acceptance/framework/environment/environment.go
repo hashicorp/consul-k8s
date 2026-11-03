@@ -5,6 +5,7 @@ package environment
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/gruntwork-io/terratest/modules/k8s"
@@ -14,17 +15,20 @@ import (
 	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
-	DefaultContextIndex = 0
+	DefaultContextIndex        = 0
+	OpenShiftAPIRequestTimeout = 30 * time.Second
 )
 
 // TestEnvironment represents the infrastructure environment of the test,
@@ -155,15 +159,22 @@ func (k kubernetesContext) KubectlOptionsForNamespace(ns string) *k8s.KubectlOpt
 	}
 }
 
-// KubernetesClientFromOptions takes KubectlOptions and returns Kubernetes API client.
-func KubernetesClientFromOptions(t testutil.TestingTB, options *k8s.KubectlOptions) kubernetes.Interface {
+func kubernetesClientConfig(t testutil.TestingTB, options *k8s.KubectlOptions, openShift bool) *rest.Config {
+	t.Helper()
 	configPath, err := options.GetConfigPath(t)
 	require.NoError(t, err)
 
 	config, err := k8s.LoadApiClientConfigE(configPath, options.ContextName)
 	require.NoError(t, err)
+	if openShift {
+		config.Timeout = OpenShiftAPIRequestTimeout
+	}
+	return config
+}
 
-	client, err := kubernetes.NewForConfig(config)
+// KubernetesClientFromOptions takes KubectlOptions and returns Kubernetes API client.
+func KubernetesClientFromOptions(t testutil.TestingTB, options *k8s.KubectlOptions) kubernetes.Interface {
+	client, err := kubernetes.NewForConfig(kubernetesClientConfig(t, options, false))
 	require.NoError(t, err)
 
 	return client
@@ -174,7 +185,9 @@ func (k kubernetesContext) KubernetesClient(t testutil.TestingTB) kubernetes.Int
 		return k.client
 	}
 
-	k.client = KubernetesClientFromOptions(t, k.KubectlOptions(t))
+	client, err := kubernetes.NewForConfig(kubernetesClientConfig(t, k.KubectlOptions(t), k.openShift))
+	require.NoError(t, err)
+	k.client = client
 
 	return k.client
 }
@@ -184,16 +197,13 @@ func (k kubernetesContext) ControllerRuntimeClient(t testutil.TestingTB) client.
 		return k.runtimeClient
 	}
 
-	options := k.KubectlOptions(t)
-	configPath, err := options.GetConfigPath(t)
-	require.NoError(t, err)
-	config, err := k8s.LoadApiClientConfigE(configPath, options.ContextName)
-	require.NoError(t, err)
+	config := kubernetesClientConfig(t, k.KubectlOptions(t), k.openShift)
 
 	s := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(s))
 	require.NoError(t, gwv1.Install(s))
 	if k.openShift {
+		require.NoError(t, apiextensionsv1.AddToScheme(s))
 		require.NoError(t, customgwv1beta1.Install(s))
 		require.NoError(t, customgwv1alpha2.Install(s))
 	}

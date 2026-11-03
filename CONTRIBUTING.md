@@ -776,6 +776,19 @@ ignoring `AlreadyExists` or force-finalizing it.
 WAN failover helpers also retain their Helm namespace settings so intentions
 target the mirrored Consul namespaces.
 
+OCP client-go and controller-runtime requests, including API discovery, have a
+30-second request timeout. Teardown retries transient API failures with a bounded
+budget and still attempts Helm uninstall if gateway cleanup fails. Cleanup of a
+release that was never installed is idempotent; authentication, ownership, and
+validation errors are not treated as successful cleanup.
+
+When the namespace is explicitly labeled for acceptance cleanup and no Consul
+pods remain anywhere in the cluster, OCP installs can recover orphaned
+Consul-scoped CRDs left after an uninstall lost its Helm records. Recovery checks
+Helm ownership and test-instance ownership, refuses foreign finalizers, and never
+removes OpenShift-managed Gateway API CRDs. This prevents one failed package's
+teardown from causing CRD ownership conflicts in later packages.
+
 The OCP API Gateway lifecycle test uses an isolated application namespace and
 waits for its gateway classes to be deleted while the controller is still
 running. Gateway fixture cleanup removes only Consul's HTTPRoute finalizer

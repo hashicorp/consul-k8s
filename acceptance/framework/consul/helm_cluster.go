@@ -236,6 +236,7 @@ func (h *HelmCluster) removeReleasedChartVersion() {
 
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
+	openShift := h.cfg.EnableOpenshift || h.cfg.UseOpenshift
 
 	// check and remove any CRDs with finalizers
 	if !h.cfg.EnableOpenshift && !h.cfg.UseOpenshift {
@@ -244,13 +245,20 @@ func (h *HelmCluster) Create(t *testing.T) {
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
-	helpers.Cleanup(t, h.noCleanupOnFailure, h.noCleanup, func() {
-		h.Destroy(t)
-	})
+	cleanup := func() { h.Destroy(t) }
+	if !openShift {
+		helpers.Cleanup(t, h.noCleanupOnFailure, h.noCleanup, cleanup)
+	}
 
 	// Fail if there are any existing installations of the Helm chart.
 	if !h.SkipCheckForPreviousInstallations {
 		helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
+	}
+	if openShift {
+		if !h.SkipCheckForPreviousInstallations {
+			require.NoError(t, h.cleanupOpenShiftOrphanedCRDs(t))
+		}
+		helpers.Cleanup(t, h.noCleanupOnFailure, h.noCleanup, cleanup)
 	}
 
 	chartName := config.HelmChartPath
@@ -308,7 +316,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 	if h.cfg.EnableOpenshift || h.cfg.UseOpenshift {
-		h.cleanupOpenShiftCustomGatewayClasses(t)
+		if err := h.cleanupOpenShiftCustomGatewayClasses(t); err != nil {
+			t.Errorf("OpenShift custom gateway cleanup failed; still attempting release uninstall: %v", err)
+		}
 	}
 
 	// Clean up any stuck gateway resources, note that we swallow all errors from
@@ -351,12 +361,14 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
-		require.NoError(r, err)
-	})
 	if h.cfg.EnableOpenshift || h.cfg.UseOpenshift {
+		require.NoError(t, uninstallOpenShiftRelease(t, h.helmOptions, h.releaseName))
 		h.waitForOpenShiftCRDDeletion(t)
+	} else {
+		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+			err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			require.NoError(r, err)
+		})
 	}
 
 	// Retry because sometimes certain resources (like PVC) take time to delete

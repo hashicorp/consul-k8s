@@ -5,10 +5,12 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -48,7 +50,7 @@ func ensureOpenShiftNamespace(ctx context.Context, client kubernetes.Interface, 
 			return ns.DeletionTimestamp == nil, nil
 		}
 		if !apierrors.IsNotFound(err) {
-			if isRetryableOpenShiftNamespaceError(err) {
+			if IsRetryableOpenShiftAPIError(err) {
 				lastAPIError = err
 				return false, nil
 			}
@@ -60,7 +62,7 @@ func ensureOpenShiftNamespace(ctx context.Context, client kubernetes.Interface, 
 		if apierrors.IsAlreadyExists(err) {
 			return false, nil
 		}
-		if err != nil && isRetryableOpenShiftNamespaceError(err) {
+		if err != nil && IsRetryableOpenShiftAPIError(err) {
 			lastAPIError = err
 			return false, nil
 		}
@@ -73,9 +75,23 @@ func ensureOpenShiftNamespace(ctx context.Context, client kubernetes.Interface, 
 	return created, nil
 }
 
-func isRetryableOpenShiftNamespaceError(err error) bool {
-	if apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) || apierrors.IsTooManyRequests(err) {
+// IsRetryableOpenShiftAPIError identifies transient API transport failures,
+// including errors wrapped by controller-runtime discovery.
+func IsRetryableOpenShiftAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) || apierrors.IsTooManyRequests(err) || apierrors.IsServiceUnavailable(err) {
 		return true
+	}
+	var networkError net.Error
+	if errors.As(err, &networkError) && networkError.Timeout() {
+		return true
+	}
+	for _, connectionError := range []error{syscall.ECONNRESET, syscall.ECONNREFUSED, syscall.ETIMEDOUT} {
+		if errors.Is(err, connectionError) {
+			return true
+		}
 	}
 	for _, connectionError := range openShiftKubeAPIConnectErrs {
 		if strings.Contains(err.Error(), connectionError) {

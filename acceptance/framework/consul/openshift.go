@@ -6,7 +6,9 @@ package consul
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -21,9 +24,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func isOpenShiftReleaseStorageTimeout(message string) bool {
@@ -67,29 +76,230 @@ func installOpenShiftWithStorageRetry(t *testing.T, options *helm.Options, relea
 	}
 }
 
-func (h *HelmCluster) cleanupOpenShiftCustomGatewayClasses(t *testing.T) {
-	t.Helper()
-	var classes customgwv1beta1.CustomGatewayClassList
-	err := h.runtimeClient.List(context.Background(), &classes)
-	if apierrors.IsNotFound(err) || apimeta.IsNoMatchError(err) {
-		return
+func runOpenShiftAPIOperation(ctx context.Context, operation func(context.Context) error) error {
+	var lastError error
+	err := wait.PollUntilContextCancel(ctx, openShiftAPIRetry().Wait, true, func(ctx context.Context) (bool, error) {
+		requestContext, cancel := context.WithTimeout(ctx, environment.OpenShiftAPIRequestTimeout)
+		defer cancel()
+		err := operation(requestContext)
+		if err == nil {
+			return true, nil
+		}
+		if k8s.IsRetryableOpenShiftAPIError(err) || apierrors.IsConflict(err) {
+			lastError = err
+			return false, nil
+		}
+		return false, err
+	})
+	if err != nil && lastError != nil {
+		return fmt.Errorf("OpenShift API operation failed (last error: %v): %w", lastError, err)
 	}
-	require.NoError(t, err)
+	return err
+}
+
+func (h *HelmCluster) cleanupOpenShiftCustomGatewayClasses(t *testing.T) error {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), openShiftAPIRetry().Timeout)
+	defer cancel()
+	var classes customgwv1beta1.CustomGatewayClassList
+	err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+		err := h.runtimeClient.List(ctx, &classes)
+		if apierrors.IsNotFound(err) || apimeta.IsNoMatchError(err) {
+			return nil
+		}
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("listing OpenShift custom gateway classes: %w", err)
+	}
 	for _, gatewayClass := range classes.Items {
-		release := gatewayClass.Labels["release"]
-		ownedFixture := release == "" && gatewayClass.Labels["consul.hashicorp.com/acceptance-namespace"] == h.helmOptions.KubectlOptions.Namespace
-		if release != h.releaseName && !ownedFixture {
+		if !h.ownsOpenShiftCustomGatewayClass(&gatewayClass) {
 			continue
 		}
 		t.Logf("Cleaning custom gateway class %s before uninstalling release %s", gatewayClass.Name, h.releaseName)
-		gatewayClass.Finalizers = nil
-		if err := h.runtimeClient.Update(context.Background(), &gatewayClass); err != nil && !apierrors.IsNotFound(err) {
-			require.NoError(t, err)
-		}
-		if err := h.runtimeClient.Delete(context.Background(), &gatewayClass); err != nil && !apierrors.IsNotFound(err) {
-			require.NoError(t, err)
+		err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+			var current customgwv1beta1.CustomGatewayClass
+			if err := h.runtimeClient.Get(ctx, client.ObjectKeyFromObject(&gatewayClass), &current); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			if !h.ownsOpenShiftCustomGatewayClass(&current) {
+				return nil
+			}
+			if len(current.Finalizers) != 0 {
+				current.Finalizers = nil
+				if err := h.runtimeClient.Update(ctx, &current); err != nil {
+					return client.IgnoreNotFound(err)
+				}
+			}
+			return client.IgnoreNotFound(h.runtimeClient.Delete(ctx, &current))
+		})
+		if err != nil {
+			return fmt.Errorf("cleaning OpenShift custom gateway class %s: %w", gatewayClass.Name, err)
 		}
 	}
+	return nil
+}
+
+func (h *HelmCluster) ownsOpenShiftCustomGatewayClass(gatewayClass *customgwv1beta1.CustomGatewayClass) bool {
+	release := gatewayClass.Labels["release"]
+	return release == h.releaseName || (release == "" &&
+		gatewayClass.Labels["consul.hashicorp.com/acceptance-namespace"] == h.helmOptions.KubectlOptions.Namespace)
+}
+
+func isOpenShiftReleaseNotFound(releaseName, output string, err error) bool {
+	if err == nil {
+		return false
+	}
+	message := output + "\n" + err.Error()
+	return strings.Contains(message, "uninstall: Release not loaded: "+releaseName+": release: not found") ||
+		strings.Contains(message, "uninstall: Release not loaded: "+releaseName+": not found")
+}
+
+func uninstallOpenShiftRelease(t *testing.T, options *helm.Options, releaseName string) error {
+	t.Helper()
+	for attempt := 1; ; attempt++ {
+		output, err := helm.RunHelmCommandAndGetOutputE(t, options, "uninstall", releaseName, "--keep-history", "--timeout", "2m", "--debug")
+		if err == nil {
+			return nil
+		}
+		if isOpenShiftReleaseNotFound(releaseName, output, err) {
+			t.Logf("Release %s is already absent; continuing release-owned resource cleanup", releaseName)
+			return nil
+		}
+		if attempt == 3 || (!k8s.IsRetryableOpenShiftAPIError(err) && !k8s.IsRetryableOpenShiftAPIError(errors.New(output))) {
+			return fmt.Errorf("uninstalling OpenShift release %s: %w\noutput: %s", releaseName, err, output)
+		}
+		t.Logf("Transient OpenShift API error during release %s uninstall; retrying attempt %d/3: %v", releaseName, attempt+1, err)
+		time.Sleep(openShiftAPIRetry().Wait)
+	}
+}
+
+func (h *HelmCluster) cleanupOpenShiftOrphanedCRDs(t *testing.T) error {
+	t.Helper()
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	ctx, cancel := context.WithTimeout(context.Background(), openShiftAPIRetry().Timeout)
+	defer cancel()
+	var testNamespace corev1.Namespace
+	if err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+		return h.runtimeClient.Get(ctx, client.ObjectKey{Name: namespace}, &testNamespace)
+	}); err != nil {
+		return fmt.Errorf("checking OpenShift acceptance namespace %s: %w", namespace, err)
+	}
+	if testNamespace.Labels["consul.hashicorp.com/acceptance-tests"] != "true" ||
+		namespace == metav1.NamespaceDefault || namespace == "openshift" || namespace == "dedicated-admin" ||
+		strings.HasPrefix(namespace, "kube-") || strings.HasPrefix(namespace, "openshift-") {
+		return nil
+	}
+
+	var pods corev1.PodList
+	if err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+		return h.runtimeClient.List(ctx, &pods, client.MatchingLabels{"app": "consul"})
+	}); err != nil {
+		return fmt.Errorf("checking for active Consul installations before CRD recovery: %w", err)
+	}
+	if len(pods.Items) != 0 {
+		t.Log("Skipping orphaned Consul CRD recovery because Consul pods still exist")
+		return nil
+	}
+
+	var namespaces corev1.NamespaceList
+	if err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+		return h.runtimeClient.List(ctx, &namespaces, client.MatchingLabels{"consul.hashicorp.com/acceptance-namespace": namespace})
+	}); err != nil {
+		return err
+	}
+	ownedNamespaces := map[string]bool{namespace: true}
+	for _, auxiliary := range namespaces.Items {
+		ownedNamespaces[auxiliary.Name] = true
+	}
+	var crds apiextensionsv1.CustomResourceDefinitionList
+	if err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+		return h.runtimeClient.List(ctx, &crds)
+	}); err != nil {
+		return fmt.Errorf("listing orphaned OpenShift Consul CRDs: %w", err)
+	}
+	for _, crd := range crds.Items {
+		owner := crd.Annotations["meta.helm.sh/release-name"]
+		if (crd.Spec.Group != "consul.hashicorp.com" && crd.Spec.Group != "auth.consul.hashicorp.com") ||
+			crd.Annotations["meta.helm.sh/release-namespace"] != namespace ||
+			owner == "" || crd.Labels["release"] != owner {
+			continue
+		}
+		var version string
+		for _, candidate := range crd.Spec.Versions {
+			if candidate.Served {
+				version = candidate.Name
+				if candidate.Storage {
+					break
+				}
+			}
+		}
+		if version == "" {
+			return fmt.Errorf("orphaned Consul CRD %s has no served version", crd.Name)
+		}
+		instances := &unstructured.UnstructuredList{}
+		instances.SetGroupVersionKind(schema.GroupVersionKind{Group: crd.Spec.Group, Version: version, Kind: crd.Spec.Names.ListKind})
+		if err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+			return h.runtimeClient.List(ctx, instances)
+		}); err != nil {
+			return fmt.Errorf("listing instances of orphaned CRD %s: %w", crd.Name, err)
+		}
+		for _, instance := range instances.Items {
+			owned := ownedNamespaces[instance.GetNamespace()] ||
+				instance.GetLabels()["release"] == owner ||
+				instance.GetLabels()["consul.hashicorp.com/acceptance-namespace"] == namespace ||
+				instance.GetAnnotations()["meta.helm.sh/release-namespace"] == namespace
+			if !owned {
+				return fmt.Errorf("refusing to recover CRD %s: instance %s/%s has no acceptance ownership", crd.Name, instance.GetNamespace(), instance.GetName())
+			}
+			for _, finalizer := range instance.GetFinalizers() {
+				if !strings.HasSuffix(finalizer, ".consul.hashicorp.com") {
+					return fmt.Errorf("refusing to recover CRD %s: instance %s/%s has foreign finalizer %s", crd.Name, instance.GetNamespace(), instance.GetName(), finalizer)
+				}
+			}
+		}
+		t.Logf("Removing orphaned Consul CRD %s from release %s in acceptance namespace %s", crd.Name, owner, namespace)
+		for _, instance := range instances.Items {
+			key := client.ObjectKeyFromObject(&instance)
+			gvk := instance.GroupVersionKind()
+			if err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+				current := &unstructured.Unstructured{}
+				current.SetGroupVersionKind(gvk)
+				if err := h.runtimeClient.Get(ctx, key, current); err != nil {
+					return client.IgnoreNotFound(err)
+				}
+				finalizers := slices.DeleteFunc(current.GetFinalizers(), func(finalizer string) bool {
+					return strings.HasSuffix(finalizer, ".consul.hashicorp.com")
+				})
+				current.SetFinalizers(finalizers)
+				if err := h.runtimeClient.Update(ctx, current); err != nil {
+					return client.IgnoreNotFound(err)
+				}
+				return client.IgnoreNotFound(h.runtimeClient.Delete(ctx, current))
+			}); err != nil {
+				return fmt.Errorf("cleaning orphaned CRD %s instance %s: %w", crd.Name, key, err)
+			}
+		}
+		if err := runOpenShiftAPIOperation(ctx, func(ctx context.Context) error {
+			return client.IgnoreNotFound(h.runtimeClient.Delete(ctx, &crd))
+		}); err != nil {
+			return fmt.Errorf("deleting orphaned Consul CRD %s: %w", crd.Name, err)
+		}
+		if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+			var current apiextensionsv1.CustomResourceDefinition
+			err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: crd.Name}, &current)
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			if k8s.IsRetryableOpenShiftAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}); err != nil {
+			return fmt.Errorf("waiting for orphaned Consul CRD %s deletion: %w", crd.Name, err)
+		}
+	}
+	return nil
 }
 
 func (h *HelmCluster) waitForOpenShiftCRDDeletion(t *testing.T) {
