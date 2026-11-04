@@ -378,18 +378,27 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 						w.Log.Error(err, "couldn't get service accounts")
 						return admission.Errored(http.StatusInternalServerError, err)
 					}
-					if len(sa.Secrets) == 0 {
+					// Only a service account token Secret can be used to log in. A
+					// ServiceAccount can also reference other Secrets: OpenShift links an
+					// image pull (dockercfg) Secret to every ServiceAccount, and since
+					// OpenShift 4.16 that is often the only one listed, so the first
+					// entry cannot be assumed to be the token.
+					secretName = w.serviceAccountTokenSecretName(ctx, req.Namespace, sa)
+					if secretName == "" {
 						// Check to see if there is a secret with the same name as the ServiceAccount for Kube-1.24+.
-						w.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
+						w.Log.Info(fmt.Sprintf("service account %s has no linked service account token secret", svc))
 						sec, err := w.Clientset.CoreV1().Secrets(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
-						if err != nil {
+						switch {
+						case err == nil:
+							secretName = sec.Name
+							w.Log.Info(fmt.Sprintf("fetched secret: %s", secretName))
+						case len(sa.Secrets) > 0:
+							// Preserve the previous behaviour when neither lookup finds a token Secret.
+							secretName = sa.Secrets[0].Name
+						default:
 							w.Log.Error(err, "couldn't get Secret associated with Service Account")
 							return admission.Errored(http.StatusInternalServerError, err)
 						}
-						secretName = sec.Name
-						w.Log.Info(fmt.Sprintf("fetched secret: %s", secretName))
-					} else {
-						secretName = sa.Secrets[0].Name
 					}
 					w.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", secretName)
 					pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
@@ -725,6 +734,25 @@ func (w *MeshWebhook) annotatedServiceNames(pod corev1.Pod) []string {
 		annotatedSvcNames = strings.Split(anno, ",")
 	}
 	return annotatedSvcNames
+}
+
+// serviceAccountTokenSecretName returns the name of the first Secret linked to sa
+// that is a service account token bound to sa, or "" if there is none. Secrets of
+// any other type (for example OpenShift's image pull dockercfg Secret) are skipped
+// because they have no token to log in with.
+func (w *MeshWebhook) serviceAccountTokenSecretName(ctx context.Context, namespace string, sa *corev1.ServiceAccount) string {
+	for _, ref := range sa.Secrets {
+		sec, err := w.Clientset.CoreV1().Secrets(namespace).Get(ctx, ref.Name, metav1.GetOptions{})
+		if err != nil {
+			w.Log.Info("skipping Secret linked to service account", "serviceAccountName", sa.Name, "secretName", ref.Name, "error", err.Error())
+			continue
+		}
+		if sec.Type != corev1.SecretTypeServiceAccountToken || sec.Annotations[corev1.ServiceAccountNameKey] != sa.Name {
+			continue
+		}
+		return sec.Name
+	}
+	return ""
 }
 
 func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod corev1.Pod) error {
