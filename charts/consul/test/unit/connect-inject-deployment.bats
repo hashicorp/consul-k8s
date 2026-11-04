@@ -97,6 +97,35 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: does not pass enable-gateway-scaling by default" {
+  # The flag is only rendered when scaling is enabled so that the 1.8 chart keeps
+  # working with control-plane images that predate the scaling backport.
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-enable-gateway-scaling"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: sets enable-gateway-scaling=true when managed gateway scaling is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.apiGateway.managedGatewayClass.scaling.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-enable-gateway-scaling=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "connectInject/Deployment: adds flag default-enable-metrics=true when global.metrics.enabled=true" {
   cd `chart_dir`
   local cmd=$(helm template \

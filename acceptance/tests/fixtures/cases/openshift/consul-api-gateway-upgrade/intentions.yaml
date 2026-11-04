@@ -1,0 +1,34 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Intentions used by the Helm upgrade and coexistence tests. They allow traffic
+# from the legacy gateway (api-gateway), the gateway that generate-manifests
+# creates under consul.hashicorp.com during the upgrade (api-gateway-consul) and
+# the consul.hashicorp.com gateway from consul-api-gateway-basic (consul-api-gateway).
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: to-backend-default
+  namespace: default
+spec:
+  destination:
+    name: backend
+  sources:
+    - name: frontend
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: to-frontend-default
+  namespace: default
+spec:
+  destination:
+    name: frontend
+  sources:
+    - name: api-gateway
+      action: allow
+    - name: api-gateway-consul
+      action: allow
+    - name: consul-api-gateway
+      action: allow

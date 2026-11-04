@@ -1,0 +1,23 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Gateway managed by the new Consul API Gateway controller
+# (consul.hashicorp.com/gateway-controller-consul) via the consul-custom-class
+# CustomGatewayClass created by the gateway-resources-custom Helm hook.
+apiVersion: consul.hashicorp.com/v1beta1
+kind: Gateway
+metadata:
+  name: consul-api-gateway
+  namespace: consul
+  labels:
+    component: api-gateway-consul
+spec:
+  gatewayClassName: consul-custom-class
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    tls:
+      certificateRefs:
+      - name: consul-server-cert
+        namespace: consul

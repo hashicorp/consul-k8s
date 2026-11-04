@@ -1,0 +1,26 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: to-backend-default
+  namespace: default
+spec:
+  destination:
+    name: backend
+  sources:
+    - name: frontend
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: to-frontend-default
+  namespace: default
+spec:
+  destination:
+    name: frontend
+  sources:
+    - name: consul-api-gateway
+      action: allow

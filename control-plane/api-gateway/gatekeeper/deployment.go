@@ -57,21 +57,31 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1.Gateway,
 		currentReplicas = existingDeployment.Spec.Replicas
 	}
 
-	deployment, err := g.deployment(ctx, gateway, gcc, config, currentReplicas)
+	var replicas *int32
+	if config.EnableGatewayScaling {
+		scalingConfig, err := g.ReconcileScaling(ctx, gateway, gcc)
+		if err != nil {
+			g.Log.Error(err, "failed to reconcile scaling configuration")
+			return err
+		}
+		replicas = resolvedDeploymentReplicas(scalingConfig, gcc, currentReplicas)
+	} else {
+		logScalingFeatureDisabled(g.Log, gateway)
+		if err := g.DeleteHPA(ctx, gateway); err != nil {
+			g.Log.Error(err, "failed to delete controller-managed HPA while scaling is disabled")
+			return err
+		}
+		replicas = deploymentReplicas(gcc, currentReplicas)
+	}
+
+	deployment, err := g.deployment(ctx, gateway, gcc, config, replicas)
 	if err != nil {
 		return err
 	}
 	g.Log.V(1).Info("desired deployment: " + fmt.Sprintf("%+v", deployment))
 
-	if exists {
-		g.Log.V(1).Info("Existing Gateway Deployment found.")
-
-		// If the user has set the number of replicas, let's respect that.
-		deployment.Spec.Replicas = existingDeployment.Spec.Replicas
-	}
-
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme(), g.Log)
+	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gateway, g.Client.Scheme(), g.Log)
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -99,7 +109,7 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, gwName types.Namespac
 	return err
 }
 
-func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
+func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, replicas *int32) (*appsv1.Deployment, error) {
 	initContainer, err := g.initContainer(config, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
@@ -139,7 +149,7 @@ func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1.Gateway, gcc v
 			Labels:    common.LabelsForGateway(&gateway),
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: deploymentReplicas(gcc, currentReplicas),
+			Replicas: replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: common.LabelsForGateway(&gateway),
 			},
@@ -180,11 +190,11 @@ func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1.Gateway, gcc v
 	}, nil
 }
 
-func mergeDeployments(log logr.Logger, gcc v1alpha1.GatewayClassConfig, gateway gwv1.Gateway, a, b *appsv1.Deployment) *appsv1.Deployment {
+func mergeDeployments(log logr.Logger, gateway gwv1.Gateway, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
 		// Replace template
 		b.Spec.Template = a.Spec.Template
-		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
+		b.Spec.Replicas = a.Spec.Replicas
 	}
 
 	// Apply probes from Gateway annotations if present
@@ -296,9 +306,9 @@ func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
 
 }
 
-func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1.Gateway, scheme *runtime.Scheme, log logr.Logger) resourceMutator {
+func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gateway gwv1.Gateway, scheme *runtime.Scheme, log logr.Logger) resourceMutator {
 	return func() error {
-		mutated = mergeDeployments(log, gcc, gateway, deployment, mutated)
+		mutated = mergeDeployments(log, gateway, deployment, mutated)
 		if deploymentExists {
 			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
 		}

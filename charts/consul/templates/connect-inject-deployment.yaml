@@ -189,6 +189,9 @@ spec:
                 -default-enable-metrics=false \
                 {{- end }}
                 -enable-gateway-metrics={{ .Values.global.metrics.enableGatewayMetrics }}  \
+                {{- if .Values.connectInject.apiGateway.managedGatewayClass.scaling.enabled }}
+                -enable-gateway-scaling=true \
+                {{- end }}
                 -default-enable-metrics-merging={{ .Values.connectInject.metrics.defaultEnableMerging }}  \
                 -default-merged-metrics-port={{ .Values.connectInject.metrics.defaultMergedMetricsPort }} \
                 -default-prometheus-scrape-port={{ .Values.connectInject.metrics.defaultPrometheusScrapePort }} \
