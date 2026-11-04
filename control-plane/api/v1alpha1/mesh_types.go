@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -13,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"slices"
 )
 
 const (
@@ -83,6 +85,7 @@ type MeshTLSConfig struct {
 	Incoming *MeshDirectionalTLSConfig `json:"incoming,omitempty"`
 	// Outgoing defines the TLS configuration for outbound mTLS connections dialing upstreams
 	// from Connect and IngressGateway proxy kinds.
+	// +kubebuilder:validation:XValidation:rule="!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && self.tlsMinVersion == 'TLSv1_3') || 'P-256' in self.ecdhCurves",message="ecdhCurves must include \"P-256\" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys"
 	Outgoing *MeshDirectionalTLSConfig `json:"outgoing,omitempty"`
 }
 
@@ -383,30 +386,43 @@ func (in *MeshDirectionalTLSConfig) validate(path *field.Path) field.ErrorList {
 	// validCurves defines the supported ECDH/KEM curves for TLS 1.3.
 	// NOTE: If this list is updated, ensure the corresponding validEnvoyECDHCurves
 	// map in github.com/hashicorp/consul/agent/structs/config_entry_mesh.go is also updated.
-	validCurves := []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"}
+	validCurves := meshECDHCurves
 	if len(in.ECDHCurves) > 0 {
-		versionAllowsCurves := !isTLSVersionLessThanTLS12(in.TLSMinVersion)
-		if !versionAllowsCurves {
+		if isTLSVersionLessThanTLS12(in.TLSMinVersion) {
 			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves, "ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"))
 		}
-		validCurveNames := true
 		for i, curve := range in.ECDHCurves {
 			if !sliceContains(validCurves, curve) {
-				validCurveNames = false
 				errs = append(errs, field.Invalid(path.Child("ecdhCurves").Index(i), curve, notInSliceMessage(validCurves)))
 			}
-		}
-		// Consul service mesh leaf certificates always use ECDSA P-256 keys. In
-		// TLS 1.2 a peer only accepts an ECDSA certificate whose curve it offered,
-		// so TLS 1.2 handshakes fail unless P-256 is in the list.
-		if versionAllowsCurves && validCurveNames && sliceContains(versions, in.TLSMinVersion) && in.TLSMinVersion != "TLSv1_3" && !sliceContains(in.ECDHCurves, "P-256") {
-			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves,
-				`ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); `+
-					`Consul service mesh certificates use ECDSA P-256 keys. Add "P-256" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to "TLSv1_3"`))
 		}
 	}
 
 	return errs
+}
+
+// meshECDHCurves are the key exchange groups accepted in ecdhCurves.
+var meshECDHCurves = []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"}
+
+// ecdhCurvesLackP256ForTLS12 reports whether a valid configuration offers
+// curves that cannot complete a TLS 1.2 handshake. Consul service mesh leaf
+// certificates always use ECDSA P-256 keys. In TLS 1.2 a peer only accepts an
+// ECDSA certificate whose curve it offered, so the handshake fails with
+// WRONG_CURVE unless P-256 is in the list. Invalid versions and curve names
+// are reported by validate instead.
+func (in *MeshDirectionalTLSConfig) ecdhCurvesLackP256ForTLS12() bool {
+	if in == nil || len(in.ECDHCurves) == 0 || in.TLSMinVersion == "TLSv1_3" {
+		return false
+	}
+	if !sliceContains([]string{"", "TLS_AUTO", "TLSv1_2"}, in.TLSMinVersion) {
+		return false
+	}
+	for _, c := range in.ECDHCurves {
+		if !sliceContains(meshECDHCurves, c) {
+			return false
+		}
+	}
+	return !sliceContains(in.ECDHCurves, "P-256")
 }
 
 func (in *MeshDirectionalTLSConfig) toConsul() *capi.MeshDirectionalTLSConfig {
@@ -492,7 +508,48 @@ func isTLSVersionLessThanTLS12(v string) bool {
 	return rank < tlsVersionComparison["TLSv1_2"]
 }
 
-// Stubs replaced in the next commit.
-func (in *Mesh) ValidateOutgoingECDHCurvesUpdate(old *Mesh) error { return nil }
+func (in *Mesh) outgoingTLS() *MeshDirectionalTLSConfig {
+	if in == nil || in.Spec.TLS == nil {
+		return nil
+	}
+	return in.Spec.TLS.Outgoing
+}
 
-func (in *Mesh) ECDHCurvesP256Warnings() []string { return nil }
+// ValidateOutgoingECDHCurvesUpdate rejects Outgoing ecdhCurves that cannot
+// complete a TLS 1.2 handshake when they are new or differ from old, or when
+// old was compatible. An unchanged stored configuration is accepted so that
+// existing resources keep reconciling, matching Consul's write validation.
+func (in *Mesh) ValidateOutgoingECDHCurvesUpdate(old *Mesh) error {
+	out := in.outgoingTLS()
+	if !out.ecdhCurvesLackP256ForTLS12() {
+		return nil
+	}
+	if prev := old.outgoingTLS(); prev.ecdhCurvesLackP256ForTLS12() && slices.Equal(prev.ECDHCurves, out.ECDHCurves) {
+		return nil
+	}
+	return apierrors.NewInvalid(
+		schema.GroupKind{Group: ConsulHashicorpGroup, Kind: MeshKubeKind},
+		in.KubernetesName(),
+		field.ErrorList{field.Invalid(field.NewPath("spec", "tls", "outgoing", "ecdhCurves"), out.ECDHCurves,
+			`ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); `+
+				`Consul service mesh certificates use ECDSA P-256 keys. Add "P-256" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to "TLSv1_3"`)})
+}
+
+// ECDHCurvesP256Warnings returns admission warnings for each direction whose
+// ecdhCurves cannot complete a TLS 1.2 handshake.
+func (in *Mesh) ECDHCurvesP256Warnings() []string {
+	if in == nil || in.Spec.TLS == nil {
+		return nil
+	}
+	var warnings []string
+	for _, d := range []struct {
+		name string
+		cfg  *MeshDirectionalTLSConfig
+	}{{"incoming", in.Spec.TLS.Incoming}, {"outgoing", in.Spec.TLS.Outgoing}} {
+		if d.cfg.ecdhCurvesLackP256ForTLS12() {
+			warnings = append(warnings, fmt.Sprintf(`spec.tls.%s.ecdhCurves does not include "P-256" while TLS 1.2 can be negotiated; `+
+				`TLS 1.2 handshakes with Consul service mesh certificates, which use ECDSA P-256 keys, fail with WRONG_CURVE`, d.name))
+		}
+	}
+	return warnings
+}

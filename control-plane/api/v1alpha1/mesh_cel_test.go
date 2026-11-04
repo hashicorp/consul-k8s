@@ -74,7 +74,9 @@ func validateMeshCEL(t *testing.T, path string, tls map[string]interface{}) fiel
 
 func TestMeshCRD_CEL_ECDHCurves(t *testing.T) {
 	const minVersionMsg = "ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"
-	curves := []interface{}{"X25519MLKEM768", "X25519"}
+	// Include P-256 so these cases isolate the tlsMinVersion rule from the
+	// outgoing P-256 rule covered by TestMeshCRD_CEL_OutgoingECDHCurvesRequireP256.
+	curves := []interface{}{"X25519MLKEM768", "X25519", "P-256"}
 
 	cases := map[string]struct {
 		cfg     map[string]interface{}
