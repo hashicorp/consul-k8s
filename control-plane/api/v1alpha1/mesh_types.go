@@ -491,3 +491,8 @@ func isTLSVersionLessThanTLS12(v string) bool {
 	}
 	return rank < tlsVersionComparison["TLSv1_2"]
 }
+
+// Stubs replaced in the next commit.
+func (in *Mesh) ValidateOutgoingECDHCurvesUpdate(old *Mesh) error { return nil }
+
+func (in *Mesh) ECDHCurvesP256Warnings() []string { return nil }

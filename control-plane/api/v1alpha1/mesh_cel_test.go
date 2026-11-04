@@ -137,3 +137,52 @@ func TestMeshCRD_ChartMatchesBases(t *testing.T) {
 	bases := loadMeshCRDSchema(t, meshCRDFiles["bases"])
 	require.Equal(t, bases, chart, "regenerate the Mesh CRD so the Helm chart and config/crd/bases copies match")
 }
+
+func TestMeshCRD_CEL_OutgoingECDHCurvesRequireP256(t *testing.T) {
+	const p256Msg = `ecdhCurves must include "P-256" when TLS 1.2 can be negotiated`
+	pqc := []interface{}{"X25519MLKEM768", "X25519"}
+
+	cases := map[string]struct {
+		tls     map[string]interface{}
+		wantErr string
+	}{
+		"outgoing TLSv1_2 without P-256": {
+			tls:     map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": pqc, "tlsMinVersion": "TLSv1_2"}},
+			wantErr: p256Msg,
+		},
+		"outgoing TLS_AUTO without P-256": {
+			tls:     map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": pqc, "tlsMinVersion": "TLS_AUTO"}},
+			wantErr: p256Msg,
+		},
+		"outgoing without tlsMinVersion and without P-256": {
+			tls:     map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": pqc}},
+			wantErr: p256Msg,
+		},
+		"outgoing TLSv1_2 with P-256": {
+			tls: map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": []interface{}{"X25519", "P-256"}, "tlsMinVersion": "TLSv1_2"}},
+		},
+		"outgoing TLSv1_3 without P-256": {
+			tls: map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": pqc, "tlsMinVersion": "TLSv1_3"}},
+		},
+		"outgoing empty curves": {
+			tls: map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": []interface{}{}, "tlsMinVersion": "TLSv1_2"}},
+		},
+		"incoming TLSv1_2 without P-256 is not rejected": {
+			tls: map[string]interface{}{"incoming": map[string]interface{}{"ecdhCurves": pqc, "tlsMinVersion": "TLSv1_2"}},
+		},
+	}
+	for crdName, path := range meshCRDFiles {
+		for name, tc := range cases {
+			t.Run(crdName+"/"+name, func(t *testing.T) {
+				errs := validateMeshCEL(t, path, tc.tls)
+				if tc.wantErr == "" {
+					require.Empty(t, errs)
+					return
+				}
+				require.Len(t, errs, 1)
+				require.Contains(t, errs[0].Error(), tc.wantErr)
+				require.Contains(t, errs[0].Field, "spec.tls.outgoing")
+			})
+		}
+	}
+}
