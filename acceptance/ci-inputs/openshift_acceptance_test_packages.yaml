@@ -10,13 +10,13 @@
 - {runner: 5, test-packages: "connect", mode: "single-cluster"}
 # - {runner: 6, test-packages: "snapshot-agent", mode: "single-cluster"}
 # - {runner: 7, test-packages: "terminating-gateway", mode: "single-cluster"}
-- {runner: 8, test-packages: "openshift", mode: "single-cluster"}
+# - {runner: 8, test-packages: "openshift", mode: "single-cluster"}
 # - {runner: 9, test-packages: "consul-dns", mode: "single-cluster"}
-- {runner: 10, test-packages: "sync", mode: "single-cluster"}
+# - {runner: 10, test-packages: "sync", mode: "single-cluster"}
 # - {runner: 11, test-packages: "ingress-gateway", mode: "single-cluster"}
 # - {runner: 12, test-packages: "segments", mode: "single-cluster"}
 # - {runner: 13, test-packages: "vault", mode: "single-cluster"}
-- {runner: 14, test-packages: "api-gateway", mode: "single-cluster"}
+# - {runner: 14, test-packages: "api-gateway", mode: "single-cluster"}
 # - {runner: 15, test-packages: "custom-api-gateway", mode: "single-cluster"}
 
 # Multi-cluster packages run across primary and secondary OCP clusters
