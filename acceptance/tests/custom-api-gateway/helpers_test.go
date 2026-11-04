@@ -40,16 +40,20 @@ type gatewayHarness struct {
 func newGatewayHarness(t *testing.T, secure bool) *gatewayHarness {
 	t.Helper()
 	cfg := suite.Config()
-	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		t.Skip("OpenShift uses acceptance/tests/openshift")
-	}
 	ctx := suite.Environment().DefaultContext(t)
-	cluster := consul.NewHelmCluster(t, map[string]string{
-		"connectInject.enabled":         "true",
-		"global.crds.consulapi.enabled": "true",
-		"global.acls.manageSystemACLs":  strconv.FormatBool(secure),
-		"global.tls.enabled":            strconv.FormatBool(secure),
-	}, ctx, cfg, helpers.RandomName())
+	helmValues := map[string]string{
+		"connectInject.enabled":        "true",
+		"global.acls.manageSystemACLs": strconv.FormatBool(secure),
+		"global.tls.enabled":           strconv.FormatBool(secure),
+	}
+	// On OpenShift the chart installs the consul.hashicorp.com Gateway CRDs and
+	// enables the custom gateway controller from the OpenShift-specific value.
+	if cfg.EnableOpenshift {
+		helmValues["global.openshift.crds.consulapi.enabled"] = "true"
+	} else {
+		helmValues["global.crds.consulapi.enabled"] = "true"
+	}
+	cluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, helpers.RandomName())
 	cluster.Create(t)
 	consulClient, _ := cluster.SetupConsulClient(t, secure)
 	// The shared client does not register the custom Gateway API types.

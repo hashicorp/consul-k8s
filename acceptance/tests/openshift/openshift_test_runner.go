@@ -36,6 +36,8 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 	cmd = exec.Command("kubectl", "delete", "namespace", "consul")
 	_, _ = cmd.CombinedOutput()
 
+	waitForTerminatingConsulCRDs(t)
+
 	// Add the hashicorp helm repo
 	cmd = exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")
 	output, err := cmd.CombinedOutput()
@@ -88,6 +90,32 @@ func upgradeOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, names
 	args := append(openshiftHelmArgs(cfg, secure, namespaceMirroring, withOpenshiftVersionDefaults(t, extraHelmValues)), "--wait", "--timeout", "15m")
 	output, err := exec.Command("helm", args...).CombinedOutput()
 	require.NoErrorf(t, err, "failed to upgrade consul: %s", string(output))
+}
+
+// waitForTerminatingConsulCRDs waits until consul.hashicorp.com CRDs left behind by a
+// previous test's uninstall have finished deleting. A CRD whose objects still carry a
+// finalizer (for example a CustomGatewayClass) stays in Terminating after the
+// controller that would clear the finalizer is uninstalled. If the next install's
+// Helm release adopts such a CRD it is deleted underneath Helm, which then fails
+// with "resource not ready ... NotFound".
+//
+// Only CRDs that are already being deleted are touched: the finalizers of their
+// leftover objects are cleared so the deletion can complete. Nothing is deleted
+// that was not already being deleted, and nothing outside consul.hashicorp.com.
+func waitForTerminatingConsulCRDs(t *testing.T) {
+	t.Helper()
+	script := `set -u
+for crd in $(kubectl get crd -o jsonpath='{range .items[?(@.metadata.deletionTimestamp)]}{.metadata.name}{"\n"}{end}' | grep '\.consul\.hashicorp\.com$'); do
+  echo "waiting for terminating CRD $crd"
+  kubectl get "$crd" -A -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' 2>/dev/null |
+  while read -r ns name; do
+    [ -z "$name" ] && { name=$ns; ns=""; }
+    kubectl patch "$crd" "$name" ${ns:+-n "$ns"} --type=merge -p '{"metadata":{"finalizers":[]}}' >/dev/null 2>&1 || true
+  done
+  kubectl wait --for=delete "crd/$crd" --timeout=180s
+done`
+	output, err := exec.Command("bash", "-c", script).CombinedOutput()
+	require.NoErrorf(t, err, "consul.hashicorp.com CRDs from a previous run did not finish deleting: %s", string(output))
 }
 
 // withOpenshiftVersionDefaults returns extraHelmValues plus the values required by the
