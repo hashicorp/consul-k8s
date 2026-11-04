@@ -49,7 +49,7 @@ func OpenShiftStaticServerOverlay(t *testing.T, cfg *config.TestConfig, basePath
 		overlay += `patches:
 - target:
     kind: Deployment
-    name: oauth2-proxy
+    name: (oauth2-proxy|static-server|static-client)
   patch: |-
     - op: add
       path: /spec/template/metadata/annotations/k8s.v1.cni.cncf.io~1networks

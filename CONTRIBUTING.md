@@ -776,6 +776,23 @@ ignoring `AlreadyExists` or force-finalizing it.
 WAN failover helpers also retain their Helm namespace settings so intentions
 target the mirrored Consul namespaces.
 
+Sameness tests support Kind and OpenShift with `-enable-enterprise`,
+`-enable-multi-cluster`, and four Kubernetes contexts. For OpenShift, use
+`-use-openshift` or `-enable-openshift` and provide contexts in this order:
+the `dc1` server cluster, its `ap1` partition cluster, `dc2`, and `dc3`.
+For example, from `acceptance/tests`:
+
+```shell
+go test ./sameness -v -p 1 -timeout 3h \
+  -use-openshift -enable-enterprise -enable-multi-cluster -enable-transparent-proxy \
+  -kube-contexts="ocp-dc1,ocp-ap1,ocp-dc2,ocp-dc3" \
+  -kube-namespaces="consul,consul,consul,consul"
+```
+
+OpenShift sameness runs use the configured Consul installation namespace for
+DNS and the workloads' actual node topology for locality assertions without
+overwriting cloud-managed node labels.
+
 OCP client-go and controller-runtime requests, including API discovery, have a
 30-second request timeout. Teardown retries transient API failures with a bounded
 budget and still attempts Helm uninstall if gateway cleanup fails. Cleanup of a

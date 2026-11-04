@@ -63,6 +63,64 @@ func TestOpenShiftStaticServerOverlayNonOpenShift(t *testing.T) {
 	require.Equal(t, "fixture", OpenShiftStaticServerOverlay(t, &config.TestConfig{}, "fixture", "default"))
 }
 
+func TestOpenShiftSamenessWorkloadOverlays(t *testing.T) {
+	kubectl, err := exec.LookPath("kubectl")
+	if err != nil {
+		t.Skip("kubectl is required to validate local kustomize rendering")
+	}
+	for _, tc := range []struct {
+		fixture   string
+		workload  string
+		namespace string
+		identity  string
+	}{
+		{fixture: "static-server/dc1-default", workload: "static-server", namespace: "ns2", identity: "cluster-01-a"},
+		{fixture: "static-server/dc1-partition", workload: "static-server", namespace: "ns2", identity: "cluster-01-b"},
+		{fixture: "static-server/dc2", workload: "static-server", namespace: "ns2", identity: "cluster-02-a"},
+		{fixture: "static-server/dc3", workload: "static-server", namespace: "ns2", identity: "cluster-03-a"},
+		{fixture: "static-client/default-partition", workload: "static-client", namespace: "ns1"},
+		{fixture: "static-client/ap1-partition", workload: "static-client", namespace: "ns1"},
+		{fixture: "static-client/default-partition-tproxy", workload: "static-client", namespace: "ns1"},
+		{fixture: "static-client/ap1-partition-tproxy", workload: "static-client", namespace: "ns1"},
+	} {
+		for _, cni := range []bool{false, true} {
+			name := tc.fixture
+			if cni {
+				name += "-cni"
+			}
+			t.Run(name, func(t *testing.T) {
+				cfg := &config.TestConfig{UseOpenshift: true, EnableCNI: cni}
+				directory := OpenShiftStaticServerOverlay(t, cfg, "../../tests/fixtures/cases/sameness/"+tc.fixture, tc.namespace)
+				output, err := exec.Command(kubectl, "kustomize", directory).CombinedOutput()
+				require.NoError(t, err, string(output))
+				decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(string(output)), 4096)
+				found := false
+				for {
+					var deployment appsv1.Deployment
+					err := decoder.Decode(&deployment)
+					if err == io.EOF {
+						break
+					}
+					require.NoError(t, err)
+					if deployment.Kind != "Deployment" || deployment.Name != tc.workload {
+						continue
+					}
+					found = true
+					require.Equal(t, tc.namespace, deployment.Namespace)
+					require.Equal(t, cni, strings.Contains(deployment.Spec.Template.Annotations["k8s.v1.cni.cncf.io/networks"], "consul-cni"))
+					container := deployment.Spec.Template.Spec.Containers[0]
+					if tc.workload == "static-client" {
+						require.Equal(t, "docker.io/anubhavmishra/tiny-tools:latest", container.Image)
+					} else {
+						require.Contains(t, strings.Join(container.Args, " "), tc.identity)
+					}
+				}
+				require.True(t, found)
+			})
+		}
+	}
+}
+
 func TestOpenShiftStaticServerHTTPSFixture(t *testing.T) {
 	const basePath = "../../tests/fixtures/bases/static-server-https"
 	require.Equal(t, basePath, OpenShiftStaticServerHTTPSFixture(t, &config.TestConfig{}, basePath, "consul"))

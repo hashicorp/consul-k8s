@@ -196,6 +196,7 @@ func TestFailover_Connect(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				clusterCfg := *cfg
 				// Create the cluster-01-a
 				defaultPartitionHelmValues := map[string]string{
 					"global.datacenter": cluster01Datacenter,
@@ -213,7 +214,7 @@ func TestFailover_Connect(t *testing.T) {
 				}
 				helpers.MergeMaps(defaultPartitionHelmValues, commonHelmValues)
 
-				testClusters[keyCluster01a].helmCluster = consul.NewHelmCluster(t, defaultPartitionHelmValues, testClusters[keyCluster01a].context, cfg, releaseName)
+				testClusters[keyCluster01a].helmCluster = consul.NewHelmCluster(t, defaultPartitionHelmValues, testClusters[keyCluster01a].context, &clusterCfg, releaseName)
 				testClusters[keyCluster01a].helmCluster.Create(t)
 
 				// Get the TLS CA certificate and key secret from the server cluster and apply it to the client cluster.
@@ -264,7 +265,7 @@ func TestFailover_Connect(t *testing.T) {
 				}
 				helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
 
-				testClusters[keyCluster01b].helmCluster = consul.NewHelmCluster(t, secondaryPartitionHelmValues, testClusters[keyCluster01b].context, cfg, releaseName)
+				testClusters[keyCluster01b].helmCluster = consul.NewHelmCluster(t, secondaryPartitionHelmValues, testClusters[keyCluster01b].context, &clusterCfg, releaseName)
 				testClusters[keyCluster01b].helmCluster.Create(t)
 			}()
 
@@ -272,6 +273,7 @@ func TestFailover_Connect(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				clusterCfg := *cfg
 				PeerOneHelmValues := map[string]string{
 					"global.datacenter": cluster02Datacenter,
 				}
@@ -283,7 +285,7 @@ func TestFailover_Connect(t *testing.T) {
 				}
 				helpers.MergeMaps(PeerOneHelmValues, commonHelmValues)
 
-				testClusters[keyCluster02a].helmCluster = consul.NewHelmCluster(t, PeerOneHelmValues, testClusters[keyCluster02a].context, cfg, releaseName)
+				testClusters[keyCluster02a].helmCluster = consul.NewHelmCluster(t, PeerOneHelmValues, testClusters[keyCluster02a].context, &clusterCfg, releaseName)
 				testClusters[keyCluster02a].helmCluster.Create(t)
 			}()
 
@@ -291,6 +293,7 @@ func TestFailover_Connect(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				clusterCfg := *cfg
 				PeerTwoHelmValues := map[string]string{
 					"global.datacenter": cluster03Datacenter,
 				}
@@ -302,7 +305,7 @@ func TestFailover_Connect(t *testing.T) {
 				}
 				helpers.MergeMaps(PeerTwoHelmValues, commonHelmValues)
 
-				testClusters[keyCluster03a].helmCluster = consul.NewHelmCluster(t, PeerTwoHelmValues, testClusters[keyCluster03a].context, cfg, releaseName)
+				testClusters[keyCluster03a].helmCluster = consul.NewHelmCluster(t, PeerTwoHelmValues, testClusters[keyCluster03a].context, &clusterCfg, releaseName)
 				testClusters[keyCluster03a].helmCluster.Create(t)
 			}()
 
@@ -351,7 +354,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Apply locality to clusters
 			for _, v := range testClusters {
-				setK8sNodeLocality(t, v.context, v)
+				setK8sNodeLocality(t, cfg, v.context, v)
 			}
 
 			// Peering/Dialer relationship
@@ -447,7 +450,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Setup DNS.
 			for _, v := range testClusters {
-				dnsService, err := v.context.KubernetesClient(t).CoreV1().Services("default").Get(ctx.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
+				dnsService, err := v.context.KubernetesClient(t).CoreV1().Services(v.context.KubectlOptions(t).Namespace).Get(ctx.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
 				require.NoError(t, err)
 				v.dnsIP = &dnsService.Spec.ClusterIP
 				logger.Logf(t, "%s dnsIP: %s", v.name, *v.dnsIP)
@@ -477,13 +480,13 @@ func TestFailover_Connect(t *testing.T) {
 			// Create static server/client after the rest of the config is setup for a more stable testing experience
 			// Create static server deployments.
 			logger.Log(t, "creating static-server and static-client deployments")
-			deployCustomizeAsync(t, testClusters[keyCluster01a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+			deployCustomizeAsync(t, testClusters[keyCluster01a].serverOpts, cfg,
 				"../fixtures/cases/sameness/static-server/dc1-default", &wg)
-			deployCustomizeAsync(t, testClusters[keyCluster01b].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+			deployCustomizeAsync(t, testClusters[keyCluster01b].serverOpts, cfg,
 				"../fixtures/cases/sameness/static-server/dc1-partition", &wg)
-			deployCustomizeAsync(t, testClusters[keyCluster02a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+			deployCustomizeAsync(t, testClusters[keyCluster02a].serverOpts, cfg,
 				"../fixtures/cases/sameness/static-server/dc2", &wg)
-			deployCustomizeAsync(t, testClusters[keyCluster03a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+			deployCustomizeAsync(t, testClusters[keyCluster03a].serverOpts, cfg,
 				"../fixtures/cases/sameness/static-server/dc3", &wg)
 
 			// Create static client deployments.
@@ -496,19 +499,19 @@ func TestFailover_Connect(t *testing.T) {
 				staticClientKustomizeDirAP1 = fmt.Sprintf("%s-%s", staticClientKustomizeDirAP1, "tproxy")
 			}
 
-			deployCustomizeAsync(t, testClusters[keyCluster01a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+			deployCustomizeAsync(t, testClusters[keyCluster01a].clientOpts, cfg,
 				staticClientKustomizeDirDefault, &wg)
-			deployCustomizeAsync(t, testClusters[keyCluster02a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+			deployCustomizeAsync(t, testClusters[keyCluster02a].clientOpts, cfg,
 				staticClientKustomizeDirDefault, &wg)
-			deployCustomizeAsync(t, testClusters[keyCluster03a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+			deployCustomizeAsync(t, testClusters[keyCluster03a].clientOpts, cfg,
 				staticClientKustomizeDirDefault, &wg)
-			deployCustomizeAsync(t, testClusters[keyCluster01b].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+			deployCustomizeAsync(t, testClusters[keyCluster01b].clientOpts, cfg,
 				staticClientKustomizeDirAP1, &wg)
 			wg.Wait()
 
 			// Verify that both static-server and static-client have been injected and now have 2 containers in each cluster.
 			// Also get the server IP
-			testClusters.setServerIP(t)
+			testClusters.setServerIP(t, cfg)
 
 			// Everything should be up and running now
 			testClusters.verifyServerUpState(t, cfg.EnableTransparentProxy)
@@ -520,7 +523,7 @@ func TestFailover_Connect(t *testing.T) {
 			// locality-aware routing will function in consul-k8s. In the future, this test will be expanded
 			// to test multi-cluster locality-based failover with sameness groups.
 			for _, v := range testClusters {
-				v.checkLocalities(t)
+				v.checkLocalities(t, cfg)
 			}
 
 			// Verify all the failover Scenarios
@@ -593,7 +596,7 @@ func TestFailover_Connect(t *testing.T) {
 					testClusters.resetScale(t)
 					testClusters.verifyServerUpState(t, cfg.EnableTransparentProxy)
 					// We're resetting the scale, so make sure we have all the new IP addresses saved
-					testClusters.setServerIP(t)
+					testClusters.setServerIP(t, cfg)
 
 					for i, v := range sc.failovers {
 						// Verify Failover (If this is the first check, then just verifying we're starting with the right server)
@@ -658,6 +661,15 @@ func (c *cluster) fullTextPartition() string {
 	}
 }
 
+func (c *cluster) dnsFailoverName(t *testing.T, cfg *config.TestConfig) string {
+	if cfg.UseKind {
+		return strings.ReplaceAll(c.context.KubectlOptions(t).ContextName, "kind-", "")
+	}
+	service := c.getCatalogService(t, staticServerName, staticServerNamespace, c.partition)
+	require.NotEmpty(t, service.Node, "missing Consul node for cluster %s", c.name)
+	return service.Node
+}
+
 // serviceTargetCheck verifies that curling the `static-server` using the `static-client` responds with the expected
 // cluster name. Each static-server responds with a unique name so that we can verify failover occured as expected.
 func (c *cluster) serviceTargetCheck(t *testing.T, expectedName string, curlAddress string) {
@@ -705,6 +717,7 @@ func (c *cluster) preparedQueryFailoverCheck(t *testing.T, cfg *config.TestConfi
 func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, failover *cluster) {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	dnsLookup := []string{fmt.Sprintf("static-server.service.ns2.ns.%s.sg.%s.ap.consul", samenessGroupName, c.fullTextPartition()), "+tcp", "SRV"}
+	expectedName := failover.dnsFailoverName(t, cfg)
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Use the primary cluster when performing a DNS lookup, this mostly affects cases
 		// where we are verifying DNS for a partition
@@ -719,10 +732,6 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 		// the context can be used to determine that failover occured to the expected kubernetes cluster
 		// hosting Consul
 		assert.Contains(r, logs, "ADDITIONAL SECTION:")
-		expectedName := failover.context.KubectlOptions(r).ContextName
-		if cfg.UseKind {
-			expectedName = strings.Replace(expectedName, "kind-", "", -1)
-		}
 		assert.Contains(r, logs, expectedName)
 	})
 }
@@ -842,7 +851,7 @@ func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig,
 
 // checkLocalities checks the given cluster for `static-client` and `static-server` instances matching the locality
 // expected for the cluster.
-func (c *cluster) checkLocalities(t *testing.T) {
+func (c *cluster) checkLocalities(t *testing.T, cfg *config.TestConfig) {
 	for ns, svcs := range map[string][]string{
 		staticClientNamespace: {
 			staticClientName,
@@ -853,11 +862,31 @@ func (c *cluster) checkLocalities(t *testing.T) {
 			staticServerName + "-sidecar-proxy",
 		},
 	} {
+		expected := c.locality
+		if cfg.EnableOpenshift || cfg.UseOpenshift {
+			expected = c.workloadLocality(t, ns, svcs[0])
+		}
 		for _, svc := range svcs {
 			cs := c.getCatalogService(t, svc, ns, c.partition)
-			assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
-			assert.Equal(t, c.locality, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
+			require.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
+			assert.Equal(t, expected, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
 		}
+	}
+}
+
+func (c *cluster) workloadLocality(t *testing.T, namespace, name string) api.Locality {
+	t.Helper()
+	client := c.context.KubernetesClient(t)
+	pods, err := client.CoreV1().Pods(namespace).List(ctx.Background(), metav1.ListOptions{LabelSelector: "app=" + name})
+	require.NoError(t, err)
+	require.Len(t, pods.Items, 1, "expected one %s pod in namespace %s", name, namespace)
+	require.NotEmpty(t, pods.Items[0].Spec.NodeName)
+	node, err := client.CoreV1().Nodes().Get(ctx.Background(), pods.Items[0].Spec.NodeName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, node.Labels[corev1.LabelTopologyRegion], "node %s requires a topology region for locality checks", node.Name)
+	return api.Locality{
+		Region: node.Labels[corev1.LabelTopologyRegion],
+		Zone:   node.Labels[corev1.LabelTopologyZone],
 	}
 }
 
@@ -932,10 +961,17 @@ func (c clusters) resetScale(t *testing.T) {
 // setServerIP makes sure everything is up and running and then saves the
 // static-server IP to the appropriate cluster. IP addresses can change when
 // services are scaled up and down.
-func (c clusters) setServerIP(t *testing.T) {
+func (c clusters) setServerIP(t *testing.T, cfg *config.TestConfig) {
 	for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
 		for k, v := range c {
-			podList, err := v.context.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(ctx.Background(),
+			namespace := metav1.NamespaceAll
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				namespace = v.clientOpts.Namespace
+				if labelSelector == "app=static-server" {
+					namespace = v.serverOpts.Namespace
+				}
+			}
+			podList, err := v.context.KubernetesClient(t).CoreV1().Pods(namespace).List(ctx.Background(),
 				metav1.ListOptions{LabelSelector: labelSelector})
 			require.NoError(t, err)
 			require.Len(t, podList.Items, 1)
@@ -974,11 +1010,7 @@ func copySecret(t *testing.T, cfg *config.TestConfig, sourceContext, destContext
 
 func createNamespaces(t *testing.T, cfg *config.TestConfig, context environment.TestContext) {
 	logger.Logf(t, "creating namespaces in %s", context.KubectlOptions(t).ContextName)
-	k8s.RunKubectl(t, context.KubectlOptions(t), "create", "ns", staticServerNamespace)
-	k8s.RunKubectl(t, context.KubectlOptions(t), "create", "ns", staticClientNamespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, context.KubectlOptions(t), "delete", "ns", staticClientNamespace, staticServerNamespace)
-	})
+	k8s.CreateNamespaces(t, context, cfg, staticServerNamespace, staticClientNamespace)
 }
 
 func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, opts *terratestk8s.KubectlOptions) {
@@ -990,7 +1022,11 @@ func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, o
 
 // setK8sNodeLocality labels the k8s node corresponding to the given cluster with standard labels indicating the
 // locality of that node. These are propagated by connect-inject to registered Consul services.
-func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluster) {
+func setK8sNodeLocality(t *testing.T, cfg *config.TestConfig, context environment.TestContext, c *cluster) {
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		// Preserve cloud-managed topology; verify locality against each workload's node instead.
+		return
+	}
 	nodeList, err := context.KubernetesClient(t).CoreV1().Nodes().List(ctx.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 	// Get the name of the (only) node from the Kind cluster.
@@ -1006,8 +1042,8 @@ func dnsQuery(t testutil.TestingTB, cfg *config.TestConfig, releaseName string, 
 
 	retry.RunWith(timer, t, func(r *retry.R) {
 		args := []string{"exec", "-i",
-			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
-				releaseName), "ANY"}
+			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.%s",
+				releaseName, dnsServer.context.KubectlOptions(r).Namespace), "ANY"}
 		args = append(args, dnsQuery...)
 		var err error
 		logs, err = k8s.RunKubectlAndGetOutputE(r, dnsServer.clientOpts, args...)
@@ -1036,10 +1072,12 @@ func localityForRegion(r string) api.Locality {
 	}
 }
 
-func deployCustomizeAsync(t *testing.T, opts *terratestk8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string, wg *sync.WaitGroup) {
+func deployCustomizeAsync(t *testing.T, opts *terratestk8s.KubectlOptions, cfg *config.TestConfig, kustomizeDir string, wg *sync.WaitGroup) {
+	k8s.ApplyOpenShiftCNINetworkAttachment(t, opts, cfg)
+	kustomizeDir = k8s.OpenShiftStaticServerOverlay(t, cfg, kustomizeDir, opts.Namespace)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		k8s.DeployKustomize(t, opts, noCleanupOnFailure, noCleanup, debugDirectory, kustomizeDir)
+		k8s.DeployKustomize(t, opts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, kustomizeDir)
 	}()
 }
