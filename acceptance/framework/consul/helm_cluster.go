@@ -125,27 +125,11 @@ func NewHelmCluster(
 	}
 }
 
-func (h *HelmCluster) prepareCRDs(t *testing.T) {
-	t.Helper()
-	// OpenShift owns platform CRDs. Never strip their finalizers as part of
-	// preparing a temporary Consul installation.
-	if h.helmOptions.SetValues["global.openshift.enabled"] == "true" {
-		return
-	}
-	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
-}
-
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
 
-	h.prepareCRDs(t)
-
-	openshift := h.helmOptions.SetValues["global.openshift.enabled"] == "true"
-	// A rejected OpenShift run does not own a release to uninstall. Run the
-	// guard before registering cleanup, but retain cleanup for partial installs.
-	if openshift && !h.SkipCheckForPreviousInstallations {
-		helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
-	}
+	// check and remove any CRDs with finalizers
+	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
@@ -153,8 +137,8 @@ func (h *HelmCluster) Create(t *testing.T) {
 		h.Destroy(t)
 	})
 
-	// Preserve the existing preflight/cleanup ordering for non-OpenShift runs.
-	if !openshift && !h.SkipCheckForPreviousInstallations {
+	// Fail if there are any existing installations of the Helm chart.
+	if !h.SkipCheckForPreviousInstallations {
 		helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")
 	}
 

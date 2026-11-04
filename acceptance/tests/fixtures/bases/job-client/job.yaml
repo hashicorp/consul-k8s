@@ -5,6 +5,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
    name: job-client
+   namespace: default
    labels:
      app: job-client
 spec:

@@ -5,6 +5,7 @@ apiVersion: consul.hashicorp.com/v1alpha1
 kind: RouteAuthFilter
 metadata:
   name: route-jwt-auth-filter
+  namespace: default
 spec:
   jwt:
     providers:

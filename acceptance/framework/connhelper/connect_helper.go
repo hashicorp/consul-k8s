@@ -343,23 +343,12 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts) {
 		client = opts.ClientType
 	}
 
-	// Services are only registered in a Consul namespace named after their
-	// Kubernetes namespace when Consul namespaces are enabled. Otherwise they live
-	// in Consul's default namespace, and Consul Enterprise rejects an intention
-	// for a namespace that does not exist (e.g. when tests run in a non-default
-	// Kubernetes namespace such as "consul-test"). Explicit namespaces from opts
-	// are always honoured.
-	defaultNamespace := ""
-	if c.HelmValues["global.enableConsulNamespaces"] == "true" {
-		defaultNamespace = c.KubectlOptsForApp(t).Namespace
-	}
-
-	sourceNamespace := defaultNamespace
+	sourceNamespace := c.KubectlOptsForApp(t).Namespace
 	if opts.SourceNamespace != "" {
 		sourceNamespace = opts.SourceNamespace
 	}
 
-	destinationNamespace := defaultNamespace
+	destinationNamespace := c.KubectlOptsForApp(t).Namespace
 	if opts.DestinationNamespace != "" {
 		destinationNamespace = opts.DestinationNamespace
 	}
