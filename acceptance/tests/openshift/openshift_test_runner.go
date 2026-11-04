@@ -67,7 +67,7 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 		assert.NoErrorf(t, err, "failed to delete secret: %s", string(output))
 	})
 
-	cmd = exec.Command("helm", openshiftHelmArgs(cfg, secure, namespaceMirroring, extraHelmValues)...)
+	cmd = exec.Command("helm", openshiftHelmArgs(cfg, secure, namespaceMirroring, withOpenshiftVersionDefaults(t, extraHelmValues))...)
 
 	output, err = cmd.CombinedOutput()
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
@@ -85,9 +85,26 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 func upgradeOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespaceMirroring bool, extraHelmValues map[string]string) {
 	t.Helper()
 
-	args := append(openshiftHelmArgs(cfg, secure, namespaceMirroring, extraHelmValues), "--wait", "--timeout", "15m")
+	args := append(openshiftHelmArgs(cfg, secure, namespaceMirroring, withOpenshiftVersionDefaults(t, extraHelmValues)), "--wait", "--timeout", "15m")
 	output, err := exec.Command("helm", args...).CombinedOutput()
 	require.NoErrorf(t, err, "failed to upgrade consul: %s", string(output))
+}
+
+// withOpenshiftVersionDefaults returns extraHelmValues plus the values required by the
+// cluster's OpenShift version. OpenShift 4.19+ ships and owns the gateway.networking.k8s.io
+// CRDs, so the chart must be told not to render them (global.openshift.isOcpGreaterthan4_18),
+// otherwise Helm refuses to install because it cannot adopt the platform-owned CRDs.
+// A value set explicitly by the test always wins.
+func withOpenshiftVersionDefaults(t *testing.T, extraHelmValues map[string]string) map[string]string {
+	t.Helper()
+	values := make(map[string]string, len(extraHelmValues)+1)
+	for k, v := range extraHelmValues {
+		values[k] = v
+	}
+	if _, ok := values["global.openshift.isOcpGreaterthan4_18"]; !ok && openshiftVersionAtLeast(t, 4, 19) {
+		values["global.openshift.isOcpGreaterthan4_18"] = "true"
+	}
+	return values
 }
 
 func openshiftHelmArgs(cfg *config.TestConfig, secure, namespaceMirroring bool, extraHelmValues map[string]string) []string {

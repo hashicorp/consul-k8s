@@ -75,6 +75,10 @@ type ConfigEntryResource interface {
 // ConsulMeta contains metadata which represents installation specific
 // information about Consul.
 type ConsulMeta struct {
+	// IsEnterpriseDistribution indicates whether the connected Consul cluster
+	// reports a valid enterprise license at startup.
+	IsEnterpriseDistribution bool
+
 	// PartitionsEnabled indicates that a user is running Consul Enterprise
 	// with version 1.11+ which supports Admin Partitions.
 	PartitionsEnabled bool

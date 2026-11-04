@@ -133,6 +133,10 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	if t.EnableOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
+		// Use the Gateway API CRDs provided by the OpenShift test cluster rather
+		// than trying to adopt them into a temporary Helm release. Tests that
+		// explicitly own CRD installation can override this value.
+		setIfNotEmpty(helmValues, "global.installK8sNetworkingCRDs", "false")
 	}
 
 	if t.EnablePodSecurityPolicies {

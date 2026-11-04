@@ -19,3 +19,4 @@
 - {runner: 14, test-packages: "terminating-gateway"}
 - {runner: 15, test-packages: "vault"}
 - {runner: 16, test-packages: "server"}
+- {runner: 17, test-packages: "custom-api-gateway"}

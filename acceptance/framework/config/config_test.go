@@ -87,6 +87,7 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 			},
 			map[string]string{
 				"global.openshift.enabled":                      "true",
+				"global.installK8sNetworkingCRDs":               "false",
 				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},
@@ -128,6 +129,73 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 			require.Equal(t, tt.want, values)
 		})
 	}
+}
+
+func TestConfig_HelmValuesFromConfig_Platforms(t *testing.T) {
+	for name, cfg := range map[string]TestConfig{
+		"default":                {},
+		"AKS":                    {UseAKS: true},
+		"EKS":                    {UseEKS: true},
+		"GKE":                    {UseGKE: true},
+		"Kind":                   {UseKind: true},
+		"UseOpenshift flag only": {UseOpenshift: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			values, err := cfg.HelmValuesFromConfig()
+			require.NoError(t, err)
+			require.Equal(t, map[string]string{
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			}, values)
+		})
+	}
+
+	t.Run("GKE Autopilot", func(t *testing.T) {
+		cfg := TestConfig{UseGKE: true, UseGKEAutopilot: true}
+		values, err := cfg.HelmValuesFromConfig()
+		require.NoError(t, err)
+		require.Equal(t, map[string]string{
+			"global.server.resources.requests.cpu":           "500m",
+			"global.server.resources.limits.cpu":             "500m",
+			"connectInject.apiGateway.manageExternalCRDs":    "false",
+			"connectInject.apiGateway.manageNonStandardCRDs": "true",
+			"connectInject.transparentProxy.defaultEnabled":  "false",
+		}, values)
+	})
+
+	t.Run("both OpenShift flags", func(t *testing.T) {
+		cfg := TestConfig{EnableOpenshift: true, UseOpenshift: true}
+		values, err := cfg.HelmValuesFromConfig()
+		require.NoError(t, err)
+		require.Equal(t, map[string]string{
+			"global.openshift.enabled":                      "true",
+			"global.installK8sNetworkingCRDs":               "false",
+			"connectInject.transparentProxy.defaultEnabled": "false",
+		}, values)
+	})
+
+	t.Run("OpenShift security and CNI settings preserved", func(t *testing.T) {
+		cfg := TestConfig{
+			EnableOpenshift:                true,
+			EnablePodSecurityPolicies:      true,
+			EnableCNI:                      true,
+			EnableRestrictedPSAEnforcement: true,
+			EnableTransparentProxy:         true,
+		}
+		values, err := cfg.HelmValuesFromConfig()
+		require.NoError(t, err)
+		require.Equal(t, map[string]string{
+			"global.openshift.enabled":                      "true",
+			"global.installK8sNetworkingCRDs":               "false",
+			"global.enablePodSecurityPolicies":              "true",
+			"connectInject.cni.enabled":                     "true",
+			"connectInject.cni.logLevel":                    "debug",
+			"connectInject.cni.multus":                      "true",
+			"connectInject.cni.cniBinDir":                   "/var/lib/cni/bin",
+			"connectInject.cni.cniNetDir":                   "/etc/kubernetes/cni/net.d",
+			"connectInject.cni.namespace":                   "kube-system",
+			"connectInject.transparentProxy.defaultEnabled": "true",
+		}, values)
+	})
 }
 
 func TestConfig_HelmValuesFromConfig_EntImage(t *testing.T) {

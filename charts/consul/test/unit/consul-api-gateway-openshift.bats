@@ -58,6 +58,34 @@ ocp_template() {
 #--------------------------------------------------------------------
 # CRDs
 
+@test "consulAPIGateway/OpenShift: acceptance override preserves platform networking CRDs" {
+  cd `chart_dir`
+  for nonstandard in false true; do
+    run ocp_template \
+      --set 'global.installK8sNetworkingCRDs=false' \
+      --set 'global.openshift.crds.enableTcpRoute=true' \
+      --set 'global.openshift.crds.consulapi.enabled=true' \
+      --set "connectInject.apiGateway.manageNonStandardCRDs=${nonstandard}"
+    [ "$status" -eq 0 ]
+    for crd in gatewayclasses gateways httproutes referencegrants tcproutes; do
+      ! echo "$output" | grep -q "name: ${crd}.gateway.networking.k8s.io"
+    done
+    for crd in serviceintentions cgateways chttproutes creferencegrants customgatewayclasses ctcproutes; do
+      echo "$output" | grep -q "name: ${crd}.consul.hashicorp.com"
+    done
+    echo "$output" | grep -q '# Source: consul/templates/connect-inject-deployment.yaml'
+  done
+}
+
+@test "consulAPIGateway/OpenShift: acceptance override does not change non-OpenShift defaults" {
+  cd `chart_dir`
+  run helm template --set 'connectInject.enabled=true' .
+  [ "$status" -eq 0 ]
+  for crd in gatewayclasses gateways httproutes referencegrants; do
+    echo "$output" | grep -q "name: ${crd}.gateway.networking.k8s.io"
+  done
+}
+
 @test "consulAPIGateway/OpenShift: consul.hashicorp.com Gateway CRD not rendered by default" {
   cd `chart_dir`
   run bash -c "$(declare -f ocp_template); ocp_template -s templates/consul-crd-gateways-external.yaml"
