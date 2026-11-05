@@ -4,6 +4,7 @@
 package sameness
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,14 +12,18 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	kubernetesfake "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,6 +49,86 @@ func TestSamenessSupportedPlatforms(t *testing.T) {
 			tc.cfg.KubeEnvs = make([]config.KubeTestConfig, tc.clusters)
 			require.Equal(t, tc.want, samenessTestConfigSupported(&tc.cfg))
 		})
+	}
+}
+
+func TestSamenessGroupAdmissionNamespace(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		partition string
+	}{
+		{name: keyCluster01a, partition: "default"},
+		{name: keyCluster01b, partition: cluster01Partition},
+		{name: keyCluster02a, partition: "default"},
+		{name: keyCluster03a, partition: "default"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			content, err := os.ReadFile("../fixtures/bases/sameness/" + tc.name + "-default-ns/sameness.yaml")
+			require.NoError(t, err)
+			var group v1alpha1.SamenessGroup
+			require.NoError(t, yaml.NewYAMLOrJSONDecoder(bytes.NewReader(content), 4096).Decode(&group))
+			meta := apicommon.ConsulMeta{Partition: tc.partition, DestinationNamespace: "default"}
+			group.Namespace = "consul"
+			require.ErrorContains(t, group.Validate(meta), "sameness groups must reside in the default namespace")
+			group.Namespace = metav1.NamespaceDefault
+			require.NoError(t, group.Validate(meta))
+		})
+	}
+}
+
+func TestSamenessGroupApplyAndCleanupNamespace(t *testing.T) {
+	directory := t.TempDir()
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SAMENESS_KUBECTL_CALLS\"\ncase \"$*\" in *' get crd '*) printf '{\"items\":[]}\\n' ;; esac\n"
+	require.NoError(t, os.WriteFile(filepath.Join(directory, "kubectl"), []byte(script), 0700))
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+	for _, tc := range []struct {
+		name      string
+		namespace string
+		cfg       config.TestConfig
+	}{
+		{name: "Kind", namespace: "default", cfg: config.TestConfig{UseKind: true}},
+		{name: "OpenShift", namespace: "consul", cfg: config.TestConfig{EnableOpenshift: true}},
+		{name: "OpenShift alternate namespace", namespace: "consul-secondary", cfg: config.TestConfig{UseOpenshift: true}},
+	} {
+		calls := filepath.Join(directory, tc.name+".calls")
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("SAMENESS_KUBECTL_CALLS", calls)
+			t.Cleanup(func() {
+				require.Eventually(t, func() bool {
+					output, err := os.ReadFile(calls)
+					return err == nil && strings.Contains(string(output), " get crd ")
+				}, 5*time.Second, 10*time.Millisecond, "wait for the cleanup helper's CRD discovery")
+			})
+			options := &terratestk8s.KubectlOptions{
+				ContextName: "review-context", ConfigPath: "/review/kubeconfig", Namespace: tc.namespace,
+			}
+			c := &cluster{
+				name: keyCluster01a, context: &samenessTestContext{options: options},
+			}
+			c.applySamenessGroup(t, &tc.cfg)
+			require.Equal(t, tc.namespace, options.Namespace, "the installation namespace must not change")
+		})
+		output, err := os.ReadFile(calls)
+		require.NoError(t, err)
+		var commands []string
+		for _, command := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+			if !strings.Contains(command, " get crd ") {
+				commands = append(commands, command)
+			}
+		}
+		require.Contains(t, commands[0], "apply")
+		require.Contains(t, commands[len(commands)-1], "delete")
+		for _, command := range commands {
+			require.Contains(t, command, "--context review-context")
+			require.Contains(t, command, "--namespace default")
+		}
+		if tc.cfg.EnableOpenshift || tc.cfg.UseOpenshift {
+			require.Len(t, commands, 3)
+			require.Contains(t, commands[1], "label samenessgroups.consul.hashicorp.com "+samenessGroupName)
+			require.Contains(t, commands[1], "consul.hashicorp.com/acceptance-namespace="+tc.namespace)
+		} else {
+			require.Len(t, commands, 2)
+		}
 	}
 }
 

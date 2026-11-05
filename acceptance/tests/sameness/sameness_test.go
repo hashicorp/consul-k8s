@@ -445,7 +445,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Create sameness group after exporting the services, this will reduce flakiness in an automated test
 			for _, v := range testClusters {
-				applyResources(t, cfg, fmt.Sprintf("../fixtures/bases/sameness/%s-default-ns", v.name), v.context.KubectlOptions(t))
+				v.applySamenessGroup(t, cfg)
 			}
 
 			// Setup DNS.
@@ -1018,6 +1018,17 @@ func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, o
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, opts, kustomizeDir)
 	})
+}
+
+func (c *cluster) applySamenessGroup(t *testing.T, cfg *config.TestConfig) {
+	t.Helper()
+	// The admission webhook requires the Kubernetes default namespace, not the Helm namespace.
+	options := c.context.KubectlOptionsForNamespace(metav1.NamespaceDefault)
+	applyResources(t, cfg, fmt.Sprintf("../fixtures/bases/sameness/%s-default-ns", c.name), options)
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		k8s.RunKubectl(t, options, "label", "samenessgroups.consul.hashicorp.com", samenessGroupName,
+			"consul.hashicorp.com/acceptance-namespace="+c.context.KubectlOptions(t).Namespace, "--overwrite")
+	}
 }
 
 // setK8sNodeLocality labels the k8s node corresponding to the given cluster with standard labels indicating the
