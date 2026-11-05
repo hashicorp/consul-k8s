@@ -1,6 +1,5 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
-# just for re-trigger the workfow
 
 # Single-cluster packages run against the primary OCP cluster
 # - {runner: 0, test-packages: "cli", mode: "single-cluster"}
