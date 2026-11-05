@@ -163,9 +163,16 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 	consulCluster.Create(t)
 
 	consulClient, _ := consulCluster.SetupConsulClient(t, true)
+	var queryOptions *api.QueryOptions
+	var writeOptions *api.WriteOptions
+	if cfg.EnableEnterprise && (cfg.EnableOpenshift || cfg.UseOpenshift) {
+		namespace := ctx.KubectlOptions(t).Namespace
+		queryOptions = &api.QueryOptions{Namespace: namespace}
+		writeOptions = &api.WriteOptions{Namespace: namespace}
+	}
 
 	// Set global protocol to HTTP so HTTPRoutes are accepted without per-service
-	// ServiceDefaults.
+	// ServiceDefaults. ProxyDefaults must remain in the default Consul namespace.
 	_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
 		Kind: api.ProxyDefaults,
 		Name: api.ProxyConfigGlobal,
@@ -176,6 +183,8 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 	require.NoError(t, err)
 
 	fixturePath := "../fixtures/cases/api-gateways/auto-tls"
+	fixturePath = k8s.OpenShiftStaticServerOverlay(t, cfg, fixturePath, ctx.KubectlOptions(t).Namespace)
+	k8s.ApplyOpenShiftCNINetworkAttachment(t, ctx.KubectlOptions(t), cfg)
 
 	logger.Log(t, "creating auto-tls api-gateway resources")
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", fixturePath)
@@ -189,7 +198,7 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 
 	// Wait for static-server (in-mesh) to be available and registered.
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", "deploy/static-server")
-	waitForConsulServiceRegistered(t, consulClient, "static-server")
+	waitForConsulServiceRegistered(t, consulClient, "static-server", queryOptions)
 
 	// Allow the gateway to reach the in-mesh static-server.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -198,7 +207,7 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 		Sources: []*api.SourceIntention{
 			{Name: "auto-tls-gateway", Action: api.IntentionActionAllow},
 		},
-	}, nil)
+	}, writeOptions)
 	require.NoError(t, err)
 
 	// ── 1. Patch CoreDNS to forward .consul queries to Consul DNS ────────────
@@ -225,7 +234,7 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 	// ── 3. Consul config entry carries TLS.Enabled = true ────────────────────
 	logger.Log(t, "verifying Consul APIGateway config entry has TLS.Enabled=true")
 	retryCheckWithWait(t, 60, 2*time.Second, func(r *retry.R) {
-		entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "auto-tls-gateway", nil)
+		entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "auto-tls-gateway", queryOptions)
 		require.NoError(r, err)
 		gw := entry.(*api.APIGatewayConfigEntry)
 		require.Truef(r, gw.TLS.Enabled,
@@ -333,21 +342,33 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 	// ── 10. DNS resolution: static-server.api-gateway.consul → gateway IP ─────
 	// Verify that Consul DNS resolves the api-gateway hostname to the gateway's
 	// address. This proves the state store gateway-services mapping is live.
-	logger.Log(t, "verifying DNS resolution of "+apiGWHostname)
+	openShift := cfg.EnableOpenshift || cfg.UseOpenshift
+	dnsHostname := apiGWHostname
+	if openShift && cfg.EnableEnterprise && k8sOptions.Namespace != "default" {
+		// Consul DNS requires the ".ns" marker; the certificate SAN omits it.
+		dnsHostname = fmt.Sprintf("static-server.api-gateway.%s.ns.consul", k8sOptions.Namespace)
+	}
+	logger.Log(t, "verifying DNS resolution of "+dnsHostname)
 	retryCheckWithWait(t, 30, 3*time.Second, func(r *retry.R) {
-		out, err := k8s.RunKubectlAndGetOutputE(r, k8sOptions,
-			"exec", "deploy/"+StaticClientName, "-c", StaticClientName, "--",
-			"sh", "-c", fmt.Sprintf("nslookup %s 2>&1 || getent hosts %s 2>&1", apiGWHostname, apiGWHostname),
-		)
+		lookup := []string{"sh", "-c", fmt.Sprintf("nslookup %s 2>&1 || getent hosts %s 2>&1", dnsHostname, dnsHostname)}
+		if openShift {
+			lookup = []string{"getent", "ahosts", dnsHostname}
+		}
+		args := append([]string{"exec", "deploy/" + StaticClientName, "-c", StaticClientName, "--"}, lookup...)
+		out, err := k8s.RunKubectlAndGetOutputE(r, k8sOptions, args...)
 		require.NoError(r, err, out)
+		if openShift {
+			require.Containsf(r, strings.Fields(out), gatewayAddress, "expected DNS resolution of %q to include gateway address", dnsHostname)
+			return
+		}
 		// Either an A record or the gateway IP must appear in the output.
 		require.Truef(r,
 			strings.Contains(out, gatewayAddress) || strings.Contains(out, "Address"),
 			"expected DNS resolution of %q to include gateway address %q; got: %s",
-			apiGWHostname, gatewayAddress, out,
+			dnsHostname, gatewayAddress, out,
 		)
 	})
-	logger.Log(t, "DNS resolution of "+apiGWHostname+" → gateway ✓")
+	logger.Log(t, "DNS resolution of "+dnsHostname+" → gateway ✓")
 
 	// ── 11. CA-verified HTTPS using the hostname (no -k) ─────────────────────
 	// This is the definitive end-to-end assertion: the client reaches the
@@ -376,7 +397,7 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 	k8s.RunKubectl(t, k8sOptions, "annotate", "gateway", "auto-tls-gateway",
 		"consul.hashicorp.com/tls-enabled-") // trailing dash removes annotation
 	retryCheckWithWait(t, 60, 2*time.Second, func(r *retry.R) {
-		entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "auto-tls-gateway", nil)
+		entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "auto-tls-gateway", queryOptions)
 		require.NoError(r, err)
 		require.Falsef(r, entry.(*api.APIGatewayConfigEntry).TLS.Enabled,
 			"expected TLS.Enabled=false after removing annotation")
@@ -386,7 +407,7 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 	k8s.RunKubectl(t, k8sOptions, "annotate", "gateway", "auto-tls-gateway",
 		"consul.hashicorp.com/tls-enabled=true")
 	retryCheckWithWait(t, 60, 2*time.Second, func(r *retry.R) {
-		entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "auto-tls-gateway", nil)
+		entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "auto-tls-gateway", queryOptions)
 		require.NoError(r, err)
 		require.Truef(r, entry.(*api.APIGatewayConfigEntry).TLS.Enabled,
 			"expected TLS.Enabled=true after re-adding annotation")
@@ -415,6 +436,10 @@ func patchCoreDNSForConsul(t *testing.T, releaseName string) {
 	require.NoErrorf(t, err, "could not find Consul DNS service %s", dnsSvcName)
 	consulDNSIP := dnsSvc.Spec.ClusterIP
 	logger.Logf(t, "Consul DNS service ClusterIP: %s", consulDNSIP)
+	if suite.Config().EnableOpenshift || suite.Config().UseOpenshift {
+		k8s.ConfigureOpenShiftDNS(t, ctx, suite.Config(), consulDNSIP)
+		return
+	}
 
 	// 2. Detect whether the cluster uses coredns or kube-dns.
 	cmClient := k8sClient.CoreV1().ConfigMaps("kube-system")

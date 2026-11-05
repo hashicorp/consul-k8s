@@ -8,7 +8,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"net/http"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -21,36 +20,31 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
 func TestOpenshift_Basic(t *testing.T) {
 	cfg := suite.Config()
+	ctx := suite.Environment().DefaultContext(t)
+	fixtureOptions := ctx.KubectlOptionsForNamespace("")
 	newOpenshiftCluster(t, cfg, true, false)
 
 	// this is normally called by the environment, but because we have to bypass we have to call it explicitly
 	logf.SetLogger(logr.New(nil))
 	logger.Log(t, "creating resources for OpenShift test")
 
-	counter := &retry.Counter{Count: 10, Wait: 120 * time.Second}
-	var err error
-	var output []byte
-	retry.RunWith(counter, t, func(r *retry.R) {
-		cmd := exec.Command("kubectl", "apply", "-f", "../fixtures/cases/openshift/basic")
-		output, err = cmd.CombinedOutput()
-		require.NoErrorf(r, err, "failed to create resources: %s", string(output))
-	})
+	output, err := k8s.RunKubectlAndGetOutputE(t, fixtureOptions, "apply", "-f", "../fixtures/cases/openshift/basic")
+	require.NoErrorf(t, err, "failed to create resources: %s", output)
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		cmd := exec.Command("kubectl", "delete", "-f", "../fixtures/cases/openshift/basic")
-		output, err := cmd.CombinedOutput()
-		assert.NoErrorf(t, err, "failed to delete resources: %s", string(output))
+		output, err := k8s.RunKubectlAndGetOutputE(t, fixtureOptions, "delete", "-f", "../fixtures/cases/openshift/basic")
+		assert.NoErrorf(t, err, "failed to delete resources: %s", output)
 	})
 
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
-	ctx := suite.Environment().DefaultContext(t)
 	k8sClient := ctx.ControllerRuntimeClient(t)
 
 	// Get the public IP address of the API gateway that we created from its status.
@@ -58,8 +52,8 @@ func TestOpenshift_Basic(t *testing.T) {
 	// On startup, the controller can take upwards of 1m to perform leader election,
 	// so we may need to wait a long time for the reconcile loop to run (hence the timeout).
 	var gatewayIP string
-	counter = &retry.Counter{Count: 10, Wait: 120 * time.Second}
-	retry.RunWith(counter, t, func(r *retry.R) {
+	retrier := &retry.Timer{Timeout: 10 * time.Minute, Wait: 5 * time.Second}
+	retry.RunWith(retrier, t, func(r *retry.R) {
 		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "api-gateway", Namespace: "consul"}, &gateway)
 		require.NoError(r, err)
@@ -73,17 +67,21 @@ func TestOpenshift_Basic(t *testing.T) {
 	// via the API gateway that we created.
 	//
 	// The request goes Gateway --> Frontend --> Backend
-	client := &http.Client{Transport: &http.Transport{
+	client := &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
 
 	var resp *http.Response
-	counter = &retry.Counter{Count: 10, Wait: 120 * time.Second}
-	retry.RunWith(counter, t, func(r *retry.R) {
+	retrier = &retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		if resp != nil {
+			require.NoError(r, resp.Body.Close())
+		}
 		resp, err = client.Get("https://" + gatewayIP)
 		require.NoErrorf(r, err, "request to API gateway failed: %s", err)
-		assert.Equalf(r, resp.StatusCode, http.StatusOK, "request to API gateway returned failure code: %d", resp.StatusCode)
+		require.Equalf(r, http.StatusOK, resp.StatusCode, "request to API gateway returned failure code: %d", resp.StatusCode)
 	})
+	defer resp.Body.Close()
 
 	var body struct {
 		Body          string `json:"body"`
