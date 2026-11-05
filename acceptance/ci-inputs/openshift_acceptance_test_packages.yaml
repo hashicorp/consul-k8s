@@ -7,7 +7,7 @@
 # - {runner: 2, test-packages: "metrics", mode: "single-cluster"}
 # - {runner: 3, test-packages: "server", mode: "single-cluster"}
 # - {runner: 4, test-packages: "config-entries", mode: "single-cluster"}
-- {runner: 5, test-packages: "connect", mode: "single-cluster"}
+# - {runner: 5, test-packages: "connect", mode: "single-cluster"}
 # - {runner: 6, test-packages: "snapshot-agent", mode: "single-cluster"}
 # - {runner: 7, test-packages: "terminating-gateway", mode: "single-cluster"}
 # - {runner: 8, test-packages: "openshift", mode: "single-cluster"}
@@ -23,4 +23,4 @@
 # - {runner: 16, test-packages: "partitions", mode: "multi-cluster"}
 # - {runner: 17, test-packages: "peering", mode: "multi-cluster"}
 # - {runner: 18, test-packages: "wan-federation", mode: "multi-cluster"}
-# - {runner: 19, test-packages: "sameness", mode: "multi-cluster"}
+- {runner: 19, test-packages: "sameness", mode: "multi-cluster"}
