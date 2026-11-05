@@ -1,0 +1,25 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteRetryFilter
+metadata:
+  name: retrytrafficfilter
+spec:
+  numRetries: 1
+  retryOnConnectFailure: false
+  retryOn:
+    - reset
+    - unavailable
+  retryOnStatusCodes:
+    - 500
+    - 502
+
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteTimeoutFilter
+metadata:
+  name: timeouttrafficfilter
+spec:
+  requestTimeout: "1s"
+  idleTimeout: "1s"

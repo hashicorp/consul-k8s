@@ -8,21 +8,26 @@ import (
 	"os"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	testsuite "github.com/hashicorp/consul-k8s/acceptance/framework/suite"
 )
 
 var suite testsuite.Suite
 
+const expectedNumberOfClusters = 4
+
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 
-	expectedNumberOfClusters := 4
-
-	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) && suite.Config().UseKind {
+	if samenessTestConfigSupported(suite.Config()) {
 		os.Exit(suite.Run())
-	} else {
-		fmt.Println(fmt.Sprintf("Skipping sameness tests because either -enable-multi-cluster is "+
-			"not set, the number of clusters did not match the expected count of %d, or --useKind is false. "+
-			"Sameness acceptance tests are currently only supported on Kind clusters", expectedNumberOfClusters))
 	}
+
+	fmt.Printf("Skipping sameness tests: requires -enable-multi-cluster, at least %d clusters, "+
+		"and -use-kind, -enable-openshift or -use-openshift.\n", expectedNumberOfClusters)
+}
+
+func samenessTestConfigSupported(cfg *config.TestConfig) bool {
+	return cfg.EnableMultiCluster && cfg.IsExpectedClusterCount(expectedNumberOfClusters) &&
+		(cfg.UseKind || cfg.EnableOpenshift || cfg.UseOpenshift)
 }

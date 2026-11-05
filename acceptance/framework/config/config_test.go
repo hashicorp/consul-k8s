@@ -91,6 +91,32 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 			},
 		},
 		{
+			"sets openshift value when UseOpenshift is set",
+			TestConfig{
+				UseOpenshift: true,
+			},
+			map[string]string{
+				"global.openshift.enabled":                      "true",
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
+		},
+		{
+			"sets openshift CNI paths when UseOpenshift is set",
+			TestConfig{
+				UseOpenshift: true,
+				EnableCNI:    true,
+			},
+			map[string]string{
+				"global.openshift.enabled":                      "true",
+				"connectInject.cni.enabled":                     "true",
+				"connectInject.cni.logLevel":                    "debug",
+				"connectInject.cni.multus":                      "true",
+				"connectInject.cni.cniBinDir":                   "/var/lib/cni/bin",
+				"connectInject.cni.cniNetDir":                   "/etc/kubernetes/cni/net.d",
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
+		},
+		{
 			"sets enablePodSecurityPolicies helm value when -enable-pod-security-policies is set",
 			TestConfig{
 				EnablePodSecurityPolicies: true,

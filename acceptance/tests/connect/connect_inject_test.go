@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -825,6 +826,24 @@ func multiportGateTestAppNamespace(t *testing.T, cfg *config.TestConfig, ctx env
 		require.Equal(r, corev1.NamespaceActive, existing.Status.Phase,
 			"namespace %s is still terminating from a previous run", name)
 	})
+	k8s.MarkAcceptanceNamespace(t, opts, cfg, name)
+	if (cfg.EnableOpenshift || cfg.UseOpenshift) && cfg.EnableTransparentProxy {
+		// Workload controllers create Pods with only the SCCs granted to the
+		// Pod's service account, and the injected transparent proxy init
+		// container needs the privileged SCC.
+		_, err := ctx.KubernetesClient(t).RbacV1().RoleBindings(name).Create(context.Background(), &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "default-openshift-privileged"},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     "system:openshift:scc:privileged",
+			},
+			Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: "default", Namespace: name}},
+		}, metav1.CreateOptions{})
+		if !apierrors.IsAlreadyExists(err) {
+			require.NoError(t, err)
+		}
+	}
 
 	if cfg.EnableRestrictedPSAEnforcement {
 		// The fixtures run as root, which a restricted namespace rejects.
@@ -947,7 +966,11 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			logger.Log(t, "creating multiport static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
+			multiportFixture := "../fixtures/bases/multiport-app"
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				multiportFixture = "../fixtures/cases/multiport-app-openshift"
+			}
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, multiportFixture)
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
 
 			// Check that static-client has been injected and now has 2 containers.
@@ -1009,7 +1032,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// pod to static-server.
 
 			// Deploy static-server.
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployStaticWorkload(t, ctx.KubectlOptions(t), cfg, "../fixtures/cases/static-server-inject")
 
 			// For outbound connections from the multi port pod, only intentions from the first service in the multiport
 			// pod need to be created, since all upstream connections are made through the first service's envoy proxy.
