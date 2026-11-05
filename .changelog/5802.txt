@@ -1,0 +1,3 @@
+```release-note:security
+Upgrade `golang.org/x/net` to v0.62.0 to address vulnerabilities [[GO-2026-6860](https://pkg.go.dev/vuln/GO-2026-6860)] (CVE-2026-78661) and [[GO-2026-6866](https://pkg.go.dev/vuln/GO-2026-6866)] (CVE-2026-97045) in the CLI, CNI, acceptance and control-plane submodules.
+```
