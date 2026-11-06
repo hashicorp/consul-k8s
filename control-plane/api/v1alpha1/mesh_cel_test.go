@@ -59,16 +59,32 @@ func meshCELValidator(t *testing.T, path string) (*cel.Validator, *schema.Struct
 	return validator, structural
 }
 
+func meshObject(spec map[string]interface{}, finalizers ...interface{}) map[string]interface{} {
+	meta := map[string]interface{}{"name": "mesh"}
+	if len(finalizers) > 0 {
+		meta["finalizers"] = finalizers
+	}
+	return map[string]interface{}{
+		"apiVersion": "consul.hashicorp.com/v1alpha1",
+		"kind":       "Mesh",
+		"metadata":   meta,
+		"spec":       spec,
+	}
+}
+
 func validateMeshCEL(t *testing.T, path string, tls map[string]interface{}) field.ErrorList {
 	t.Helper()
 	validator, structural := meshCELValidator(t, path)
-	obj := map[string]interface{}{
-		"apiVersion": "consul.hashicorp.com/v1alpha1",
-		"kind":       "Mesh",
-		"metadata":   map[string]interface{}{"name": "mesh"},
-		"spec":       map[string]interface{}{"tls": tls},
-	}
-	errs, _ := validator.Validate(context.Background(), field.NewPath("root"), structural, obj, nil, celconfig.RuntimeCELCostBudget)
+	errs, _ := validator.Validate(context.Background(), field.NewPath("root"), structural, meshObject(map[string]interface{}{"tls": tls}), nil, celconfig.RuntimeCELCostBudget)
+	return errs
+}
+
+// validateMeshCELUpdate evaluates the CRD rules for an update from oldObj to
+// obj without validation ratcheting, as on Kubernetes versions before 1.30.
+func validateMeshCELUpdate(t *testing.T, path string, oldObj, obj map[string]interface{}) field.ErrorList {
+	t.Helper()
+	validator, structural := meshCELValidator(t, path)
+	errs, _ := validator.Validate(context.Background(), field.NewPath("root"), structural, obj, oldObj, celconfig.RuntimeCELCostBudget)
 	return errs
 }
 
@@ -141,49 +157,99 @@ func TestMeshCRD_ChartMatchesBases(t *testing.T) {
 }
 
 func TestMeshCRD_CEL_OutgoingECDHCurvesRequireP256(t *testing.T) {
-	const p256Msg = `ecdhCurves must include "P-256" when TLS 1.2 can be negotiated`
+	const p256Msg = `spec.tls.outgoing.ecdhCurves must include "P-256" when TLS 1.2 can be negotiated`
 	pqc := []interface{}{"X25519MLKEM768", "X25519"}
+	outgoing := func(min string, curves ...interface{}) map[string]interface{} {
+		o := map[string]interface{}{"ecdhCurves": curves}
+		if min != "" {
+			o["tlsMinVersion"] = min
+		}
+		return map[string]interface{}{"tls": map[string]interface{}{"outgoing": o}}
+	}
+	incoming := func(min string, curves ...interface{}) map[string]interface{} {
+		return map[string]interface{}{"tls": map[string]interface{}{"incoming": map[string]interface{}{"ecdhCurves": curves, "tlsMinVersion": min}}}
+	}
+	withTProxy := func(spec map[string]interface{}) map[string]interface{} {
+		spec["transparentProxy"] = map[string]interface{}{"meshDestinationsOnly": true}
+		return spec
+	}
 
 	cases := map[string]struct {
-		tls     map[string]interface{}
+		old     map[string]interface{} // nil means create
+		new     map[string]interface{}
 		wantErr string
 	}{
-		"outgoing TLSv1_2 without P-256": {
-			tls:     map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": pqc, "tlsMinVersion": "TLSv1_2"}},
+		// Rules that compare with the old object are not evaluated on create,
+		// so the webhook enforces the requirement for new resources.
+		"create with outgoing curves lacking P-256 is left to the webhook": {
+			new: meshObject(outgoing("TLSv1_2", pqc...)),
+		},
+
+		// Without ratcheting, every update is validated against the whole
+		// object. An unchanged outgoing block must not block updates such as
+		// adding a finalizer or changing other fields.
+		"update adding a finalizer keeps unchanged incompatible outgoing curves": {
+			old: meshObject(outgoing("TLSv1_2", pqc...)),
+			new: meshObject(outgoing("TLSv1_2", pqc...), "finalizers.consul.hashicorp.com"),
+		},
+		"update changing another field keeps unchanged incompatible outgoing curves": {
+			old: meshObject(outgoing("", pqc...)),
+			new: meshObject(withTProxy(outgoing("", pqc...))),
+		},
+		"update changing outgoing curves to another incompatible list is rejected": {
+			old:     meshObject(outgoing("TLSv1_2", pqc...)),
+			new:     meshObject(outgoing("TLSv1_2", "X25519")),
 			wantErr: p256Msg,
 		},
-		"outgoing TLS_AUTO without P-256": {
-			tls:     map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": pqc, "tlsMinVersion": "TLS_AUTO"}},
+		"update lowering outgoing tlsMinVersion from TLSv1_3 is rejected": {
+			old:     meshObject(outgoing("TLSv1_3", pqc...)),
+			new:     meshObject(outgoing("TLSv1_2", pqc...)),
 			wantErr: p256Msg,
 		},
-		"outgoing without tlsMinVersion and without P-256": {
-			tls:     map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": pqc}},
+		"update removing outgoing tlsMinVersion TLSv1_3 is rejected": {
+			old:     meshObject(outgoing("TLSv1_3", pqc...)),
+			new:     meshObject(outgoing("", pqc...)),
 			wantErr: p256Msg,
 		},
-		"outgoing TLSv1_2 with P-256": {
-			tls: map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": []interface{}{"X25519", "P-256"}, "tlsMinVersion": "TLSv1_2"}},
+		"update adding incompatible outgoing curves to a resource without TLS is rejected": {
+			old:     meshObject(map[string]interface{}{}),
+			new:     meshObject(outgoing("TLS_AUTO", pqc...)),
+			wantErr: p256Msg,
 		},
-		"outgoing TLSv1_3 without P-256": {
-			tls: map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": pqc, "tlsMinVersion": "TLSv1_3"}},
+		"update adding P-256 to incompatible outgoing curves is accepted": {
+			old: meshObject(outgoing("TLSv1_2", pqc...)),
+			new: meshObject(outgoing("TLSv1_2", "X25519MLKEM768", "X25519", "P-256")),
 		},
-		"outgoing empty curves": {
-			tls: map[string]interface{}{"outgoing": map[string]interface{}{"ecdhCurves": []interface{}{}, "tlsMinVersion": "TLSv1_2"}},
+		"update setting outgoing tlsMinVersion to TLSv1_3 is accepted": {
+			old: meshObject(outgoing("TLSv1_2", pqc...)),
+			new: meshObject(outgoing("TLSv1_3", pqc...)),
 		},
-		"incoming TLSv1_2 without P-256 is not rejected": {
-			tls: map[string]interface{}{"incoming": map[string]interface{}{"ecdhCurves": pqc, "tlsMinVersion": "TLSv1_2"}},
+		"update emptying outgoing curves is accepted": {
+			old: meshObject(outgoing("TLSv1_2", pqc...)),
+			new: meshObject(outgoing("TLSv1_2")),
+		},
+		"update changing incoming curves lacking P-256 is accepted": {
+			old: meshObject(incoming("TLSv1_2", pqc...)),
+			new: meshObject(incoming("TLSv1_2", "X25519")),
 		},
 	}
 	for crdName, path := range meshCRDFiles {
 		for name, tc := range cases {
 			t.Run(crdName+"/"+name, func(t *testing.T) {
-				errs := validateMeshCEL(t, path, tc.tls)
+				var errs field.ErrorList
+				if tc.old == nil {
+					validator, structural := meshCELValidator(t, path)
+					errs, _ = validator.Validate(context.Background(), field.NewPath("root"), structural, tc.new, nil, celconfig.RuntimeCELCostBudget)
+				} else {
+					errs = validateMeshCELUpdate(t, path, tc.old, tc.new)
+				}
 				if tc.wantErr == "" {
 					require.Empty(t, errs)
 					return
 				}
 				require.Len(t, errs, 1)
 				require.Contains(t, errs[0].Error(), tc.wantErr)
-				require.Contains(t, errs[0].Field, "spec.tls.outgoing")
+				require.Contains(t, errs[0].Field, "root.spec")
 			})
 		}
 	}
