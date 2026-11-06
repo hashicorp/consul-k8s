@@ -1,0 +1,3 @@
+```release-note:improvement
+test: Fix EKS acceptance test failures by adding VPC peering routes and security-group rules for private subnets, using `aws eks get-token` for Terraform Kubernetes and Helm provider auth, waiting for LoadBalancer services to be reachable in partitions and Vault tests, waiting for the Vault auth service-account token to be populated, and fixing a race in `TestConnectInject_ProxyLifecycleShutdown`.
+```
