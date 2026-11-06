@@ -1,0 +1,3 @@
+```release-note:improvement
+test: Fix flaky `consul-dns` acceptance tests on AKS by running `dig` through `kubectl exec` in a long-lived pod instead of `kubectl run -i --rm`, which could lose the command output.
+```
