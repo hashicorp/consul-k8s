@@ -3,5 +3,5 @@ crd: Fix the Mesh CRD validation rule so `ecdhCurves` can be set without `tlsMin
 ```
 
 ```release-note:improvement
-crd: The Mesh CRD and webhook reject new or changed `spec.tls.outgoing.ecdhCurves` without `P-256` when TLS 1.2 can be negotiated, matching Consul's mesh config entry validation. Incoming lists and unchanged outgoing lists produce admission warnings instead.
+crd: The Mesh webhook rejects new or changed `spec.tls.outgoing.ecdhCurves` without `P-256` when TLS 1.2 can be negotiated, matching Consul's mesh config entry validation, and the Mesh CRD enforces the same rule on updates. Existing resources with an unchanged outgoing list keep reconciling on every supported Kubernetes version. Incoming lists and unchanged outgoing lists produce admission warnings instead.
 ```

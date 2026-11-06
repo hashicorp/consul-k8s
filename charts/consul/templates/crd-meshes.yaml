@@ -222,8 +222,6 @@ spec:
                     x-kubernetes-validations:
                     - message: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher
                       rule: '!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || !has(self.tlsMinVersion) || !(self.tlsMinVersion in [''TLSv1_0'', ''TLSv1_1''])'
-                    - message: ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys
-                      rule: '!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && self.tlsMinVersion == ''TLSv1_3'') || ''P-256'' in self.ecdhCurves'
                 type: object
               transparentProxy:
                 description: TransparentProxy controls the configuration specific
@@ -246,6 +244,9 @@ spec:
                   for more details.
                 type: boolean
             type: object
+            x-kubernetes-validations:
+            - message: spec.tls.outgoing.ecdhCurves must include "P-256" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys
+              rule: '!has(self.tls) || !has(self.tls.outgoing) || !has(self.tls.outgoing.ecdhCurves) || size(self.tls.outgoing.ecdhCurves) == 0 || (has(self.tls.outgoing.tlsMinVersion) && self.tls.outgoing.tlsMinVersion == ''TLSv1_3'') || ''P-256'' in self.tls.outgoing.ecdhCurves || (has(oldSelf.tls) && has(oldSelf.tls.outgoing) && oldSelf.tls.outgoing == self.tls.outgoing)'
           status:
             properties:
               conditions:

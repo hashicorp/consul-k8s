@@ -50,6 +50,11 @@ type MeshList struct {
 }
 
 // MeshSpec defines the desired state of Mesh.
+// The outgoing P-256 rule compares with the stored object (oldSelf), so an
+// unchanged outgoing block never blocks updates such as adding a finalizer,
+// even on Kubernetes versions without validation ratcheting. Rules that use
+// oldSelf do not run on create; the webhook enforces the rule for new resources.
+// +kubebuilder:validation:XValidation:rule="!has(self.tls) || !has(self.tls.outgoing) || !has(self.tls.outgoing.ecdhCurves) || size(self.tls.outgoing.ecdhCurves) == 0 || (has(self.tls.outgoing.tlsMinVersion) && self.tls.outgoing.tlsMinVersion == 'TLSv1_3') || 'P-256' in self.tls.outgoing.ecdhCurves || (has(oldSelf.tls) && has(oldSelf.tls.outgoing) && oldSelf.tls.outgoing == self.tls.outgoing)",message="spec.tls.outgoing.ecdhCurves must include \"P-256\" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys"
 type MeshSpec struct {
 	// TransparentProxy controls the configuration specific to proxies in "transparent" mode. Added in v1.10.0.
 	TransparentProxy TransparentProxyMeshConfig `json:"transparentProxy,omitempty"`
@@ -85,7 +90,6 @@ type MeshTLSConfig struct {
 	Incoming *MeshDirectionalTLSConfig `json:"incoming,omitempty"`
 	// Outgoing defines the TLS configuration for outbound mTLS connections dialing upstreams
 	// from Connect and IngressGateway proxy kinds.
-	// +kubebuilder:validation:XValidation:rule="!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && self.tlsMinVersion == 'TLSv1_3') || 'P-256' in self.ecdhCurves",message="ecdhCurves must include \"P-256\" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys"
 	Outgoing *MeshDirectionalTLSConfig `json:"outgoing,omitempty"`
 }
 
