@@ -147,18 +147,10 @@ func TestPartitions_Gateway(t *testing.T) {
 	}
 
 	logger.Logf(t, "creating namespaces %s and %s in servers cluster", staticServerNamespace, StaticClientNamespace)
-	k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-	k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
-	})
+	k8s.CreateNamespaces(t, defaultPartitionClusterContext, cfg, staticServerNamespace, StaticClientNamespace)
 
 	logger.Logf(t, "creating namespaces %s and %s in clients cluster", staticServerNamespace, StaticClientNamespace)
-	k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-	k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
-	})
+	k8s.CreateNamespaces(t, secondaryPartitionClusterContext, cfg, staticServerNamespace, StaticClientNamespace)
 
 	consulClient, _ := serverConsulCluster.SetupConsulClient(t, true)
 
@@ -238,6 +230,11 @@ func TestPartitions_Gateway(t *testing.T) {
 		require.NoError(r, err, out)
 	})
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		if cfg.EnableOpenshift || cfg.UseOpenshift {
+			k8s.DeleteOpenShiftHTTPRoute(t, secondaryPartitionClusterContext.ControllerRuntimeClient(t), secondaryPartitionClusterStaticServerOpts.Namespace, "http-route")
+			k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "delete", "--ignore-not-found", "--timeout=2m", "-k", "../fixtures/bases/api-gateway")
+			return
+		}
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "delete", "-k", "../fixtures/bases/api-gateway")

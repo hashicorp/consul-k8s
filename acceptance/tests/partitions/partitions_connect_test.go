@@ -209,18 +209,10 @@ func TestPartitions_Connect(t *testing.T) {
 			}
 
 			logger.Logf(t, "creating namespaces %s and %s in servers cluster", staticServerNamespace, StaticClientNamespace)
-			k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
-			})
+			k8s.CreateNamespaces(t, defaultPartitionClusterContext, cfg, staticServerNamespace, StaticClientNamespace)
 
 			logger.Logf(t, "creating namespaces %s and %s in clients cluster", staticServerNamespace, StaticClientNamespace)
-			k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
-			})
+			k8s.CreateNamespaces(t, secondaryPartitionClusterContext, cfg, staticServerNamespace, StaticClientNamespace)
 
 			consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.ACLsEnabled)
 
