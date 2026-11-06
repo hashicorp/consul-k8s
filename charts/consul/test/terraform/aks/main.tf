@@ -96,6 +96,12 @@ resource "azurerm_kubernetes_cluster" "default" {
   }
 
   tags = var.tags
+
+  // AKS deletes regularly take longer than the provider's 90m default, failing
+  // otherwise-green acceptance jobs during terraform destroy.
+  timeouts {
+    delete = "3h"
+  }
 }
 
 resource "local_file" "kubeconfigs" {
