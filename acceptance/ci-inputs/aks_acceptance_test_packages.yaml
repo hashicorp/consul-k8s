@@ -6,3 +6,5 @@
 - {runner: 1, test-packages: "connect"}
 - {runner: 2, test-packages: "partitions"}
 - {runner: 3, test-packages: "wan-federation"}
+- {runner: 4, test-packages: "api-gateway"}
+- {runner: 5, test-packages: "terminating-gateway"}
