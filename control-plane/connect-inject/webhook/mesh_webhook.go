@@ -378,18 +378,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 						w.Log.Error(err, "couldn't get service accounts")
 						return admission.Errored(http.StatusInternalServerError, err)
 					}
-					if len(sa.Secrets) == 0 {
-						// Check to see if there is a secret with the same name as the ServiceAccount for Kube-1.24+.
-						w.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", svc))
-						sec, err := w.Clientset.CoreV1().Secrets(req.Namespace).Get(ctx, svc, metav1.GetOptions{})
-						if err != nil {
-							w.Log.Error(err, "couldn't get Secret associated with Service Account")
-							return admission.Errored(http.StatusInternalServerError, err)
-						}
-						secretName = sec.Name
-						w.Log.Info(fmt.Sprintf("fetched secret: %s", secretName))
-					} else {
-						secretName = sa.Secrets[0].Name
+					secretName, err = w.serviceAccountTokenSecretName(ctx, req.Namespace, sa)
+					if err != nil {
+						w.Log.Error(err, "couldn't get Secret associated with Service Account")
+						return admission.Errored(http.StatusInternalServerError, err)
 					}
 					w.Log.Info("found service account, mounting service account secret to Pod", "serviceAccountName", secretName)
 					pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
@@ -550,6 +542,45 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 // overwriteProbes overwrites readiness/liveness probes of this pod when
 // both transparent proxy is enabled and overwrite probes is true for the pod.
+// serviceAccountTokenSecretName returns the name of the Secret holding the ServiceAccount's
+// API token, which multi-port pods mount so each service can log in to Consul as its own
+// ServiceAccount.
+//
+// A ServiceAccount's secrets list is not limited to token secrets: OpenShift, for example,
+// adds an image pull secret (type kubernetes.io/dockercfg) to every ServiceAccount, and
+// since Kubernetes 1.24 the token secret is no longer listed at all. Mounting the first
+// listed secret can therefore mount one with no token in it. The secret is chosen in this
+// order:
+//  1. a listed secret of type kubernetes.io/service-account-token for this ServiceAccount;
+//  2. the Secret named after the ServiceAccount (the Kubernetes 1.24+ convention). When the
+//     ServiceAccount lists secrets, it must also be a token secret for this ServiceAccount;
+//  3. the first listed secret, as before, when none of the above can be found.
+func (w *MeshWebhook) serviceAccountTokenSecretName(ctx context.Context, namespace string, sa *corev1.ServiceAccount) (string, error) {
+	isTokenFor := func(sec *corev1.Secret) bool {
+		return sec.Type == corev1.SecretTypeServiceAccountToken &&
+			sec.Annotations[corev1.ServiceAccountNameKey] == sa.Name
+	}
+
+	for _, ref := range sa.Secrets {
+		sec, err := w.Clientset.CoreV1().Secrets(namespace).Get(ctx, ref.Name, metav1.GetOptions{})
+		if err == nil && isTokenFor(sec) {
+			return sec.Name, nil
+		}
+	}
+
+	sec, err := w.Clientset.CoreV1().Secrets(namespace).Get(ctx, sa.Name, metav1.GetOptions{})
+	if err == nil && (len(sa.Secrets) == 0 || isTokenFor(sec)) {
+		w.Log.Info(fmt.Sprintf("fetched secret: %s", sec.Name))
+		return sec.Name, nil
+	}
+
+	if len(sa.Secrets) > 0 {
+		return sa.Secrets[0].Name, nil
+	}
+	w.Log.Info(fmt.Sprintf("service account %s has zero secrets exp at least 1", sa.Name))
+	return "", err
+}
+
 func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) error {
 	tproxyEnabled, err := common.TransparentProxyEnabled(ns, *pod, w.EnableTransparentProxy)
 	if err != nil {

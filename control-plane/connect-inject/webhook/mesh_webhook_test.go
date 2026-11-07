@@ -2600,3 +2600,78 @@ func buildMux(t *testing.T, cfg consulServerRespCfg) http.Handler {
 
 	return mux
 }
+
+// TestServiceAccountTokenSecretName checks which Secret is mounted for a multi-port service's
+// ServiceAccount, including OpenShift, which lists an image pull secret on every ServiceAccount.
+func TestServiceAccountTokenSecretName(t *testing.T) {
+	const ns = "default"
+	tokenSecret := func(name, saName string) *corev1.Secret {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns, Annotations: map[string]string{corev1.ServiceAccountNameKey: saName}},
+			Type:       corev1.SecretTypeServiceAccountToken,
+		}
+	}
+	dockercfgSecret := func(name string) *corev1.Secret {
+		return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}, Type: corev1.SecretTypeDockercfg}
+	}
+	sa := func(refs ...string) *corev1.ServiceAccount {
+		s := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "web-admin", Namespace: ns}}
+		for _, r := range refs {
+			s.Secrets = append(s.Secrets, corev1.ObjectReference{Name: r})
+		}
+		return s
+	}
+
+	cases := map[string]struct {
+		sa      *corev1.ServiceAccount
+		secrets []runtime.Object
+		exp     string
+		expErr  bool
+	}{
+		"listed token secret": {
+			sa:      sa("web-admin-token-abcde"),
+			secrets: []runtime.Object{tokenSecret("web-admin-token-abcde", "web-admin")},
+			exp:     "web-admin-token-abcde",
+		},
+		"openshift: image pull secret listed first, token secret listed after it": {
+			sa:      sa("web-admin-dockercfg-abcde", "web-admin-token-abcde"),
+			secrets: []runtime.Object{dockercfgSecret("web-admin-dockercfg-abcde"), tokenSecret("web-admin-token-abcde", "web-admin")},
+			exp:     "web-admin-token-abcde",
+		},
+		"openshift: only the image pull secret listed, token secret named after the service account": {
+			sa:      sa("web-admin-dockercfg-abcde"),
+			secrets: []runtime.Object{dockercfgSecret("web-admin-dockercfg-abcde"), tokenSecret("web-admin", "web-admin")},
+			exp:     "web-admin",
+		},
+		"listed secrets: same-named secret that is not this service account's token is not used": {
+			sa:      sa("web-admin-dockercfg-abcde"),
+			secrets: []runtime.Object{dockercfgSecret("web-admin-dockercfg-abcde"), tokenSecret("web-admin", "someone-else")},
+			exp:     "web-admin-dockercfg-abcde",
+		},
+		"kube 1.24+: no listed secrets, secret named after the service account": {
+			sa:      sa(),
+			secrets: []runtime.Object{tokenSecret("web-admin", "web-admin")},
+			exp:     "web-admin",
+		},
+		"listed secret that cannot be read falls back to the first listed secret": {
+			sa:  sa("web-admin"),
+			exp: "web-admin",
+		},
+		"no listed secrets and no secret named after the service account": {
+			sa:     sa(),
+			expErr: true,
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := MeshWebhook{Log: logrtest.New(t), Clientset: fake.NewSimpleClientset(c.secrets...)}
+			got, err := w.serviceAccountTokenSecretName(context.Background(), ns, c.sa)
+			if c.expErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, c.exp, got)
+		})
+	}
+}

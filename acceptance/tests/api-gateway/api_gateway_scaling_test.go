@@ -425,7 +425,10 @@ func createScalingGatewayClassResources(
 			Name: gatewayClassConfigName,
 		},
 		Spec: v1alpha1.GatewayClassConfigSpec{
-			DeploymentSpec: deploymentSpec,
+			// On OpenShift the gateway Role grants "use" of this SCC; the connect-injector can only
+			// grant an SCC it holds itself (restricted-v2, the chart default). Ignored elsewhere.
+			OpenshiftSCCName: "restricted-v2",
+			DeploymentSpec:   deploymentSpec,
 		},
 	}
 

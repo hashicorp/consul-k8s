@@ -28,3 +28,14 @@ load _helpers
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "server/SecurityContextConstraints: allows only the runtime/default seccomp profile" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-securitycontextconstraints.yaml  \
+      --set 'global.openshift.enabled=true' \
+      --set 'server.exposeGossipAndRPCPorts=true' \
+      . | tee /dev/stderr |
+      yq -c '.seccompProfiles' | tee /dev/stderr)
+  [ "${actual}" = '["runtime/default"]' ]
+}

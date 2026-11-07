@@ -333,6 +333,10 @@ func TestOpenshift_ConsulAPIGateway_HelmUpgrade(t *testing.T) {
 		// expectTCPRouteWatch is whether the legacy controller watches TCPRoutes after the upgrade.
 		expectTCPRouteWatch bool
 		requiresOCP419      bool
+		// requiresOCPBelow419 marks cases that start from an OCP 4.18 install. On 4.19+
+		// the platform owns the gateway.networking.k8s.io CRDs and ships no TCPRoute CRD,
+		// so that starting state cannot exist and the legacy TCPRoute watch stays off.
+		requiresOCPBelow419 bool
 	}{
 		{
 			name: "consulapi enabled",
@@ -347,6 +351,7 @@ func TestOpenshift_ConsulAPIGateway_HelmUpgrade(t *testing.T) {
 				"global.openshift.crds.enableTcpRoute": "true",
 			},
 			expectTCPRouteWatch: true,
+			requiresOCPBelow419: true,
 		},
 		{
 			name: "OCP greater than 4.18 with TCPRoute",
@@ -367,6 +372,9 @@ func TestOpenshift_ConsulAPIGateway_HelmUpgrade(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			logf.SetLogger(logr.New(nil))
 
+			if c.requiresOCPBelow419 && openshiftVersionAtLeast(t, 4, 19) {
+				t.Skip("skipping: simulates upgrading an OpenShift 4.18 cluster; on 4.19+ the platform owns the Gateway API CRDs and has no TCPRoute CRD")
+			}
 			if c.requiresOCP419 && !openshiftVersionAtLeast(t, 4, 19) {
 				t.Skip("skipping: requires OpenShift >= 4.19, which provides the gateway.networking.k8s.io CRDs")
 			}

@@ -67,6 +67,19 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
+	if cfg.EnableOpenshift {
+		// Without this the Vault chart pins runAsUser 100 / fsGroup 1000 on the server and
+		// injector, and the injector pins the same on vault-agent sidecars; the restricted-v2
+		// SCC rejects those pods. OpenShift mode leaves the IDs to OpenShift instead, so the
+		// pods still run under restricted-v2 and no broader SCC is granted.
+		values["global.openshift"] = "true"
+		// OpenShift resolves unqualified image names through its own registry aliases
+		// (hashicorp/vault -> registry.connect.redhat.com, which needs a pull secret), so
+		// name the Docker Hub images explicitly. An enterprise image set below still wins.
+		values["server.image.repository"] = "docker.io/hashicorp/vault"
+		values["injector.image.repository"] = "docker.io/hashicorp/vault-k8s"
+		values["injector.agentImage.repository"] = "docker.io/hashicorp/vault"
+	}
 	vaultReleaseName := helpers.RandomName()
 	k8sClient := environment.KubernetesClientFromOptions(t, ctx.KubectlOptions(t))
 	vaultLicenseSecretName := fmt.Sprintf("%s-enterprise-license", vaultReleaseName)
@@ -359,10 +372,18 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	signer, _, caPem, caCertTmpl, err := cert.GenerateCA("Vault CA")
 	require.NoError(t, err)
 	vaultService := fmt.Sprintf("%s-vault", v.releaseName)
+	// Clients reach Vault through its Service in the namespace Vault is installed in, which
+	// is not always "default" (on OpenShift the tests run in a dedicated namespace).
 	certSANs := []string{
 		vaultService,
 		fmt.Sprintf("%s.default", vaultService),
 		fmt.Sprintf("%s.default.svc", vaultService),
+	}
+	if namespace != "" && namespace != "default" {
+		certSANs = append(certSANs,
+			fmt.Sprintf("%s.%s", vaultService, namespace),
+			fmt.Sprintf("%s.%s.svc", vaultService, namespace),
+		)
 	}
 	certPem, keyPem, err := cert.GenerateCert("Vault server", 24*time.Hour, caCertTmpl, signer, certSANs)
 	require.NoError(t, err)

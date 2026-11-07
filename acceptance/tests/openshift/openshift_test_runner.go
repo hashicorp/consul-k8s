@@ -27,14 +27,20 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 	cmd = exec.Command("helm", "uninstall", "consul", "--namespace", "consul")
 	_, _ = cmd.CombinedOutput()
 
-	// Bypass finalizers for the consul namespace deletion.
+	// Cleanup of old consul namespace. Let the namespace controller delete its
+	// contents first: stripping the "kubernetes" finalizer before deleting stops it
+	// from doing so, and leaves the namespace Terminating forever with the previous
+	// install's PVC and secrets still inside. Only if normal deletion does not finish
+	// is the finalizer bypassed, on the already-terminating namespace.
 	ns := "consul"
-	cmd = exec.Command("bash", "-c", `kubectl get ns "`+ns+`" -o json | jq 'del(.spec.finalizers)' | kubectl replace --raw "/api/v1/namespaces/`+ns+`/finalize" -f -`)
-	_ = cmd.Run()
-
-	// Cleanup of old consul namespace
-	cmd = exec.Command("kubectl", "delete", "namespace", "consul")
+	cmd = exec.Command("kubectl", "delete", "namespace", ns, "--ignore-not-found", "--wait=true", "--timeout=5m")
 	_, _ = cmd.CombinedOutput()
+	if exec.Command("kubectl", "get", "namespace", ns).Run() == nil {
+		cmd = exec.Command("bash", "-c", `kubectl get ns "`+ns+`" -o json | jq 'del(.spec.finalizers)' | kubectl replace --raw "/api/v1/namespaces/`+ns+`/finalize" -f -`)
+		_ = cmd.Run()
+		cmd = exec.Command("kubectl", "wait", "--for=delete", "namespace/"+ns, "--timeout=2m")
+		_, _ = cmd.CombinedOutput()
+	}
 
 	waitForTerminatingConsulCRDs(t)
 

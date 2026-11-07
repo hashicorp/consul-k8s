@@ -416,6 +416,12 @@ func createScalingGatewayClassResourcesOCP(
 		},
 		Spec: v1alpha1.GatewayClassConfigSpec{
 			DeploymentSpec: deploymentSpec,
+			// The gateway Role grants "use" on this SCC, and the injector may only
+			// grant SCC access it holds itself: the chart's
+			// managedGatewayClass.openshiftSCCName, "restricted-v2" by default. Left
+			// empty, creating the Role is rejected as an RBAC escalation and the
+			// gateway Deployment is never created.
+			OpenshiftSCCName: "restricted-v2",
 		},
 	}
 
