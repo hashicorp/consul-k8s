@@ -192,7 +192,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var gateway gwv1.Gateway
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayTestNamespace(t, ctx)}, &gateway)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -238,7 +238,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 				// http route checks
 				var httproute gwv1.HTTPRoute
-				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httproute)
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: gatewayTestNamespace(t, ctx)}, &httproute)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -256,7 +256,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// tcp route checks
 			var tcpRoute gwv1alpha2.TCPRoute
 			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
-				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: "default"}, &tcpRoute)
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: gatewayTestNamespace(t, ctx)}, &tcpRoute)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -478,7 +478,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1.Gateway
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayTestNamespace(t, ctx)}, &gateway)
 		require.NoError(r, err)
 
 		// check our finalizers
@@ -513,23 +513,23 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: gatewayTestNamespace(t, ctx)}, &httpRoute)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: "default"}, &httpRouteAuth)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: gatewayTestNamespace(t, ctx)}, &httpRouteAuth)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-no-auth-on-auth-listener", Namespace: "default"}, &httpRouteNoAuthOnAuthListener)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-no-auth-on-auth-listener", Namespace: gatewayTestNamespace(t, ctx)}, &httpRouteNoAuthOnAuthListener)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route2-auth", Namespace: "default"}, &httpRouteAuth2)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route2-auth", Namespace: gatewayTestNamespace(t, ctx)}, &httpRouteAuth2)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth-invalid", Namespace: "default"}, &httpRouteInvalid)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth-invalid", Namespace: gatewayTestNamespace(t, ctx)}, &httpRouteInvalid)
 		require.NoError(r, err)
 
 		// check our finalizers

@@ -116,7 +116,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	var gatewayAddress string
 	retryCheck(t, 60, func(r *retry.R) {
 		var gateway gwv1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayTestNamespace(t, ctx)}, &gateway)
 		require.NoError(r, err)
 
 		// check that we have an address to use

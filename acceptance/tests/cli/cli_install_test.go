@@ -62,8 +62,10 @@ func TestInstall(t *testing.T) {
 				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
 			}
 
-			// Run proxy list and get the two results.
-			listOut, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "list")
+			// Run proxy list and get the two results. The client and server run in the
+			// app namespace, which is not always "default" (consul-test on OpenShift).
+			appNamespace := connHelper.KubectlOptsForApp(t).Namespace
+			listOut, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "list", "-namespace", appNamespace)
 			require.NoError(t, err)
 			logger.Log(t, string(listOut))
 			list := translateListOutput(listOut)
@@ -76,7 +78,7 @@ func TestInstall(t *testing.T) {
 			retrier := &retry.Timer{Timeout: 10 * time.Minute, Wait: 20 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
-					out, err := cli.Run(r, ctx.KubectlOptions(r), "proxy", "read", podName)
+					out, err := cli.Run(r, ctx.KubectlOptions(r), "proxy", "read", podName, "-namespace", appNamespace)
 					require.NoError(r, err)
 
 					output := string(out)
@@ -105,7 +107,7 @@ func TestInstall(t *testing.T) {
 				require.NoError(r, err)
 
 				clientPodName = clientPod.Items[0].Name
-				upstreamsOut, err = cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "upstreams", "-pod", clientPodName)
+				upstreamsOut, err = cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "upstreams", "-pod", clientPodName, "-namespace", appNamespace)
 				logger.Log(r, string(upstreamsOut))
 				require.NoError(r, err)
 			})
@@ -124,7 +126,7 @@ func TestInstall(t *testing.T) {
 					)
 					require.NoError(r, err)
 					serverIP := serverService.Items[0].Spec.ClusterIP
-					proxyOut, err := cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
+					proxyOut, err := cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "proxy", "-pod", clientPodName, "-namespace", appNamespace, "-upstream-ip", serverIP)
 					require.NoError(r, err)
 					require.Regexp(r, "Upstream resources are valid", string(proxyOut))
 					logger.Log(r, string(proxyOut))
@@ -142,6 +144,8 @@ func TestInstall(t *testing.T) {
 						"proxy",
 						"-pod",
 						clientPodName,
+						"-namespace",
+						appNamespace,
 						"-upstream-envoy-id",
 						"static-server",
 					)

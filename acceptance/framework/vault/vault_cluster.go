@@ -5,7 +5,12 @@ package vault
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -203,7 +208,9 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 	retry.Run(t, func(r *retry.R) {
 		sa, err := v.kubernetesClient.CoreV1().ServiceAccounts(namespace).Get(context.Background(), vaultServerServiceAccountName, metav1.GetOptions{})
 		require.NoError(r, err)
-		if len(sa.Secrets) == 0 {
+		// OpenShift lists the account's dockercfg pull secret here, so check for an actual
+		// service-account-token secret rather than for an empty list.
+		if !v.hasServiceAccountTokenSecret(sa) {
 			_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        vaultServerServiceAccountName,
@@ -238,19 +245,86 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 		sa, err = v.kubernetesClient.CoreV1().ServiceAccounts(saNS).Get(context.Background(), saName, metav1.GetOptions{})
 		require.NoError(r, err)
 		// In Kubernetes <1.24 the serviceAccount will have a secret automatically generated.
-		if len(sa.Secrets) != 0 {
-			secretName = sa.Secrets[0].Name
+		// Only a service-account-token secret will do: OpenShift also lists the
+		// account's dockercfg pull secret here, which has no token or CA in it.
+		for _, ref := range sa.Secrets {
+			s, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), ref.Name, metav1.GetOptions{})
+			if err == nil && s.Type == corev1.SecretTypeServiceAccountToken {
+				secretName = ref.Name
+				break
+			}
 		}
 	})
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
-	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
-	require.NoError(t, err)
+	var tokenSecret *corev1.Secret
+	retry.Run(t, func(r *retry.R) {
+		tokenSecret, err = v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+		require.NoError(r, err)
+		// The token controller fills the secret in asynchronously.
+		require.NotEmpty(r, tokenSecret.Data["token"], "service account token secret %s has no token yet", secretName)
+	})
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
 		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
-		"kubernetes_ca_cert": string(tokenSecret.Data["ca.crt"]),
+		"kubernetes_ca_cert": caCertForKubernetesHost(t, k8sHost, tokenSecret.Data["ca.crt"]),
 		"kubernetes_host":    k8sHost,
 	})
 	require.NoError(t, err)
+}
+
+// hasServiceAccountTokenSecret reports whether one of the secrets listed on sa is a
+// service-account-token secret.
+func (v *VaultCluster) hasServiceAccountTokenSecret(sa *corev1.ServiceAccount) bool {
+	for _, ref := range sa.Secrets {
+		s, err := v.kubernetesClient.CoreV1().Secrets(sa.Namespace).Get(context.Background(), ref.Name, metav1.GetOptions{})
+		if err == nil && s.Type == corev1.SecretTypeServiceAccountToken {
+			return true
+		}
+	}
+	return false
+}
+
+// caCertForKubernetesHost returns the CA that Vault should use to verify k8sHost. That is the
+// cluster's own CA (from the service account token secret) whenever it verifies the host, as
+// on EKS, GKE, AKS and kind. Some clusters, such as ROSA, serve their public API endpoint with a
+// publicly trusted certificate that the in-cluster CA does not cover; there the root of the
+// chain that this machine verified against its system trust store is returned instead.
+// Verification is never skipped.
+func caCertForKubernetesHost(t *testing.T, k8sHost string, inClusterCA []byte) string {
+	t.Helper()
+	u, err := url.Parse(k8sHost)
+	// In-cluster service addresses are always covered by the cluster's own CA (and cannot be
+	// reached from the machine running the tests anyway).
+	if err != nil || u.Host == "" || strings.HasSuffix(u.Hostname(), ".svc") || strings.Contains(u.Hostname(), ".svc.") {
+		return string(inClusterCA)
+	}
+	addr := u.Host
+	if u.Port() == "" {
+		addr = net.JoinHostPort(u.Hostname(), "443")
+	}
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+
+	pool := x509.NewCertPool()
+	if pool.AppendCertsFromPEM(inClusterCA) {
+		conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{RootCAs: pool, ServerName: u.Hostname()})
+		if err == nil {
+			conn.Close()
+			return string(inClusterCA)
+		}
+	}
+
+	conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: u.Hostname()})
+	if err != nil {
+		// Neither CA verifies the host; keep the original behaviour.
+		return string(inClusterCA)
+	}
+	defer conn.Close()
+	chains := conn.ConnectionState().VerifiedChains
+	if len(chains) == 0 || len(chains[0]) == 0 {
+		return string(inClusterCA)
+	}
+	root := chains[0][len(chains[0])-1]
+	logger.Logf(t, "the in-cluster CA does not verify %s; using its publicly trusted root %q", k8sHost, root.Subject.CommonName)
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw}))
 }
 
 // Create installs Vault via Helm and then calls bootstrap to initialize it.

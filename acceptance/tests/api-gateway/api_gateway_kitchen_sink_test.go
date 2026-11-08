@@ -144,10 +144,10 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	logger.Log(t, "waiting for gateway and httproute to be ready")
 
 	// Wait for Gateway to be ready
-	gatewayAddress = waitForGatewayReady(t, ctx, k8sClient, "gateway", "default", fixturePath, applyCounter)
+	gatewayAddress = waitForGatewayReady(t, ctx, k8sClient, "gateway", gatewayTestNamespace(t, ctx), fixturePath, applyCounter)
 
 	// Wait for HTTPRoute to be ready
-	waitForHTTPRouteReady(t, ctx, k8sClient, "http-route", "default", fixturePath, applyCounter)
+	waitForHTTPRouteReady(t, ctx, k8sClient, "http-route", gatewayTestNamespace(t, ctx), fixturePath, applyCounter)
 
 	// GENERAL Asserts- test that assets were created as expected
 	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
@@ -291,6 +291,16 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 }
 
 // waitForGatewayReady waits for Gateway to be ready with recreation attempts.
+// gatewayTestNamespace is the Kubernetes namespace the test fixtures are applied in:
+// the context's namespace ("default" unless -kube-namespaces says otherwise, for
+// example consul-test on OpenShift).
+func gatewayTestNamespace(t *testing.T, ctx environment.TestContext) string {
+	if ns := ctx.KubectlOptions(t).Namespace; ns != "" {
+		return ns
+	}
+	return "default"
+}
+
 func waitForGatewayReady(t *testing.T, ctx environment.TestContext, k8sClient client.Client, gatewayName, namespace, fixturePath string, applyCounter *retry.Counter) string {
 	maxRetries := 5
 
