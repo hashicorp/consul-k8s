@@ -192,7 +192,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var gateway gwv1.Gateway
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayTestNamespace(t, ctx)}, &gateway)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -238,7 +238,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 				// http route checks
 				var httproute gwv1.HTTPRoute
-				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: gatewayTestNamespace(t, ctx)}, &httproute)
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httproute)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -256,7 +256,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// tcp route checks
 			var tcpRoute gwv1alpha2.TCPRoute
 			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
-				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: gatewayTestNamespace(t, ctx)}, &tcpRoute)
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: "default"}, &tcpRoute)
 				require.NoError(r, err)
 
 				// check our finalizers

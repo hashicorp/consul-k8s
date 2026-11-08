@@ -290,7 +290,6 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 	return success, gatewayAddress
 }
 
-// waitForGatewayReady waits for Gateway to be ready with recreation attempts.
 // gatewayTestNamespace is the Kubernetes namespace the test fixtures are applied in:
 // the context's namespace ("default" unless -kube-namespaces says otherwise, for
 // example consul-test on OpenShift).
@@ -301,6 +300,7 @@ func gatewayTestNamespace(t *testing.T, ctx environment.TestContext) string {
 	return "default"
 }
 
+// waitForGatewayReady waits for Gateway to be ready with recreation attempts.
 func waitForGatewayReady(t *testing.T, ctx environment.TestContext, k8sClient client.Client, gatewayName, namespace, fixturePath string, applyCounter *retry.Counter) string {
 	maxRetries := 5
 

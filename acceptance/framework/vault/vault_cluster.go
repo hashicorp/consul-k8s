@@ -210,7 +210,7 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 		require.NoError(r, err)
 		// OpenShift lists the account's dockercfg pull secret here, so check for an actual
 		// service-account-token secret rather than for an empty list.
-		if !v.hasServiceAccountTokenSecret(sa) {
+		if v.serviceAccountTokenSecretName(sa) == "" {
 			_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        vaultServerServiceAccountName,
@@ -247,12 +247,8 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 		// In Kubernetes <1.24 the serviceAccount will have a secret automatically generated.
 		// Only a service-account-token secret will do: OpenShift also lists the
 		// account's dockercfg pull secret here, which has no token or CA in it.
-		for _, ref := range sa.Secrets {
-			s, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), ref.Name, metav1.GetOptions{})
-			if err == nil && s.Type == corev1.SecretTypeServiceAccountToken {
-				secretName = ref.Name
-				break
-			}
+		if name := v.serviceAccountTokenSecretName(sa); name != "" {
+			secretName = name
 		}
 	})
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
@@ -271,16 +267,16 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 	require.NoError(t, err)
 }
 
-// hasServiceAccountTokenSecret reports whether one of the secrets listed on sa is a
-// service-account-token secret.
-func (v *VaultCluster) hasServiceAccountTokenSecret(sa *corev1.ServiceAccount) bool {
+// serviceAccountTokenSecretName returns the name of the first secret listed on sa that is a
+// service-account-token secret, or "" if there is none.
+func (v *VaultCluster) serviceAccountTokenSecretName(sa *corev1.ServiceAccount) string {
 	for _, ref := range sa.Secrets {
 		s, err := v.kubernetesClient.CoreV1().Secrets(sa.Namespace).Get(context.Background(), ref.Name, metav1.GetOptions{})
 		if err == nil && s.Type == corev1.SecretTypeServiceAccountToken {
-			return true
+			return ref.Name
 		}
 	}
-	return false
+	return ""
 }
 
 // caCertForKubernetesHost returns the CA that Vault should use to verify k8sHost. That is the
