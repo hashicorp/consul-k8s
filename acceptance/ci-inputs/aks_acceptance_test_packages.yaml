@@ -1,10 +1,7 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
-# TEMP: only the packages that failed in the 2.1.0 / 1.21.19 compatibility runs.
-- {runner: 0, test-packages: "consul-dns"}
-- {runner: 1, test-packages: "connect"}
-- {runner: 2, test-packages: "partitions"}
-- {runner: 3, test-packages: "wan-federation"}
-- {runner: 4, test-packages: "api-gateway"}
-- {runner: 5, test-packages: "terminating-gateway"}
+# TEMP: AKS destroy-retry validation, only the packages whose destroy hung.
+- {runner: 0, test-packages: "connect"}
+- {runner: 1, test-packages: "partitions"}
+- {runner: 2, test-packages: "api-gateway"}
