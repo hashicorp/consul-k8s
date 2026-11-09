@@ -1,7 +1,4 @@
 ```release-note:improvement
 test: Fix flaky `consul-dns` acceptance tests on AKS by running `dig` through `kubectl exec` in a long-lived pod instead of `kubectl run -i --rm`, which could lose the command output.
-```
-
-```release-note:improvement
-test: Increase the AKS acceptance test cluster delete timeout to 3h, so slow AKS cluster deletion no longer fails jobs whose tests passed.
+test: Set a 30m delete timeout on AKS acceptance test clusters, so a delete blocked by an Azure platform operation fails fast and can be retried instead of waiting until the timeout.
 ```
