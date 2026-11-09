@@ -97,10 +97,12 @@ resource "azurerm_kubernetes_cluster" "default" {
 
   tags = var.tags
 
-  // AKS deletes regularly take longer than the provider's 90m default, failing
-  // otherwise-green acceptance jobs during terraform destroy.
+  // A healthy delete takes ~5m. If Azure is running a platform operation on the
+  // nodes (e.g. UpgradeVMAgent), the delete fails on the Azure side but the
+  // provider keeps polling until the timeout. Keep the timeout short so the
+  // destroy step in CI can retry with a fresh delete request.
   timeouts {
-    delete = "3h"
+    delete = "30m"
   }
 }
 
