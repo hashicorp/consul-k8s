@@ -357,6 +357,9 @@ func TestRun_SignalCleanup(t *testing.T) {
 			err = os.WriteFile(filepath.Join(sourceDir, config.DefaultPluginType), []byte("test-binary-content"), 0755)
 			require.NoError(t, err)
 
+			// Create source nft bundle for copying
+			writeTestNftBundle(t, filepath.Join(sourceDir, consulNftName), "test-nft-content")
+
 			// Create a CNI config file to test cleanup
 			configFile := filepath.Join(cfg.CNINetDir, "10-test.conflist")
 			configContent := `{
@@ -424,6 +427,11 @@ func TestRun_SignalCleanup(t *testing.T) {
 			require.NoError(t, err, "Should be able to read CNI binary file")
 			require.Equal(t, "test-binary-content", string(content), "CNI binary content should match")
 
+			nftBundlePath := filepath.Join(cfg.CNIBinDir, consulNftName)
+			nftContent, err := os.ReadFile(filepath.Join(nftBundlePath, "nft"))
+			require.NoError(t, err, "nft bundle should exist before cleanup")
+			require.Equal(t, "test-nft-content", string(nftContent), "nft bundle content should match")
+
 			_, err = os.Stat(kubeconfigPath)
 			require.NoError(t, err, "Kubeconfig should exist before cleanup")
 			if tt.autorotateToken {
@@ -462,6 +470,12 @@ func TestRun_SignalCleanup(t *testing.T) {
 			// Check CNI binary is removed
 			_, err = os.Stat(cniBinaryPath)
 			require.True(t, os.IsNotExist(err), "CNI binary should be removed after cleanup")
+
+			_, err = os.Lstat(nftBundlePath)
+			require.True(t, os.IsNotExist(err), "nft bundle should be removed after cleanup")
+			versions, err := filepath.Glob(filepath.Join(cfg.CNIBinDir, nftBundleVersionPrefix+"*"))
+			require.NoError(t, err)
+			require.Empty(t, versions, "nft bundle versions should be removed after cleanup")
 
 			// Check kubeconfig is removed
 			_, err = os.Stat(kubeconfigPath)

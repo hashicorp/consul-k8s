@@ -1,0 +1,3 @@
+```release-note:bug
+cni: Fix transparent proxy traffic redirection failing with "nft binary not found" on nodes that do not ship nftables (e.g. GKE Container-Optimized OS). The CNI installer now copies the nft binary from the control-plane image's nftables package, together with its shared libraries, to the CNI bin directory, and the plugin uses it when nft is not available on the node.
+```
