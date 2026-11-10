@@ -97,6 +97,7 @@ func TestSyncCatalogNamespaces(t *testing.T) {
 
 			logger.Logf(t, "creating namespace %s", staticServerNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
+			k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})

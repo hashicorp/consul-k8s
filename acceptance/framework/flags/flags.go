@@ -218,7 +218,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		KubeEnvs:           kubeEnvs,
 		EnableMultiCluster: t.flagEnableMultiCluster,
 
-		EnableOpenshift: t.flagEnableOpenshift,
+		EnableOpenshift: t.flagEnableOpenshift || t.flagUseOpenshift,
 
 		SkipDataDogTests: t.flagSkipDatadogTests,
 

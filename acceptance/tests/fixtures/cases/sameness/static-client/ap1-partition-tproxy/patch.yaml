@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: static-client
-          image: anubhavmishra/tiny-tools:latest
+          image: docker.io/anubhavmishra/tiny-tools:latest
           # Just spin & wait forever, we'll use `kubectl exec` to demo
           command: ['/bin/sh', '-c', '--']
           args: ['while true; do sleep 30; done;']
