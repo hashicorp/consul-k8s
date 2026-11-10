@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -752,7 +753,8 @@ func writeBundle(t *testing.T, binDir string, loaderScript string) string {
 	bundle := filepath.Join(binDir, ".consul-nft-v-test")
 	require.NoError(t, os.MkdirAll(filepath.Join(bundle, "lib"), 0o755))
 	if loaderScript == "" {
-		loaderScript = "#!/bin/sh\necho \"$@\" > " + filepath.Join(bundle, "out") + "\ncat >> " + filepath.Join(bundle, "out") + "\n"
+		out := filepath.Join(bundle, "out")
+		loaderScript = "#!/bin/sh\necho \"$@\" > " + out + "\nfor a; do f=$a; done\ncat \"$f\" >> " + out + "\n"
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(bundle, "ld.so"), []byte(loaderScript), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(bundle, "nft"), []byte("nft"), 0o755))
@@ -776,21 +778,21 @@ func TestNftProvider_RulesAndClear(t *testing.T) {
 }
 
 func TestNftProvider_NftCommand(t *testing.T) {
-	t.Run("prefers host nft", func(t *testing.T) {
-		dir := t.TempDir()
-		writeBundle(t, dir, "")
-		p := newNftProvider("", dir)
-		p.lookPath = func(string) (string, error) { return "/usr/sbin/nft", nil }
+	hostNft := func(string) (string, error) { return "/usr/sbin/nft", nil }
+
+	t.Run("falls back to host nft without bundle", func(t *testing.T) {
+		p := newNftProvider("", t.TempDir())
+		p.lookPath = hostNft
 		cmd, err := p.nftCommand()
 		require.NoError(t, err)
 		require.Equal(t, []string{"/usr/sbin/nft"}, cmd)
 	})
 
-	t.Run("falls back to bundle through its loader", func(t *testing.T) {
+	t.Run("prefers bundle through its loader over host nft", func(t *testing.T) {
 		empty, dir := t.TempDir(), t.TempDir()
 		bundle := writeBundle(t, dir, "")
 		p := newNftProvider("", "", empty, dir)
-		p.lookPath = notFound
+		p.lookPath = hostNft
 		cmd, err := p.nftCommand()
 		require.NoError(t, err)
 		require.Equal(t, []string{
@@ -824,8 +826,9 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 		t.Skip("uses a shell script as a fake loader")
 	}
 
-	t.Run("runs bundled nft inside the netns", func(t *testing.T) {
-		dir := t.TempDir()
+	t.Run("runs bundled nft with a script file inside the netns", func(t *testing.T) {
+		dir, tmp := t.TempDir(), t.TempDir()
+		t.Setenv("TMPDIR", tmp)
 		bundle := writeBundle(t, dir, "")
 		var gotNS string
 		p := newNftProvider("/var/run/netns/pod", dir)
@@ -841,8 +844,12 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 		require.Equal(t, "/var/run/netns/pod", gotNS)
 		got, err := os.ReadFile(filepath.Join(bundle, "out"))
 		require.NoError(t, err)
-		require.Equal(t, "--library-path "+filepath.Join(bundle, "lib")+" "+filepath.Join(bundle, "nft")+
-			" -f -\nadd table inet consul\nadd chain inet consul OUTPUT", string(got))
+		require.Regexp(t, "^"+regexp.QuoteMeta("--library-path "+filepath.Join(bundle, "lib")+" "+filepath.Join(bundle, "nft")+
+			" -f "+tmp+string(filepath.Separator))+`consul-cni-nft-\d+\.nft\n`+
+			regexp.QuoteMeta("add table inet consul\nadd chain inet consul OUTPUT\n")+"$", string(got))
+		left, err := os.ReadDir(tmp)
+		require.NoError(t, err)
+		require.Empty(t, left, "script file must be removed")
 	})
 
 	t.Run("no netns runs in current namespace", func(t *testing.T) {
@@ -865,13 +872,17 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 	})
 
 	t.Run("returns nft failure output", func(t *testing.T) {
-		dir := t.TempDir()
+		dir, tmp := t.TempDir(), t.TempDir()
+		t.Setenv("TMPDIR", tmp)
 		writeBundle(t, dir, "#!/bin/sh\necho boom >&2\nexit 1\n")
 		p := newNftProvider("", dir)
 		p.lookPath = notFound
 		err := p.ApplyRules("nft")
 		require.ErrorContains(t, err, "failed to apply nftables rules")
 		require.ErrorContains(t, err, "boom")
+		left, err := os.ReadDir(tmp)
+		require.NoError(t, err)
+		require.Empty(t, left, "script file must be removed")
 	})
 
 	t.Run("no nft available", func(t *testing.T) {

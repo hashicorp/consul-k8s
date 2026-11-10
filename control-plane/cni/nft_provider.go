@@ -21,8 +21,8 @@ import (
 const bundledNftName = "consul-nft"
 
 // nftProvider implements nftables.Provider. It collects nft script lines and applies them atomically
-// with `nft -f -` inside the pod's network namespace, using the node's nft binary when present and
-// otherwise the bundled consul-nft directory.
+// with `nft -f <script file>` inside the pod's network namespace, using the bundled consul-nft directory
+// when present and otherwise the node's nft binary.
 type nftProvider struct {
 	lines []string
 	// netNS is the pod network namespace path. When empty the rules are applied in the current namespace.
@@ -49,17 +49,24 @@ func (n *nftProvider) AddRule(_ string, args ...string) {
 	n.lines = append(n.lines, strings.Join(args, " "))
 }
 
-// ApplyRules pipes all collected lines to `nft -f -` so they are applied atomically.
+// ApplyRules writes all collected lines to a script file and applies it with `nft -f <file>` so the rules
+// are applied atomically. A file is used instead of stdin (`-f -`) because some node nft builds, e.g. on
+// GKE Container-Optimized OS, do not support reading the script from stdin.
 func (n *nftProvider) ApplyRules(_ string) error {
 	nftCmd, err := n.nftCommand()
 	if err != nil {
 		return err
 	}
 
+	script, err := writeNftScript(n.lines)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(script)
+
 	run := func() error {
-		args := append(nftCmd[1:len(nftCmd):len(nftCmd)], "-f", "-")
+		args := append(nftCmd[1:len(nftCmd):len(nftCmd)], "-f", script)
 		cmd := exec.Command(nftCmd[0], args...)
-		cmd.Stdin = strings.NewReader(strings.Join(n.lines, "\n"))
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("failed to apply nftables rules with %s: %w, output: %s",
@@ -88,13 +95,27 @@ func (n *nftProvider) ClearAllRules() {
 	n.lines = nil
 }
 
-// nftCommand returns the command used to run nft: the node's nft binary if it is in PATH, otherwise the
-// bundled nft run through its bundled dynamic loader so that it only uses the bundled libraries.
-func (n *nftProvider) nftCommand() ([]string, error) {
-	if path, err := n.lookPath("nft"); err == nil {
-		return []string{path}, nil
+// writeNftScript writes lines to a new temporary file readable only by the current user and returns its path.
+func writeNftScript(lines []string) (string, error) {
+	f, err := os.CreateTemp("", "consul-cni-nft-*.nft")
+	if err != nil {
+		return "", fmt.Errorf("could not create nftables script file: %w", err)
 	}
+	_, err = f.WriteString(strings.Join(lines, "\n") + "\n")
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		os.Remove(f.Name())
+		return "", fmt.Errorf("could not write nftables script file: %w", err)
+	}
+	return f.Name(), nil
+}
 
+// nftCommand returns the command used to run nft: the bundled nft run through its bundled dynamic loader,
+// so that a known nft version with its own libraries is used, or the node's nft binary from PATH if no
+// bundle is installed.
+func (n *nftProvider) nftCommand() ([]string, error) {
 	var searched []string
 	for _, dir := range n.binDirs {
 		if dir == "" {
@@ -112,6 +133,10 @@ func (n *nftProvider) nftCommand() ([]string, error) {
 		if isExecutable(loader) && isExecutable(nft) && isDir(lib) {
 			return []string{loader, "--library-path", lib, nft}, nil
 		}
+	}
+
+	if path, err := n.lookPath("nft"); err == nil {
+		return []string{path}, nil
 	}
 	return nil, fmt.Errorf("nft binary not found in PATH and bundled %s not found (searched %s)",
 		bundledNftName, strings.Join(searched, ", "))
