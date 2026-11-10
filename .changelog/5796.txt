@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: Retry the Consul Enterprise license check performed at startup of inject-connect on transient errors (connection failures, 408, 429 and 5xx responses) instead of failing on the first attempt, so a Consul server that is not yet ready no longer causes the distribution to be misdetected.
+```
