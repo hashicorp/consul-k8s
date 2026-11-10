@@ -231,8 +231,8 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	// Set NetNS passed through the CNI.
 	nftCfg.NetNS = args.Netns
 
-	// Set the provider to a fake provider in testing, otherwise use a provider that falls
-	// back to the bundled consul-nft binary on nodes without nft (e.g. GKE COS).
+	// Set the provider to a fake provider in testing, otherwise use a provider that prefers the
+	// bundled consul-nft binary and falls back to the node's nft.
 	if c.nftablesProvider != nil {
 		nftCfg.NftablesProvider = c.nftablesProvider
 	} else {

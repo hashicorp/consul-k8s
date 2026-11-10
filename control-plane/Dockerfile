@@ -60,7 +60,8 @@ ENV VERSION=${VERSION}
 RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables zlib
 
 # Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
-# the node so the CNI plugin can apply nftables rules on nodes without nft (e.g. GKE Container-Optimized OS).
+# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
+# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
 RUN set -eu; d=/bin/consul-nft; \
     loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
     test -n "$loader"; \
@@ -128,7 +129,8 @@ ENV VERSION=${PRODUCT_VERSION}
 RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ nftables zlib
 
 # Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
-# the node so the CNI plugin can apply nftables rules on nodes without nft (e.g. GKE Container-Optimized OS).
+# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
+# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
 RUN set -eu; d=/bin/consul-nft; \
     loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
     test -n "$loader"; \
@@ -217,7 +219,8 @@ RUN microdnf update -y && \
     microdnf clean all
 
 # Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
-# the node so the CNI plugin can apply nftables rules on nodes without nft (e.g. GKE Container-Optimized OS).
+# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
+# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
 RUN set -eu; d=/bin/consul-nft; \
     loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
     test -n "$loader"; \
