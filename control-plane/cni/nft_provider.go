@@ -11,8 +11,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/vishvananda/netns"
+
+	"github.com/hashicorp/consul-k8s/control-plane/cni/nftlock"
 )
 
 // bundledNftName is the directory that the CNI installer copies next to consul-cni. It contains the nft
@@ -33,14 +36,17 @@ type nftProvider struct {
 	lookPath func(string) (string, error)
 	// runInNetNS runs fn inside the network namespace at path. It is overridable for testing.
 	runInNetNS func(path string, fn func() error) error
+	// lockTimeout bounds the wait for the CNI installer to finish installing or removing the bundle.
+	lockTimeout time.Duration
 }
 
 func newNftProvider(netNS string, binDirs ...string) *nftProvider {
 	return &nftProvider{
-		netNS:      netNS,
-		binDirs:    binDirs,
-		lookPath:   exec.LookPath,
-		runInNetNS: runInNetNS,
+		netNS:       netNS,
+		binDirs:     binDirs,
+		lookPath:    exec.LookPath,
+		runInNetNS:  runInNetNS,
+		lockTimeout: 10 * time.Second,
 	}
 }
 
@@ -53,16 +59,18 @@ func (n *nftProvider) AddRule(_ string, args ...string) {
 // are applied atomically. A file is used instead of stdin (`-f -`) because some node nft builds, e.g. on
 // GKE Container-Optimized OS, do not support reading the script from stdin.
 func (n *nftProvider) ApplyRules(_ string) error {
-	nftCmd, err := n.nftCommand()
+	nftCmd, release, err := n.nftCommand()
 	if err != nil {
 		return err
 	}
+	// Keep the bundle locked until nft has finished so the installer cannot remove it while it is in use.
+	defer release()
 
 	script, err := writeNftScript(n.lines)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(script)
+	defer func() { _ = os.Remove(script) }()
 
 	run := func() error {
 		args := append(nftCmd[1:len(nftCmd):len(nftCmd)], "-f", script)
@@ -106,7 +114,7 @@ func writeNftScript(lines []string) (string, error) {
 		err = closeErr
 	}
 	if err != nil {
-		os.Remove(f.Name())
+		_ = os.Remove(f.Name())
 		return "", fmt.Errorf("could not write nftables script file: %w", err)
 	}
 	return f.Name(), nil
@@ -114,8 +122,8 @@ func writeNftScript(lines []string) (string, error) {
 
 // nftCommand returns the command used to run nft: the bundled nft run through its bundled dynamic loader,
 // so that a known nft version with its own libraries is used, or the node's nft binary from PATH if no
-// bundle is installed.
-func (n *nftProvider) nftCommand() ([]string, error) {
+// bundle is installed. When the bundle is used it is locked (shared) until release is called.
+func (n *nftProvider) nftCommand() (cmd []string, release func(), err error) {
 	var searched []string
 	for _, dir := range n.binDirs {
 		if dir == "" {
@@ -123,22 +131,30 @@ func (n *nftProvider) nftCommand() ([]string, error) {
 		}
 		bundle := filepath.Join(dir, bundledNftName)
 		searched = append(searched, bundle)
+		unlock, err := nftlock.Shared(dir, n.lockTimeout)
+		if errors.Is(err, os.ErrNotExist) {
+			// The installer creates the lock file before it installs a bundle.
+			continue
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not lock bundled %s: %w", bundle, err)
+		}
 		// Resolve the symlink once so that all paths refer to the same bundle version even if the
 		// installer swaps the symlink to a new version while nft is running.
 		resolved, err := filepath.EvalSymlinks(bundle)
-		if err != nil {
-			continue
+		if err == nil {
+			loader, nft, lib := filepath.Join(resolved, "ld.so"), filepath.Join(resolved, "nft"), filepath.Join(resolved, "lib")
+			if isExecutable(loader) && isExecutable(nft) && isDir(lib) {
+				return []string{loader, "--library-path", lib, nft}, unlock, nil
+			}
 		}
-		loader, nft, lib := filepath.Join(resolved, "ld.so"), filepath.Join(resolved, "nft"), filepath.Join(resolved, "lib")
-		if isExecutable(loader) && isExecutable(nft) && isDir(lib) {
-			return []string{loader, "--library-path", lib, nft}, nil
-		}
+		unlock()
 	}
 
 	if path, err := n.lookPath("nft"); err == nil {
-		return []string{path}, nil
+		return []string{path}, func() {}, nil
 	}
-	return nil, fmt.Errorf("nft binary not found in PATH and bundled %s not found (searched %s)",
+	return nil, nil, fmt.Errorf("nft binary not found in PATH and bundled %s not found (searched %s)",
 		bundledNftName, strings.Join(searched, ", "))
 }
 
@@ -171,7 +187,7 @@ func runInNetNS(path string, fn func() error) error {
 	if err != nil {
 		return fmt.Errorf("could not open network namespace %s: %w", path, err)
 	}
-	defer target.Close()
+	defer func() { _ = target.Close() }()
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -184,7 +200,7 @@ func runInNetNS(path string, fn func() error) error {
 			errCh <- fmt.Errorf("could not get current network namespace: %w", err)
 			return
 		}
-		defer orig.Close()
+		defer func() { _ = orig.Close() }()
 		if err := netns.Set(target); err != nil {
 			runtime.UnlockOSThread()
 			errCh <- fmt.Errorf("could not enter network namespace %s: %w", path, err)
