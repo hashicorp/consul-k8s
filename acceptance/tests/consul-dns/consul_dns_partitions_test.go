@@ -21,6 +21,8 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const staticServerName = "static-server"
@@ -318,10 +320,89 @@ func requirePrivateServerAddress(t *testing.T, cfg *config.TestConfig, address s
 	require.NoErrorf(t, err, "Consul server address validation failed for %q", address)
 }
 
+// requireNoPublicServices fails the test if any Service belonging to this Helm
+// release is reachable from outside the cluster.
+//
+// requirePrivateServerAddress only covers the single address the other cluster
+// dials. This covers everything else: the chart can grow a Service, or a value
+// can flip one to a type that publishes it, and nothing would otherwise notice
+// that it came up reachable. Checking what the cluster actually assigned is the
+// only way to know, because an internal load balancer annotation a provider
+// does not recognise is discarded without an error.
+//
+// All three ways a Service can be published are checked, because the drift this
+// guards against produces any of them, not only load balancers.
+//
+// The list is scoped to the release's own label so that a test running
+// concurrently against the same cluster can never fail this one.
+func requireNoPublicServices(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext, releaseName string) {
+	t.Helper()
+
+	// Kind provisions no cloud load balancers, and its node addresses live on a
+	// local docker bridge.
+	if cfg.UseKind {
+		return
+	}
+
+	services, err := ctx.KubernetesClient(t).CoreV1().Services(ctx.KubectlOptions(t).Namespace).
+		List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + releaseName})
+	require.NoError(t, err, "could not list Services to confirm none of them is publicly reachable")
+
+	for _, service := range services.Items {
+		// A NodePort binds its port on every node's interfaces, so on a node
+		// pool with public node IPs it is reachable with no load balancer
+		// involved. There is no assigned address to resolve and nothing to
+		// constrain it with, so on a cloud the only safe answer is to reject it
+		// -- which is also what privateServerExposure guarantees we never ask
+		// for.
+		require.NotEqualf(t, corev1.ServiceTypeNodePort, service.Spec.Type,
+			"Service %s is a NodePort, which is reachable on every node's own address", service.Name)
+
+		// externalIPs make a Service answer on addresses Kubernetes does not
+		// manage, so they are held to the same standard as a load balancer's.
+		addresses := append([]string{}, service.Spec.ExternalIPs...)
+		for _, ingress := range service.Status.LoadBalancer.Ingress {
+			switch {
+			case ingress.IP != "":
+				addresses = append(addresses, ingress.IP)
+			case ingress.Hostname != "":
+				addresses = append(addresses, ingress.Hostname)
+			default:
+				// A load balancer that has not been assigned an address yet has
+				// nothing to check. Nothing can reach it either, and the caller
+				// only runs once, so this is a known blind spot rather than a
+				// pass.
+				logger.Logf(t, "Service %s has a load balancer with no address yet, skipping", service.Name)
+			}
+		}
+
+		for _, address := range addresses {
+			// One budget per address: a slow lookup must not eat the time the
+			// next address needs.
+			deadline, cancel := context.WithTimeout(context.Background(), time.Minute)
+			err := waitForPrivateAddress(deadline, address)
+			cancel()
+
+			require.NoErrorf(t, err,
+				"Service %s is published at %s, which is reachable from the internet", service.Name, address)
+		}
+	}
+}
+
 // isPrivateAddress reports whether ip is on a network that is not routable from
 // the internet.
+//
+// Anything this cannot positively classify as unroutable is reported as public.
+// That direction matters: a false "private" leaves Consul exposed and silent,
+// while a false "public" only fails a test.
 func isPrivateAddress(ip net.IP) bool {
-	if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+	// The unspecified address means "no address", not "a private address", and
+	// nil means the input never parsed. Neither is evidence of anything, so
+	// neither may be treated as safe.
+	if ip == nil || ip.IsUnspecified() {
+		return false
+	}
+	if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
 		return true
 	}
 	// Carrier-grade NAT, 100.64.0.0/10. Some managed clusters allocate internal
@@ -553,6 +634,7 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, defaultClusterContext, partitionServiceName)
 	requirePrivateServerAddress(t, cfg, partitionSvcAddress)
+	requireNoPublicServices(t, cfg, defaultClusterContext, releaseName)
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryClusterContext)
 
@@ -590,6 +672,7 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	secondaryConsulCluster := consul.NewHelmCluster(t, clientHelmValues, secondaryClusterContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
+	requireNoPublicServices(t, cfg, secondaryClusterContext, releaseName)
 
 	defaultStaticServerOpts := &terratestk8s.KubectlOptions{
 		ContextName: defaultClusterContext.KubectlOptions(t).ContextName,
