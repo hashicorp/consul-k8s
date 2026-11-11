@@ -131,6 +131,43 @@ func ServiceHost(t *testing.T, cfg *config.TestConfig, ctx environment.TestConte
 	}
 }
 
+// WaitForServiceReachable resolves serviceName's LoadBalancer hostname via
+// ServiceHost and then waits until a TCP connection on the given port
+// succeeds. This is intended to be used as a pre-flight gate before triggering
+// a helm install whose pre-install / post-install Jobs (e.g. partition-init,
+// server-acl-init) call into this service. Without this gate, those Jobs run
+// inside the helm 15m hook timeout and absorb LB cold-start latency (DNS
+// propagation, ELB instance registration, SG rule activation) as test
+// flakiness. By waiting outside helm we fail fast on real outages and avoid
+// false negatives caused by infra warm-up.
+//
+// On Kind the dial is skipped because the service is exposed via NodePort on
+// a port that won't match this function's argument; we still return the host
+// so callers can use a single code path.
+func WaitForServiceReachable(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext, serviceName string, port int) string {
+	t.Helper()
+	host := ServiceHost(t, cfg, ctx, serviceName)
+	if cfg.UseKind {
+		return host
+	}
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	logger.Logf(t, "[preflight] waiting for service %s at %s to accept TCP connections", serviceName, addr)
+	start := time.Now()
+	// 10m total budget (120 * 5s) — well under helm's 15m hook timeout so we
+	// surface "LB never came up" deterministically rather than from inside a
+	// helm hook.
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 120}, t, func(r *retry.R) {
+		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+		if err != nil {
+			r.Errorf("[preflight] service %s at %s not yet reachable: %v", serviceName, addr, err)
+			return
+		}
+		_ = conn.Close()
+	})
+	logger.Logf(t, "[preflight] service %s at %s reachable after %s", serviceName, addr, time.Since(start))
+	return host
+}
+
 // CopySecret copies a Kubernetes secret from one cluster to another.
 func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext, secretName string) {
 	t.Helper()
