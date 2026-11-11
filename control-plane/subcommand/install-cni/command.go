@@ -167,8 +167,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Copy the bundled nft so the plugin can apply rules on nodes without nft (e.g. GKE COS).
-	c.installNftBundle(cfg.CNIBinDir)
+	// Copy the bundled nft so the plugin can apply rules on nodes without nft (e.g. GKE COS). Fail before
+	// the plugin is enabled so that the pod is restarted and the installation retried.
+	if err := c.installNftBundle(cfg.CNIBinDir); err != nil {
+		c.logger.Error("Unable to install nft bundle", "error", err)
+		return 1
+	}
 
 	// Get the config file that is on the host.
 	c.logger.Info("Getting default config file from", "destination", cfg.CNINetDir)
@@ -362,7 +366,8 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 	}
 
 	// Remove the nft bundle before the consul-cni binary: a new installer pod waits for consul-cni to be
-	// removed before it installs its own files, so removing the bundle afterwards could delete them.
+	// removed before it installs its own files, so removing the bundle afterwards could delete them. The
+	// removal waits for in-flight plugin invocations that are running the bundled nft.
 	c.logger.Info("Removing nft bundle", "dir", cfg.CNIBinDir)
 	if err = removeNftBundle(cfg.CNIBinDir); err != nil {
 		c.logger.Error("Unable to remove nft bundle", "error", err)

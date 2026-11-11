@@ -24,6 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/cni/nftlock"
 )
 
 const (
@@ -759,6 +761,7 @@ func writeBundle(t *testing.T, binDir string, loaderScript string) string {
 	require.NoError(t, os.WriteFile(filepath.Join(bundle, "ld.so"), []byte(loaderScript), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(bundle, "nft"), []byte("nft"), 0o755))
 	require.NoError(t, os.Symlink(filepath.Base(bundle), filepath.Join(binDir, bundledNftName)))
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, nftlock.FileName), nil, 0o644))
 	resolved, err := filepath.EvalSymlinks(bundle)
 	require.NoError(t, err)
 	return resolved
@@ -783,8 +786,9 @@ func TestNftProvider_NftCommand(t *testing.T) {
 	t.Run("falls back to host nft without bundle", func(t *testing.T) {
 		p := newNftProvider("", t.TempDir())
 		p.lookPath = hostNft
-		cmd, err := p.nftCommand()
+		cmd, release, err := p.nftCommand()
 		require.NoError(t, err)
+		release()
 		require.Equal(t, []string{"/usr/sbin/nft"}, cmd)
 	})
 
@@ -793,11 +797,47 @@ func TestNftProvider_NftCommand(t *testing.T) {
 		bundle := writeBundle(t, dir, "")
 		p := newNftProvider("", "", empty, dir)
 		p.lookPath = hostNft
-		cmd, err := p.nftCommand()
+		cmd, release, err := p.nftCommand()
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			filepath.Join(bundle, "ld.so"), "--library-path", filepath.Join(bundle, "lib"), filepath.Join(bundle, "nft"),
 		}, cmd)
+
+		// The bundle stays locked until release so the installer cannot remove it while nft runs.
+		_, err = nftlock.Exclusive(dir, 50*time.Millisecond)
+		require.ErrorContains(t, err, "timed out")
+		release()
+		unlock, err := nftlock.Exclusive(dir, time.Second)
+		require.NoError(t, err)
+		unlock()
+	})
+
+	t.Run("ignores bundle without lock file", func(t *testing.T) {
+		dir := t.TempDir()
+		writeBundle(t, dir, "")
+		require.NoError(t, os.Remove(filepath.Join(dir, nftlock.FileName)))
+		p := newNftProvider("", dir)
+		p.lookPath = hostNft
+		cmd, release, err := p.nftCommand()
+		require.NoError(t, err)
+		release()
+		require.Equal(t, []string{"/usr/sbin/nft"}, cmd)
+	})
+
+	t.Run("fails when the bundle stays locked by the installer", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("locking is a no-op on Windows")
+		}
+		dir := t.TempDir()
+		writeBundle(t, dir, "")
+		unlock, err := nftlock.Exclusive(dir, time.Second)
+		require.NoError(t, err)
+		defer unlock()
+		p := newNftProvider("", dir)
+		p.lookPath = hostNft
+		p.lockTimeout = 50 * time.Millisecond
+		_, _, err = p.nftCommand()
+		require.ErrorContains(t, err, "could not lock bundled")
 	})
 
 	t.Run("ignores incomplete bundle", func(t *testing.T) {
@@ -806,7 +846,7 @@ func TestNftProvider_NftCommand(t *testing.T) {
 		require.NoError(t, os.Chmod(filepath.Join(bundle, "nft"), 0o644))
 		p := newNftProvider("", dir)
 		p.lookPath = notFound
-		_, err := p.nftCommand()
+		_, _, err := p.nftCommand()
 		require.ErrorContains(t, err, "nft binary not found in PATH")
 		require.ErrorContains(t, err, filepath.Join(dir, bundledNftName))
 	})
@@ -816,7 +856,7 @@ func TestNftProvider_NftCommand(t *testing.T) {
 		require.NoError(t, os.Symlink(".consul-nft-v-gone", filepath.Join(dir, bundledNftName)))
 		p := newNftProvider("", dir)
 		p.lookPath = notFound
-		_, err := p.nftCommand()
+		_, _, err := p.nftCommand()
 		require.ErrorContains(t, err, "nft binary not found in PATH")
 	})
 }

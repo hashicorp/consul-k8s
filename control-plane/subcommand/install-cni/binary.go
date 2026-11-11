@@ -15,6 +15,9 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+	"time"
+
+	"github.com/hashicorp/consul-k8s/control-plane/cni/nftlock"
 )
 
 // copyFile copies a file from a source directory to a destination directory.
@@ -71,25 +74,27 @@ func removeFile(path string) error {
 
 // The nft bundle is installed on the node as <cniBinDir>/.consul-nft-v-<hash>/ and exposed through the
 // <cniBinDir>/consul-nft symlink. Swapping the symlink with a rename is atomic, so the CNI plugin always
-// sees a complete bundle, including while a new version is being installed.
+// sees a complete bundle, including while a new version is being installed. Installing, pruning and
+// removing bundle versions is done under an exclusive nftlock lock; the plugin holds a shared lock while it
+// runs nft, so a version is never removed while it is in use.
 const (
 	nftBundleVersionPrefix = ".consul-nft-v-"
 	nftBundleTempPrefix    = ".consul-nft-tmp-"
+	// nftBundleLockTimeout bounds the wait for in-flight plugin invocations and other installers.
+	nftBundleLockTimeout = 30 * time.Second
 )
 
-// installNftBundle installs the nft bundle from the image into destDir. A missing bundle is not fatal:
-// the plugin still works on nodes that have nft installed.
-func (c *Command) installNftBundle(destDir string) {
+// installNftBundle installs the nft bundle from the image into destDir. A bundle that is missing from the
+// image is not an error: the plugin still works on nodes that have nft installed.
+func (c *Command) installNftBundle(destDir string) error {
 	srcDir := filepath.Join(c.flagCNIBinSourceDir, consulNftName)
 	if info, err := os.Stat(srcDir); err != nil || !info.IsDir() {
 		c.logger.Warn("nft bundle not found in image, nodes without nft will not be able to apply traffic redirection rules",
 			"source", srcDir, "error", err)
-		return
+		return nil
 	}
 	c.logger.Info("Installing nft bundle", "destination", destDir)
-	if err := installNftBundle(srcDir, destDir); err != nil {
-		c.logger.Error("Unable to install nft bundle", "error", err)
-	}
+	return installNftBundle(srcDir, destDir)
 }
 
 // installNftBundle copies srcDir into a content-addressed directory in destDir, points the consul-nft
@@ -103,12 +108,27 @@ func installNftBundle(srcDir, destDir string) error {
 	versionName := nftBundleVersionPrefix + hash
 	versionDir := filepath.Join(destDir, versionName)
 
+	release, err := nftlock.Exclusive(destDir, nftBundleLockTimeout)
+	if err != nil {
+		return fmt.Errorf("could not lock nft bundle in %s: %w", destDir, err)
+	}
+	defer release()
+
+	link := filepath.Join(destDir, consulNftName)
+	previous, _ := os.Readlink(link)
+	if previous == versionName {
+		if info, err := os.Stat(versionDir); err == nil && info.IsDir() {
+			// Already installed. Pruning now would remove the version kept for in-flight invocations.
+			return nil
+		}
+	}
+
 	if _, err := os.Stat(versionDir); os.IsNotExist(err) {
 		tmpDir, err := os.MkdirTemp(destDir, nftBundleTempPrefix)
 		if err != nil {
 			return fmt.Errorf("could not create temp dir in %s: %w", destDir, err)
 		}
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 		if err := copyDir(srcDir, tmpDir); err != nil {
 			return err
 		}
@@ -119,8 +139,6 @@ func installNftBundle(srcDir, destDir string) error {
 		return err
 	}
 
-	link := filepath.Join(destDir, consulNftName)
-	previous, _ := os.Readlink(link)
 	if info, err := os.Lstat(link); err == nil && info.Mode()&os.ModeSymlink == 0 {
 		// Not a symlink; it cannot be replaced atomically by rename.
 		if err := os.RemoveAll(link); err != nil {
@@ -153,16 +171,23 @@ func installNftBundle(srcDir, destDir string) error {
 	return nil
 }
 
-// removeNftBundle removes the consul-nft symlink and all installed bundle versions from destDir.
+// removeNftBundle removes the consul-nft symlink, all installed bundle versions and the lock file from
+// destDir. It waits for in-flight plugin invocations that use the bundle to finish.
 func removeNftBundle(destDir string) error {
+	release, err := nftlock.Exclusive(destDir, nftBundleLockTimeout)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("could not lock nft bundle in %s: %w", destDir, err)
+	}
+	defer release()
+
 	if err := removeFile(filepath.Join(destDir, consulNftName)); err != nil {
 		return err
 	}
 	entries, err := os.ReadDir(destDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
 		return err
 	}
 	for _, e := range entries {
@@ -172,7 +197,8 @@ func removeNftBundle(destDir string) error {
 			}
 		}
 	}
-	return nil
+	// Removed last and while still locked: waiters notice that the file is gone and see no bundle.
+	return removeFile(filepath.Join(destDir, nftlock.FileName))
 }
 
 // hashDir returns a short hash of the relative paths, permissions and contents of the regular files in dir.
@@ -210,7 +236,9 @@ func hashDir(dir string) (string, error) {
 			return "", err
 		}
 		_, err = io.Copy(h, f)
-		f.Close()
+		if closeErr := f.Close(); err == nil {
+			err = closeErr
+		}
 		if err != nil {
 			return "", err
 		}
@@ -252,13 +280,13 @@ func copyRegularFile(src, dst string, perm os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
+		_ = out.Close()
 		return fmt.Errorf("could not copy %s to %s: %w", src, dst, err)
 	}
 	if err := out.Close(); err != nil {
