@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -192,6 +193,20 @@ func privateServerExposure(cfg *config.TestConfig) (map[string]string, error) {
 		return nil, fmt.Errorf("refusing to install: this platform has no known private load balancer " +
 			"annotation, so the Consul servers would be published to the internet on a public IP; add the " +
 			"platform's internal load balancer annotation to internalLoadBalancerAnnotation first")
+	}
+
+	// Helm's --set splits a value on commas, so an annotation containing one
+	// would be chopped into a fragment Helm reads as another key. That either
+	// fails the install or, worse, leaves the Service with the annotation
+	// missing -- which means a public IP, the exact thing this function exists
+	// to prevent. Nothing emitted above contains a comma today; this is here so
+	// that the day someone adds one (AWS load balancer attributes and tag lists
+	// are comma-separated) it fails here, loudly, instead of in CI as a
+	// mysteriously public load balancer.
+	if strings.Contains(annotation, ",") {
+		return nil, fmt.Errorf("refusing to install: the internal load balancer annotation for this "+
+			"platform contains a comma, which Helm's --set would mis-parse, leaving the Consul servers "+
+			"without it and therefore on a public IP: %q", annotation)
 	}
 
 	return map[string]string{"server.exposeService.annotations": annotation}, nil
