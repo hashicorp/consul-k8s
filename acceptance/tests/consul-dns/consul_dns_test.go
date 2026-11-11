@@ -25,7 +25,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -512,59 +511,6 @@ func getCoreDNSConfigMap(t *testing.T, ctx environment.TestContext) *corev1.Conf
         labelSelectors, knownNames, observedNames)
     return nil
 }
-// runDigPod runs a single dig query in a throwaway pod and returns dig's output.
-//
-// The output is read back with `kubectl logs` instead of by attaching to the
-// pod, which is what `kubectl run -i` does. dig writes its answer and exits in
-// milliseconds, and an attach stream only carries what is written after it is
-// established -- there is no replay. Whenever the attach loses that race the
-// answer is lost for good, `kubectl run` still exits 0, and the caller is left
-// asserting against an empty string. The race is lost consistently on clusters
-// where the kubelet's attach path is slow, so retrying does not help. A
-// container log, by contrast, is written to disk by the kubelet and can be read
-// after the process has exited, so reading it cannot be raced.
-//
-// For the same reason the pod is not created with --rm: deleting it on exit
-// would take the log away before it could be read.
-func runDigPod(r *retry.R, ctx environment.TestContext, podName, releaseName, svcName string) string {
-	// An earlier attempt may have left the pod behind, and the name is fixed
-	// per query, so it has to be gone before this one can create it.
-	deleteDigPod(r, ctx, podName)
-
-	_, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r),
-		"run", podName,
-		"--restart", "Never",
-		"--image", "anubhavmishra/tiny-tools",
-		"--labels", "release="+releaseName,
-		"--", "dig", svcName, "ANY")
-	require.NoError(r, err)
-
-	// Wait for dig to exit so that the log is complete when it is read. The
-	// budget matches kubectl's own default --pod-running-timeout, so a cluster
-	// that cannot start the pod fails no more slowly than it used to.
-	retry.RunWith(&retry.Timer{Timeout: time.Minute, Wait: 1 * time.Second}, r, func(rr *retry.R) {
-		pod, err := ctx.KubernetesClient(rr).CoreV1().
-			Pods(ctx.KubectlOptions(rr).Namespace).Get(context.Background(), podName, metav1.GetOptions{})
-		require.NoError(rr, err)
-		require.Truef(rr, pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed,
-			"dig pod %s has not finished, phase is %s", podName, pod.Status.Phase)
-	})
-
-	logs, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "logs", podName)
-	require.NoError(r, err)
-	return logs
-}
-
-// deleteDigPod removes a dig pod if it is still around, waiting for it to be
-// gone so that the name is free for the next query.
-func deleteDigPod(t testutil.TestingTB, ctx environment.TestContext, podName string) {
-	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
-		"delete", "pod", podName, "--ignore-not-found", "--now")
-	if err != nil {
-		logger.Logf(t, "could not delete dig pod %s, continuing: %v", podName, err)
-	}
-}
-
 func verifyDNS(
 	t *testing.T,
 	cfg *config.TestConfig,
@@ -604,15 +550,11 @@ func verifyDNS(
 	})
 	_, err = k8s.RunKubectlAndGetOutputE(t, requestingOpts, "wait", "--for=condition=Ready", "pod/"+dnsUtilsPod, "--timeout=5m")
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		deleteDigPod(t, requestingCtx, dnsUtilsPod)
-	})
 
 	var logs string
 	retry.RunWith(&retry.Counter{Wait: 30 * time.Second, Count: 10}, t, func(r *retry.R) {
 		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), "exec", dnsUtilsPod, "--", "dig", svcName, "ANY")
 		require.NoError(r, err)
-		logs = runDigPod(r, requestingCtx, dnsUtilsPod, releaseName, svcName)
 		logger.Logf(t, "verify the DNS results. with logs: \n%s", logs)
 
 		// Normalize whitespace for reliable matching
