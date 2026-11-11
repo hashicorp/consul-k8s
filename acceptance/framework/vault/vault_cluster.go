@@ -129,7 +129,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 // VaultClient returns the vault client.
 func (v *VaultCluster) VaultClient(*testing.T) *vapi.Client { return v.vaultClient }
 
-// SetupVaultClient sets up and returns a Vault Client.
+// SetupVaultClient opens a tunnel and waits for the Vault API before returning a client.
 func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 	t.Helper()
 
@@ -138,32 +138,42 @@ func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 	}
 
 	config := vapi.DefaultConfig()
-	localPort := terratestk8s.GetAvailablePort(t)
-	remotePort := 8200 // use non-secure by default
-
-	serverPod := fmt.Sprintf("%s-vault-0", v.releaseName)
-	tunnel := terratestk8s.NewTunnelWithLogger(
-		v.helmOptions.KubectlOptions,
-		terratestk8s.ResourceTypePod,
-		serverPod,
-		localPort,
-		remotePort,
-		v.logger)
-
-	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
-		require.NoError(r, tunnel.ForwardPortE(r))
-	})
-
-	t.Cleanup(func() {
-		tunnel.Close()
-	})
-
-	config.Address = fmt.Sprintf("https://localhost:%d", localPort)
 	// We don't need to verify TLS for localhost traffic.
 	err := config.ConfigureTLS(&vapi.TLSConfig{Insecure: true})
 	require.NoError(t, err)
-	vaultClient, err := vapi.NewClient(config)
-	require.NoError(t, err)
+
+	var vaultClient *vapi.Client
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+		tunnel := terratestk8s.NewTunnelWithLogger(
+			v.helmOptions.KubectlOptions,
+			terratestk8s.ResourceTypePod,
+			fmt.Sprintf("%s-vault-0", v.releaseName),
+			0,
+			8200,
+			v.logger)
+		// A request before Vault is listening can terminate the tunnel.
+		// Close failed attempts and create a fresh tunnel on the next retry.
+		connected := false
+		defer func() {
+			if !connected {
+				tunnel.Close()
+			}
+		}()
+		require.NoError(r, tunnel.ForwardPortE(r))
+
+		config.Address = "https://" + tunnel.Endpoint()
+		client, err := vapi.NewClient(config)
+		require.NoError(r, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err = client.Sys().InitStatusWithContext(ctx)
+		require.NoError(r, err, "waiting for Vault API through port-forward")
+
+		t.Cleanup(tunnel.Close)
+		vaultClient = client
+		connected = true
+	})
 	return vaultClient
 }
 
@@ -235,11 +245,35 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 		}
 	})
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
-	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
-	require.NoError(t, err)
+	// On Kubernetes >= 1.24, when the auth-method Secret of type
+	// SecretTypeServiceAccountToken is manually created, the kube
+	// token-controller populates data.token asynchronously. If we read the
+	// Secret before that lands, Vault gets configured with an empty
+	// token_reviewer_jwt and every TokenReview Vault performs against the
+	// kubernetes API returns 401 — which Vault surfaces to login clients
+	// (vault-agent in partition-init / server-acl-init Jobs) as 403
+	// "permission denied" for the entire test run. Poll until the token is
+	// populated before writing the auth config to avoid this race.
+	var reviewerJWT, caCert string
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
+		tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+		require.NoError(r, err)
+		jwt := string(tokenSecret.Data["token"])
+		ca := string(tokenSecret.Data["ca.crt"])
+		if jwt == "" {
+			r.Errorf("auth method SA token secret %s/%s has empty data.token (waiting for token-controller)", saNS, secretName)
+			return
+		}
+		if ca == "" {
+			r.Errorf("auth method SA token secret %s/%s has empty data.ca.crt", saNS, secretName)
+			return
+		}
+		reviewerJWT = jwt
+		caCert = ca
+	})
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
-		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
-		"kubernetes_ca_cert": string(tokenSecret.Data["ca.crt"]),
+		"token_reviewer_jwt": reviewerJWT,
+		"kubernetes_ca_cert": caCert,
 		"kubernetes_host":    k8sHost,
 	})
 	require.NoError(t, err)
@@ -418,14 +452,15 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	namespace := v.helmOptions.KubectlOptions.Namespace
 	retrier := &retry.Timer{Timeout: 4 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
-		// Wait for vault server pod to be running so that we can create Vault client without errors.
 		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})
 		require.NoError(r, err)
 		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
+	})
 
-		// Set up the client so that we can make API calls to initialize and unseal.
-		v.vaultClient = v.SetupVaultClient(r)
+	// Keep the tunnel alive for the entire test, not just a retry attempt.
+	v.vaultClient = v.SetupVaultClient(t)
 
+	retry.RunWith(&retry.Timer{Timeout: 4 * time.Minute, Wait: 1 * time.Second}, t, func(r *retry.R) {
 		// Initialize Vault with 1 secret share. We don't need to
 		// more key shares for this test installation.
 		initResp, err := v.vaultClient.Sys().Init(&vapi.InitRequest{

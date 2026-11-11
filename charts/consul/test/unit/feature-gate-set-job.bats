@@ -142,29 +142,30 @@ load _helpers
       --set 'ai.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q "consul-ai enabled"
+  echo "${actual}" | grep -q -- "-feature-gate=consul-ai=true"
 }
 
 #--------------------------------------------------------------------
-# CONSUL_HTTP_ADDR construction
+# Consul connection configuration
 
-@test "feature-gate-set/Job: uses http scheme when tls disabled" {
+@test "feature-gate-set/Job: uses the control-plane command" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
+      --set 'global.imageK8S=control-plane:test' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q 'CONSUL_HTTP_ADDR="http://'
+  echo "${actual}" | grep -q 'exec consul-k8s-control-plane feature-gate-set'
 }
 
-@test "feature-gate-set/Job: uses https scheme when tls enabled" {
+@test "feature-gate-set/Job: enables TLS through shared Consul flags" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q 'CONSUL_HTTP_ADDR="https://'
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_USE_TLS") | .value' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "feature-gate-set/Job: uses externalServers address in CONSUL_ADDRESSES when externalServers.enabled=true" {
@@ -188,34 +189,55 @@ load _helpers
   [[ "$output" == *"externalServers.hosts must be set"* ]]
 }
 
-@test "feature-gate-set/Job: rejects exec-based external server hosts" {
+@test "feature-gate-set/Job: accepts the full exec-based external server discovery string" {
   cd `chart_dir`
+  local hosts="exec=echo 10.52.4.128 10.52.4.129 10.52.4.130 10.52.4.131 10.52.4.132 10.52.4.133 10.52.4.134 10.52.4.135 10.52.4.124 10.52.4.125"
   run helm template -s templates/feature-gate-set-job.yaml \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
-      --set-string 'externalServers.hosts[0]=exec=echo 127.0.0.1' .
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"DNS name, IP address, or provider= auto-join string; exec= addresses are not supported"* ]]
+      --set 'externalServers.skipServerWatch=true' \
+      --set 'externalServers.grpcPort=8503' \
+      --set 'externalServers.tlsServerName=consul.example.com' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=external-partition' \
+      --set 'global.openshift.enabled=true' \
+      --set 'global.imageK8S=control-plane:test' \
+      --set-string "externalServers.hosts[0]=$hosts" .
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ADDRESSES") | .value')" = "$hosts" ]
+  [ "$(echo "$output" | yq -r '.spec.template.spec.containers[0].image')" = "control-plane:test" ]
+  [ "$(echo "$output" | yq '.spec.template.spec.initContainers | length')" = "0" ]
 }
 
-@test "feature-gate-set/Job: brackets IPv6 hosts in the HTTP URL" {
+@test "feature-gate-set/Job: leaves the injector full exec discovery string unchanged" {
   cd `chart_dir`
-  local script=$(helm template -s templates/feature-gate-set-job.yaml \
+  local hosts="exec=echo 10.52.4.128 10.52.4.129 10.52.4.130 10.52.4.131 10.52.4.132 10.52.4.133 10.52.4.134 10.52.4.135 10.52.4.124 10.52.4.125"
+  local env=$(helm template -s templates/connect-inject-deployment.yaml \
+      --set 'server.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.skipServerWatch=true' \
+      --set-string "externalServers.hosts[0]=$hosts" \
+      . | yq '.spec.template.spec.containers[0].env')
+  [ "$(echo "$env" | jq -r '.[] | select(.name == "CONSUL_ADDRESSES") | .value')" = "$hosts" ]
+  [ "$(echo "$env" | jq -r '.[] | select(.name == "CONSUL_SKIP_SERVER_WATCH") | .value')" = "true" ]
+}
+
+@test "feature-gate-set/Job: passes IPv6 hosts to the control-plane command" {
+  cd `chart_dir`
+  local actual=$(helm template -s templates/feature-gate-set-job.yaml \
       --set 'server.enabled=false' \
       --set 'externalServers.enabled=true' \
       --set-string 'externalServers.hosts[0]=2001:db8::1' \
       --set 'global.tls.enabled=true' \
       --set 'ai.enabled=true' \
-      . | yq -r '.spec.template.spec.containers[0].command[2]')
-  local actual=$(CONSUL_ADDRESSES=2001:db8::1 CONSUL_HTTP_PORT=8501 \
-      /bin/sh -ec 'consul() { printf "%s\n" "$CONSUL_HTTP_ADDR"; }; curl() { printf "\"127.0.0.1:8300\""; }; '"$script")
-  [ "$actual" = "Waiting for Consul leader...
-Consul leader is ready: \"127.0.0.1:8300\"
-Setting feature gate: consul-ai=enabled
-https://[2001:db8::1]:8501" ]
+      . | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ADDRESSES") | .value')
+  [ "$actual" = "2001:db8::1" ]
 }
 
-@test "feature-gate-set/Job: applies externalServers.tlsServerName to curl and the Consul CLI" {
+@test "feature-gate-set/Job: applies externalServers.tlsServerName through shared Consul flags" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
@@ -225,10 +247,8 @@ https://[2001:db8::1]:8501" ]
       --set 'externalServers.tlsServerName=consul.example.com' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q 'export CONSUL_TLS_SERVER_NAME="consul.example.com"'
-  echo "${actual}" | grep -q 'export CONSUL_CURL_ADDR="https://${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}"'
-  echo "${actual}" | grep -q -- '--connect-to "${CONSUL_TLS_SERVER_NAME}:${CONSUL_HTTP_PORT}:${consul_host}:${CONSUL_HTTP_PORT}"'
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_TLS_SERVER_NAME") | .value' | tee /dev/stderr)
+  [ "${actual}" = "consul.example.com" ]
 }
 
 #--------------------------------------------------------------------
@@ -271,14 +291,14 @@ https://[2001:db8::1]:8501" ]
   [ "${actual}" = "key" ]
 }
 
-@test "feature-gate-set/Job: sets CONSUL_CACERT env when tls enabled" {
+@test "feature-gate-set/Job: sets CONSUL_CACERT_FILE env when tls enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -q "CONSUL_CACERT=/consul/tls/ca/tls.crt"
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
 @test "feature-gate-set/Job: does not mount consul-ca-cert when externalServers.useSystemRoots=true" {
@@ -295,7 +315,7 @@ https://[2001:db8::1]:8501" ]
   [ "${actual}" = "false" ]
 }
 
-@test "feature-gate-set/Job: does not set CONSUL_CACERT when externalServers.useSystemRoots=true" {
+@test "feature-gate-set/Job: does not set CONSUL_CACERT_FILE when externalServers.useSystemRoots=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
@@ -305,25 +325,25 @@ https://[2001:db8::1]:8501" ]
       --set 'global.tls.enabled=true' \
       --set 'externalServers.useSystemRoots=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -qv "CONSUL_CACERT="
+      yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_CACERT_FILE")] | length' | tee /dev/stderr)
+  [ "${actual}" = "0" ]
 }
 
 #--------------------------------------------------------------------
 # global.acls.bootstrapToken (externally-managed ACLs)
 
-@test "feature-gate-set/Job: CONSUL_HTTP_TOKEN is set via secretKeyRef when bootstrapToken is provided" {
+@test "feature-gate-set/Job: CONSUL_ACL_TOKEN is set via secretKeyRef when bootstrapToken is provided" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       --set 'global.acls.bootstrapToken.secretName=my-token-secret' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .name' | tee /dev/stderr)
-  [ "${actual}" = "CONSUL_HTTP_TOKEN" ]
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN") | .name' | tee /dev/stderr)
+  [ "${actual}" = "CONSUL_ACL_TOKEN" ]
 }
 
-@test "feature-gate-set/Job: CONSUL_HTTP_TOKEN secretKeyRef name and key match bootstrapToken" {
+@test "feature-gate-set/Job: CONSUL_ACL_TOKEN secretKeyRef name and key match bootstrapToken" {
   cd `chart_dir`
   local actual
   actual=$(helm template \
@@ -331,7 +351,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.bootstrapToken.secretName=my-token-secret' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .valueFrom.secretKeyRef.name' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN") | .valueFrom.secretKeyRef.name' | tee /dev/stderr)
   [ "${actual}" = "my-token-secret" ]
 
   actual=$(helm template \
@@ -339,16 +359,16 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.bootstrapToken.secretName=my-token-secret' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .valueFrom.secretKeyRef.key' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN") | .valueFrom.secretKeyRef.key' | tee /dev/stderr)
   [ "${actual}" = "token" ]
 }
 
-@test "feature-gate-set/Job: no CONSUL_HTTP_TOKEN env when bootstrapToken not set and no manageSystemACLs" {
+@test "feature-gate-set/Job: no CONSUL_ACL_TOKEN env when bootstrapToken not set and no manageSystemACLs" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN" or .name == "CONSUL_HTTP_TOKEN_FILE")] | length' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN" or .name == "CONSUL_ACL_TOKEN_FILE")] | length' | tee /dev/stderr)
   [ "${actual}" = "0" ]
 }
 
@@ -358,7 +378,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.replicationToken.secretName=replication-token' \
       --set 'global.acls.replicationToken.secretKey=token' \
       . | yq '.')
-  [ "$(echo "$job" | yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN" or .name == "CONSUL_HTTP_TOKEN_FILE")] | length')" = "0" ]
+  [ "$(echo "$job" | yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN" or .name == "CONSUL_ACL_TOKEN_FILE")] | length')" = "0" ]
   [ "$(echo "$job" | yq '[.spec.template.spec.volumes // [] | .[].name] | contains(["bootstrap-acl-token"])')" = "false" ]
 }
 
@@ -411,13 +431,13 @@ https://[2001:db8::1]:8501" ]
   [ "${actual}" = "true" ]
 }
 
-@test "feature-gate-set/Job: sets CONSUL_HTTP_TOKEN_FILE to /consul/acl/tokens/token when global.acls.manageSystemACLs=true" {
+@test "feature-gate-set/Job: sets CONSUL_ACL_TOKEN_FILE to /consul/acl/tokens/token when global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/consul/acl/tokens/token" ]
 }
 
@@ -434,8 +454,8 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.replicationToken.secretName=replication-token' \
       --set 'global.acls.replicationToken.secretKey=token' \
       . | yq '.')
-  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .valueFrom.secretKeyRef.name')" = "replication-token" ]
-  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .valueFrom.secretKeyRef.key')" = "token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN") | .valueFrom.secretKeyRef.name')" = "replication-token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN") | .valueFrom.secretKeyRef.key')" = "token" ]
   [ "$(echo "$job" | yq -r '[.spec.template.spec.volumes // [] | .[].name] | contains(["bootstrap-acl-token"])')" = "false" ]
 }
 
@@ -448,7 +468,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.replicationToken.secretName=replication-token' \
       --set 'global.acls.replicationToken.secretKey=token' \
       . | yq '.')
-  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN") | .valueFrom.secretKeyRef.name')" = "bootstrap-token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN") | .valueFrom.secretKeyRef.name')" = "bootstrap-token" ]
   [ "$(echo "$job" | yq '[.spec.template.spec.volumes // [] | .[].name] | contains(["bootstrap-acl-token"])')" = "false" ]
 }
 
@@ -473,7 +493,7 @@ https://[2001:db8::1]:8501" ]
 #--------------------------------------------------------------------
 # Vault — TLS only (no ACLs)
 
-@test "feature-gate-set/Job: does not set CONSUL_CACERT when tls enabled with Vault backend" {
+@test "feature-gate-set/Job: uses the Vault CA through shared Consul flags" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
@@ -484,8 +504,8 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulCARole=ca-role' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2]' | tee /dev/stderr)
-  echo "${actual}" | grep -qv "CONSUL_CACERT="
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
+  [ "${actual}" = "/vault/secrets/serverca.crt" ]
 }
 
 @test "feature-gate-set/Job: does not mount consul-ca-cert volume when tls enabled with Vault backend" {
@@ -614,7 +634,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | select(.name=="CONSUL_HTTP_TOKEN_FILE") | .value' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name=="CONSUL_ACL_TOKEN_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 
   # No secret volumes — Vault agent injects the token
@@ -664,7 +684,7 @@ https://[2001:db8::1]:8501" ]
   [ "${actual}" = "false" ]
 }
 
-@test "feature-gate-set/Job: sets CONSUL_HTTP_TOKEN_FILE to vault path when Vault backend and ACLs enabled" {
+@test "feature-gate-set/Job: sets CONSUL_ACL_TOKEN_FILE to vault path when Vault backend and ACLs enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
@@ -677,7 +697,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 }
 
@@ -733,7 +753,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.acls.bootstrapToken.secretName=consul/bootstrap-token' \
       --set 'global.acls.bootstrapToken.secretKey=token' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | select(.name=="CONSUL_HTTP_TOKEN_FILE") | .value' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name=="CONSUL_ACL_TOKEN_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 
   actual=$(helm template \
@@ -789,7 +809,7 @@ https://[2001:db8::1]:8501" ]
   [ "${actual}" = "true" ]
 }
 
-@test "feature-gate-set/Job: sets CONSUL_HTTP_TOKEN_FILE to vault path when bootstrapToken set with Vault (no manageSystemACLs)" {
+@test "feature-gate-set/Job: sets CONSUL_ACL_TOKEN_FILE to vault path when bootstrapToken set with Vault (no manageSystemACLs)" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/feature-gate-set-job.yaml \
@@ -800,7 +820,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.featureGateSetRole=acl-role' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/bootstrap-token" ]
 }
 
@@ -905,7 +925,7 @@ https://[2001:db8::1]:8501" ]
       . | yq '.')
   [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-secret-bootstrap-token"]')" = "consul/data/bootstrap-token" ]
   [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-secret-replication-token"]')" = "null" ]
-  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value')" = "/vault/secrets/bootstrap-token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN_FILE") | .value')" = "/vault/secrets/bootstrap-token" ]
 }
 
 @test "feature-gate-set/Job: injects the replication token from Vault in a secondary datacenter" {
@@ -929,7 +949,7 @@ https://[2001:db8::1]:8501" ]
   [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-secret-replication-token"]')" = "consul/data/replication-token" ]
   [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-secret-bootstrap-token"]')" = "null" ]
   [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject-template-replication-token"]' | grep -c 'Data.data.token')" -gt 0 ]
-  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN_FILE") | .value')" = "/vault/secrets/replication-token" ]
+  [ "$(echo "$job" | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN_FILE") | .value')" = "/vault/secrets/replication-token" ]
   [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/role"]')" = "feature-gate-role" ]
 }
 
@@ -1020,7 +1040,7 @@ https://[2001:db8::1]:8501" ]
       --set 'global.secretsBackend.vault.consulServerRole=test' \
       . | yq '.')
   [ "$(echo "$job" | yq -r '.spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]')" = "null" ]
-  [ "$(echo "$job" | yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_HTTP_TOKEN" or .name == "CONSUL_HTTP_TOKEN_FILE")] | length')" = "0" ]
+  [ "$(echo "$job" | yq '[.spec.template.spec.containers[0].env[] | select(.name == "CONSUL_ACL_TOKEN" or .name == "CONSUL_ACL_TOKEN_FILE")] | length')" = "0" ]
 }
 
 #--------------------------------------------------------------------

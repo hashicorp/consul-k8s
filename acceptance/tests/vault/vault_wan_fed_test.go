@@ -500,6 +500,17 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		secondaryConsulHelmValues["meshGateway.service.nodePort"] = "30000"
 	}
 
+	// Pre-flight: the secondary consul install depends on two cross-cluster
+	// endpoints in the primary: the Vault server LB (vault-agent sidecars
+	// injected into every secondary pod connect to it; if unreachable, pods
+	// never become Ready and helm --wait times out at 15m) and the primary
+	// mesh-gateway LB (federation traffic). On fresh AWS ELBs DNS + SG +
+	// instance registration can briefly exceed helm's 15m budget. Block here
+	// so cold-start surfaces deterministically outside the helm wait. No-op
+	// on Kind (helper short-circuits when cfg.UseKind is true).
+	k8s.WaitForServiceReachable(t, cfg, primaryCtx, fmt.Sprintf("%s-vault", vaultReleaseName), 8200)
+	k8s.WaitForServiceReachable(t, cfg, primaryCtx, fmt.Sprintf("%s-consul-mesh-gateway", consulReleaseName), 443)
+
 	// Install the secondary consul cluster in the secondary kubernetes context.
 	secondaryConsulCluster := consul.NewHelmCluster(t, secondaryConsulHelmValues, secondaryCtx, cfg, consulReleaseName)
 	secondaryConsulCluster.Create(t)
@@ -511,6 +522,28 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	secondaryConsulCluster.ACLToken = replicationToken
 	secondaryClient, _ := secondaryConsulCluster.SetupConsulClient(t, true)
 	helpers.VerifyFederation(t, primaryClient, secondaryClient, consulReleaseName, true)
+
+	for _, host := range []string{
+		"dns", "ip",
+		// Re-enable when the distroless consul-dataplane image supports exec=echo.
+		// "exec",
+	} {
+		testExternalVaultFeatureGate(t, cfg, secondaryCtx, vaultClient, consulReleaseName, secondaryAuthMethodName,
+			fmt.Sprintf("%s,%s", replicationTokenSecret.PolicyName, serverPKIConfigSecondary.PolicyName),
+			host,
+			map[string]string{
+				"global.datacenter":                            "dc2",
+				"global.acls.manageSystemACLs":                 "true",
+				"global.acls.replicationToken.secretName":      replicationTokenSecret.Path,
+				"global.acls.replicationToken.secretKey":       replicationTokenSecret.Key,
+				"global.tls.caCert.secretName":                 serverPKIConfigSecondary.CAPath,
+				"global.secretsBackend.vault.consulCARole":     serverPKIConfig.RoleName,
+				"global.secretsBackend.vault.ca.secretName":    vaultCASecretName,
+				"global.secretsBackend.vault.ca.secretKey":     "tls.crt",
+				"global.secretsBackend.vault.agentAnnotations": secondaryConsulHelmValues["global.secretsBackend.vault.agentAnnotations"],
+				"externalServers.tlsServerName":                "server.dc2.consul",
+			})
+	}
 
 	// Create a ProxyDefaults resource to configure services to use the mesh
 	// gateways.

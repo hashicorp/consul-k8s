@@ -172,13 +172,14 @@ global:
       # If TLS is enabled, also grant read access
       # to `global.tls.caCert.secretName`.
       # To discover the service account name, run:
+      # ```shell-session
       # $ helm template --show-only templates/feature-gate-set-serviceaccount.yaml <release-name> hashicorp/consul
+      # ```
       # and check `metadata.name`.
       featureGateSetRole: ""
 
       # [Enterprise Only] A Vault role that allows the Consul `partition-init` job to read a Vault secret for the partition ACL token.
       #  The `partition-init` job bootstraps Admin Partitions on Consul servers.
-      # .
       # This role must be bound the `partition-init` job's service account.
       # To discover the service account name of the `partition-init` job, run with Helm values for the client cluster:
       # ```shell-session
@@ -1644,8 +1645,10 @@ externalServers:
   # An array of external Consul server hosts that are used to make
   # HTTPS connections from the components in this Helm chart.
   # Valid values include an IP, a DNS name, or an [exec=](https://github.com/hashicorp/go-netaddrs) string.
-  # The feature-gate-set job uses the Consul CLI and requires the first host to be
-  # a DNS name or IP address; it rejects exec= strings when external servers are enabled.
+  # For `provider=k8s` discovery, the feature-gate hook is granted pod-list access
+  # in the release namespace only. Specify that namespace in the discovery string.
+  # Discovery in other namespaces or across all namespaces requires additional
+  # administrator-managed RBAC for the `<release>-consul-feature-gate-set` service account.
   # The port must be provided separately below.
   # Note: This slice can only contain a single element.
   # Note: If enabling clients, `client.join` must also be set to the hosts that should be
