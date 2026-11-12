@@ -241,10 +241,10 @@ func internalLoadBalancerAnnotation(cfg *config.TestConfig) string {
 
 // waitForPrivateAddress retries DNS readiness while preserving the private-address check.
 // The caller must provide a context with a deadline. This function will:
-//   1. Accept IP address literals directly
-//   2. Retry DNS resolution with exponential backoff
-//   3. Validate that all resolved IPs are private
-//   4. Respect the context deadline
+//  1. Accept IP address literals directly
+//  2. Retry DNS resolution with exponential backoff
+//  3. Validate that all resolved IPs are private
+//  4. Respect the context deadline
 //
 // This is secure by design: it never bypasses the privacy check, it only
 // adds retry logic to handle transient DNS resolution delays.
