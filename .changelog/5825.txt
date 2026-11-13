@@ -1,0 +1,3 @@
+```release-note:security
+Pin `github.com/klauspost/compress` to v1.19.0 to address vulnerability [[CVE-2026-63209](https://osv.dev/vulnerability/CVE-2026-63209)] in the acceptance and control-plane submodules.
+```
