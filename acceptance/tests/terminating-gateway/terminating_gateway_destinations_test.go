@@ -34,7 +34,6 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 	}
 
 	const (
-		staticServerServiceName = "static-server.default"
 		staticServerHostnameID  = "static-server-hostname"
 		staticServerIPID        = "static-server-ip"
 		terminatingGatewayRules = `service_prefix "static-server" {
@@ -56,6 +55,13 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 		name := fmt.Sprintf("secure: %t", c.secure)
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
+			// The static-server is deployed into the context's namespace, which is
+			// not always "default" (consul-test on OpenShift).
+			staticServerNamespace := ctx.KubectlOptions(t).Namespace
+			if staticServerNamespace == "" {
+				staticServerNamespace = "default"
+			}
+			staticServerServiceName := "static-server." + staticServerNamespace
 
 			helmValues := map[string]string{
 				"connectInject.enabled":                    "true",

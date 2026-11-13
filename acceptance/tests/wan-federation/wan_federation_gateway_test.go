@@ -207,11 +207,17 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 	// On startup, the controller can take upwards of 1m to perform
 	// leader election so we may need to wait a long time for
 	// the reconcile loop to run (hence the 1m timeout here).
+	// The gateway is applied with `kubectl apply -k` into the context's namespace
+	// (consul-test on OpenShift, default elsewhere), so look it up there.
+	gatewayNamespace := ctx.KubectlOptions(t).Namespace
+	if gatewayNamespace == "" {
+		gatewayNamespace = "default"
+	}
 	var gatewayAddress string
 	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 		require.NoError(r, err)
 
 		// check that we have an address to use
