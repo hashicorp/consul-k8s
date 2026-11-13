@@ -33,7 +33,7 @@ six==1.16.0
 # GHSA-gjv8-xp57-g29c (polynomial-time ReDoS in IDENTIFIER/VALUE selector
 # sub-patterns), and GHSA-j934-xhv5-fg8f (polynomial-time ReDoS in RE_WS_END
 # whitespace/comment trimming regex).
-soupsieve==2.10
+soupsieve==4.0
 # tornado 6.6.1 is the latest stable release; 6.6 fixes GHSA-r4j5-9xpp-3985
 # (event loop blocking and excess memory use from chunked bodies with many
 # small chunks). Earlier 6.5.x releases fixed CVE-2026-103262: unbounded memory
