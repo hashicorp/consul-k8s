@@ -173,46 +173,52 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			}
 
 			if gracePeriodSeconds > 0 {
-				// Ensure outbound requests are still successful during grace period.
-				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
+				// Ensure outbound requests are successful only within a stable subset
+				// of the configured proxy grace window, and do not run checks past the deadline
+				// where pod/envoy teardown races can cause false negatives.
+				// We stop probing 1s before the deadline to account for kubectl exec latency:
+				// on slow platforms (EKS), an exec against a terminating pod can hang for
+				// several seconds before returning NotFound, so checking the top of each
+				// iteration prevents an in-flight probe from crossing the grace boundary.
+				graceDeadline := time.Now().Add(time.Duration(gracePeriodSeconds) * time.Second)
 				podGoneEarly := false
 			gracePeriodLoop:
 				for {
-					select {
-					case <-gracePeriodTimer.C:
+					// Guard at the top: stop before starting a new probe if fewer than
+					// 1s remain, to ensure the exec completes before pod teardown.
+					if time.Until(graceDeadline) < 1*time.Second {
 						break gracePeriodLoop
-					default:
-						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
-						retry.RunWith(retrier, t, func(r *retry.R) {
-							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
-							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
-							if err != nil {
-								// OpenShift can remove the pod before the grace period timer fires.
-								if (cfg.EnableOpenshift || cfg.UseOpenshift) && strings.Contains(output, "not found") {
-									podGoneEarly = true
-									return
-								}
-								r.Errorf("%v", err.Error())
+					}
+					retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
+					retry.RunWith(retrier, t, func(r *retry.R) {
+						logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
+						output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
+						if err != nil {
+							// OpenShift can remove the pod before the grace period deadline.
+							if (cfg.EnableOpenshift || cfg.UseOpenshift) && strings.Contains(output, "not found") {
+								podGoneEarly = true
 								return
 							}
-							require.Condition(r, func() bool {
-								return !strings.Contains(output, "curl: (7) Failed to connect")
-							}, fmt.Sprintf("Error: %s", output))
-						})
-						if podGoneEarly {
-							break gracePeriodLoop
+							r.Errorf("%v", err.Error())
+							return
 						}
-
-						// If listener draining is disabled, ensure inbound
-						// requests are accepted during grace period.
-						if !drainListenersEnabled {
-							connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
-						}
-						// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
-						// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
-
-						time.Sleep(2 * time.Second)
+						require.Condition(r, func() bool {
+							return !strings.Contains(output, "curl: (7) Failed to connect")
+						}, fmt.Sprintf("Error: %s", output))
+					})
+					if podGoneEarly {
+						break gracePeriodLoop
 					}
+
+					// If listener draining is disabled, ensure inbound
+					// requests are accepted during grace period.
+					if !drainListenersEnabled {
+						connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+					}
+					// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
+					// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
+
+					time.Sleep(1 * time.Second)
 				}
 			} else {
 				// Ensure outbound requests fail because proxy has terminated
