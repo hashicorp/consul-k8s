@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -26,6 +27,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -185,13 +187,43 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 }
 
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
-    actualName := getCoreDNSConfigMapName(t, ctx)
+    primaryName, targetName := coreDNSConfigMapToPatch(t, ctx)
 
-    // 1. BACKUP: Capture the current state
-    logger.Log(t, "Backing up original CoreDNS config...")
-    originalConfig, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), 
-        "get", "configmap", actualName, "-n", "kube-system", "-o", "yaml")
-    require.NoError(t, err)
+    // Both files live in a per-test directory. They used to be fixed names in
+    // the working directory, which is wrong twice over: this function is called
+    // once per cluster (default and secondary) and again by the flip sub-tests,
+    // so each call overwrote the previous call's backup, and the cleanups then
+    // ran LIFO and restored whichever backup happened to be written last -- one
+    // cluster's Corefile into the other. It also wrote into the repository
+    // itself, so a real cluster's DNS config could be picked up by a tracked
+    // file and committed by accident.
+    workDir := t.TempDir()
+    backupFile := filepath.Join(workDir, "coredns-original.yaml")
+    customFile := filepath.Join(workDir, "coredns-custom.yaml")
+
+    // 1. BACKUP: Capture the current state of the ConfigMap we are about to
+    // change. On a managed CoreDNS that is coredns-custom, which usually does
+    // not exist yet, so its absence is expected and is restored by deleting it.
+    logger.Log(t, "Backing up original CoreDNS config...", "configmap", targetName)
+
+    // Only a coredns-custom that genuinely does not exist yet is allowed to be
+    // missing. Treating any other failure as "absent" would make the cleanup
+    // below delete the cluster's real DNS ConfigMap over a transient API error.
+    _, err := ctx.KubernetesClient(t).CoreV1().ConfigMaps("kube-system").
+        Get(context.Background(), targetName, metav1.GetOptions{})
+    existedBefore := err == nil
+    if !existedBefore {
+        require.Truef(t, apierrors.IsNotFound(err) && targetName == coreDNSCustomConfigMap,
+            "could not read configmap %s in kube-system: %v", targetName, err)
+        logger.Logf(t, "configmap %s does not exist yet, it will be deleted on cleanup", targetName)
+    }
+
+    var originalConfig string
+    if existedBefore {
+        originalConfig, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+            "get", "configmap", targetName, "-n", "kube-system", "-o", "yaml")
+        require.NoError(t, err)
+    }
 
     // --- FIX: Sanitize the YAML to remove version locking ---
     // We remove fields that cause "Conflict" errors during restore.
@@ -211,34 +243,129 @@ func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, re
     cleanConfig := strings.Join(sanitizedLines, "\n")
     // ---------------------------------------------------------
 
-    // Write the sanitized backup file
-    err = os.WriteFile("coredns-original.yaml", []byte(cleanConfig), 0644)
-    require.NoError(t, err)
+    // Write the sanitized backup file. There is nothing to back up when the
+    // ConfigMap does not exist yet, and the restore below is skipped in that
+    // case, so an empty file would only be a trap for a later reader.
+    if existedBefore {
+        err = os.WriteFile(backupFile, []byte(cleanConfig), 0644)
+        require.NoError(t, err)
+    }
 
     // 2. GENERATE & APPLY Custom Config
-    updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, port, "coredns-custom.yaml")
-    updateCoreDNS(t, ctx, "coredns-custom.yaml")
+    updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, port, customFile, targetName)
+    updateCoreDNS(t, ctx, customFile, targetName, primaryName)
 
     // 3. CLEANUP: Restore the backup
     t.Cleanup(func() {
         logger.Log(t, "Restoring original CoreDNS configuration...")
-        updateCoreDNS(t, ctx, "coredns-original.yaml")
+        if existedBefore {
+            updateCoreDNS(t, ctx, backupFile, targetName, primaryName)
+        } else {
+            _, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+                "delete", "configmap", targetName, "-n", "kube-system", "--ignore-not-found")
+            require.NoError(t, err)
+            restartDNSDeployment(t, ctx, primaryName)
+        }
         time.Sleep(5 * time.Second)
     })
 }
 
+// coreDNSCustomConfigMap is the ConfigMap a managed CoreDNS imports extra
+// server blocks from.
+const coreDNSCustomConfigMap = "coredns-custom"
+
+// coreDNSConfigMapToPatch returns the ConfigMap that a stub domain for the
+// consul zone has to be written to.
+//
+// On a managed CoreDNS the Corefile itself is off limits: AKS owns the coredns
+// ConfigMap and its reconciler restores its own Corefile over any edit, so a
+// stub domain written there disappears part way through a run and queries for
+// .consul quietly fall through to the cluster's upstream resolver. Such a
+// CoreDNS instead imports extra server blocks from a separate coredns-custom
+// ConfigMap, which nothing reconciles away.
+//
+// The Corefile's own import line is what selects the strategy, rather than a
+// cloud vendor label, because it is the thing that actually decides whether a
+// custom server block will be loaded, and it keeps working for any other
+// distribution that adopts the same mechanism.
+// It returns two names, because on a managed CoreDNS they differ: primary is
+// the cluster's own DNS ConfigMap, which also identifies the DNS Deployment,
+// and target is the ConfigMap this test may write to. Callers need both, and
+// passing them explicitly is what keeps the Deployment choice tied to the
+// cluster's DNS rather than to whatever we happen to be patching.
+func coreDNSConfigMapToPatch(t *testing.T, ctx environment.TestContext) (primary string, target string) {
+    cm := getCoreDNSConfigMap(t, ctx)
+    require.NotNil(t, cm, "could not find the cluster's CoreDNS ConfigMap")
+
+    // The glob is matched without its "import " prefix or leading path so that
+    // any spelling of the import line is recognised. GKE's kube-dns ConfigMap
+    // has no Corefile key at all and EKS, kind and upstream CoreDNS ship no
+    // import line, so all three keep their existing strategy.
+    if strings.Contains(cm.Data["Corefile"], "custom/*.server") {
+        logger.Log(t, "CoreDNS imports custom server blocks, its Corefile is managed", "configmap", cm.Name)
+        return cm.Name, coreDNSCustomConfigMap
+    }
+    return cm.Name, cm.Name
+}
+
+// restartDNSDeployment rolls the cluster DNS deployment and waits for it to
+// come back, so that a Corefile change is certain to be in effect before the
+// caller queries anything.
+// primaryConfigMapName is the cluster's own DNS ConfigMap, never the
+// coredns-custom one: the Deployment to roll follows the cluster's DNS, not the
+// ConfigMap this test happens to be writing to.
+func restartDNSDeployment(t *testing.T, ctx environment.TestContext, primaryConfigMapName string) {
+    deploymentName := "deployment/coredns"
+    if strings.Contains(primaryConfigMapName, "kube-dns") {
+        deploymentName = "deployment/kube-dns"
+    }
+
+    logger.Log(t, "Restarting DNS deployment", "name", deploymentName)
+    _, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "restart", deploymentName, "-n", "kube-system")
+    require.NoError(t, err)
+
+    out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", deploymentName, "-n", "kube-system")
+    require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
+}
+
 func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
-    enableDNSProxy bool, port string, dnsFileName string) {
+    enableDNSProxy bool, port string, dnsFileName string, actualName string) {
     
     // Calculate target IP
     dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
     require.NoError(t, err)
-    
-    actualName := getCoreDNSConfigMapName(t, ctx)
 
     dnsTarget := dnsIP
     if enableDNSProxy {
         dnsTarget = net.JoinHostPort(dnsIP, port)
+    }
+
+    // --- STRATEGY C: AKS / managed CoreDNS (coredns-custom) ---
+    // The Corefile is owned by the cluster's addon reconciler and any edit to
+    // it is restored, so the stub domain goes into the ConfigMap the Corefile
+    // imports extra server blocks from. The key has to end in .server for the
+    // `import custom/*.server` line to pick it up.
+    if actualName == coreDNSCustomConfigMap {
+        logger.Log(t, "Detected managed CoreDNS. Using coredns-custom strategy.", "target", dnsTarget)
+
+        configMapYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: %s
+  namespace: kube-system
+data:
+  consul.server: |
+    consul:53 {
+        errors
+        cache 30
+        forward . %s
+    }
+`, coreDNSCustomConfigMap, dnsTarget)
+
+        err = os.WriteFile(dnsFileName, []byte(configMapYAML), 0644)
+        require.NoError(t, err)
+        return
     }
 
     // --- STRATEGY A: GKE / Legacy (kube-dns) ---
@@ -267,8 +394,10 @@ data:
         return
     }
 
-    // --- STRATEGY B: EKS / AKS / Standard (coredns) ---
-    // Standard clusters allow us to overwrite the Corefile.
+    // --- STRATEGY B: EKS / Standard (coredns) ---
+    // An unmanaged CoreDNS lets us overwrite the Corefile outright. Note this
+    // is only reached when the Corefile imports no custom server blocks, i.e.
+    // when nothing will restore it behind our back.
     logger.Log(t, "Detected Standard CoreDNS. Using Corefile template strategy.", "target", dnsTarget)
 
     input, err := os.ReadFile("coredns-template.yaml")
@@ -281,9 +410,7 @@ data:
     require.NoError(t, err)
 }
 
-func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
-    actualName := getCoreDNSConfigMapName(t, ctx)
-
+func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string, actualName string, primaryConfigMapName string) {
     // --- STEP 0: PATCH THE FILE ---
     content, err := os.ReadFile(coreDNSConfigFile)
     require.NoError(t, err)
@@ -291,8 +418,10 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
     strContent := string(content)
     fileChanged := false
 
-    // Ensure name matches the cluster (kube-dns vs coredns)
-    if actualName == "kube-dns" && strings.Contains(strContent, "name: coredns") {
+    // Ensure name matches the cluster (kube-dns vs coredns). coredns-custom is
+    // its own ConfigMap and is never renamed, and "name: coredns" is a prefix
+    // of "name: coredns-custom", so an unguarded rename would corrupt it.
+    if actualName == "kube-dns" && strings.Contains(strContent, "name: coredns\n") {
         logger.Log(t, "Patching config file to target kube-dns instead of coredns")
         strContent = strings.ReplaceAll(strContent, "name: coredns", "name: kube-dns")
         fileChanged = true
@@ -321,33 +450,23 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
     })
 
     // --- STEP 2: VALIDATE OUTPUT ---
-    msgConfigured := fmt.Sprintf("configmap/%s configured", actualName)
-    msgReplaced := fmt.Sprintf("configmap/%s replaced", actualName)
-    msgUnchanged := fmt.Sprintf("configmap/%s unchanged", actualName)
-
-    require.True(t, 
-        strings.Contains(logs, msgConfigured) || strings.Contains(logs, msgReplaced) || strings.Contains(logs, msgUnchanged), 
-        "expected CoreDNS update output to contain '%s', '%s', or '%s' but got: \n%s", 
-        msgConfigured, msgReplaced, msgUnchanged, logs)
-
-    // --- STEP 3: RESTART DEPLOYMENT ---
-    deploymentName := "deployment/coredns"
-    if strings.Contains(actualName, "kube-dns") {
-        deploymentName = "deployment/kube-dns"
+    // "created" belongs here too: coredns-custom normally does not exist until
+    // the first time this runs, so the first apply reports a create.
+    var accepted []string
+    for _, verb := range []string{"configured", "replaced", "unchanged", "created"} {
+        accepted = append(accepted, fmt.Sprintf("configmap/%s %s", actualName, verb))
     }
 
-    logger.Log(t, "Restarting DNS deployment", "name", deploymentName)
+    require.True(t, 
+        slices.ContainsFunc(accepted, func(msg string) bool { return strings.Contains(logs, msg) }),
+        "expected CoreDNS update output to contain one of %v but got: \n%s",
+        accepted, logs)
 
-    restartCoreDNSCommand := []string{"rollout", "restart", deploymentName, "-n", "kube-system"}
-    _, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
-    require.NoError(t, err)
-
-    // --- STEP 4: WAIT FOR ROLLOUT ---
-    out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", deploymentName, "-n", "kube-system")
-    require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
+    // --- STEP 3: RESTART AND WAIT FOR ROLLOUT ---
+    restartDNSDeployment(t, ctx, primaryConfigMapName)
 }
 
-func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
+func getCoreDNSConfigMap(t *testing.T, ctx environment.TestContext) *corev1.ConfigMap {
     client := ctx.KubernetesClient(t).CoreV1().ConfigMaps("kube-system")
     ctxBg := context.Background()
 
@@ -364,7 +483,7 @@ func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
             for _, cm := range cms.Items {
                 if _, ok := cm.Data["Corefile"]; ok {
                     logger.Log(t, "found DNS configmap via label with Corefile", "label", label, "name", cm.Name)
-                    return cm.Name
+                    return cm.DeepCopy()
                 }
             }
         }
@@ -376,7 +495,7 @@ func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
         cm, err := client.Get(ctxBg, name, metav1.GetOptions{})
         if err == nil {
             logger.Log(t, "found DNS configmap via name", "name", cm.Name)
-            return cm.Name
+            return cm
         }
     }
 
@@ -390,7 +509,7 @@ func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
     }
     t.Fatalf("Failed to find CoreDNS ConfigMap. Checked labels: %v, Checked names: %v. Available: %v", 
         labelSelectors, knownNames, observedNames)
-    return ""
+    return nil
 }
 func verifyDNS(
 	t *testing.T,
