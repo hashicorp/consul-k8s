@@ -96,6 +96,14 @@ resource "azurerm_kubernetes_cluster" "default" {
   }
 
   tags = var.tags
+
+  // A healthy delete takes ~5m. If Azure is running a platform operation on the
+  // nodes (e.g. UpgradeVMAgent), the delete fails on the Azure side but the
+  // provider keeps polling until the timeout. Keep the timeout short so the
+  // destroy step in CI can retry with a fresh delete request.
+  timeouts {
+    delete = "30m"
+  }
 }
 
 resource "local_file" "kubeconfigs" {
