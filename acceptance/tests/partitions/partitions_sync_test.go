@@ -105,6 +105,10 @@ func TestPartitions_Sync(t *testing.T) {
 			serverHelmValues := map[string]string{
 				"server.exposeGossipAndRPCPorts": "true",
 			}
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				// External servers use the expose-servers LoadBalancer, not host ports.
+				serverHelmValues["server.exposeGossipAndRPCPorts"] = "false"
+			}
 
 			// On Kind, there are no load balancers but since all clusters
 			// share the same node network (docker bridge), we can use
@@ -199,16 +203,10 @@ func TestPartitions_Sync(t *testing.T) {
 			}
 
 			logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
-			k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
-			})
+			k8s.CreateNamespaces(t, primaryClusterContext, cfg, staticServerNamespace)
 
 			logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
-			k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
-			})
+			k8s.CreateNamespaces(t, secondaryClusterContext, cfg, staticServerNamespace)
 
 			consulClient, _ := primaryConsulCluster.SetupConsulClient(t, c.ACLsEnabled)
 

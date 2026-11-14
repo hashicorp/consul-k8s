@@ -41,12 +41,16 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 
-	defaultNamespace := "default"
+	k8sOptions := ctx.KubectlOptions(t)
+	defaultNamespace := k8sOptions.Namespace
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		defaultNamespace, k8sOptions = createNamespace(t, ctx, cfg)
+	}
 
 	// create a service to target
 	targetName := "static-server"
 	logger.Log(t, "creating target server")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployStaticWorkload(t, k8sOptions, cfg, "../fixtures/cases/static-server-inject")
 
 	// create a basic GatewayClassConfig
 	gatewayClassConfigName := "controlled-gateway-class-config"
@@ -55,12 +59,21 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 			Name: gatewayClassConfigName,
 		},
 	}
+	if cfg.EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
+	}
 	logger.Log(t, "creating gateway class config")
 	err := k8sClient.Create(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateway class configs")
-		k8sClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{})
+		if cfg.EnableOpenshift || cfg.UseOpenshift {
+			require.NoError(t, client.IgnoreNotFound(k8sClient.Delete(context.Background(), gatewayClassConfig)))
+			k8s.RunKubectl(t, k8sOptions, "wait", "--for=delete", "--timeout=2m",
+				"gatewayclassconfigs.consul.hashicorp.com/"+gatewayClassConfigName)
+		} else {
+			k8sClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{})
+		}
 	})
 
 	gatewayParametersRef := &gwv1.ParametersReference{
@@ -71,21 +84,33 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// create three gateway classes, two we control, one we don't
 	controlledGatewayClassOneName := "controlled-gateway-class-one"
+	controlledGatewayClassTwoName := "controlled-gateway-class-two"
+	uncontrolledGatewayClassName := "uncontrolled-gateway-class"
 	logger.Log(t, "creating controlled gateway class one")
 	createGatewayClass(t, k8sClient, controlledGatewayClassOneName, gatewayClassControllerName, gatewayParametersRef)
+	gatewayClassNames := []string{controlledGatewayClassOneName}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateway classes")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{})
+		if cfg.EnableOpenshift || cfg.UseOpenshift {
+			for _, name := range gatewayClassNames {
+				gatewayClass := &gwv1.GatewayClass{ObjectMeta: metav1.ObjectMeta{Name: name}}
+				require.NoError(t, client.IgnoreNotFound(k8sClient.Delete(context.Background(), gatewayClass)))
+				k8s.RunKubectl(t, k8sOptions, "wait", "--for=delete", "--timeout=2m",
+					"gatewayclasses.gateway.networking.k8s.io/"+name)
+			}
+		} else {
+			k8sClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{})
+		}
 	})
 
-	controlledGatewayClassTwoName := "controlled-gateway-class-two"
 	logger.Log(t, "creating controlled gateway class two")
 	createGatewayClass(t, k8sClient, controlledGatewayClassTwoName, gatewayClassControllerName, gatewayParametersRef)
+	gatewayClassNames = append(gatewayClassNames, controlledGatewayClassTwoName)
 
-	uncontrolledGatewayClassName := "uncontrolled-gateway-class"
 	logger.Log(t, "creating uncontrolled gateway class")
 	createGatewayClass(t, k8sClient, uncontrolledGatewayClassName, "example.com/some-controller", nil)
+	gatewayClassNames = append(gatewayClassNames, uncontrolledGatewayClassName)
 
 	// Create a certificate to reference in listeners
 	certificateInfo := generateCertificate(t, nil, "certificate.consul.local")
@@ -133,15 +158,23 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	routeOneName := "route-one"
 	logger.Log(t, "creating route one")
 	routeOne := createRoute(t, k8sClient, routeOneName, defaultNamespace, controlledGatewayOneName, targetName)
+	routeNames := []string{routeOneName}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all http routes")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1.HTTPRoute{}, client.InNamespace(defaultNamespace))
+		if cfg.EnableOpenshift || cfg.UseOpenshift {
+			for _, name := range routeNames {
+				k8s.DeleteOpenShiftHTTPRoute(t, k8sClient, defaultNamespace, name)
+			}
+		} else {
+			k8sClient.DeleteAllOf(context.Background(), &gwv1.HTTPRoute{}, client.InNamespace(defaultNamespace))
+		}
 	})
 
 	routeTwoName := "route-two"
 	logger.Log(t, "creating route two")
 	routeTwo := createRoute(t, k8sClient, routeTwoName, defaultNamespace, controlledGatewayTwoName, targetName)
+	routeNames = append(routeNames, routeTwoName)
 
 	// Scenario: Ensure ACL roles/policies are set correctly
 	logger.Log(t, "checking that ACL roles/policies are set correctly for controlled gateway one")
@@ -460,6 +493,12 @@ func createGatewayClass(t *testing.T, client client.Client, name, controllerName
 			ControllerName: gwv1.GatewayController(controllerName),
 			ParametersRef:  parameters,
 		},
+	}
+	if cfg := suite.Config(); cfg.EnableOpenshift || cfg.UseOpenshift {
+		// Lets the OpenShift cleanup script find cluster-scoped classes left by this namespace.
+		gatewayClass.Labels = map[string]string{
+			"consul.hashicorp.com/acceptance-namespace": suite.Environment().DefaultContext(t).KubectlOptions(t).Namespace,
+		}
 	}
 
 	err := client.Create(context.Background(), gatewayClass)
