@@ -148,3 +148,24 @@ target=templates/gateway-resources-job.yaml
   local actual=$(echo $tolerations | yq 'contains(["tolerations","- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node\" \n\"value\": \"clients\" \n- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node2\" \n\"value\": \"clients2\"" ])')
   [ "${actual}" = "true" ]
 }
+
+@test "gatewayresources/Job: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s $target  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "gatewayresources/Job: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s $target  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.apiGateway.managedGatewayClass.resourceJob.tolerations=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
