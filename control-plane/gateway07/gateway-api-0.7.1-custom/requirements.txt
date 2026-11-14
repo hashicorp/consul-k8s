@@ -34,14 +34,16 @@ six==1.16.0
 # sub-patterns), and GHSA-j934-xhv5-fg8f (polynomial-time ReDoS in RE_WS_END
 # whitespace/comment trimming regex).
 soupsieve==2.10
-# tornado 6.5.9 fixes CVE-2026-103262: unbounded memory accumulation in
-# CurlAsyncHTTPClient decompression bomb via gzip-encoded responses.
-# Also fixes GHSA-mgf9-4vpg-hj56 (CVE-2026-49855) gzip-bomb,
+# tornado 6.6.1 is the latest stable release; 6.6 fixes GHSA-r4j5-9xpp-3985
+# (event loop blocking and excess memory use from chunked bodies with many
+# small chunks). Earlier 6.5.x releases fixed CVE-2026-103262: unbounded memory
+# accumulation in CurlAsyncHTTPClient decompression bomb via gzip-encoded
+# responses, GHSA-mgf9-4vpg-hj56 (CVE-2026-49855) gzip-bomb,
 # GHSA-3x9g-8vmp-wqvf cross-origin Authorization/Cookie leak,
 # GHSA-pw6j-qg29-8w7f CurlAsyncHTTPClient credential leak on handle reuse, and
 # GHSA-mpf4-983q-p7j4 (CVE-2026-82397): urlencoded body DoS via unbounded
 # field count (max_num_fields not passed to parse_qs).
-tornado==6.5.9
+tornado==6.6.1
 # urllib3 2.8.0 fixes CVE-2026-97687 (proxy TLS context contamination) and
 # CVE-2026-97689 (unbounded memory via unterminated chunked transfer encoding).
 # Also fixes CVE-2026-44432 (partial decompression exhaustion).
