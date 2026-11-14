@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/require"
 )
 
 // Test that terminating gateways work in a default and secure installations.
@@ -53,6 +55,15 @@ func TestTerminatingGateway(t *testing.T) {
 
 			// Once the cluster is up, register the external service, then create the config entry.
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
+			written, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
+				Kind: api.ProxyDefaults,
+				Name: api.ProxyConfigGlobal,
+				Config: map[string]interface{}{
+					"protocol": "http",
+				},
+			}, nil)
+			require.NoError(t, err)
+			require.True(t, written)
 
 			logger.Log(t, "creating terminating gateway")
 			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
@@ -95,6 +106,18 @@ func TestTerminatingGateway(t *testing.T) {
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerLocalAddress)
+
+			helpers.CheckListenerTracing(t, func(t *testing.T, enabled bool) {
+				helpers.SetGlobalListenerTracing(t, consulClient, enabled)
+			}, helpers.ListenerTracingTarget{
+				Options:       ctx.KubectlOptions(t),
+				LabelSelector: fmt.Sprintf("component=terminating-gateway,release=%s", releaseName),
+				StatPrefix:    "upstream.",
+			}, helpers.ListenerTracingTarget{
+				Options:       ctx.KubectlOptions(t),
+				LabelSelector: "app=static-client",
+				StatPrefix:    "upstream.",
+			})
 		})
 	}
 }
