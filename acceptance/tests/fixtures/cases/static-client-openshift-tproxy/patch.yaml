@@ -1,9 +1,9 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
-# When using the CNI on OpenShift, we need to specify the
-# network attachment definition for the pods to use. This assumes
-# that one named 'consul-cni' was created by the acceptance tests.
+# This fixture is for OpenShift WITHOUT CNI enabled and transparent proxy.
+# For OpenShift WITH CNI, use static-client-openshift-tproxy-cni instead.
+# Note: The previous version incorrectly included CNI annotations.
 
 apiVersion: apps/v1
 kind: Deployment
@@ -14,5 +14,4 @@ spec:
     metadata:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "k8s.v1.cni.cncf.io/networks": '[{ "name":"consul-cni" }]'
 
