@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-helm/hack/aws-acceptance-test-cleanup
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.1
