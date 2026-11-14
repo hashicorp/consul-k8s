@@ -5,6 +5,7 @@ package apigateway
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"testing"
@@ -62,8 +63,8 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	consulCluster.Create(t)
 
 	logger.Log(t, "creating static-server and static-client deployments")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+	k8s.DeployStaticWorkload(t, ctx.KubectlOptions(t), cfg, "../fixtures/cases/static-server-inject")
+	k8s.DeployStaticWorkload(t, ctx.KubectlOptions(t), cfg, "../fixtures/cases/static-client-inject")
 
 	// Override the default proxy config settings for this test
 	consulClient, _ := consulCluster.SetupConsulClient(t, true, serverReleaseName)
@@ -83,6 +84,11 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	logger.Log(t, "creating certificate secret")
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	require.NoError(t, err, out)
+	if cfg.EnableOpenshift {
+		certificate := generateCertificate(t, nil, "gateway.test.local")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "certificate", "--type=merge", "-p",
+			fmt.Sprintf(`{"data":{"tls.crt":"%s","tls.key":"%s"}}`, base64.StdEncoding.EncodeToString(certificate.CertPEM), base64.StdEncoding.EncodeToString(certificate.PrivateKeyPEM)))
+	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
@@ -110,9 +116,10 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
 	helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+	k8s.MarkAcceptanceResource(t, ctx.KubectlOptions(t), cfg, "gatewayclasses.gateway.networking.k8s.io", "gateway-class")
 
 	logger.Log(t, "patching route to target server")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
 
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
@@ -124,7 +131,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	var gatewayAddress string
 	retryCheck(t, 60, func(r *retry.R) {
 		var gateway gwv1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: ctx.KubectlOptions(t).Namespace}, &gateway)
 		require.NoError(r, err)
 
 		// check that we have an address to use

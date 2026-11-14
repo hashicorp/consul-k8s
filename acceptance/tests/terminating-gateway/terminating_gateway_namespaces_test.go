@@ -64,6 +64,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
+			k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, testNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
@@ -274,6 +275,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					if ns != "default" && !ok {
 						logger.Logf(t, "creating Kubernetes namespace %s", ns)
 						k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", ns)
+						k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, ns)
 						helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 							k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", ns)
 						})
@@ -322,6 +324,9 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					NoCleanup:           cfg.NoCleanup,
 					KustomizeConfigPath: tc.externalServiceRegistrationConfig.path,
 				}
+				if (cfg.EnableOpenshift || cfg.UseOpenshift) && tc.externalServiceRegistrationConfig.namespace == "default" {
+					k8sOpts.KustomizeConfigPath = "../fixtures/cases/terminating-gateway-namespaces/external-service-default/external-service-registration"
+				}
 
 				consulOpts := helpers.ConsulOptions{
 					ConsulClient:                    consulClient,
@@ -330,6 +335,11 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				}
 
 				helpers.RegisterExternalServiceCRD(t, k8sOpts, consulOpts)
+				if cfg.EnableOpenshift || cfg.UseOpenshift {
+					k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "registrations.consul.hashicorp.com", consulOpts.ExternalServiceNameRegistration,
+						"-n", externalServiceRegistrationNSOpts.Namespace,
+						"consul.hashicorp.com/acceptance-namespace="+ctx.KubectlOptions(t).Namespace, "--overwrite")
+				}
 
 				// Deploy the static client
 				logger.Log(t, "deploying static client")
