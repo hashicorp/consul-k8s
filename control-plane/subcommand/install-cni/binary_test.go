@@ -9,8 +9,12 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/control-plane/cni/nftlock"
 )
 
 func TestCopyFile(t *testing.T) {
@@ -146,4 +150,206 @@ func TestRemoveFile(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// writeTestNftBundle creates a bundle laid out like the one produced by bundle-nft.sh.
+func writeTestNftBundle(t *testing.T, dir, nftContent string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "lib"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ld.so"), []byte("loader"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "nft"), []byte(nftContent), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "lib", "libnftables.so.1"), []byte("lib"), 0o644))
+}
+
+func bundleVersions(t *testing.T, dir string) []string {
+	t.Helper()
+	versions, err := filepath.Glob(filepath.Join(dir, nftBundleVersionPrefix+"*"))
+	require.NoError(t, err)
+	for i := range versions {
+		versions[i] = filepath.Base(versions[i])
+	}
+	return versions
+}
+
+func TestInstallNftBundle(t *testing.T) {
+	src, dest := t.TempDir(), t.TempDir()
+	writeTestNftBundle(t, src, "v1")
+
+	require.NoError(t, installNftBundle(src, dest))
+
+	link := filepath.Join(dest, consulNftName)
+	target, err := os.Readlink(link)
+	require.NoError(t, err)
+	require.Equal(t, []string{target}, bundleVersions(t, dest))
+	require.False(t, filepath.IsAbs(target), "symlink target should be relative")
+
+	for name, perm := range map[string]os.FileMode{"ld.so": 0o755, "nft": 0o755, "lib/libnftables.so.1": 0o644} {
+		info, err := os.Stat(filepath.Join(link, name))
+		require.NoError(t, err, name)
+		require.Equal(t, perm, info.Mode().Perm(), name)
+	}
+	content, err := os.ReadFile(filepath.Join(link, "nft"))
+	require.NoError(t, err)
+	require.Equal(t, "v1", string(content))
+
+	// No temporary files are left behind.
+	leftovers, err := filepath.Glob(filepath.Join(dest, nftBundleTempPrefix+"*"))
+	require.NoError(t, err)
+	require.Empty(t, leftovers)
+}
+
+func TestInstallNftBundle_Idempotent(t *testing.T) {
+	src, dest := t.TempDir(), t.TempDir()
+	writeTestNftBundle(t, src, "v1")
+
+	require.NoError(t, installNftBundle(src, dest))
+	first, err := os.Readlink(filepath.Join(dest, consulNftName))
+	require.NoError(t, err)
+	require.NoError(t, installNftBundle(src, dest))
+	second, err := os.Readlink(filepath.Join(dest, consulNftName))
+	require.NoError(t, err)
+
+	require.Equal(t, first, second)
+	require.Equal(t, []string{first}, bundleVersions(t, dest))
+}
+
+func TestInstallNftBundle_UpgradeKeepsPreviousVersion(t *testing.T) {
+	dest := t.TempDir()
+	link := filepath.Join(dest, consulNftName)
+	var targets []string
+	for _, v := range []string{"v1", "v2", "v3"} {
+		src := t.TempDir()
+		writeTestNftBundle(t, src, v)
+		require.NoError(t, installNftBundle(src, dest))
+		target, err := os.Readlink(link)
+		require.NoError(t, err)
+		targets = append(targets, target)
+
+		content, err := os.ReadFile(filepath.Join(link, "nft"))
+		require.NoError(t, err)
+		require.Equal(t, v, string(content))
+	}
+
+	// v1 is pruned, v2 is kept as the previous version for in-flight plugin invocations.
+	require.ElementsMatch(t, []string{targets[1], targets[2]}, bundleVersions(t, dest))
+}
+
+func TestInstallNftBundle_ReinstallKeepsPreviousVersion(t *testing.T) {
+	dest := t.TempDir()
+	v1, v2 := t.TempDir(), t.TempDir()
+	writeTestNftBundle(t, v1, "v1")
+	writeTestNftBundle(t, v2, "v2")
+
+	require.NoError(t, installNftBundle(v1, dest))
+	require.NoError(t, installNftBundle(v2, dest))
+	before := bundleVersions(t, dest)
+	require.Len(t, before, 2)
+
+	// Installing the current version again must not prune the previous one (v1 -> v2 -> v2).
+	require.NoError(t, installNftBundle(v2, dest))
+	require.ElementsMatch(t, before, bundleVersions(t, dest))
+	content, err := os.ReadFile(filepath.Join(dest, consulNftName, "nft"))
+	require.NoError(t, err)
+	require.Equal(t, "v2", string(content))
+}
+
+func TestInstallNftBundle_WaitsForPlugin(t *testing.T) {
+	src, dest := t.TempDir(), t.TempDir()
+	writeTestNftBundle(t, src, "v1")
+	require.NoError(t, installNftBundle(src, dest))
+
+	// A plugin invocation holds the shared lock while it runs nft.
+	release, err := nftlock.Shared(dest, time.Second)
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() { done <- removeNftBundle(dest) }()
+	select {
+	case <-done:
+		t.Fatal("bundle removed while a plugin invocation was using it")
+	case <-time.After(100 * time.Millisecond):
+	}
+	_, err = os.Stat(filepath.Join(dest, consulNftName, "nft"))
+	require.NoError(t, err)
+
+	release()
+	require.NoError(t, <-done)
+	_, err = os.Lstat(filepath.Join(dest, consulNftName))
+	require.True(t, os.IsNotExist(err))
+}
+
+func TestInstallNftBundle_ReplacesNonSymlink(t *testing.T) {
+	src, dest := t.TempDir(), t.TempDir()
+	writeTestNftBundle(t, src, "v1")
+	require.NoError(t, os.WriteFile(filepath.Join(dest, consulNftName), []byte("stale file"), 0o755))
+
+	require.NoError(t, installNftBundle(src, dest))
+	info, err := os.Lstat(filepath.Join(dest, consulNftName))
+	require.NoError(t, err)
+	require.NotZero(t, info.Mode()&os.ModeSymlink)
+}
+
+func TestInstallNftBundle_RejectsUnsupportedFiles(t *testing.T) {
+	src, dest := t.TempDir(), t.TempDir()
+	writeTestNftBundle(t, src, "v1")
+	require.NoError(t, os.Symlink("nft", filepath.Join(src, "link")))
+
+	require.ErrorContains(t, installNftBundle(src, dest), "unsupported file type")
+	_, err := os.Lstat(filepath.Join(dest, consulNftName))
+	require.True(t, os.IsNotExist(err))
+}
+
+func TestRemoveNftBundle(t *testing.T) {
+	src, dest := t.TempDir(), t.TempDir()
+	writeTestNftBundle(t, src, "v1")
+	require.NoError(t, installNftBundle(src, dest))
+	other := filepath.Join(dest, "other-plugin")
+	require.NoError(t, os.WriteFile(other, []byte("x"), 0o755))
+
+	require.NoError(t, removeNftBundle(dest))
+
+	_, err := os.Lstat(filepath.Join(dest, consulNftName))
+	require.True(t, os.IsNotExist(err))
+	require.Empty(t, bundleVersions(t, dest))
+	_, err = os.Stat(other)
+	require.NoError(t, err, "unrelated files must not be removed")
+	_, err = os.Stat(filepath.Join(dest, nftlock.FileName))
+	require.True(t, os.IsNotExist(err), "lock file must be removed")
+
+	// Removing again is a no-op.
+	require.NoError(t, removeNftBundle(dest))
+	_, err = os.Stat(filepath.Join(dest, nftlock.FileName))
+	require.True(t, os.IsNotExist(err))
+
+	// So is removing from a directory that does not exist.
+	require.NoError(t, removeNftBundle(filepath.Join(dest, "missing")))
+}
+
+func TestCommand_InstallNftBundleMissingSource(t *testing.T) {
+	src, dest := t.TempDir(), t.TempDir()
+	cmd := &Command{flagCNIBinSourceDir: src, logger: hclog.NewNullLogger()}
+
+	require.NoError(t, cmd.installNftBundle(dest))
+
+	_, err := os.Lstat(filepath.Join(dest, consulNftName))
+	require.True(t, os.IsNotExist(err))
+}
+
+func TestCommand_InstallNftBundleError(t *testing.T) {
+	src := t.TempDir()
+	writeTestNftBundle(t, filepath.Join(src, consulNftName), "v1")
+	cmd := &Command{flagCNIBinSourceDir: src, logger: hclog.NewNullLogger()}
+
+	// Run fails before enabling the plugin when the bundle cannot be installed.
+	require.Error(t, cmd.installNftBundle(filepath.Join(t.TempDir(), "missing")))
+}
+
+func TestCommand_InstallNftBundle(t *testing.T) {
+	src, dest := t.TempDir(), t.TempDir()
+	writeTestNftBundle(t, filepath.Join(src, consulNftName), "v1")
+	cmd := &Command{flagCNIBinSourceDir: src, logger: hclog.NewNullLogger()}
+
+	require.NoError(t, cmd.installNftBundle(dest))
+	content, err := os.ReadFile(filepath.Join(dest, consulNftName, "nft"))
+	require.NoError(t, err)
+	require.Equal(t, "v1", string(content))
 }

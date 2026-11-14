@@ -1,0 +1,3 @@
+```release-note:bug
+cni: Fix transparent proxy traffic redirection failing on nodes that do not ship nftables, or whose nft cannot read rules from stdin (e.g. GKE Container-Optimized OS). The CNI installer now copies the nft binary from the control-plane image's nftables package, together with its shared libraries, to the CNI bin directory. The plugin prefers this bundled nft, falls back to the node's nft when no bundle is installed, and applies rules from a script file instead of stdin.
+```

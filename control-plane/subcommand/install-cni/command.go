@@ -27,6 +27,7 @@ import (
 const (
 	defaultCNIBinSourceDir = "/bin"
 	consulCNIName          = "consul-cni" // Name of the plugin and binary. They must be the same as per the CNI spec.
+	consulNftName          = "consul-nft" // Bundled nft used by the plugin when the node has no nft.
 	defaultLogJSON         = false
 	gracePeriodTimeout     = 100 * time.Second
 )
@@ -163,6 +164,13 @@ func (c *Command) Run(args []string) int {
 	// Watch for changes in the binary file and copy it to the destination when updates occur.
 	if err := c.binWatcher(ctx, srcFile, cfg.CNIBinDir, cfg.Type); err != nil {
 		c.logger.Error("Binary watcher failed", "error", err)
+		return 1
+	}
+
+	// Copy the bundled nft so the plugin can apply rules on nodes without nft (e.g. GKE COS). Fail before
+	// the plugin is enabled so that the pod is restarted and the installation retried.
+	if err := c.installNftBundle(cfg.CNIBinDir); err != nil {
+		c.logger.Error("Unable to install nft bundle", "error", err)
 		return 1
 	}
 
@@ -355,6 +363,14 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 		if err != nil {
 			c.logger.Error("Unable to cleanup CNI Config: %w", err)
 		}
+	}
+
+	// Remove the nft bundle before the consul-cni binary: a new installer pod waits for consul-cni to be
+	// removed before it installs its own files, so removing the bundle afterwards could delete them. The
+	// removal waits for in-flight plugin invocations that are running the bundled nft.
+	c.logger.Info("Removing nft bundle", "dir", cfg.CNIBinDir)
+	if err = removeNftBundle(cfg.CNIBinDir); err != nil {
+		c.logger.Error("Unable to remove nft bundle", "error", err)
 	}
 
 	cniBinaryPath := filepath.Join(cfg.CNIBinDir, cfg.Type)

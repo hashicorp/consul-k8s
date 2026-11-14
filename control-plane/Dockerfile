@@ -59,6 +59,22 @@ ENV VERSION=${VERSION}
 # Add --upgrade to ensure the latest security patches for iputils are applied
 RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables zlib
 
+# Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
+# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
+# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
+RUN set -eu; d=/bin/consul-nft; \
+    loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
+    test -n "$loader"; \
+    mkdir -p "$d/lib"; \
+    cp /usr/sbin/nft "$d/nft"; \
+    cp -L "$loader" "$d/ld.so"; \
+    for lib in $(ldd /usr/sbin/nft | sed -n 's|.*=> \(/[^ ]*\) .*|\1|p'); do cp -L "$lib" "$d/lib/"; done; \
+    chmod 0755 "$d" "$d/lib" "$d/nft" "$d/ld.so"; \
+    chmod 0644 "$d"/lib/*; \
+    deps=$("$d/ld.so" --library-path "$d/lib" --list "$d/nft"); \
+    if echo "$deps" | grep -q "not found"; then echo "$deps"; exit 1; fi; \
+    if echo "$deps" | grep "=>" | grep -v "=> $d/" | grep -v "=> $loader "; then exit 1; fi
+
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
@@ -111,6 +127,22 @@ ENV VERSION=${PRODUCT_VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
 RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ nftables zlib
+
+# Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
+# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
+# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
+RUN set -eu; d=/bin/consul-nft; \
+    loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
+    test -n "$loader"; \
+    mkdir -p "$d/lib"; \
+    cp /usr/sbin/nft "$d/nft"; \
+    cp -L "$loader" "$d/ld.so"; \
+    for lib in $(ldd /usr/sbin/nft | sed -n 's|.*=> \(/[^ ]*\) .*|\1|p'); do cp -L "$lib" "$d/lib/"; done; \
+    chmod 0755 "$d" "$d/lib" "$d/nft" "$d/ld.so"; \
+    chmod 0644 "$d"/lib/*; \
+    deps=$("$d/ld.so" --library-path "$d/lib" --list "$d/nft"); \
+    if echo "$deps" | grep -q "not found"; then echo "$deps"; exit 1; fi; \
+    if echo "$deps" | grep "=>" | grep -v "=> $d/" | grep -v "=> $loader "; then exit 1; fi
 
 # for FIPS CGO glibc compatibility in alpine
 # see https://github.com/golang/go/issues/59305
@@ -185,6 +217,22 @@ COPY LICENSE /licenses/mozilla.txt
 RUN microdnf update -y && \
     microdnf install -y ca-certificates libcap openssl shadow-utils nftables && \
     microdnf clean all
+
+# Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
+# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
+# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
+RUN set -eu; d=/bin/consul-nft; \
+    loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
+    test -n "$loader"; \
+    mkdir -p "$d/lib"; \
+    cp /usr/sbin/nft "$d/nft"; \
+    cp -L "$loader" "$d/ld.so"; \
+    for lib in $(ldd /usr/sbin/nft | sed -n 's|.*=> \(/[^ ]*\) .*|\1|p'); do cp -L "$lib" "$d/lib/"; done; \
+    chmod 0755 "$d" "$d/lib" "$d/nft" "$d/ld.so"; \
+    chmod 0644 "$d"/lib/*; \
+    deps=$("$d/ld.so" --library-path "$d/lib" --list "$d/nft"); \
+    if echo "$deps" | grep -q "not found"; then echo "$deps"; exit 1; fi; \
+    if echo "$deps" | grep "=>" | grep -v "=> $d/" | grep -v "=> $loader "; then exit 1; fi
 
 # Create a non-root user to run the software. On OpenShift, this
 # will not matter since the container is run as a random user and group
