@@ -85,7 +85,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		isEnterpriseDistribution = true
 	} else {
 		var err error
-		isEnterpriseDistribution, err = consul.IsEnterpriseDistribution(consulConfig, watcher)
+		isEnterpriseDistribution, err = consul.IsEnterpriseDistribution(ctx, consulConfig, watcher)
 		if err != nil {
 			setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; multi-port service registrations will remain disabled until a valid license is detected", "error", err)
 			isEnterpriseDistribution = false
