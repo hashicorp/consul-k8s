@@ -66,7 +66,22 @@ func (v *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
-	return common.ValidateConfigEntry(ctx, req, v.Logger, v, &mesh, v.ConsulMeta)
+	var oldMesh *Mesh
+	if req.Operation == admissionv1.Update && len(req.OldObject.Raw) > 0 {
+		oldMesh = &Mesh{}
+		if err := v.decoder.DecodeRaw(req.OldObject, oldMesh); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+	}
+	if err := mesh.ValidateOutgoingECDHCurvesUpdate(oldMesh); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	resp := common.ValidateConfigEntry(ctx, req, v.Logger, v, &mesh, v.ConsulMeta)
+	if resp.Allowed {
+		resp = resp.WithWarnings(mesh.ECDHCurvesP256Warnings()...)
+	}
+	return resp
 }
 
 func (v *MeshWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
