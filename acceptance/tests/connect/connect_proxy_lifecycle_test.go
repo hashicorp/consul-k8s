@@ -181,19 +181,34 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 				// several seconds before returning NotFound, so checking the top of each
 				// iteration prevents an in-flight probe from crossing the grace boundary.
 				graceDeadline := time.Now().Add(time.Duration(gracePeriodSeconds) * time.Second)
+				podGoneEarly := false
+			gracePeriodLoop:
 				for {
 					// Guard at the top: stop before starting a new probe if fewer than
 					// 1s remain, to ensure the exec completes before pod teardown.
 					if time.Until(graceDeadline) < 1*time.Second {
-						break
+						break gracePeriodLoop
 					}
-					logger.Logf(t, "checking connectivity to static-server from terminating pod %s", clientPodName)
-					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
-					require.NoError(t, err)
-
-					require.Condition(t, func() bool {
-						return !strings.Contains(output, "curl: (7) Failed to connect")
-					}, fmt.Sprintf("Error: %s", output))
+					retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
+					retry.RunWith(retrier, t, func(r *retry.R) {
+						logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
+						output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
+						if err != nil {
+							// OpenShift can remove the pod before the grace period deadline.
+							if (cfg.EnableOpenshift || cfg.UseOpenshift) && strings.Contains(output, "not found") {
+								podGoneEarly = true
+								return
+							}
+							r.Errorf("%v", err.Error())
+							return
+						}
+						require.Condition(r, func() bool {
+							return !strings.Contains(output, "curl: (7) Failed to connect")
+						}, fmt.Sprintf("Error: %s", output))
+					})
+					if podGoneEarly {
+						break gracePeriodLoop
+					}
 
 					// If listener draining is disabled, ensure inbound
 					// requests are accepted during grace period.
@@ -213,6 +228,10 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					require.Condition(r, func() bool {
 						exists := false
 						if strings.Contains(output, "curl: (7) Failed to connect") {
+							exists = true
+						}
+						// CRI-O rejects exec once the terminating container has stopped.
+						if (cfg.EnableOpenshift || cfg.UseOpenshift) && strings.Contains(output, "container is not created or running") {
 							exists = true
 						}
 						return exists

@@ -1,0 +1,13 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: certificate
+  labels:
+    test-certificate: "true"
+type: kubernetes.io/tls
+data:
+  tls.crt: ""
+  tls.key: ""

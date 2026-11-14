@@ -5,23 +5,133 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 )
+
+// EnsureOpenShiftNamespace waits for a terminating namespace to disappear before
+// recreating it. It reports whether this call created the namespace.
+func EnsureOpenShiftNamespace(t *testing.T, client kubernetes.Interface, namespace string) bool {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	created, err := ensureOpenShiftNamespace(ctx, client, namespace)
+	require.NoError(t, err)
+	return created
+}
+
+func ensureOpenShiftNamespace(ctx context.Context, client kubernetes.Interface, namespace string) (bool, error) {
+	created := false
+	var conditions []corev1.NamespaceCondition
+	var lastAPIError error
+	err := wait.PollUntilContextCancel(ctx, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		ns, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+		if err == nil {
+			conditions = ns.Status.Conditions
+			return ns.DeletionTimestamp == nil, nil
+		}
+		if !apierrors.IsNotFound(err) {
+			if IsRetryableOpenShiftAPIError(err) {
+				lastAPIError = err
+				return false, nil
+			}
+			return false, err
+		}
+		_, err = client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespace},
+		}, metav1.CreateOptions{})
+		if apierrors.IsAlreadyExists(err) {
+			return false, nil
+		}
+		if err != nil && IsRetryableOpenShiftAPIError(err) {
+			lastAPIError = err
+			return false, nil
+		}
+		created = err == nil
+		return created, err
+	})
+	if err != nil {
+		return false, fmt.Errorf("waiting for OpenShift namespace %s to be active (last conditions: %v, last API error: %v): %w", namespace, conditions, lastAPIError, err)
+	}
+	return created, nil
+}
+
+// IsRetryableOpenShiftAPIError identifies transient API transport failures,
+// including errors wrapped by controller-runtime discovery.
+func IsRetryableOpenShiftAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) || apierrors.IsTooManyRequests(err) || apierrors.IsServiceUnavailable(err) {
+		return true
+	}
+	var networkError net.Error
+	if errors.As(err, &networkError) && networkError.Timeout() {
+		return true
+	}
+	for _, connectionError := range []error{syscall.ECONNRESET, syscall.ECONNREFUSED, syscall.ETIMEDOUT} {
+		if errors.Is(err, connectionError) {
+			return true
+		}
+	}
+	for _, connectionError := range openShiftKubeAPIConnectErrs {
+		if strings.Contains(err.Error(), connectionError) {
+			return true
+		}
+	}
+	return false
+}
+
+// CreateNamespaces tracks partial creation on OpenShift so failures cannot
+// leave untracked fixtures on a reused cluster.
+func CreateNamespaces(t *testing.T, ctx environment.TestContext, cfg *config.TestConfig, namespaces ...string) {
+	t.Helper()
+	options := ctx.KubectlOptions(t)
+	if !cfg.EnableOpenshift && !cfg.UseOpenshift {
+		for _, namespace := range namespaces {
+			RunKubectl(t, options, "create", "ns", namespace)
+		}
+		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			RunKubectl(t, options, append([]string{"delete", "ns"}, namespaces...)...)
+		})
+		return
+	}
+
+	var created []string
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		if len(created) == 0 {
+			return
+		}
+		args := append([]string{"delete", "ns"}, created...)
+		args = append(args, "--timeout=3m")
+		RunKubectl(t, options, args...)
+	})
+	for _, namespace := range namespaces {
+		require.Truef(t, EnsureOpenShiftNamespace(t, ctx.KubernetesClient(t), namespace),
+			"test namespace %s already exists and is active; clean up the previous test before rerunning", namespace)
+		created = append(created, namespace)
+		MarkAcceptanceNamespace(t, options, cfg, namespace)
+	}
+}
 
 // KubernetesAPIServerHostFromOptions returns the Kubernetes API server host from options.
 func KubernetesAPIServerHostFromOptions(t *testing.T, options *terratestk8s.KubectlOptions) string {
