@@ -189,7 +189,7 @@ func (w *MeshWebhook) containerInit(ctx context.Context, namespace corev1.Namesp
 			},
 			corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_META",
-				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+				Value: fmt.Sprintf("pod=$(POD_NAMESPACE)/$(POD_NAME),container=%s", injectInitContainerName),
 			})
 
 		if w.EnableNamespaces {
