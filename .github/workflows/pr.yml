@@ -2,7 +2,7 @@
 name: pr
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, ready_for_review]
     branches:
       - main
       - "release/**"
@@ -53,7 +53,7 @@ jobs:
       - conditional-skip
       - check-release-only
       - get-go-version
-    if: needs.conditional-skip.outputs.skip-ci != 'true' && needs.check-release-only.outputs.release-only != 'true'
+    if: needs.conditional-skip.outputs.skip-ci != 'true' && needs.check-release-only.outputs.release-only != 'true' && !github.event.pull_request.draft
     uses: ./.github/workflows/coverage.yml
     with:
       go-version: ${{ needs.get-go-version.outputs.go-version }}
