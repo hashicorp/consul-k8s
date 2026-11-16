@@ -236,7 +236,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	if c.nftablesProvider != nil {
 		nftCfg.NftablesProvider = c.nftablesProvider
 	} else {
-		nftCfg.NftablesProvider = newNftProvider(args.Netns, bundledNftDirs(cfg.CNIBinDir)...)
+		nftCfg.NftablesProvider = newNftProvider(logger, args.Netns, bundledNftDirs(cfg.CNIBinDir)...)
 	}
 
 	// Apply the nft rules.

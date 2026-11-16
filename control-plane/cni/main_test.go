@@ -768,7 +768,7 @@ func writeBundle(t *testing.T, binDir string, loaderScript string) string {
 }
 
 func TestNftProvider_RulesAndClear(t *testing.T) {
-	p := newNftProvider("")
+	p := newNftProvider(nil, "")
 	p.AddRule("nft", "add", "table", "inet", "consul")
 	p.AddRule("nft", "add", "chain", "inet", "consul", "PREROUTING")
 	require.Equal(t, []string{
@@ -784,7 +784,7 @@ func TestNftProvider_NftCommand(t *testing.T) {
 	hostNft := func(string) (string, error) { return "/usr/sbin/nft", nil }
 
 	t.Run("falls back to host nft without bundle", func(t *testing.T) {
-		p := newNftProvider("", t.TempDir())
+		p := newNftProvider(nil, "", t.TempDir())
 		p.lookPath = hostNft
 		cmd, release, err := p.nftCommand()
 		require.NoError(t, err)
@@ -795,7 +795,7 @@ func TestNftProvider_NftCommand(t *testing.T) {
 	t.Run("prefers bundle through its loader over host nft", func(t *testing.T) {
 		empty, dir := t.TempDir(), t.TempDir()
 		bundle := writeBundle(t, dir, "")
-		p := newNftProvider("", "", empty, dir)
+		p := newNftProvider(nil, "", "", empty, dir)
 		p.lookPath = hostNft
 		cmd, release, err := p.nftCommand()
 		require.NoError(t, err)
@@ -816,7 +816,7 @@ func TestNftProvider_NftCommand(t *testing.T) {
 		dir := t.TempDir()
 		writeBundle(t, dir, "")
 		require.NoError(t, os.Remove(filepath.Join(dir, nftlock.FileName)))
-		p := newNftProvider("", dir)
+		p := newNftProvider(nil, "", dir)
 		p.lookPath = hostNft
 		cmd, release, err := p.nftCommand()
 		require.NoError(t, err)
@@ -824,7 +824,7 @@ func TestNftProvider_NftCommand(t *testing.T) {
 		require.Equal(t, []string{"/usr/sbin/nft"}, cmd)
 	})
 
-	t.Run("fails when the bundle stays locked by the installer", func(t *testing.T) {
+	t.Run("falls back to host nft when the bundle stays locked by the installer", func(t *testing.T) {
 		if runtime.GOOS == "windows" {
 			t.Skip("locking is a no-op on Windows")
 		}
@@ -833,18 +833,38 @@ func TestNftProvider_NftCommand(t *testing.T) {
 		unlock, err := nftlock.Exclusive(dir, time.Second)
 		require.NoError(t, err)
 		defer unlock()
-		p := newNftProvider("", dir)
+		p := newNftProvider(nil, "", dir)
 		p.lookPath = hostNft
 		p.lockTimeout = 50 * time.Millisecond
+		cmd, release, err := p.nftCommand()
+		require.NoError(t, err)
+		release()
+		require.Equal(t, []string{"/usr/sbin/nft"}, cmd)
+	})
+
+	t.Run("fails when the bundle stays locked and there is no host nft", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("locking is a no-op on Windows")
+		}
+		dir := t.TempDir()
+		writeBundle(t, dir, "")
+		unlock, err := nftlock.Exclusive(dir, time.Second)
+		require.NoError(t, err)
+		defer unlock()
+		p := newNftProvider(nil, "", dir)
+		p.lookPath = notFound
+		p.lockTimeout = 50 * time.Millisecond
 		_, _, err = p.nftCommand()
+		require.ErrorContains(t, err, "nft binary not found in PATH")
 		require.ErrorContains(t, err, "could not lock bundled")
+		require.ErrorContains(t, err, "timed out")
 	})
 
 	t.Run("ignores incomplete bundle", func(t *testing.T) {
 		dir := t.TempDir()
 		bundle := writeBundle(t, dir, "")
 		require.NoError(t, os.Chmod(filepath.Join(bundle, "nft"), 0o644))
-		p := newNftProvider("", dir)
+		p := newNftProvider(nil, "", dir)
 		p.lookPath = notFound
 		_, _, err := p.nftCommand()
 		require.ErrorContains(t, err, "nft binary not found in PATH")
@@ -854,7 +874,7 @@ func TestNftProvider_NftCommand(t *testing.T) {
 	t.Run("ignores dangling symlink", func(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.Symlink(".consul-nft-v-gone", filepath.Join(dir, bundledNftName)))
-		p := newNftProvider("", dir)
+		p := newNftProvider(nil, "", dir)
 		p.lookPath = notFound
 		_, _, err := p.nftCommand()
 		require.ErrorContains(t, err, "nft binary not found in PATH")
@@ -871,7 +891,7 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 		t.Setenv("TMPDIR", tmp)
 		bundle := writeBundle(t, dir, "")
 		var gotNS string
-		p := newNftProvider("/var/run/netns/pod", dir)
+		p := newNftProvider(nil, "/var/run/netns/pod", dir)
 		p.lookPath = notFound
 		p.runInNetNS = func(path string, fn func() error) error {
 			gotNS = path
@@ -895,7 +915,7 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 	t.Run("no netns runs in current namespace", func(t *testing.T) {
 		dir := t.TempDir()
 		writeBundle(t, dir, "")
-		p := newNftProvider("", dir)
+		p := newNftProvider(nil, "", dir)
 		p.lookPath = notFound
 		p.runInNetNS = func(string, func() error) error { return errors.New("should not be called") }
 		p.AddRule("nft", "flush", "ruleset")
@@ -905,7 +925,7 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 	t.Run("returns netns error", func(t *testing.T) {
 		dir := t.TempDir()
 		writeBundle(t, dir, "")
-		p := newNftProvider("/var/run/netns/missing", dir)
+		p := newNftProvider(nil, "/var/run/netns/missing", dir)
 		p.lookPath = notFound
 		p.runInNetNS = func(string, func() error) error { return errors.New("netns gone") }
 		require.ErrorContains(t, p.ApplyRules("nft"), "netns gone")
@@ -915,7 +935,7 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 		dir, tmp := t.TempDir(), t.TempDir()
 		t.Setenv("TMPDIR", tmp)
 		writeBundle(t, dir, "#!/bin/sh\necho boom >&2\nexit 1\n")
-		p := newNftProvider("", dir)
+		p := newNftProvider(nil, "", dir)
 		p.lookPath = notFound
 		err := p.ApplyRules("nft")
 		require.ErrorContains(t, err, "failed to apply nftables rules")
@@ -926,7 +946,7 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 	})
 
 	t.Run("no nft available", func(t *testing.T) {
-		p := newNftProvider("", t.TempDir())
+		p := newNftProvider(nil, "", t.TempDir())
 		p.lookPath = notFound
 		require.ErrorContains(t, p.ApplyRules("nft"), "nft binary not found")
 	})

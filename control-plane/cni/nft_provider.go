@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/vishvananda/netns"
 
 	"github.com/hashicorp/consul-k8s/control-plane/cni/nftlock"
@@ -38,15 +39,20 @@ type nftProvider struct {
 	runInNetNS func(path string, fn func() error) error
 	// lockTimeout bounds the wait for the CNI installer to finish installing or removing the bundle.
 	lockTimeout time.Duration
+	logger      hclog.Logger
 }
 
-func newNftProvider(netNS string, binDirs ...string) *nftProvider {
+func newNftProvider(logger hclog.Logger, netNS string, binDirs ...string) *nftProvider {
+	if logger == nil {
+		logger = hclog.NewNullLogger()
+	}
 	return &nftProvider{
 		netNS:       netNS,
 		binDirs:     binDirs,
 		lookPath:    exec.LookPath,
 		runInNetNS:  runInNetNS,
 		lockTimeout: 10 * time.Second,
+		logger:      logger,
 	}
 }
 
@@ -122,9 +128,12 @@ func writeNftScript(lines []string) (string, error) {
 
 // nftCommand returns the command used to run nft: the bundled nft run through its bundled dynamic loader,
 // so that a known nft version with its own libraries is used, or the node's nft binary from PATH if no
-// bundle is installed. When the bundle is used it is locked (shared) until release is called.
+// usable bundle is installed. A bundle that cannot be locked in time, e.g. because the installer is still
+// replacing it, is skipped so that the node's nft can be used instead. When the bundle is used it is locked
+// (shared) until release is called.
 func (n *nftProvider) nftCommand() (cmd []string, release func(), err error) {
 	var searched []string
+	var lockErrs []error
 	for _, dir := range n.binDirs {
 		if dir == "" {
 			continue
@@ -137,7 +146,10 @@ func (n *nftProvider) nftCommand() (cmd []string, release func(), err error) {
 			continue
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not lock bundled %s: %w", bundle, err)
+			err = fmt.Errorf("could not lock bundled %s: %w", bundle, err)
+			n.logger.Warn("skipping bundled nft", "error", err)
+			lockErrs = append(lockErrs, err)
+			continue
 		}
 		// Resolve the symlink once so that all paths refer to the same bundle version even if the
 		// installer swaps the symlink to a new version while nft is running.
@@ -154,8 +166,9 @@ func (n *nftProvider) nftCommand() (cmd []string, release func(), err error) {
 	if path, err := n.lookPath("nft"); err == nil {
 		return []string{path}, func() {}, nil
 	}
-	return nil, nil, fmt.Errorf("nft binary not found in PATH and bundled %s not found (searched %s)",
+	notFoundErr := fmt.Errorf("nft binary not found in PATH and no usable bundled %s (searched %s)",
 		bundledNftName, strings.Join(searched, ", "))
+	return nil, nil, errors.Join(append([]error{notFoundErr}, lockErrs...)...)
 }
 
 func isExecutable(path string) bool {
