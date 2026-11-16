@@ -92,6 +92,12 @@ func NewHelmCluster(
 
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
+	if cfg.EnableOpenshift && openshiftOwnsGatewayAPICRDs(t, ctx) {
+		// OpenShift 4.19+ installs and owns the gateway.networking.k8s.io CRDs, so the
+		// chart must not render them or Helm refuses to install. Tests can still
+		// override this through helmValues, which are merged afterwards.
+		values["global.openshift.isOcpGreaterthan4_18"] = "true"
+	}
 	helpers.MergeMaps(values, helmValues)
 
 	logger := terratestLogger.New(logger.TestLogger{})
@@ -123,6 +129,18 @@ func NewHelmCluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 	}
+}
+
+// openshiftOwnsGatewayAPICRDs reports whether the target cluster runs OpenShift 4.19 or
+// newer, where the platform ships and owns the Gateway API CRDs.
+func openshiftOwnsGatewayAPICRDs(t *testing.T, ctx environment.TestContext) bool {
+	t.Helper()
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "clusterversion", "version", "-o", "jsonpath={.status.desired.version}")
+	require.NoErrorf(t, err, "failed to get OpenShift cluster version: %s", out)
+	var major, minor int
+	_, err = fmt.Sscanf(strings.TrimSpace(out), "%d.%d", &major, &minor)
+	require.NoErrorf(t, err, "failed to parse OpenShift cluster version %q", out)
+	return major > 4 || (major == 4 && minor >= 19)
 }
 
 func (h *HelmCluster) Create(t *testing.T) {

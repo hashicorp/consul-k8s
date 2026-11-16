@@ -3,6 +3,7 @@ package openshift
 import (
 	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -20,14 +21,16 @@ func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespace
 	cmd = exec.Command("helm", "uninstall", "consul", "--namespace", "consul")
 	_, _ = cmd.CombinedOutput()
 
-	// Bypass finalizers for the consul namespace deletion.
+	// Cleanup of old consul namespace. Only bypass finalizers if a normal delete gets stuck.
 	ns := "consul"
-	cmd = exec.Command("bash", "-c", `kubectl get ns "`+ns+`" -o json | jq 'del(.spec.finalizers)' | kubectl replace --raw "/api/v1/namespaces/`+ns+`/finalize" -f -`)
-	_ = cmd.Run()
-
-	// Cleanup of old consul namespace
-	cmd = exec.Command("kubectl", "delete", "namespace", "consul")
+	cmd = exec.Command("kubectl", "delete", "namespace", ns, "--ignore-not-found", "--wait=true", "--timeout=5m")
 	_, _ = cmd.CombinedOutput()
+	if exec.Command("kubectl", "get", "namespace", ns).Run() == nil {
+		cmd = exec.Command("bash", "-c", `kubectl get ns "`+ns+`" -o json | jq 'del(.spec.finalizers)' | kubectl replace --raw "/api/v1/namespaces/`+ns+`/finalize" -f -`)
+		_ = cmd.Run()
+		cmd = exec.Command("kubectl", "wait", "--for=delete", "namespace/"+ns, "--timeout=2m")
+		_, _ = cmd.CombinedOutput()
+	}
 
 	// Add the hashicorp helm repo
 	cmd = exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")
@@ -61,25 +64,30 @@ func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespace
 	})
 
 	chartPath := "../../../charts/consul"
-	cmd = exec.Command("helm", "upgrade", "--install", "consul", chartPath,
+	helmArgs := []string{"upgrade", "--install", "consul", chartPath,
 		"--namespace", "consul",
 		"--set", "global.name=consul",
 		"--set", "connectInject.enabled=true",
 		"--set", "connectInject.transparentProxy.defaultEnabled=false",
 		"--set", "connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts=8000",
-		"--set", "global.acls.manageSystemACLs="+strconv.FormatBool(secure),
-		"--set", "global.tls.enabled="+strconv.FormatBool(secure),
-		"--set", "global.tls.enableAutoEncrypt="+strconv.FormatBool(secure),
-		"--set", "global.enableConsulNamespaces="+strconv.FormatBool(namespaceMirroring),
-		"--set", "global.consulNamespaces.mirroringK8S="+strconv.FormatBool(namespaceMirroring),
+		"--set", "global.acls.manageSystemACLs=" + strconv.FormatBool(secure),
+		"--set", "global.tls.enabled=" + strconv.FormatBool(secure),
+		"--set", "global.tls.enableAutoEncrypt=" + strconv.FormatBool(secure),
+		"--set", "global.enableConsulNamespaces=" + strconv.FormatBool(namespaceMirroring),
+		"--set", "global.consulNamespaces.mirroringK8S=" + strconv.FormatBool(namespaceMirroring),
 		"--set", "global.openshift.enabled=true",
-		"--set", "global.image="+cfg.ConsulImage,
-		"--set", "global.imageK8S="+cfg.ConsulK8SImage,
-		"--set", "global.imageConsulDataplane="+cfg.ConsulDataplaneImage,
+		"--set", "global.image=" + cfg.ConsulImage,
+		"--set", "global.imageK8S=" + cfg.ConsulK8SImage,
+		"--set", "global.imageConsulDataplane=" + cfg.ConsulDataplaneImage,
 		"--set", "global.enterpriseLicense.secretName=consul-ent-license",
 		"--set", "global.enterpriseLicense.secretKey=key",
 		"--set", "connectInject.apiGateway.manageExternalCRDs=true",
-	)
+	}
+	// OpenShift 4.19+ ships and owns the gateway.networking.k8s.io CRDs, so the chart must not render them.
+	if openshiftVersionAtLeast(t, 4, 19) {
+		helmArgs = append(helmArgs, "--set", "global.openshift.isOcpGreaterthan4_18=true")
+	}
+	cmd = exec.Command("helm", helmArgs...)
 
 	output, err = cmd.CombinedOutput()
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
@@ -89,4 +97,18 @@ func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespace
 	})
 
 	require.NoErrorf(t, err, "failed to install consul: %s", string(output))
+}
+
+// openshiftVersionAtLeast reports whether the cluster's OpenShift version is at least major.minor.
+func openshiftVersionAtLeast(t *testing.T, major, minor int) bool {
+	t.Helper()
+	out, err := exec.Command("kubectl", "get", "clusterversion", "version", "-o", "jsonpath={.status.desired.version}").CombinedOutput()
+	require.NoErrorf(t, err, "failed to get OpenShift cluster version: %s", string(out))
+	parts := strings.SplitN(strings.TrimSpace(string(out)), ".", 3)
+	require.GreaterOrEqualf(t, len(parts), 2, "unexpected OpenShift version %q", string(out))
+	gotMajor, err := strconv.Atoi(parts[0])
+	require.NoError(t, err)
+	gotMinor, err := strconv.Atoi(parts[1])
+	require.NoError(t, err)
+	return gotMajor > major || (gotMajor == major && gotMinor >= minor)
 }

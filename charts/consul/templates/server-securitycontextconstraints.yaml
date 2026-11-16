@@ -34,6 +34,11 @@ requiredDropCapabilities:
 - SETGID
 runAsUser:
   type: MustRunAsRange
+{{- /* The server containers set seccompProfile RuntimeDefault (see
+consul.restrictedSecurityContext). An SCC with no seccompProfiles rejects any pod
+that sets a profile, so allow only runtime/default, as restricted-v2 does. */}}
+seccompProfiles:
+- runtime/default
 seLinuxContext:
   type: MustRunAs
 supplementalGroups:

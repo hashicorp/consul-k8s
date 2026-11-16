@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -41,7 +42,9 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 
-	defaultNamespace := "default"
+	// The gateways, routes and the target server all live in the test namespace
+	// ("default" unless -kube-namespaces says otherwise, e.g. consul-test on OpenShift).
+	defaultNamespace := gatewayTestNamespace(t, ctx)
 
 	// create a service to target
 	targetName := "static-server"
@@ -53,6 +56,11 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	gatewayClassConfig := &v1alpha1.GatewayClassConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: gatewayClassConfigName,
+		},
+		Spec: v1alpha1.GatewayClassConfigSpec{
+			// On OpenShift the gateway Role grants "use" of this SCC; the connect-injector can only
+			// grant an SCC it holds itself (restricted-v2, the chart default). Ignored elsewhere.
+			OpenshiftSCCName: "restricted-v2",
 		},
 	}
 	logger.Log(t, "creating gateway class config")
@@ -201,6 +209,9 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	logger.Log(t, "marking gateway two as using TCP")
 	updateKubernetes(t, k8sClient, controlledGatewayTwo, func(g *gwv1.Gateway) {
 		g.Spec.Listeners[0].Protocol = gwv1.TCPProtocolType
+		// A TCP listener carries no TLS config; Gateway API v1.1+ CRDs (OpenShift 4.19+)
+		// reject the update if it is left set. Older CRDs accept it either way.
+		g.Spec.Listeners[0].TLS = nil
 	})
 
 	// check that the route is unbound and all Consul objects and Kubernetes statuses are cleaned up
@@ -403,7 +414,12 @@ func createRoute(t *testing.T, client client.Client, name, namespace, parent, ta
 			Rules: []gwv1.HTTPRouteRule{
 				{BackendRefs: []gwv1.HTTPBackendRef{
 					{BackendRef: gwv1.BackendRef{
-						BackendObjectReference: gwv1.BackendObjectReference{Name: gwv1.ObjectName(target)},
+						// Gateway API v1.1+ CRDs (shipped by OpenShift 4.19+) reject a
+						// Service backendRef without a port; older CRDs accept it too.
+						BackendObjectReference: gwv1.BackendObjectReference{
+							Name: gwv1.ObjectName(target),
+							Port: ptr.To(gwv1.PortNumber(80)),
+						},
 					}},
 				}},
 			},

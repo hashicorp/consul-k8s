@@ -83,6 +83,12 @@ func NewCLICluster(
 
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
+	if cfg.EnableOpenshift && openshiftOwnsGatewayAPICRDs(t, ctx) {
+		// Same as NewHelmCluster: OpenShift 4.19+ owns the gateway.networking.k8s.io
+		// CRDs, so the chart must not render them or the install is refused. Tests
+		// can still override this through helmValues, which are merged afterwards.
+		values["global.openshift.isOcpGreaterthan4_18"] = "true"
+	}
 	helpers.MergeMaps(values, helmValues)
 
 	logger := terratestLogger.New(logger.TestLogger{})
