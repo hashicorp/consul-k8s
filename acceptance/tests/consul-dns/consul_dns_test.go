@@ -202,7 +202,7 @@ func configureOpenShiftDNSForConsul(t *testing.T, ctx environment.TestContext, r
 
 	upstream := dnsIP
 	if enableDNSProxy {
-		upstream = fmt.Sprintf("%s:%s", dnsIP, port)
+		upstream = net.JoinHostPort(dnsIP, port)
 	}
 
 	// Snapshot the existing spec.servers before patching so we can restore it in cleanup.
@@ -211,6 +211,25 @@ func configureOpenShiftDNSForConsul(t *testing.T, ctx environment.TestContext, r
 		"-o", "jsonpath={.spec.servers}")
 	require.NoError(t, err)
 	logger.Logf(t, "Captured existing OpenShift DNS Operator spec.servers: %s", existingServers)
+
+	// Register the restore before patching so the cluster DNS config is restored even if
+	// the patch or the wait below fails.
+	t.Cleanup(func() {
+		logger.Log(t, "Restoring OpenShift DNS Operator configuration to original spec.servers...")
+		var restorePatch string
+		if existingServers == "" || existingServers == "null" {
+			restorePatch = `{"spec":{"servers":null}}`
+		} else {
+			restorePatch = fmt.Sprintf(`{"spec":{"servers":%s}}`, existingServers)
+		}
+		_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+			"patch", "dns.operator.openshift.io", "default",
+			"--type=merge", "--patch", restorePatch)
+		if err != nil {
+			logger.Log(t, "Warning: failed to restore OpenShift DNS Operator config:", err)
+		}
+		time.Sleep(5 * time.Second)
+	})
 
 	logger.Logf(t, "Configuring OpenShift DNS Operator to forward consul domain to %s", upstream)
 	patchJSON := fmt.Sprintf(
@@ -237,24 +256,6 @@ func configureOpenShiftDNSForConsul(t *testing.T, ctx environment.TestContext, r
 
 	// Give CoreDNS time to reload the new configuration via the reload plugin.
 	time.Sleep(15 * time.Second)
-
-	// Cleanup: restore the original spec.servers snapshot.
-	t.Cleanup(func() {
-		logger.Log(t, "Restoring OpenShift DNS Operator configuration to original spec.servers...")
-		var restorePatch string
-		if existingServers == "" || existingServers == "null" {
-			restorePatch = `{"spec":{"servers":null}}`
-		} else {
-			restorePatch = fmt.Sprintf(`{"spec":{"servers":%s}}`, existingServers)
-		}
-		_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
-			"patch", "dns.operator.openshift.io", "default",
-			"--type=merge", "--patch", restorePatch)
-		if err != nil {
-			logger.Log(t, "Warning: failed to restore OpenShift DNS Operator config:", err)
-		}
-		time.Sleep(5 * time.Second)
-	})
 }
 
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {

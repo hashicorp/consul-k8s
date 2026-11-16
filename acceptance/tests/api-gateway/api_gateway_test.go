@@ -170,7 +170,8 @@ func TestAPIGateway_Basic(t *testing.T) {
 				logger.Log(t, "successfully patched httproute")
 			})
 
-			tcpRouteSupported := standardTCPRouteAvailable(t, ctx)
+			// Only skip TCPRoute on OpenShift; on other platforms a missing CRD should fail the test.
+			tcpRouteSupported := !(cfg.EnableOpenshift || cfg.UseOpenshift) || standardTCPRouteAvailable(t, ctx)
 			if tcpRouteSupported {
 				logger.Log(t, "creating target tcp server")
 				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
