@@ -183,6 +183,15 @@ func TestPartitions_Connect(t *testing.T) {
 
 			helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
 
+			// Pre-flight: wait for the primary's expose-servers Service to be
+			// reachable before installing the secondary cluster. The secondary
+			// install fires `partition-init` (pre-install) and
+			// `server-acl-init` (post-upgrade) Jobs that call this address;
+			// both are gated by helm's 15m hook timeout. Gating here surfaces
+			// LB cold-start latency deterministically rather than as a helm
+			// hook timeout. No-op on Kind.
+			k8s.WaitForServiceReachable(t, cfg, defaultPartitionClusterContext, partitionServiceName, 8501)
+
 			// Install the consul cluster without servers in the client cluster kubernetes context.
 			clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
 			clientConsulCluster.Create(t)

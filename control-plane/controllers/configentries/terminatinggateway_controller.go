@@ -579,14 +579,21 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 
 	for _, policy := range policiesToDelete {
 		// don't delete the policy for the gateway itself
-		if policy.Name == fmt.Sprintf("%s-policy", termGWName) {
+		policyName := policy.Name
+
+		if policyName == fmt.Sprintf("%s-policy", termGWName) {
 			continue
 		}
 
-		policy, _, err := consulClient.ACL().PolicyReadByName(policy.Name, nil)
+		policy, _, err := consulClient.ACL().PolicyReadByName(policyName, nil)
 		if err != nil {
-			log.Error(err, "failed to lookup policy by name from consul", policy.Name)
-			mErr = errors.Join(mErr, fmt.Errorf("error reading policy %q: %w", policy.Name, err))
+			log.Error(err, "failed to lookup policy by name from consul", policyName)
+			mErr = errors.Join(mErr, fmt.Errorf("error reading policy %q: %w", policyName, err))
+			continue
+		}
+
+		if policy == nil {
+			log.Info("unable to find policy by name", "policy", policyName)
 			continue
 		}
 

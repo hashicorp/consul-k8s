@@ -33,17 +33,16 @@ func TestRefreshDynamicClient(t *testing.T) {
 
 	connMgr := &MockServerConnectionManager{}
 
-	// Use a bad IP so that the client call fails
-	badState := discovery.State{
-		Address: discovery.Addr{
-			TCPAddr: net.TCPAddr{
-				IP:   net.ParseIP("126.0.0.1"),
-				Port: port,
-			},
-		},
-	}
+	// Only the IP of the connection manager state is used to build the client address; the port comes from the
+	// Config. Reserve a loopback port and close it so that nothing is listening on it. Connecting to it fails
+	// immediately with "connection refused", without depending on how the network handles packets sent to a
+	// routable address (which can time out instead).
+	closedListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	closedPort := closedListener.Addr().(*net.TCPAddr).Port
+	require.NoError(t, closedListener.Close())
 
-	goodState := discovery.State{
+	state := discovery.State{
 		Address: discovery.Addr{
 			TCPAddr: net.TCPAddr{
 				IP:   serverIP,
@@ -51,23 +50,20 @@ func TestRefreshDynamicClient(t *testing.T) {
 			},
 		},
 	}
-
-	// testify/mock has a weird behaviour when returning function calls. You cannot update On("State") to return
-	// something different but instead need to load up the returns. Here we are simulating a bad consul server manager
-	// state and then a good one
-	connMgr.On("State").Return(badState, nil).Once()
-	connMgr.On("State").Return(goodState, nil).Once()
+	connMgr.On("State").Return(state, nil)
 
 	cfg := capi.DefaultConfig()
-	client, err := NewDynamicClientFromConnMgr(&Config{APIClientConfig: cfg, HTTPPort: port, GRPCPort: port}, connMgr)
+	client, err := NewDynamicClientFromConnMgr(&Config{APIClientConfig: cfg, HTTPPort: closedPort, GRPCPort: closedPort}, connMgr)
 	require.NoError(t, err)
 
-	// Make a request to the bad ip of the server
+	// Make a request to the closed port
 	_, err = client.ConsulClient.Status().Leader()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connection refused")
 
-	// Refresh the client and make a call to the server now that consul-server-connection-manager state is good
+	// Point the config at the real server port, refresh the client and make a call to the server
+	client.Config.HTTPPort = port
+	client.Config.GRPCPort = port
 	err = client.RefreshClient()
 	require.NoError(t, err)
 	leader, err := client.ConsulClient.Status().Leader()

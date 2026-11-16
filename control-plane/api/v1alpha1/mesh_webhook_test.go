@@ -24,9 +24,11 @@ func TestValidateMesh(t *testing.T) {
 
 	cases := map[string]struct {
 		existingResources []runtime.Object
+		oldResource       *Mesh
 		newResource       *Mesh
 		expAllow          bool
 		expErrMessage     string
+		expWarnings       []string
 	}{
 		"no duplicates, valid": {
 			existingResources: nil,
@@ -112,7 +114,97 @@ func TestValidateMesh(t *testing.T) {
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_2",
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519", "P-256"},
+						},
+					},
+				},
+			},
+			expAllow: true,
+		},
+		"validation accepts incoming ecdhCurves with TLSv1_2 without P-256 with a warning": {
+			existingResources: nil,
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Mesh,
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_2",
 							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+			expAllow:    true,
+			expWarnings: []string{`spec.tls.incoming.ecdhCurves does not include "P-256" while TLS 1.2 can be negotiated; TLS 1.2 handshakes with Consul service mesh certificates, which use ECDSA P-256 keys, fail with WRONG_CURVE`},
+		},
+		"validation rejects new outgoing ecdhCurves with TLSv1_2 without P-256": {
+			existingResources: nil,
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Mesh,
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_2",
+							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+			expAllow:      false,
+			expErrMessage: "mesh.consul.hashicorp.com \"mesh\" is invalid: spec.tls.outgoing.ecdhCurves: Invalid value: [\"X25519MLKEM768\"]: ecdhCurves must include \"P-256\" when TLS 1.2 can be negotiated (tlsMinVersion is not TLSv1_3); Consul service mesh certificates use ECDSA P-256 keys. Add \"P-256\" to ecdhCurves, or set tlsMinVersion and tlsMaxVersion to \"TLSv1_3\"",
+		},
+		"validation accepts an update that keeps stored outgoing ecdhCurves without P-256": {
+			oldResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{Name: common.Mesh},
+				Spec: MeshSpec{TLS: &MeshTLSConfig{Outgoing: &MeshDirectionalTLSConfig{
+					TLSMinVersion: "TLSv1_2",
+					ECDHCurves:    []string{"X25519MLKEM768"},
+				}}},
+			},
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{Name: common.Mesh},
+				Spec: MeshSpec{
+					TransparentProxy: TransparentProxyMeshConfig{MeshDestinationsOnly: true},
+					TLS: &MeshTLSConfig{Outgoing: &MeshDirectionalTLSConfig{
+						TLSMinVersion: "TLSv1_2",
+						ECDHCurves:    []string{"X25519MLKEM768"},
+					}},
+				},
+			},
+			expAllow:    true,
+			expWarnings: []string{`spec.tls.outgoing.ecdhCurves does not include "P-256" while TLS 1.2 can be negotiated; TLS 1.2 handshakes with Consul service mesh certificates, which use ECDSA P-256 keys, fail with WRONG_CURVE`},
+		},
+		"validation rejects an update that lowers outgoing tlsMinVersion without P-256": {
+			oldResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{Name: common.Mesh},
+				Spec: MeshSpec{TLS: &MeshTLSConfig{Outgoing: &MeshDirectionalTLSConfig{
+					TLSMinVersion: "TLSv1_3",
+					ECDHCurves:    []string{"X25519MLKEM768"},
+				}}},
+			},
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{Name: common.Mesh},
+				Spec: MeshSpec{TLS: &MeshTLSConfig{Outgoing: &MeshDirectionalTLSConfig{
+					TLSMinVersion: "TLSv1_2",
+					ECDHCurves:    []string{"X25519MLKEM768"},
+				}}},
+			},
+			expAllow: false,
+		},
+		"validation accepts ecdhCurves without tlsMinVersion when P-256 is included": {
+			existingResources: nil,
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Mesh,
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							ECDHCurves: []string{"X25519MLKEM768", "X25519", "P-256"},
 						},
 					},
 				},
@@ -135,7 +227,7 @@ func TestValidateMesh(t *testing.T) {
 				Logger:  logrtest.New(t),
 				decoder: decoder,
 			}
-			response := validator.Handle(ctx, admission.Request{
+			req := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
@@ -144,11 +236,21 @@ func TestValidateMesh(t *testing.T) {
 						Raw: marshalledRequestObject,
 					},
 				},
-			})
+			}
+			if c.oldResource != nil {
+				marshalledOld, err := json.Marshal(c.oldResource)
+				require.NoError(t, err)
+				req.Operation = admissionv1.Update
+				req.OldObject = runtime.RawExtension{Raw: marshalledOld}
+			}
+			response := validator.Handle(ctx, req)
 
 			require.Equal(t, c.expAllow, response.Allowed)
 			if c.expErrMessage != "" {
 				require.Equal(t, c.expErrMessage, response.AdmissionResponse.Result.Message)
+			}
+			if c.expAllow {
+				require.Equal(t, c.expWarnings, response.Warnings)
 			}
 		})
 	}

@@ -172,13 +172,14 @@ global:
       # If TLS is enabled, also grant read access
       # to `global.tls.caCert.secretName`.
       # To discover the service account name, run:
+      # ```shell-session
       # $ helm template --show-only templates/feature-gate-set-serviceaccount.yaml <release-name> hashicorp/consul
+      # ```
       # and check `metadata.name`.
       featureGateSetRole: ""
 
       # [Enterprise Only] A Vault role that allows the Consul `partition-init` job to read a Vault secret for the partition ACL token.
       #  The `partition-init` job bootstraps Admin Partitions on Consul servers.
-      # .
       # This role must be bound the `partition-init` job's service account.
       # To discover the service account name of the `partition-init` job, run with Helm values for the client cluster:
       # ```shell-session
