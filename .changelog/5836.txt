@@ -1,0 +1,3 @@
+```release-note:security
+Upgrade `soupsieve` to `4.0.0` in the `gateway-api-0.7.1-custom` requirements to address [[CVE-2026-126190](https://osv.dev/vulnerability/CVE-2026-126190)] and [[CVE-2026-126191](https://osv.dev/vulnerability/CVE-2026-126191)], and upgrade `go.opentelemetry.io/otel` dependencies to `v1.47.0` across the monorepo to address [[CVE-2026-128085](https://osv.dev/vulnerability/CVE-2026-128085)].
+```
