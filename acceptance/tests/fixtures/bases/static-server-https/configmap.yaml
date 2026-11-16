@@ -12,9 +12,7 @@ data:
       skip_install_trust
       auto_https disable_redirects
     }
-    # Serve TLS for the Service name in the pod's own namespace (static-server.default
-    # unless the tests run elsewhere, e.g. consul-test on OpenShift).
-    static-server.{$POD_NAMESPACE} {
+    static-server.default {
       log
       respond  "hello world"
     }

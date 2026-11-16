@@ -32,8 +32,6 @@ func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespace
 		_, _ = cmd.CombinedOutput()
 	}
 
-	waitForTerminatingConsulCRDs(t)
-
 	// Add the hashicorp helm repo
 	cmd = exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")
 	output, err := cmd.CombinedOutput()
@@ -113,22 +111,4 @@ func openshiftVersionAtLeast(t *testing.T, major, minor int) bool {
 	gotMinor, err := strconv.Atoi(parts[1])
 	require.NoError(t, err)
 	return gotMajor > major || (gotMajor == major && gotMinor >= minor)
-}
-
-// waitForTerminatingConsulCRDs waits until consul.hashicorp.com CRDs left Terminating by a previous run are
-// deleted, clearing the finalizers of their remaining objects so the next install can recreate them.
-func waitForTerminatingConsulCRDs(t *testing.T) {
-	t.Helper()
-	script := `set -u
-for crd in $(kubectl get crd -o jsonpath='{range .items[?(@.metadata.deletionTimestamp)]}{.metadata.name}{"\n"}{end}' | grep '\.consul\.hashicorp\.com$'); do
-  echo "waiting for terminating CRD $crd"
-  kubectl get "$crd" -A -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' 2>/dev/null |
-  while read -r ns name; do
-    [ -z "$name" ] && { name=$ns; ns=""; }
-    kubectl patch "$crd" "$name" ${ns:+-n "$ns"} --type=merge -p '{"metadata":{"finalizers":[]}}' >/dev/null 2>&1 || true
-  done
-  kubectl wait --for=delete "crd/$crd" --timeout=180s
-done`
-	output, err := exec.Command("bash", "-c", script).CombinedOutput()
-	require.NoErrorf(t, err, "consul.hashicorp.com CRDs from a previous run did not finish deleting: %s", string(output))
 }
