@@ -153,7 +153,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				namespace: "default",
 			},
 			externalServiceRegistrationConfig: config{
-				path:      "../fixtures/bases/external-service-registration",
+				path:      "../fixtures/cases/terminating-gateway-namespaces/default-ns/external-service-registration",
 				namespace: "default",
 			},
 			staticServerConfig: config{
@@ -207,7 +207,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				namespace: "ns1",
 			},
 			externalServiceRegistrationConfig: config{
-				path:      "../fixtures/bases/external-service-registration",
+				path:      "../fixtures/cases/terminating-gateway-namespaces/default-ns/external-service-registration",
 				namespace: "default",
 			},
 			staticServerConfig: config{

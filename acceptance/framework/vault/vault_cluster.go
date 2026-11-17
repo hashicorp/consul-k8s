@@ -262,16 +262,37 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 		}
 	})
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
-	var tokenSecret *corev1.Secret
-	retry.Run(t, func(r *retry.R) {
-		tokenSecret, err = v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+	// On Kubernetes >= 1.24, when the auth-method Secret of type
+	// SecretTypeServiceAccountToken is manually created, the kube
+	// token-controller populates data.token asynchronously. If we read the
+	// Secret before that lands, Vault gets configured with an empty
+	// token_reviewer_jwt and every TokenReview Vault performs against the
+	// kubernetes API returns 401 — which Vault surfaces to login clients
+	// (vault-agent in partition-init / server-acl-init Jobs) as 403
+	// "permission denied" for the entire test run. Poll until the token is
+	// populated before writing the auth config to avoid this race.
+	var reviewerJWT, caCert string
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
+		tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
 		require.NoError(r, err)
-		// The token controller fills the secret in asynchronously.
-		require.NotEmpty(r, tokenSecret.Data["token"], "service account token secret %s has no token yet", secretName)
+		jwt := string(tokenSecret.Data["token"])
+		ca := string(tokenSecret.Data["ca.crt"])
+		if jwt == "" {
+			r.Errorf("auth method SA token secret %s/%s has empty data.token (waiting for token-controller)", saNS, secretName)
+			return
+		}
+		if ca == "" {
+			r.Errorf("auth method SA token secret %s/%s has empty data.ca.crt", saNS, secretName)
+			return
+		}
+		reviewerJWT = jwt
+		caCert = ca
 	})
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
-		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
-		"kubernetes_ca_cert": caCertForKubernetesHost(t, k8sHost, tokenSecret.Data["ca.crt"]),
+		"token_reviewer_jwt": reviewerJWT,
+		// Use the CA that actually verifies k8sHost (on ROSA the public API endpoint is not
+		// covered by the in-cluster CA). Verification is never skipped.
+		"kubernetes_ca_cert": caCertForKubernetesHost(t, k8sHost, []byte(caCert)),
 		"kubernetes_host":    k8sHost,
 	})
 	require.NoError(t, err)
