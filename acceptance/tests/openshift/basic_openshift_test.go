@@ -33,6 +33,13 @@ func TestOpenshift_Basic(t *testing.T) {
 	logf.SetLogger(logr.New(nil))
 	logger.Log(t, "creating resources for OpenShift test")
 
+	// Register cleanup before applying so partially created resources are removed while the controller is still running.
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		cmd := exec.Command("kubectl", "delete", "-f", "../fixtures/cases/openshift/basic", "--ignore-not-found")
+		output, err := cmd.CombinedOutput()
+		assert.NoErrorf(t, err, "failed to delete resources: %s", string(output))
+	})
+
 	counter := &retry.Counter{Count: 10, Wait: 120 * time.Second}
 	var err error
 	var output []byte
@@ -40,12 +47,6 @@ func TestOpenshift_Basic(t *testing.T) {
 		cmd := exec.Command("kubectl", "apply", "-f", "../fixtures/cases/openshift/basic")
 		output, err = cmd.CombinedOutput()
 		require.NoErrorf(r, err, "failed to create resources: %s", string(output))
-	})
-
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		cmd := exec.Command("kubectl", "delete", "-f", "../fixtures/cases/openshift/basic")
-		output, err := cmd.CombinedOutput()
-		assert.NoErrorf(t, err, "failed to delete resources: %s", string(output))
 	})
 
 	// Grab a kubernetes client so that we can verify binding

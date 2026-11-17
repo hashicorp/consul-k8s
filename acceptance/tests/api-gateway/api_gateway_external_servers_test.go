@@ -5,6 +5,7 @@ package apigateway
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"testing"
 
@@ -87,6 +88,13 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	})
+	if cfg.EnableOpenshift {
+		// The fixture secret holds placeholder data; OpenShift needs a valid certificate for the HTTPS listener.
+		certificate := generateCertificate(t, nil, "gateway.test.local")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "certificate", "--type=merge", "-p",
+			fmt.Sprintf(`{"data":{"tls.crt":"%s","tls.key":"%s"}}`,
+				base64.StdEncoding.EncodeToString(certificate.CertPEM), base64.StdEncoding.EncodeToString(certificate.PrivateKeyPEM)))
+	}
 
 	logger.Log(t, "creating api-gateway resources")
 	// Apply api-gateway resources with retry logic to handle intermittent failures
@@ -116,7 +124,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	var gatewayAddress string
 	retryCheck(t, 60, func(r *retry.R) {
 		var gateway gwv1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayTestNamespace(t, ctx)}, &gateway)
 		require.NoError(r, err)
 
 		// check that we have an address to use

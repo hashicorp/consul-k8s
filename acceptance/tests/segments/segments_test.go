@@ -94,6 +94,10 @@ func TestSegments_MeshWithAgentfulClients(t *testing.T) {
 //
 // The two clusters' node networks must be routable to each other (as on Kind, or peered VPCs).
 func TestSegments_MeshWithAgentfulClientsMultiCluster(t *testing.T) {
+	if cfg := suite.Config(); (cfg.EnableOpenshift || cfg.UseOpenshift) && (!cfg.EnableMultiCluster || !cfg.IsExpectedClusterCount(2)) {
+		t.Skip("requires at least two clusters and -enable-multi-cluster")
+	}
+
 	const segmentName = "alpha1"
 	const segmentPort = 8303
 	// serf.StatusAlive: the member status Consul reports for a live agent.

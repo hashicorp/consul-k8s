@@ -1,3 +1,0 @@
-```release-note:bug
-helm: Fix the server SecurityContextConstraints created on OpenShift when `server.exposeGossipAndRPCPorts` is enabled so that it allows the `runtime/default` seccomp profile. Previously OpenShift rejected the server pods because they request `RuntimeDefault` and the SCC allowed no seccomp profile.
-```

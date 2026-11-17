@@ -29,8 +29,10 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RandomName generates a random string with a 'test-' prefix.
@@ -404,24 +406,37 @@ func WaitForInput(t *testing.T) {
 // not found, attempts to delete and recreate the resource by reapplying the kustomize manifest.
 func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, routeName, kustomizeDir string) {
 	t.Helper()
+	WaitForResourceWithRetry(t, kubectlOptions, routeName, kustomizeDir, "httproute")
+}
 
-	logger.Log(t, "waiting for httproute to be created")
+// WaitForGatewayClassConfigWithRetry is WaitForHTTPRouteWithRetry for a GatewayClassConfig.
+func WaitForGatewayClassConfigWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, configName, kustomizeDir string) {
+	t.Helper()
+	WaitForResourceWithRetry(t, kubectlOptions, configName, kustomizeDir, "gatewayclassconfig")
+}
+
+// WaitForResourceWithRetry is WaitForHTTPRouteWithRetry for any resource type,
+// e.g. "httproutes.consul.hashicorp.com" for custom API gateway routes.
+func WaitForResourceWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, routeName, kustomizeDir, resource string) {
+	t.Helper()
+
+	logger.Logf(t, "waiting for %s to be created", resource)
 	found := false
 	maxAttempts := 3
 	checksPerAttempt := 5
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		logger.Logf(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
+		logger.Logf(t, "%s existence check attempt %d/%d", resource, attempt, maxAttempts)
 
 		// Check for httproute existence using simple loop
 		for i := range checksPerAttempt {
-			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "httproute", routeName)
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", resource, routeName)
 			if err == nil {
 				found = true
-				logger.Logf(t, "httproute %s found successfully", routeName)
+				logger.Logf(t, "%s %s found successfully", resource, routeName)
 				break
 			}
-			logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
+			logger.Logf(t, "%s check %d/%d: %v", resource, i+1, checksPerAttempt, err)
 			time.Sleep(2 * time.Second)
 		}
 
@@ -430,11 +445,11 @@ func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions,
 		}
 
 		if attempt < maxAttempts {
-			logger.Logf(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
+			logger.Logf(t, "%s not found after %d seconds, attempting delete/recreate (attempt %d/%d)", resource, checksPerAttempt*2, attempt, maxAttempts)
 			// Delete the httproute if it exists in a bad state
-			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", "httproute", routeName, "--ignore-not-found=true")
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", resource, routeName, "--ignore-not-found=true")
 			if err != nil {
-				logger.Logf(t, "warning: failed to delete httproute %s: %v", routeName, err)
+				logger.Logf(t, "warning: failed to delete %s %s: %v", resource, routeName, err)
 			}
 			// Recreate by reapplying the base resources
 			out, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "apply", "-k", kustomizeDir)
@@ -445,7 +460,7 @@ func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions,
 	}
 
 	if !found {
-		require.Failf(t, "httproute %s was not found after %d attempts with delete/recreate", routeName, maxAttempts)
+		require.Failf(t, "%s %s was not found after %d attempts with delete/recreate", resource, routeName, maxAttempts)
 	}
 }
 
@@ -497,4 +512,26 @@ func HasStatusCondition(conditions []metav1.Condition, toCheck metav1.Condition)
 		}
 	}
 	return false
+}
+
+// WaitForGatewayClassConfigWithClientRetry waits until the GatewayClassConfig is readable
+// through the controller-runtime client.
+func WaitForGatewayClassConfigWithClientRetry(t *testing.T, k8sClient client.Client, configName string) {
+	t.Helper()
+	WaitForResourceWithClientRetry(t, k8sClient, client.ObjectKey{Name: configName}, &v1alpha1.GatewayClassConfig{}, "gatewayclassconfig")
+}
+
+// WaitForResourceWithClientRetry waits until the object is readable through the controller-runtime client.
+func WaitForResourceWithClientRetry(t *testing.T, k8sClient client.Client, objectKey client.ObjectKey, object client.Object, resourceKind string) {
+	t.Helper()
+
+	logger.Logf(t, "waiting for %s %s to be readable via controller-runtime client", resourceKind, objectKey.Name)
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 10}, t, func(r *retry.R) {
+		err := k8sClient.Get(context.Background(), objectKey, object)
+		if k8serrors.IsNotFound(err) {
+			r.Errorf("%s %s not found yet", resourceKind, objectKey.Name)
+			return
+		}
+		require.NoError(r, err)
+	})
 }

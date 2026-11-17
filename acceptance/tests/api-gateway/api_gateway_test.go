@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -169,17 +170,23 @@ func TestAPIGateway_Basic(t *testing.T) {
 				logger.Log(t, "successfully patched httproute")
 			})
 
-			logger.Log(t, "creating target tcp server")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server-tcp"))
+			// Only skip TCPRoute on OpenShift; on other platforms a missing CRD should fail the test.
+			tcpRouteSupported := !(cfg.EnableOpenshift || cfg.UseOpenshift) || standardTCPRouteAvailable(t, ctx)
+			if tcpRouteSupported {
+				logger.Log(t, "creating target tcp server")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server-tcp"))
 
-			logger.Log(t, "creating tcp-route")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				// Ignore errors here because if the test ran as expected
-				// the custom resources will have been deleted.
-				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
-			})
+				logger.Log(t, "creating tcp-route")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					// Ignore errors here because if the test ran as expected
+					// the custom resources will have been deleted.
+					k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
+				})
+			} else {
+				logger.Log(t, "skipping TCPRoute checks: the cluster does not serve tcproutes.gateway.networking.k8s.io")
+			}
 
 			// Grab a kubernetes client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.
@@ -192,7 +199,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var gateway gwv1.Gateway
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayTestNamespace(t, ctx)}, &gateway)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -208,7 +215,11 @@ func TestAPIGateway_Basic(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-				require.EqualValues(r, 1, gateway.Status.Listeners[1].AttachedRoutes)
+				if tcpRouteSupported {
+					require.EqualValues(r, 1, gateway.Status.Listeners[1].AttachedRoutes)
+				} else {
+					require.EqualValues(r, 0, gateway.Status.Listeners[1].AttachedRoutes)
+				}
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, falseCondition("Conflicted", "NoConflicts"))
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
@@ -238,7 +249,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 				// http route checks
 				var httproute gwv1.HTTPRoute
-				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httproute)
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: gatewayTestNamespace(t, ctx)}, &httproute)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -253,25 +264,27 @@ func TestAPIGateway_Basic(t *testing.T) {
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 			})
-			// tcp route checks
-			var tcpRoute gwv1alpha2.TCPRoute
-			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
-				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: "default"}, &tcpRoute)
-				require.NoError(r, err)
+			if tcpRouteSupported {
+				// tcp route checks
+				var tcpRoute gwv1alpha2.TCPRoute
+				retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
+					err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: gatewayTestNamespace(t, ctx)}, &tcpRoute)
+					require.NoError(r, err)
 
-				// check our finalizers
-				require.Len(r, tcpRoute.Finalizers, 1)
-				require.EqualValues(r, gatewayFinalizer, tcpRoute.Finalizers[0])
+					// check our finalizers
+					require.Len(r, tcpRoute.Finalizers, 1)
+					require.EqualValues(r, gatewayFinalizer, tcpRoute.Finalizers[0])
 
-				// check parent status
-				require.Len(r, tcpRoute.Status.Parents, 1)
-				require.EqualValues(r, gatewayClassControllerName, tcpRoute.Status.Parents[0].ControllerName)
-				require.EqualValues(r, "gateway", tcpRoute.Status.Parents[0].ParentRef.Name)
+					// check parent status
+					require.Len(r, tcpRoute.Status.Parents, 1)
+					require.EqualValues(r, gatewayClassControllerName, tcpRoute.Status.Parents[0].ControllerName)
+					require.EqualValues(r, "gateway", tcpRoute.Status.Parents[0].ParentRef.Name)
 
-				checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-				checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-				checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
-			})
+					checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+					checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+					checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
+				})
+			}
 			// check that the Consul entries were created
 			var gateway *api.APIGatewayConfigEntry
 			var httpRoute *api.HTTPRouteConfigEntry
@@ -285,15 +298,19 @@ func TestAPIGateway_Basic(t *testing.T) {
 				require.NoError(r, err)
 				httpRoute = entry.(*api.HTTPRouteConfigEntry)
 
-				entry, _, err = consulClient.ConfigEntries().Get(api.TCPRoute, "tcp-route", nil)
-				require.NoError(r, err)
-				route = entry.(*api.TCPRouteConfigEntry)
+				if tcpRouteSupported {
+					entry, _, err = consulClient.ConfigEntries().Get(api.TCPRoute, "tcp-route", nil)
+					require.NoError(r, err)
+					route = entry.(*api.TCPRouteConfigEntry)
+				}
 				// now check the gateway status conditions
 				checkConsulStatusCondition(r, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
 
 				// and the route status conditions
 				checkConsulStatusCondition(r, httpRoute.Status.Conditions, trueConsulCondition("Bound", "Bound"))
-				checkConsulStatusCondition(r, route.Status.Conditions, trueConsulCondition("Bound", "Bound"))
+				if tcpRouteSupported {
+					checkConsulStatusCondition(r, route.Status.Conditions, trueConsulCondition("Bound", "Bound"))
+				}
 			})
 
 			// finally we check that we can actually route to the service via the gateway
@@ -307,7 +324,9 @@ func TestAPIGateway_Basic(t *testing.T) {
 				// check that intentions keep our connection from happening
 				k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddress)
 
-				k8s.CheckStaticServerConnectionFailing(t, k8sOptions, StaticClientName, targetTCPAddress)
+				if tcpRouteSupported {
+					k8s.CheckStaticServerConnectionFailing(t, k8sOptions, StaticClientName, targetTCPAddress)
+				}
 
 				k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-k", targetHTTPSAddress)
 
@@ -343,8 +362,10 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "trying calls to api gateway http")
 			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPAddress)
 
-			logger.Log(t, "trying calls to api gateway tcp")
-			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetTCPAddress)
+			if tcpRouteSupported {
+				logger.Log(t, "trying calls to api gateway tcp")
+				k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetTCPAddress)
+			}
 
 			logger.Log(t, "trying calls to api gateway https")
 			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPSAddress, "-k")
@@ -478,7 +499,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1.Gateway
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayTestNamespace(t, ctx)}, &gateway)
 		require.NoError(r, err)
 
 		// check our finalizers
@@ -513,23 +534,23 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: gatewayTestNamespace(t, ctx)}, &httpRoute)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: "default"}, &httpRouteAuth)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: gatewayTestNamespace(t, ctx)}, &httpRouteAuth)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-no-auth-on-auth-listener", Namespace: "default"}, &httpRouteNoAuthOnAuthListener)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-no-auth-on-auth-listener", Namespace: gatewayTestNamespace(t, ctx)}, &httpRouteNoAuthOnAuthListener)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route2-auth", Namespace: "default"}, &httpRouteAuth2)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route2-auth", Namespace: gatewayTestNamespace(t, ctx)}, &httpRouteAuth2)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth-invalid", Namespace: "default"}, &httpRouteInvalid)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth-invalid", Namespace: gatewayTestNamespace(t, ctx)}, &httpRouteInvalid)
 		require.NoError(r, err)
 
 		// check our finalizers
@@ -783,4 +804,13 @@ func trueConsulCondition(conditionType, reason string) api.Condition {
 		Reason: reason,
 		Status: "True",
 	}
+}
+
+// standardTCPRouteAvailable reports whether the cluster serves the Gateway API TCPRoute CRD.
+// OpenShift 4.19+ ships only the standard Gateway API channel and does not allow installing
+// additional gateway.networking.k8s.io CRDs, so TCPRoute is not available there.
+func standardTCPRouteAvailable(t *testing.T, ctx environment.TestContext) bool {
+	t.Helper()
+	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "crd", "tcproutes.gateway.networking.k8s.io")
+	return err == nil
 }
