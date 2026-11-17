@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Only create server clusterrole/binding when server or global is enabled.
+```
