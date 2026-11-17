@@ -178,6 +178,11 @@ func TestPartitions_Sync(t *testing.T) {
 
 			helpers.MergeMaps(clientHelmValues, commonHelmValues)
 
+			// Pre-flight: wait for the primary's expose-servers Service to be
+			// reachable before installing the secondary cluster (see other
+			// partition tests for rationale). No-op on Kind.
+			k8s.WaitForServiceReachable(t, cfg, primaryClusterContext, partitionServiceName, 8501)
+
 			// Install the consul cluster without servers in the client cluster kubernetes context.
 			secondaryConsulCluster := consul.NewHelmCluster(t, clientHelmValues, secondaryClusterContext, cfg, releaseName)
 			secondaryConsulCluster.Create(t)

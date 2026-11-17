@@ -1,0 +1,4 @@
+```release-note:security
+Pin `github.com/klauspost/compress` to v1.19.0 to address vulnerability [[CVE-2026-63209](https://osv.dev/vulnerability/CVE-2026-63209)] in the acceptance and control-plane submodules.
+Upgrade `gateway-api-0.7.1-custom` to v0.1.11 and Go to 1.26.10.
+```

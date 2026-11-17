@@ -412,19 +412,29 @@ func verifyDNS(
 		servicePodIPs[i] = serverPod.Status.PodIP
 	}
 
+	// Run dig via `kubectl exec` in a long-lived pod. `kubectl run -i --rm -- dig`
+	// can lose the command output when dig exits before kubectl attaches, which
+	// makes the test retry until it times out.
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
-	dnsTestPodArgs := []string{
-		"run", "-i", dnsUtilsPod, "--rm",
+	requestingOpts := requestingCtx.KubectlOptions(t)
+	_, err = k8s.RunKubectlAndGetOutputE(t, requestingOpts,
+		"run", dnsUtilsPod,
 		"--restart", "Never",
 		"--image", "anubhavmishra/tiny-tools",
-		"--labels", "release=" + releaseName,
-		"--", "dig", svcName, "ANY",
-	}
+		"--labels", "release="+releaseName,
+		"--command", "--", "sleep", "3600",
+	)
+	require.NoError(t, err)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		_, _ = k8s.RunKubectlAndGetOutputE(t, requestingOpts, "delete", "pod", dnsUtilsPod, "--ignore-not-found", "--wait=false")
+	})
+	_, err = k8s.RunKubectlAndGetOutputE(t, requestingOpts, "wait", "--for=condition=Ready", "pod/"+dnsUtilsPod, "--timeout=5m")
+	require.NoError(t, err)
 
 	var logs string
 	retry.RunWith(&retry.Counter{Wait: 30 * time.Second, Count: 10}, t, func(r *retry.R) {
-		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
+		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), "exec", dnsUtilsPod, "--", "dig", svcName, "ANY")
 		require.NoError(r, err)
 		logger.Logf(t, "verify the DNS results. with logs: \n%s", logs)
 
