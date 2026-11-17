@@ -20,6 +20,7 @@
 1. [Adding a new ACL Token](#adding-a-new-acl-token)
 1. [Testing the Helm chart](#testing-the-helm-chart)
     1. [Running the tests](#running-the-tests)
+        1. [Running on one OpenShift cluster](#running-on-one-openshift-cluster)
     1. [Writing Unit tests](#writing-unit-tests)
     1. [Writing Acceptance tests](#writing-acceptance-tests)
     1. [Testing a dependent Consul change in CI](#testing-a-dependent-consul-change-in-ci)
