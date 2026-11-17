@@ -102,7 +102,9 @@ jobs:
     # Patch coverage measures the lines a PR adds/modifies, so it only applies
     # to pull requests. Pushes to main call this workflow without a pr-number
     # and have no "patch" to evaluate.
-    if: inputs.pr-number != ''
+    # !cancelled(): a skipped required check counts as passing, so the gate must
+    # still run (and fail) when coverage-report or the unit tests fail.
+    if: ${{ !cancelled() && inputs.pr-number != '' }}
     runs-on: ubuntu-latest
     env:
       # Minimum required coverage of the lines a PR adds/modifies (patch
@@ -111,11 +113,22 @@ jobs:
     steps:
       - name: Enforce patch coverage threshold
         env:
+          REPORT_RESULT: ${{ needs.coverage-report.result }}
           PATCH: ${{ needs.coverage-report.outputs.patch }}
           COVERED: ${{ needs.coverage-report.outputs.patch_covered }}
           COVERABLE: ${{ needs.coverage-report.outputs.patch_coverable }}
         run: |
           set -euo pipefail
+
+          if [ "${REPORT_RESULT}" != "success" ]; then
+            echo "::error::coverage-report did not succeed (result: ${REPORT_RESULT}); patch coverage could not be evaluated. Failing closed."
+            {
+              echo "### ❌ Coverage gate failed"
+              echo ""
+              echo "The coverage report job ended with \`${REPORT_RESULT}\` (unit tests or coverage computation failed), so patch coverage could not be evaluated."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
           echo "Patch coverage:     ${PATCH:-<empty>}"
           echo "Required threshold: ${PATCH_THRESHOLD}%"
