@@ -218,37 +218,29 @@ func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, re
         logger.Logf(t, "configmap %s does not exist yet, it will be deleted on cleanup", targetName)
     }
 
-    var originalConfig string
+    // Capture the current state, sanitize it and write the backup -- all only
+    // when there is something to back up. The restore below is skipped when the
+    // ConfigMap did not exist, so an empty backup file would only be a trap for
+    // a later reader. Sanitizing drops the fields that tie the YAML to a point
+    // in time, which otherwise cause "Conflict" errors on restore.
     if existedBefore {
-        originalConfig, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+        originalConfig, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
             "get", "configmap", targetName, "-n", "kube-system", "-o", "yaml")
         require.NoError(t, err)
-    }
 
-    // --- FIX: Sanitize the YAML to remove version locking ---
-    // We remove fields that cause "Conflict" errors during restore.
-    lines := strings.Split(originalConfig, "\n")
-    var sanitizedLines []string
-    for _, line := range lines {
-        trimmed := strings.TrimSpace(line)
-        // Skip metadata fields that tie the file to a specific point in time
-        if strings.HasPrefix(trimmed, "resourceVersion:") ||
-           strings.HasPrefix(trimmed, "uid:") ||
-           strings.HasPrefix(trimmed, "creationTimestamp:") ||
-           strings.HasPrefix(trimmed, "generation:") {
-            continue
+        var sanitizedLines []string
+        for _, line := range strings.Split(originalConfig, "\n") {
+            trimmed := strings.TrimSpace(line)
+            if strings.HasPrefix(trimmed, "resourceVersion:") ||
+               strings.HasPrefix(trimmed, "uid:") ||
+               strings.HasPrefix(trimmed, "creationTimestamp:") ||
+               strings.HasPrefix(trimmed, "generation:") {
+                continue
+            }
+            sanitizedLines = append(sanitizedLines, line)
         }
-        sanitizedLines = append(sanitizedLines, line)
-    }
-    cleanConfig := strings.Join(sanitizedLines, "\n")
-    // ---------------------------------------------------------
 
-    // Write the sanitized backup file. There is nothing to back up when the
-    // ConfigMap does not exist yet, and the restore below is skipped in that
-    // case, so an empty file would only be a trap for a later reader.
-    if existedBefore {
-        err = os.WriteFile(backupFile, []byte(cleanConfig), 0644)
-        require.NoError(t, err)
+        require.NoError(t, os.WriteFile(backupFile, []byte(strings.Join(sanitizedLines, "\n")), 0644))
     }
 
     // 2. GENERATE & APPLY Custom Config
@@ -294,8 +286,9 @@ const coreDNSCustomConfigMap = "coredns-custom"
 // passing them explicitly is what keeps the Deployment choice tied to the
 // cluster's DNS rather than to whatever we happen to be patching.
 func coreDNSConfigMapToPatch(t *testing.T, ctx environment.TestContext) (primary string, target string) {
+    // getCoreDNSConfigMap calls t.Fatalf rather than returning when it cannot
+    // find the ConfigMap, so cm is non-nil from here on.
     cm := getCoreDNSConfigMap(t, ctx)
-    require.NotNil(t, cm, "could not find the cluster's CoreDNS ConfigMap")
 
     // The glob is matched without its "import " prefix or leading path so that
     // any spelling of the import line is recognised. GKE's kube-dns ConfigMap

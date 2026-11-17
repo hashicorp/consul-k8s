@@ -316,6 +316,13 @@ func waitForPrivateAddress(ctx context.Context, host string) error {
 // It uses waitForPrivateAddress with a reasonable timeout (3 minutes) to handle
 // DNS resolution delays on cloud providers where the load balancer hostname
 // propagates through DNS asynchronously.
+// privateAddressCheckTimeout bounds how long a single address may take to
+// resolve before the privacy check gives up and fails. A freshly created load
+// balancer's DNS name can take a while to propagate -- AWS in particular hands
+// out a hostname rather than an address -- so this is generous. It applies per
+// address so that one slow lookup cannot eat the budget the next one needs.
+const privateAddressCheckTimeout = 3 * time.Minute
+
 func requirePrivateServerAddress(t *testing.T, cfg *config.TestConfig, address string) {
 	t.Helper()
 
@@ -328,7 +335,7 @@ func requirePrivateServerAddress(t *testing.T, cfg *config.TestConfig, address s
 	// Create a context with a 3-minute deadline for DNS resolution and validation.
 	// This gives the cloud provider's load balancer time to propagate through DNS
 	// while still failing fast if the address is public when resolved.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), privateAddressCheckTimeout)
 	defer cancel()
 
 	err := waitForPrivateAddress(ctx, address)
@@ -394,7 +401,7 @@ func requireNoPublicServices(t *testing.T, cfg *config.TestConfig, ctx environme
 		for _, address := range addresses {
 			// One budget per address: a slow lookup must not eat the time the
 			// next address needs.
-			deadline, cancel := context.WithTimeout(context.Background(), time.Minute)
+			deadline, cancel := context.WithTimeout(context.Background(), privateAddressCheckTimeout)
 			err := waitForPrivateAddress(deadline, address)
 			cancel()
 
@@ -648,6 +655,10 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, defaultClusterContext, partitionServiceName)
+	// These two overlap on expose-servers, deliberately. The first checks the
+	// exact string that is about to be baked into externalServers.hosts, at the
+	// earliest moment it exists; the second is the broader sweep that catches
+	// any other Service the release publishes.
 	requirePrivateServerAddress(t, cfg, partitionSvcAddress)
 	requireNoPublicServices(t, cfg, defaultClusterContext, releaseName)
 
