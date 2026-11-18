@@ -133,6 +133,33 @@ assert_cleanup_hooks() {
 }
 
 #--------------------------------------------------------------------
+# resources
+
+@test "ai/CleanupJob: uses default resources when global.acls.resources is not set" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s templates/ai-cleanup-crds-job.yaml \
+        "${base_flags[@]}" \
+        --is-upgrade \
+        . | tee /dev/stderr |
+        yq -r '.spec.template.spec.containers[0].resources.limits.memory' | tee /dev/stderr)
+    [ "$actual" = "50Mi" ]
+}
+
+@test "ai/CleanupJob: overrides resources when global.acls.resources is set" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s templates/ai-cleanup-crds-job.yaml \
+        "${base_flags[@]}" \
+        --is-upgrade \
+        --set 'global.acls.resources.requests.memory=128Mi' \
+        --set 'global.acls.resources.limits.memory=128Mi' \
+        . | tee /dev/stderr |
+        yq -r '.spec.template.spec.containers[0].resources.limits.memory' | tee /dev/stderr)
+    [ "$actual" = "128Mi" ]
+}
+
+#--------------------------------------------------------------------
 # cleanup ClusterRole
 
 @test "ai/CleanupClusterRole: rendered when ai.enabled=true" {

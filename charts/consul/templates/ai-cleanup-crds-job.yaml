@@ -59,6 +59,10 @@ spec:
             - consul-k8s-control-plane
           args:
             - ai-cleanup
+          {{- if .Values.global.acls.resources }}
+          resources:
+            {{- toYaml .Values.global.acls.resources | nindent 12 }}
+          {{- else }}
           resources:
             requests:
               memory: "50Mi"
@@ -66,6 +70,7 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+          {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}

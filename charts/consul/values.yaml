@@ -511,7 +511,8 @@ global:
       # @type: string
       secretKey: null
 
-    # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+    # The resource requests (CPU, memory, etc.) for the server-acl-init, server-acl-init-cleanup
+    # and ai-cleanup pods.
     # This should be a YAML map corresponding to a Kubernetes
     # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
     # object.
