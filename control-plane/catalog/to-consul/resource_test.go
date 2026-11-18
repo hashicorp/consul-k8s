@@ -1579,6 +1579,64 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	})
 }
 
+// Test that deleting one of several endpoint slices of a service only removes
+// the instances that are no longer in any remaining slice. The handlers are
+// called directly, because the test service informer resyncs and would hide
+// a wrong result by regenerating the registrations from the remaining slices.
+func TestServiceResource_clusterIP_deleteEndpointSlice(t *testing.T) {
+	t.Parallel()
+	client := fake.NewClientset()
+	syncer := newTestSyncer()
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.ClusterIPSync = true
+	endpointsResource := &serviceEndpointsResource{
+		Service: &serviceResource,
+		Ctx:     context.Background(),
+		Log:     hclog.Default(),
+	}
+
+	// foo has two slices that share one address, bar has one slice.
+	fooA := createEndpointSliceWithAddresses(t, client, "foo", metav1.NamespaceDefault, "1.1.1.1", "2.2.2.2")
+	fooB := createEndpointSliceWithAddresses(t, client, "foo", metav1.NamespaceDefault, "2.2.2.2", "4.4.4.4")
+	createEndpointSliceWithAddresses(t, client, "bar", metav1.NamespaceDefault, "5.5.5.5")
+	for _, name := range []string{"foo", "bar"} {
+		svc := clusterIPService(name, metav1.NamespaceDefault)
+		require.NoError(t, serviceResource.Upsert(metav1.NamespaceDefault+"/"+name, svc))
+	}
+
+	requireAddresses := func(expected map[string][]string) {
+		t.Helper()
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := make(map[string][]string)
+		for _, reg := range syncer.Registrations {
+			actual[reg.Service.Service] = append(actual[reg.Service.Service], reg.Service.Address)
+		}
+		require.Len(t, actual, len(expected))
+		for name, addrs := range expected {
+			require.ElementsMatch(t, addrs, actual[name], "service %s", name)
+		}
+	}
+
+	requireAddresses(map[string][]string{
+		"foo": {"1.1.1.1", "2.2.2.2", "4.4.4.4"},
+		"bar": {"5.5.5.5"},
+	})
+
+	// Delete the first slice of foo. 2.2.2.2 is still in the second slice.
+	require.NoError(t, endpointsResource.Delete(metav1.NamespaceDefault+"/"+fooA.Name, fooA))
+	requireAddresses(map[string][]string{
+		"foo": {"2.2.2.2", "4.4.4.4"},
+		"bar": {"5.5.5.5"},
+	})
+
+	// Delete the last slice of foo.
+	require.NoError(t, endpointsResource.Delete(metav1.NamespaceDefault+"/"+fooB.Name, fooB))
+	requireAddresses(map[string][]string{
+		"bar": {"5.5.5.5"},
+	})
+}
+
 // Test that the proper registrations with health checks are generated for a ClusterIP type.
 func TestServiceResource_clusterIP_healthCheck(t *testing.T) {
 	t.Parallel()
@@ -2629,6 +2687,42 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 		metav1.CreateOptions{})
 	t.Logf("Created the endpoints %+v", endpointSlice)
 	require.NoError(t, err)
+}
+
+// createEndpointSliceWithAddresses calls the fake k8s client to create an endpoint slice
+// with one ready endpoint per address and returns it.
+func createEndpointSliceWithAddresses(t *testing.T, client *fake.Clientset, serviceName string, namespace string, addresses ...string) *discoveryv1.EndpointSlice {
+	endpoints := make([]discoveryv1.Endpoint, 0, len(addresses))
+	for _, addr := range addresses {
+		endpoints = append(endpoints, discoveryv1.Endpoint{
+			Addresses: []string{addr},
+			Conditions: discoveryv1.EndpointConditions{
+				Ready:       ptr.To(true),
+				Serving:     ptr.To(true),
+				Terminating: ptr.To(false),
+			},
+		})
+	}
+
+	endpointSlice, err := client.DiscoveryV1().EndpointSlices(namespace).Create(
+		context.Background(),
+		&discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{discoveryv1.LabelServiceName: serviceName},
+				Name:   serviceName + "-" + rand.String(5),
+			},
+			AddressType: discoveryv1.AddressTypeIPv4,
+			Endpoints:   endpoints,
+			Ports: []discoveryv1.EndpointPort{
+				{
+					Name: ptr.To("http"),
+					Port: ptr.To(int32(8080)),
+				},
+			},
+		},
+		metav1.CreateOptions{})
+	require.NoError(t, err)
+	return endpointSlice
 }
 
 func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceResource {

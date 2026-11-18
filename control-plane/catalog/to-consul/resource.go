@@ -966,15 +966,16 @@ func (t *serviceEndpointsResource) Delete(endptKey string, raw interface{}) erro
 	svcKey := endpointSlice.Namespace + "/" + svcName
 
 	// This is a bit of an optimization. We only want to force a resync
-	// if we were tracking this endpoint to begin with and that endpoint
-	// had associated registrations.
+	// if we were tracking this endpoint to begin with.
 	if _, ok := t.Service.endpointSlicesMap[svcKey]; ok {
 		if _, ok := t.Service.endpointSlicesMap[svcKey][endptKey]; ok {
 			delete(t.Service.endpointSlicesMap[svcKey], endptKey)
-			if _, ok := t.Service.consulMap[svcKey]; ok {
-				delete(t.Service.consulMap, svcKey)
-				t.Service.sync()
-			}
+
+			// Other slices of this service may still have endpoints, so
+			// regenerate the registrations from what is left instead of
+			// dropping all of them.
+			t.Service.generateRegistrations(svcKey)
+			t.Service.sync()
 		}
 	}
 
