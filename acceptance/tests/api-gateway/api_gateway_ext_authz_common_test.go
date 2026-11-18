@@ -4,6 +4,9 @@
 package apigateway
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strconv"
 	"strings"
@@ -26,14 +29,44 @@ import (
 // and registered, Consul reports the route as NoUpstreamServicesTargeted. Waiting
 // for the backend to appear in the catalog before asserting route status removes
 // that race (which is more pronounced under the heavier within-mesh scenario).
-func waitForConsulServiceRegistered(t *testing.T, consulClient *api.Client, service string) {
+func waitForConsulServiceRegistered(t *testing.T, consulClient *api.Client, service string, queryOptions ...*api.QueryOptions) {
 	t.Helper()
 
+	var options *api.QueryOptions
+	if len(queryOptions) != 0 {
+		options = queryOptions[0]
+	}
 	retry.RunWith(&retry.Counter{Count: 60, Wait: 2 * time.Second}, t, func(r *retry.R) {
-		services, _, err := consulClient.Catalog().Service(service, "", nil)
+		services, _, err := consulClient.Catalog().Service(service, "", options)
 		require.NoError(r, err)
 		require.NotEmptyf(r, services, "expected service %q to be registered in the Consul catalog", service)
 	})
+}
+
+func TestWaitForConsulServiceRegisteredNamespace(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		options   []*api.QueryOptions
+		namespace string
+	}{
+		{name: "default catalog"},
+		{name: "mirrored OCP namespace", options: []*api.QueryOptions{{Namespace: "consul"}}, namespace: "consul"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			namespaces := make(chan string, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				namespaces <- r.URL.Query().Get("ns")
+				if err := json.NewEncoder(w).Encode([]*api.CatalogService{{ServiceName: "static-server"}}); err != nil {
+					t.Errorf("writing catalog response: %v", err)
+				}
+			}))
+			t.Cleanup(server.Close)
+			client, err := api.NewClient(&api.Config{Address: server.URL})
+			require.NoError(t, err)
+			waitForConsulServiceRegistered(t, client, "static-server", tc.options...)
+			require.Equal(t, tc.namespace, <-namespaces)
+		})
+	}
 }
 
 // configureLocalExtAuthzDev wires an ext_authz api-gateway test up to

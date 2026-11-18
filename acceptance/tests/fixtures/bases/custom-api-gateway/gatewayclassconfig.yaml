@@ -1,0 +1,13 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: GatewayClassConfig
+metadata:
+  name: gateway-class-config
+spec:
+  # In order for Gateways to work whether or not we're enforcing the "restricted" pod security policy, they must not used privileged ports
+  mapPrivilegedContainerPorts: 8000
+  # On OpenShift, managed Gateways need an explicit SCC name so the controller can
+  # create namespaced RBAC without attempting to grant permissions for an empty SCC.
+  openshiftSCCName: restricted-v2

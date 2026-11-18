@@ -213,7 +213,7 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: ctx.KubectlOptions(t).Namespace}, &gateway)
 		require.NoError(r, err)
 
 		// check that we have an address to use
