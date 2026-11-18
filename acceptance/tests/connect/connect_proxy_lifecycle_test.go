@@ -189,8 +189,11 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					}
 					logger.Logf(t, "checking connectivity to static-server from terminating pod %s", clientPodName)
 					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
-					// OpenShift can remove the pod before the grace period ends.
-					if err != nil && (cfg.EnableOpenshift || cfg.UseOpenshift) && strings.Contains(output, "not found") {
+					// OpenShift can remove the pod before the grace period ends, and CRI-O rejects
+					// exec once the terminating app container has stopped; either way the pod can
+					// no longer be probed.
+					if err != nil && (cfg.EnableOpenshift || cfg.UseOpenshift) &&
+						(strings.Contains(output, "not found") || strings.Contains(output, "container is not created or running")) {
 						logger.Logf(t, "terminating pod %s is already gone", clientPodName)
 						break
 					}

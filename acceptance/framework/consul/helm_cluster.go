@@ -232,7 +232,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		err := helm.DeleteE(r, h.deleteOptions(t), h.releaseName, false)
 		require.NoError(r, err)
 	})
 
@@ -483,6 +483,26 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	})
+}
+
+// deleteOptions returns the Helm options for one `helm delete` attempt. When an earlier attempt
+// left the release in the "uninstalling" state, its pre-delete hooks have already run and the
+// release's resources (including the hook Job's ServiceAccount) are deleted, so running the hooks
+// again would create a Job that can never start. Those retries skip the hooks.
+func (h *HelmCluster) deleteOptions(t *testing.T) *helm.Options {
+	secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(),
+		metav1.ListOptions{LabelSelector: fmt.Sprintf("owner=helm,name=%s,status=uninstalling", h.releaseName)})
+	if err != nil || len(secrets.Items) == 0 {
+		return h.helmOptions
+	}
+	logger.Logf(t, "release %s is already uninstalling; retrying the delete without hooks", h.releaseName)
+	opts := *h.helmOptions
+	opts.ExtraArgs = make(map[string][]string, len(h.helmOptions.ExtraArgs))
+	for k, v := range h.helmOptions.ExtraArgs {
+		opts.ExtraArgs[k] = v
+	}
+	opts.ExtraArgs["delete"] = append(append([]string{}, h.helmOptions.ExtraArgs["delete"]...), "--no-hooks")
+	return &opts
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {

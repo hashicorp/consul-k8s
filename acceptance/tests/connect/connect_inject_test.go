@@ -243,7 +243,13 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			logger.Log(t, "creating multiport static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
+			multiportApp := "../fixtures/bases/multiport-app"
+			if cfg.EnableOpenshift {
+				// OpenShift lists a dockercfg pull secret on every ServiceAccount; this case lists
+				// the multiport-admin token secret first so the injector mounts the token.
+				multiportApp = "../fixtures/cases/multiport-app-openshift"
+			}
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, multiportApp)
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
 
 			// Check that static-client has been injected and now has 2 containers.
