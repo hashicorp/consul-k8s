@@ -1,0 +1,3 @@
+```release-note:bug
+helm: The `ai-cleanup` pre-upgrade and pre-delete hook Job now uses `global.acls.resources` when it is set, instead of always using hardcoded 50Mi / 50m requests and limits.
+```
