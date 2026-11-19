@@ -1,0 +1,41 @@
+# Reusable workflow that posts a failure notification to #feed-consul-k8s-ci.
+name: reusable-slack-notify
+
+on:
+  workflow_call:
+    inputs:
+      workflow-name:
+        description: "Human readable name of the workflow that failed."
+        required: true
+        type: string
+    secrets:
+      CONSUL_K8S_CI_SLACK_WEBHOOK:
+        description: "Incoming webhook URL for #feed-consul-k8s-ci."
+        required: true
+
+permissions: {}
+
+jobs:
+  slack-notify:
+    name: slack-notify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.CONSUL_K8S_CI_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+        with:
+          payload: |
+            {
+              "text": ":x: ${{ inputs.workflow-name }} failed in ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":x: *${{ inputs.workflow-name }}* failed\n*Repository:* `${{ github.repository }}`\n*Branch:* `${{ github.ref_name }}`\n*Commit:* `${{ github.sha }}`\n*Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+                  }
+                }
+              ]
+            }

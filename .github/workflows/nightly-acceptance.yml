@@ -24,3 +24,13 @@ jobs:
         ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}" }'
+
+  slack-notify:
+    name: slack-notify
+    needs: cloud
+    if: failure()
+    uses: ./.github/workflows/reusable-slack-notify.yml
+    with:
+      workflow-name: nightly-acceptance
+    secrets:
+      CONSUL_K8S_CI_SLACK_WEBHOOK: ${{ secrets.CONSUL_K8S_CI_SLACK_WEBHOOK }}
