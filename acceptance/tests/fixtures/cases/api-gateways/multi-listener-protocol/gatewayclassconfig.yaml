@@ -6,6 +6,7 @@ kind: GatewayClassConfig
 metadata:
   name: multi-listener-gwcc
 spec:
+  openshiftSCCName: restricted-v2
   # Map privileged ports so the gateway pods run without elevated privileges
   # under both default and restricted PodSecurity Admission policies.
   mapPrivilegedContainerPorts: 8000

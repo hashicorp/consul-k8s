@@ -90,6 +90,9 @@ func TestSegments_MeshWithAgentfulClients(t *testing.T) {
 // - clients enabled on another cluster and joining the alpha segment.
 // - static client can communicate with static server.
 func TestSegments_MeshWithAgentfulClientsMultiCluster(t *testing.T) {
+	if cfg := suite.Config(); (cfg.EnableOpenshift || cfg.UseOpenshift) && (!cfg.EnableMultiCluster || !cfg.IsExpectedClusterCount(2)) {
+		t.Skip("requires at least two clusters and -enable-multi-cluster")
+	}
 	cases := map[string]struct {
 		secure bool
 	}{

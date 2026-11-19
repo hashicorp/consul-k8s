@@ -24,6 +24,9 @@ import (
 func TestVault_Partitions(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
+	if (cfg.EnableOpenshift || cfg.UseOpenshift) && !cfg.EnableMultiCluster {
+		t.Skipf("skipping this test because -enable-multi-cluster is not set")
+	}
 	serverClusterCtx := env.DefaultContext(t)
 	clientClusterCtx := env.Context(t, 1)
 	ns := serverClusterCtx.KubectlOptions(t).Namespace

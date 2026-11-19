@@ -3,6 +3,8 @@ kind: ServiceIntentions
 metadata:
   name: to-backend-default
   namespace: default
+  labels:
+    consul.hashicorp.com/acceptance-namespace: consul
 spec:
   destination:
     name: backend
@@ -15,6 +17,8 @@ kind: ServiceIntentions
 metadata:
   name: to-frontend-default
   namespace: default
+  labels:
+    consul.hashicorp.com/acceptance-namespace: consul
 spec:
   destination:
     name: frontend

@@ -185,6 +185,10 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 }
 
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
+    if suite.Config().EnableOpenshift || suite.Config().UseOpenshift {
+        configureOpenShiftDNSForConsul(t, ctx, releaseName, enableDNSProxy, port)
+        return
+    }
     actualName := getCoreDNSConfigMapName(t, ctx)
 
     // 1. BACKUP: Capture the current state
@@ -225,6 +229,17 @@ func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, re
         updateCoreDNS(t, ctx, "coredns-original.yaml")
         time.Sleep(5 * time.Second)
     })
+}
+
+func configureOpenShiftDNSForConsul(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
+	t.Helper()
+	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
+	require.NoError(t, err)
+	upstream := dnsIP
+	if enableDNSProxy {
+		upstream = net.JoinHostPort(dnsIP, port)
+	}
+	k8s.ConfigureOpenShiftDNS(t, ctx, suite.Config(), upstream)
 }
 
 func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,

@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: backend
+  labels:
+    consul.hashicorp.com/acceptance-namespace: consul
 ---
 apiVersion: v1
 kind: ServiceAccount

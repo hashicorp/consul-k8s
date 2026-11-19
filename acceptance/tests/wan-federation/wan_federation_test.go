@@ -363,6 +363,11 @@ func TestWANFederationFailover(t *testing.T) {
 				Cfg:             cfg,
 				ConsulClient:    secondaryClient,
 			}
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				// CreateIntention needs the Helm namespace settings on OpenShift.
+				primaryHelper.HelmValues = primaryHelmValues
+				secondaryHelper.HelmValues = secondaryHelmValues
+			}
 
 			// Create Namespaces
 			// We create a namespace (ns1) in both the primary and secondary datacenters (dc1, dc2)

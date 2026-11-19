@@ -428,6 +428,9 @@ func createScalingGatewayClassResources(
 			DeploymentSpec: deploymentSpec,
 		},
 	}
+	if suite.Config().EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
+	}
 
 	err := k8sClient.Create(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
