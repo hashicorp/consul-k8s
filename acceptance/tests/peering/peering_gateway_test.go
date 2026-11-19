@@ -5,6 +5,7 @@ package peering
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -319,4 +320,38 @@ func TestPeering_Gateway(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
+
+	helpers.CheckListenerTracing(t, func(t *testing.T, enabled bool) {
+		var tracing interface{}
+		if enabled {
+			tracing = helpers.ListenerTracingJSON
+		}
+		patch, err := json.Marshal(map[string]interface{}{
+			"spec": map[string]interface{}{
+				"config": map[string]interface{}{
+					"envoy_listener_tracing_json": tracing,
+				},
+			},
+		})
+		require.NoError(t, err)
+		// Patch the owning CRDs so their controllers cannot overwrite an API update.
+		for _, opts := range []*terratestk8s.KubectlOptions{
+			staticServerPeerClusterContext.KubectlOptions(t),
+			staticClientPeerClusterContext.KubectlOptions(t),
+		} {
+			k8s.RunKubectl(t, opts, "patch", "proxydefaults", "global", "--type=merge", "-p", string(patch))
+		}
+	}, helpers.ListenerTracingTarget{
+		Options:       staticServerPeerClusterContext.KubectlOptions(t),
+		LabelSelector: fmt.Sprintf("component=mesh-gateway,release=%s", releaseName),
+		StatPrefix:    "mesh_gateway_local_peered.",
+	}, helpers.ListenerTracingTarget{
+		Options:       staticServerOpts,
+		LabelSelector: "app=static-server",
+		StatPrefix:    "public_listener",
+	}, helpers.ListenerTracingTarget{
+		Options:       staticClientOpts,
+		LabelSelector: "gateway.consul.hashicorp.com/name=gateway",
+		StatPrefix:    "ingress_upstream_",
+	})
 }

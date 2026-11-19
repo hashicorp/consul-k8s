@@ -346,6 +346,18 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			logger.Log(t, "trying calls to api gateway https")
 			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPSAddress, "-k")
+
+			helpers.CheckListenerTracing(t, func(t *testing.T, enabled bool) {
+				helpers.SetGlobalListenerTracing(t, consulClient, enabled)
+			}, helpers.ListenerTracingTarget{
+				Options:       k8sOptions,
+				LabelSelector: "gateway.consul.hashicorp.com/name=gateway",
+				StatPrefix:    "ingress_upstream_",
+			}, helpers.ListenerTracingTarget{
+				Options:       k8sOptions,
+				LabelSelector: "app=static-server",
+				StatPrefix:    "public_listener",
+			})
 		})
 	}
 }
