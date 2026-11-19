@@ -27,6 +27,9 @@ spec:
         # that both forms are exercised. The second endpoint also uses a
         # non-default path.
         'consul.hashicorp.com/service-metrics-endpoints': '8080:/metrics,metrics-b:/alt-metrics'
+        # These legacy values must be ignored when service-metrics-endpoints is set.
+        'consul.hashicorp.com/service-metrics-port': '7070'
+        'consul.hashicorp.com/service-metrics-path': '/legacy-metrics'
       labels:
         app: static-multiport-metrics-app
     spec:
