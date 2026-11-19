@@ -101,11 +101,13 @@ func TestConnectInjectNamespaces(t *testing.T) {
 
 			logger.Logf(t, "creating namespaces %s and %s", staticServerNamespace, StaticClientNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
+			k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
+			k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, StaticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				// Note: this deletion will take longer in cases when the static-client deployment
 				// hasn't yet fully terminated.
@@ -147,9 +149,9 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			}
 
 			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployStaticWorkload(t, staticServerOpts, cfg, "../fixtures/cases/static-server-inject")
 			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+				k8s.DeployStaticWorkload(t, staticClientOpts, cfg, "../fixtures/cases/static-client-tproxy")
 			} else {
 				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 			}
@@ -230,7 +232,12 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+				failureMessages := []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}
+				if cfg.EnableOpenshift || cfg.UseOpenshift {
+					// The static-client's curl reports refused connections as "port 80 after N ms: ...".
+					failureMessages = append(failureMessages, "curl: (7) Failed to connect to static-server.ns1 port 80")
+				}
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, connhelper.StaticClientName, false, failureMessages, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 			} else {
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, staticClientOpts, connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			}
@@ -305,6 +312,7 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 
 			logger.Logf(t, "creating namespace %s", StaticClientNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
+			k8s.MarkAcceptanceNamespace(t, ctx.KubectlOptions(t), cfg, StaticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
 			})

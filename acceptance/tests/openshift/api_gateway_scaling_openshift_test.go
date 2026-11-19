@@ -6,6 +6,7 @@ package openshift
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -418,6 +419,11 @@ func createScalingGatewayClassResourcesOCP(
 			DeploymentSpec: deploymentSpec,
 		},
 	}
+	// The gateway Role requests "use" on this SCC, and the injector can only grant the SCC that the
+	// chart's managedGatewayClass.openshiftSCCName gives it.
+	if suite.Config().EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
+	}
 
 	err := k8sClient.Create(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
@@ -613,9 +619,11 @@ func restartAPIGatewayControllerOCP(t *testing.T, ctx environment.TestContext) {
 	require.NoError(t, err)
 	require.NotEmpty(t, pods.Items, "no connect-injector pods found")
 
+	deletedPods := make(map[string]struct{}, len(pods.Items))
 	for _, pod := range pods.Items {
 		err = k8sClient.CoreV1().Pods("consul").Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
 		require.NoError(t, err)
+		deletedPods[pod.Name] = struct{}{}
 		logger.Logf(t, "deleted pod consul/%s to restart API Gateway controller", pod.Name)
 	}
 
@@ -637,6 +645,21 @@ func restartAPIGatewayControllerOCP(t *testing.T, ctx environment.TestContext) {
 			}
 			require.True(r, ready, "pod %s missing ready condition", pod.Name)
 		}
+	})
+
+	// Gateways are only reconciled by the leader. A deleted injector doesn't release its lease, so the
+	// new pod can wait out the 90s lease duration before it starts reconciling.
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+		lease, err := k8sClient.CoordinationV1().Leases("consul").Get(context.Background(), "consul-controller-lock", metav1.GetOptions{})
+		require.NoError(r, err)
+		holder := ptr.Deref(lease.Spec.HolderIdentity, "")
+		podName, _, found := strings.Cut(holder, "_")
+		require.True(r, found, "unexpected controller lease holder %q", holder)
+		_, deleted := deletedPods[podName]
+		require.False(r, deleted, "controller lease is still held by deleted pod %s", podName)
+		pod, err := k8sClient.CoreV1().Pods("consul").Get(context.Background(), podName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.Nil(r, pod.DeletionTimestamp, "controller lease holder %s is terminating", podName)
 	})
 
 	logger.Logf(t, "API Gateway controller restarted and ready")

@@ -48,6 +48,7 @@ func TestInstall(t *testing.T) {
 			require.NoError(t, err)
 
 			cfg := suite.Config()
+			cli.OpenShift = cfg.EnableOpenshift || cfg.UseOpenshift
 			ctx := suite.Environment().DefaultContext(t)
 
 			connHelper := connhelper.ConnectHelper{

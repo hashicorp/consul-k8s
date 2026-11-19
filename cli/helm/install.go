@@ -6,6 +6,8 @@ package helm
 import (
 	"embed"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -126,6 +128,10 @@ func InstallHelmRelease(options *InstallOptions) error {
 	install.CreateNamespace = true
 	install.Wait = options.Wait
 	install.Timeout = options.Timeout
+	install.DisableOpenAPIValidation, err = skipOpenAPIValidation()
+	if err != nil {
+		return err
+	}
 
 	// Load the Helm chart.
 	chart, err := options.HelmActionsRunner.LoadChart(options.EmbeddedChart, options.ChartDirName)
@@ -141,4 +147,19 @@ func InstallHelmRelease(options *InstallOptions) error {
 
 	options.UI.Output("%s installed in namespace %q.", options.ReleaseType, options.Namespace, terminal.WithSuccessStyle())
 	return nil
+}
+
+// Large OpenShift OpenAPI documents can make the client-side download unreliable.
+// Validation remains enabled unless explicitly disabled for an acceptance run.
+func skipOpenAPIValidation() (bool, error) {
+	const key = "CONSUL_K8S_SKIP_OPENAPI_VALIDATION"
+	value := os.Getenv(key)
+	if value == "" {
+		return false, nil
+	}
+	enabled, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s: %w", key, err)
+	}
+	return enabled, nil
 }
