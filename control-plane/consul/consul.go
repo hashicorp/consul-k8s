@@ -4,6 +4,8 @@
 package consul
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -112,16 +114,59 @@ func cloneConfig(config *Config) *Config {
 
 // IsEnterpriseDistribution returns true when the connected Consul cluster
 // reports a valid enterprise license.
-func IsEnterpriseDistribution(config *Config, watcher ServerConnectionManager) (bool, error) {
-	client, err := NewClientFromConnMgr(cloneConfig(config), watcher)
-	if err != nil {
-		return false, err
+func IsEnterpriseDistribution(ctx context.Context, config *Config, watcher ServerConnectionManager) (bool, error) {
+	const (
+		maxRetries   = 5
+		retryBackoff = 30 * time.Second
+	)
+
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			timer := time.NewTimer(retryBackoff)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				if lastErr != nil {
+					return false, fmt.Errorf("%w (last attempt err: %v)", ctx.Err(), lastErr)
+				}
+				return false, ctx.Err()
+			case <-timer.C:
+			}
+		}
+
+		client, err := NewClientFromConnMgr(cloneConfig(config), watcher)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		reply, err := client.Operator().LicenseGet(nil)
+		if err != nil {
+			if !isRetryableLicenseError(err) {
+				return false, err
+			}
+			lastErr = err
+			continue
+		}
+
+		return reply != nil && reply.Valid, nil
 	}
 
-	reply, err := client.Operator().LicenseGet(nil)
-	if err != nil {
-		return false, err
-	}
+	return false, lastErr
+}
 
-	return reply != nil && reply.Valid, nil
+func isRetryableLicenseError(err error) bool {
+	var statusErr capi.StatusError
+	if errors.As(err, &statusErr) {
+		switch statusErr.Code {
+		case http.StatusRequestTimeout, http.StatusTooManyRequests:
+			return true
+		case http.StatusNotImplemented:
+			return false
+		default:
+			return statusErr.Code >= http.StatusInternalServerError
+		}
+	}
+	return true
 }
