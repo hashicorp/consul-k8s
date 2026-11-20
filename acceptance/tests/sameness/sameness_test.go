@@ -351,7 +351,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Apply locality to clusters
 			for _, v := range testClusters {
-				setK8sNodeLocality(t, v.context, v)
+				setK8sNodeLocality(t, cfg, v.context, v)
 			}
 
 			// Peering/Dialer relationship
@@ -440,14 +440,15 @@ func TestFailover_Connect(t *testing.T) {
 				}
 			}
 
-			// Create sameness group after exporting the services, this will reduce flakiness in an automated test
+			// Create sameness group after exporting the services, this will reduce flakiness in an automated test.
+			// Sameness groups must be in the Kubernetes "default" namespace, whatever namespace the test runs in.
 			for _, v := range testClusters {
-				applyResources(t, cfg, fmt.Sprintf("../fixtures/bases/sameness/%s-default-ns", v.name), v.context.KubectlOptions(t))
+				applyResources(t, cfg, fmt.Sprintf("../fixtures/bases/sameness/%s-default-ns", v.name), v.context.KubectlOptionsForNamespace(metav1.NamespaceDefault))
 			}
 
 			// Setup DNS.
 			for _, v := range testClusters {
-				dnsService, err := v.context.KubernetesClient(t).CoreV1().Services("default").Get(ctx.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
+				dnsService, err := v.context.KubernetesClient(t).CoreV1().Services(v.context.KubectlOptions(t).Namespace).Get(ctx.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
 				require.NoError(t, err)
 				v.dnsIP = &dnsService.Spec.ClusterIP
 				logger.Logf(t, "%s dnsIP: %s", v.name, *v.dnsIP)
@@ -520,7 +521,7 @@ func TestFailover_Connect(t *testing.T) {
 			// locality-aware routing will function in consul-k8s. In the future, this test will be expanded
 			// to test multi-cluster locality-based failover with sameness groups.
 			for _, v := range testClusters {
-				v.checkLocalities(t)
+				v.checkLocalities(t, cfg)
 			}
 
 			// Verify all the failover Scenarios
@@ -719,11 +720,12 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 		// the context can be used to determine that failover occured to the expected kubernetes cluster
 		// hosting Consul
 		assert.Contains(r, logs, "ADDITIONAL SECTION:")
-		expectedName := failover.context.KubectlOptions(r).ContextName
+		// This name check only works on Kind, where the cluster name shows up in the DNS answer.
+		// Elsewhere the failover target is already identified by its static-server IP above.
 		if cfg.UseKind {
-			expectedName = strings.Replace(expectedName, "kind-", "", -1)
+			expectedName := strings.Replace(failover.context.KubectlOptions(r).ContextName, "kind-", "", -1)
+			assert.Contains(r, logs, expectedName)
 		}
-		assert.Contains(r, logs, expectedName)
 	})
 }
 
@@ -841,8 +843,9 @@ func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig,
 }
 
 // checkLocalities checks the given cluster for `static-client` and `static-server` instances matching the locality
-// expected for the cluster.
-func (c *cluster) checkLocalities(t *testing.T) {
+// expected for the cluster. On Kind that is the locality the test put on the node. Elsewhere the cloud provider owns
+// the node's region and zone labels, so the expected locality is read from the node the instance's pod runs on.
+func (c *cluster) checkLocalities(t *testing.T, cfg *config.TestConfig) {
 	for ns, svcs := range map[string][]string{
 		staticClientNamespace: {
 			staticClientName,
@@ -855,10 +858,28 @@ func (c *cluster) checkLocalities(t *testing.T) {
 	} {
 		for _, svc := range svcs {
 			cs := c.getCatalogService(t, svc, ns, c.partition)
-			assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
-			assert.Equal(t, c.locality, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
+			if !assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name) {
+				continue
+			}
+			expected := c.locality
+			if !cfg.UseKind {
+				expected = c.podNodeLocality(t, cs)
+			}
+			assert.Equal(t, expected, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
 		}
 	}
+}
+
+// podNodeLocality returns the region and zone labels of the node that runs the pod behind a catalog service instance.
+func (c *cluster) podNodeLocality(t *testing.T, cs *api.CatalogService) api.Locality {
+	podName, podNS := cs.ServiceMeta["pod-name"], cs.ServiceMeta["k8s-namespace"]
+	require.NotEmpty(t, podName, "service %s in %s has no pod-name metadata", cs.ServiceName, c.name)
+	client := c.context.KubernetesClient(t)
+	pod, err := client.CoreV1().Pods(podNS).Get(ctx.Background(), podName, metav1.GetOptions{})
+	require.NoError(t, err)
+	node, err := client.CoreV1().Nodes().Get(ctx.Background(), pod.Spec.NodeName, metav1.GetOptions{})
+	require.NoError(t, err)
+	return api.Locality{Region: node.Labels[corev1.LabelTopologyRegion], Zone: node.Labels[corev1.LabelTopologyZone]}
 }
 
 func (c *cluster) getCatalogService(t *testing.T, svc, ns, partition string) *api.CatalogService {
@@ -990,7 +1011,14 @@ func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, o
 
 // setK8sNodeLocality labels the k8s node corresponding to the given cluster with standard labels indicating the
 // locality of that node. These are propagated by connect-inject to registered Consul services.
-func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluster) {
+// This is only done on Kind. On other clusters the cloud provider owns these labels (on AWS the cloud controller
+// manager puts the real values back within minutes), so the nodes are left alone and checkLocalities checks the
+// real labels instead.
+func setK8sNodeLocality(t *testing.T, cfg *config.TestConfig, context environment.TestContext, c *cluster) {
+	if !cfg.UseKind {
+		logger.Logf(t, "not relabelling nodes in %s: checking their real locality labels instead", context.KubectlOptions(t).ContextName)
+		return
+	}
 	nodeList, err := context.KubernetesClient(t).CoreV1().Nodes().List(ctx.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 	// Get the name of the (only) node from the Kind cluster.
@@ -1006,8 +1034,8 @@ func dnsQuery(t testutil.TestingTB, cfg *config.TestConfig, releaseName string, 
 
 	retry.RunWith(timer, t, func(r *retry.R) {
 		args := []string{"exec", "-i",
-			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
-				releaseName), "ANY"}
+			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.%s",
+				releaseName, dnsServer.context.KubectlOptions(r).Namespace), "ANY"}
 		args = append(args, dnsQuery...)
 		var err error
 		logs, err = k8s.RunKubectlAndGetOutputE(r, dnsServer.clientOpts, args...)

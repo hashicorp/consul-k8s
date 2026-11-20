@@ -1,0 +1,11 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+resources:
+  - ../../../../bases/external-service-registration
+
+# The terminating gateway pod runs in the Helm release namespace, which is not
+# always "default" (for example consul-test on OpenShift). Use the fully
+# qualified name so the gateway can resolve the static-server in "default".
+patches:
+  - path: external-service.yaml

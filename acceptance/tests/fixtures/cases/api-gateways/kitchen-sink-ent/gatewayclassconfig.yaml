@@ -10,3 +10,6 @@ spec:
     defaultInstances: 2
     maxInstances: 3
     minInstances: 1
+  # On OpenShift the gateway Role grants "use" of this SCC. The connect-injector can only
+  # grant an SCC it holds itself, which is restricted-v2 (the chart default). Ignored elsewhere.
+  openshiftSCCName: restricted-v2

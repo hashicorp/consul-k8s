@@ -92,6 +92,12 @@ func NewHelmCluster(
 
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
+	if cfg.EnableOpenshift && openshiftOwnsGatewayAPICRDs(t, ctx) {
+		// OpenShift 4.19+ installs and owns the gateway.networking.k8s.io CRDs, so the
+		// chart must not render them or Helm refuses to install. Tests can still
+		// override this through helmValues, which are merged afterwards.
+		values["global.openshift.isOcpGreaterthan4_18"] = "true"
+	}
 	helpers.MergeMaps(values, helmValues)
 
 	logger := terratestLogger.New(logger.TestLogger{})
@@ -123,6 +129,18 @@ func NewHelmCluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 	}
+}
+
+// openshiftOwnsGatewayAPICRDs reports whether the target cluster runs OpenShift 4.19 or
+// newer, where the platform ships and owns the Gateway API CRDs.
+func openshiftOwnsGatewayAPICRDs(t *testing.T, ctx environment.TestContext) bool {
+	t.Helper()
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "clusterversion", "version", "-o", "jsonpath={.status.desired.version}")
+	require.NoErrorf(t, err, "failed to get OpenShift cluster version: %s", out)
+	var major, minor int
+	_, err = fmt.Sscanf(strings.TrimSpace(out), "%d.%d", &major, &minor)
+	require.NoErrorf(t, err, "failed to parse OpenShift cluster version %q", out)
+	return major > 4 || (major == 4 && minor >= 19)
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
@@ -214,7 +232,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		err := helm.DeleteE(r, h.deleteOptions(t), h.releaseName, false)
 		require.NoError(r, err)
 	})
 
@@ -465,6 +483,26 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	})
+}
+
+// deleteOptions returns the Helm options for one `helm delete` attempt. When an earlier attempt
+// left the release in the "uninstalling" state, its pre-delete hooks have already run and the
+// release's resources (including the hook Job's ServiceAccount) are deleted, so running the hooks
+// again would create a Job that can never start. Those retries skip the hooks.
+func (h *HelmCluster) deleteOptions(t *testing.T) *helm.Options {
+	secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(),
+		metav1.ListOptions{LabelSelector: fmt.Sprintf("owner=helm,name=%s,status=uninstalling", h.releaseName)})
+	if err != nil || len(secrets.Items) == 0 {
+		return h.helmOptions
+	}
+	logger.Logf(t, "release %s is already uninstalling; retrying the delete without hooks", h.releaseName)
+	opts := *h.helmOptions
+	opts.ExtraArgs = make(map[string][]string, len(h.helmOptions.ExtraArgs))
+	for k, v := range h.helmOptions.ExtraArgs {
+		opts.ExtraArgs[k] = v
+	}
+	opts.ExtraArgs["delete"] = append(append([]string{}, h.helmOptions.ExtraArgs["delete"]...), "--no-hooks")
+	return &opts
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {

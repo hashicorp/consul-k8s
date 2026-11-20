@@ -1,0 +1,12 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# OpenShift adds a dockercfg pull secret to every ServiceAccount's secrets list, and the
+# injector mounts the first listed secret as the token for the pod's second (multiport-admin)
+# service. List the multiport-admin token secret first so that is the one mounted.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: multiport-admin
+secrets:
+- name: multiport-admin
