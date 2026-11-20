@@ -23,7 +23,8 @@ const (
 )
 
 const (
-	TerminatingGatewayFailedToSetACLs string = "FailedToSetACLs"
+	TerminatingGatewayFailedToSetACLs        string = "FailedToSetACLs"
+	TerminatingGatewayGatewayPolicyNotLinked string = "GatewayPolicyNotLinked"
 )
 
 // Condition Type.
