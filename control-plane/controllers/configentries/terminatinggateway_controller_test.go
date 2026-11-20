@@ -5,12 +5,14 @@ package configentries
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 
 	capi "github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +32,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -550,4 +554,284 @@ func TestTerminatingGatewayController_ensureACLBootstrapScopesBindingRuleToRelea
 	require.NoError(t, controller.ensureTerminatingGatewayACLBootstrap(logr.Discard(), termGW, helmValues))
 	require.NotNil(t, written)
 	require.Equal(t, fmt.Sprintf("serviceaccount.name==%q and serviceaccount.namespace==%q", saName, releaseNS), written.Selector)
+}
+
+func TestTerminatingGatewayController_conditionallyDeletePolicies_PolicyReadError(t *testing.T) {
+	t.Parallel()
+
+	const (
+		failingPolicy = "default-db-write-policy"
+		missingPolicy = "default-cache-write-policy"
+	)
+	var (
+		mu       sync.Mutex
+		requests []string
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		requests = append(requests, r.Method+" "+r.URL.Path)
+		mu.Unlock()
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/acl/policy/name/"+failingPolicy:
+			w.WriteHeader(http.StatusInternalServerError)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/acl/policy/name/"+missingPolicy:
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	config := capi.DefaultConfig()
+	config.Address = server.URL
+	consulClient, err := capi.NewClient(config)
+	require.NoError(t, err)
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, consulv1alpha1.AddToScheme(scheme))
+	kubeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithIndex(&consulv1alpha1.TerminatingGateway{}, terminatingGatewayByLinkedServiceName, termGWLinkedServiceIndexer).
+		Build()
+	controller := &TerminatingGatewayController{Client: kubeClient}
+
+	require.NotPanics(t, func() {
+		err = controller.conditionallyDeletePolicies(logr.Discard(), consulClient,
+			[]*capi.ACLRolePolicyLink{{Name: failingPolicy}, {Name: missingPolicy}}, "terminating-gateway")
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), failingPolicy)
+	require.ElementsMatch(t, []string{
+		"GET /v1/acl/policy/name/" + failingPolicy,
+		"GET /v1/acl/policy/name/" + missingPolicy,
+	}, requests, "no policy is deleted, and the next policy is still processed")
+}
+
+const (
+	tgwTestGatewayName = "terminating-gateway"
+	tgwTestNamespace   = "consul"
+	tgwTestRoleName    = "consul-terminating-gateway-acl-role"
+	tgwTestGWPolicy    = "terminating-gateway-policy"
+	tgwTestSvcAPolicy  = "default-svc-a-write-policy"
+	tgwTestSvcBPolicy  = "default-svc-b-write-policy"
+	tgwTestAuthMethod  = "consul-k8s-component-auth-method"
+)
+
+type tgwACLTestEnv struct {
+	controller *TerminatingGatewayController
+	consul     *capi.Client
+	helmValues *helmvalues.HelmValues
+}
+
+// newTGWACLTestEnv starts a Consul test server with ACLs enabled and the
+// component auth method, and returns a TerminatingGatewayController that uses
+// it with the bootstrap token.
+func newTGWACLTestEnv(t *testing.T) *tgwACLTestEnv {
+	t.Helper()
+	const bootToken = "11111111-2222-3333-4444-555555555555"
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.Tokens.InitialManagement = bootToken
+	})
+
+	_, _, caPEM, _, err := cert.GenerateCA("kubernetes")
+	require.NoError(t, err)
+	_, _, err = testClient.APIClient.ACL().AuthMethodCreate(&capi.ACLAuthMethod{
+		Name: tgwTestAuthMethod,
+		Type: "kubernetes",
+		Config: map[string]interface{}{
+			"Host":              "https://kubernetes.example.com",
+			"CACert":            caPEM,
+			"ServiceAccountJWT": testUnsignedJWT(),
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	connMgr := &consul.MockServerConnectionManager{}
+	connMgr.On("State").Return(discovery.State{
+		Address: discovery.Addr{TCPAddr: net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: testClient.TestServer.Config.Ports.GRPC,
+		}},
+		Token: bootToken,
+	}, nil)
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, consulv1alpha1.AddToScheme(scheme))
+	kubeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithIndex(&consulv1alpha1.TerminatingGateway{}, terminatingGatewayByLinkedServiceName, termGWLinkedServiceIndexer).
+		Build()
+
+	return &tgwACLTestEnv{
+		controller: &TerminatingGatewayController{
+			Client:           kubeClient,
+			Log:              logr.Discard(),
+			Scheme:           scheme,
+			ReleaseNamespace: tgwTestNamespace,
+			ConfigEntryController: &ConfigEntryController{
+				ConsulClientConfig:  testClient.Cfg,
+				ConsulServerConnMgr: connMgr,
+			},
+		},
+		consul: testClient.APIClient,
+		helmValues: &helmvalues.HelmValues{
+			Release: helmvalues.ReleaseConfig{Name: "consul", Namespace: tgwTestNamespace},
+			Global: helmvalues.GlobalConfig{
+				Name: "consul",
+				ACLs: helmvalues.ACLsConfig{ManageSystemACLs: true},
+			},
+		},
+	}
+}
+
+// testUnsignedJWT returns a syntactically valid, unsigned JWT for auth method
+// configuration in tests.
+func testUnsignedJWT() string {
+	enc := base64.RawURLEncoding
+	return enc.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`)) + "." +
+		enc.EncodeToString([]byte(`{"sub":"test"}`)) + "."
+}
+
+func newTestTerminatingGateway(services ...string) *consulv1alpha1.TerminatingGateway {
+	termGW := &consulv1alpha1.TerminatingGateway{
+		ObjectMeta: metav1.ObjectMeta{Name: tgwTestGatewayName, Namespace: tgwTestNamespace},
+	}
+	for _, svc := range services {
+		termGW.Spec.Services = append(termGW.Spec.Services, consulv1alpha1.LinkedService{Name: svc})
+	}
+	return termGW
+}
+
+func (e *tgwACLTestEnv) createPolicies(t *testing.T, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		_, _, err := e.consul.ACL().PolicyCreate(&capi.ACLPolicy{
+			Name:  name,
+			Rules: `node_prefix "" { policy = "read" }`,
+		}, nil)
+		require.NoError(t, err)
+	}
+}
+
+func (e *tgwACLTestEnv) createRole(t *testing.T, policies ...string) *capi.ACLRole {
+	t.Helper()
+	role := &capi.ACLRole{Name: tgwTestRoleName}
+	for _, p := range policies {
+		role.Policies = append(role.Policies, &capi.ACLRolePolicyLink{Name: p})
+	}
+	created, _, err := e.consul.ACL().RoleCreate(role, nil)
+	require.NoError(t, err)
+	return created
+}
+
+func (e *tgwACLTestEnv) rolePolicyNames(t *testing.T) []string {
+	t.Helper()
+	role, _, err := e.consul.ACL().RoleReadByName(tgwTestRoleName, nil)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	var names []string
+	for _, p := range role.Policies {
+		require.NotNil(t, p)
+		require.NotEmpty(t, p.Name)
+		names = append(names, p.Name)
+	}
+	return names
+}
+
+func (e *tgwACLTestEnv) bindingRulesForRole(t *testing.T) []*capi.ACLBindingRule {
+	t.Helper()
+	rules, _, err := e.consul.ACL().BindingRuleList(tgwTestAuthMethod, nil)
+	require.NoError(t, err)
+	var matching []*capi.ACLBindingRule
+	for _, rule := range rules {
+		if rule.BindName == tgwTestRoleName {
+			matching = append(matching, rule)
+		}
+	}
+	return matching
+}
+
+// Regression test: when the gateway policy link is missing from the role,
+// updateACls must not send an empty policy link to Consul, and it must still
+// update the linked-service policy links.
+func TestTerminatingGatewayController_updateACls_GatewayPolicyLinkMissing(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t)
+	env.createPolicies(t, tgwTestGWPolicy, tgwTestSvcAPolicy)
+	env.createRole(t, tgwTestSvcAPolicy)
+
+	err := env.controller.updateACls(logr.Discard(), newTestTerminatingGateway("svc-a", "svc-b"))
+	if err != nil {
+		require.NotContains(t, err.Error(), `No such ACL policy with name ""`)
+	}
+	require.ElementsMatch(t, []string{tgwTestSvcAPolicy, tgwTestSvcBPolicy}, env.rolePolicyNames(t))
+}
+
+// The bootstrap creates a deleted gateway policy again and links it to the
+// existing role. It keeps the linked-service policy links.
+func TestTerminatingGatewayController_ensureACLBootstrap_RelinksDeletedGatewayPolicy(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t)
+	env.createPolicies(t, tgwTestSvcAPolicy)
+	existing := env.createRole(t, tgwTestSvcAPolicy)
+
+	require.NoError(t, env.controller.ensureTerminatingGatewayACLBootstrap(
+		logr.Discard(), newTestTerminatingGateway("svc-a"), env.helmValues))
+
+	policy, _, err := env.consul.ACL().PolicyReadByName(tgwTestGWPolicy, nil)
+	require.NoError(t, err)
+	require.NotNil(t, policy)
+	role, _, err := env.consul.ACL().RoleReadByName(tgwTestRoleName, nil)
+	require.NoError(t, err)
+	require.Equal(t, existing.ID, role.ID)
+	require.ElementsMatch(t, []string{tgwTestSvcAPolicy, tgwTestGWPolicy}, env.rolePolicyNames(t))
+}
+
+// The bootstrap creates a deleted role and binding rule again.
+func TestTerminatingGatewayController_ensureACLBootstrap_RecreatesRoleAndBindingRule(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t)
+
+	require.NoError(t, env.controller.ensureTerminatingGatewayACLBootstrap(
+		logr.Discard(), newTestTerminatingGateway("svc-a"), env.helmValues))
+
+	require.ElementsMatch(t, []string{tgwTestGWPolicy}, env.rolePolicyNames(t))
+	rules := env.bindingRulesForRole(t)
+	require.Len(t, rules, 1)
+	require.Equal(t, capi.BindingRuleBindTypeRole, rules[0].BindType)
+}
+
+// The bootstrap followed by updateACls, run twice, gives exactly one gateway
+// policy link and one binding rule, and keeps the linked-service links.
+func TestTerminatingGatewayController_ensureACLBootstrapThenUpdateACls_NoDuplicates(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t)
+	termGW := newTestTerminatingGateway("svc-a")
+
+	for i := 0; i < 2; i++ {
+		require.NoError(t, env.controller.ensureTerminatingGatewayACLBootstrap(logr.Discard(), termGW, env.helmValues))
+		require.NoError(t, env.controller.updateACls(logr.Discard(), termGW))
+	}
+
+	require.ElementsMatch(t, []string{tgwTestGWPolicy, tgwTestSvcAPolicy}, env.rolePolicyNames(t))
+	require.Len(t, env.bindingRulesForRole(t), 1)
+}
+
+// With manageSystemACLs=false, the bootstrap does not create ACL objects.
+func TestTerminatingGatewayController_ensureACLBootstrap_UnmanagedIsNoop(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t)
+	env.helmValues.Global.ACLs.ManageSystemACLs = false
+
+	require.NoError(t, env.controller.ensureTerminatingGatewayACLBootstrap(
+		logr.Discard(), newTestTerminatingGateway("svc-a"), env.helmValues))
+
+	policy, _, err := env.consul.ACL().PolicyReadByName(tgwTestGWPolicy, nil)
+	require.NoError(t, err)
+	require.Nil(t, policy)
+	role, _, err := env.consul.ACL().RoleReadByName(tgwTestRoleName, nil)
+	require.NoError(t, err)
+	require.Nil(t, role)
 }
