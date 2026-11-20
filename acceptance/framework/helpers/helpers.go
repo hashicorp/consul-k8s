@@ -122,7 +122,9 @@ func Cleanup(t testutil.TestingTB, noCleanupOnFailure bool, noCleanup bool, clea
 // by first checking members are alive from the perspective of both servers.
 // If secure is true, it will also check that the ACL replication is running on the secondary server.
 func VerifyFederation(t *testing.T, primaryClient, secondaryClient *api.Client, releaseName string, secure bool) {
-	retrier := &retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Second}
+	// 10 minutes: on OpenShift (ROSA) the secondary's mesh gateway load balancer can take over
+	// 5 minutes to become routable from the primary. Healthy federation still returns as soon as it's ready.
+	retrier := &retry.Timer{Timeout: 10 * time.Minute, Wait: 1 * time.Second}
 	start := time.Now()
 
 	// Check that server in dc1 is healthy from the perspective of the server in dc2, and vice versa.
