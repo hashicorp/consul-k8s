@@ -568,7 +568,7 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 		serviceName := serviceNameFromPolicy(policy.Name)
 
 		if err := r.Client.List(context.Background(), termGWList, client.MatchingFields{terminatingGatewayByLinkedServiceName: serviceName}); err != nil {
-			log.Error(err, "failed to lookup terminating gateway list for service", serviceName)
+			log.Error(err, "failed to lookup terminating gateway list for service", "service", serviceName)
 			mErr = errors.Join(mErr, fmt.Errorf("failed to lookup terminating gateway list for service %q: %w", serviceName, err))
 			continue
 		}
@@ -587,7 +587,7 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 
 		policy, _, err := consulClient.ACL().PolicyReadByName(policyName, nil)
 		if err != nil {
-			log.Error(err, "failed to lookup policy by name from consul", policyName)
+			log.Error(err, "failed to lookup policy by name from consul", "policy", policyName)
 			mErr = errors.Join(mErr, fmt.Errorf("error reading policy %q: %w", policyName, err))
 			continue
 		}
@@ -599,7 +599,7 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 
 		_, err = consulClient.ACL().PolicyDelete(policy.ID, nil)
 		if err != nil {
-			log.Error(err, "failed to delete policy from consul", policy.Name)
+			log.Error(err, "failed to delete policy from consul", "policy", policy.Name)
 			mErr = errors.Join(mErr, fmt.Errorf("error delete policy %q: %w", policy.Name, err))
 		}
 	}
