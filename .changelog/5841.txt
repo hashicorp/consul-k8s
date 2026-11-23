@@ -1,0 +1,3 @@
+```release-note:bug
+sync-catalog: Fix deregistration of Consul services when one of several EndpointSlices of a Kubernetes Service is deleted. The registrations are now regenerated from the remaining EndpointSlices.
+```
