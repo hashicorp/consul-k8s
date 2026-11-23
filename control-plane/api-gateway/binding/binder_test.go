@@ -289,6 +289,45 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			},
 		},
+		"stale insecure frontend validation condition is cleared": {
+			config: controlledBinder(BinderConfig{
+				Gateway: gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
+					Conditions: []metav1.Condition{{
+						Type:    "InsecureFrontendValidationMode",
+						Status:  metav1.ConditionTrue,
+						Reason:  "ConfigurationChanged",
+						Message: "AllowInsecureFallback is configured but is not safely supported by this Consul version",
+					}},
+				}),
+			}),
+			expectedStatusUpdates: []client.Object{
+				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
+					Addresses: []gwv1.GatewayStatusAddress{},
+					Conditions: []metav1.Condition{{
+						Type:    "Accepted",
+						Status:  metav1.ConditionTrue,
+						Reason:  "Accepted",
+						Message: "gateway accepted",
+					}, {
+						Type:    "Programmed",
+						Status:  metav1.ConditionFalse,
+						Reason:  "Pending",
+						Message: "gateway pods are still being scheduled",
+					}},
+				})),
+			},
+			expectedConsulUpdates: []api.ConfigEntry{
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "gateway",
+					Meta: map[string]string{
+						"k8s-name":      "gateway",
+						"k8s-namespace": "default",
+					},
+					Listeners: []api.APIGatewayListener{},
+				},
+			},
+		},
 		"gateway http route no finalizer": {
 			config: controlledBinder(BinderConfig{
 				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),

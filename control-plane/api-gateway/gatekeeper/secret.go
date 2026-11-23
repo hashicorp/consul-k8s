@@ -6,6 +6,7 @@ package gatekeeper
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -13,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -119,6 +121,23 @@ func (g *Gatekeeper) secret(ctx context.Context, gateway gwv1.Gateway) (*corev1.
 				secret.Data[prefix+k] = v
 			}
 		}
+	}
+
+	for _, key := range common.FrontendCAReferences(gateway) {
+		configMap := &corev1.ConfigMap{}
+		if err := g.Client.Get(ctx, key, configMap); err != nil {
+			if k8serrors.IsNotFound(err) {
+				g.Log.V(1).Info("Referenced frontend CA ConfigMap not found", "namespace", key.Namespace, "name", key.Name)
+				continue
+			}
+			return nil, fmt.Errorf("failed to fetch frontend CA ConfigMap %s/%s: %w", key.Namespace, key.Name, err)
+		}
+		bundle, err := common.ParseFrontendCABundle(*configMap, time.Now())
+		if err != nil {
+			g.Log.V(1).Info("Referenced frontend CA ConfigMap is invalid", "namespace", key.Namespace, "name", key.Name, "error", err)
+			continue
+		}
+		secret.Data[common.FrontendCAFilename(client.ObjectKeyFromObject(&gateway), key)] = bundle.PEM
 	}
 
 	return secret, nil

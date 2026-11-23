@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -461,13 +462,19 @@ func validateListeners(gateway gwv1.Gateway, listeners []gwv1.Listener, resource
 		if refErr != nil {
 			result.refErrs = append(result.refErrs, refErr)
 		}
+		frontendAcceptedErr, frontendRefErr := validateFrontendTLS(gateway, listener, resources)
+		if frontendRefErr != nil {
+			result.refErrs = append(result.refErrs, frontendRefErr)
+		}
 
 		jwtErr := validateJWT(gateway, listener, resources)
 		if jwtErr != nil {
 			result.refErrs = append(result.refErrs, jwtErr)
 		}
 
-		if err != nil {
+		if frontendAcceptedErr != nil {
+			result.acceptedErr = frontendAcceptedErr
+		} else if err != nil {
 			result.acceptedErr = err
 		} else if jwtErr != nil {
 			result.acceptedErr = jwtErr
@@ -498,6 +505,38 @@ func validateListeners(gateway gwv1.Gateway, listeners []gwv1.Listener, resource
 		seenContainerPorts[common.ToContainerPort(listener.Port, portMapping)] = struct{}{}
 	}
 	return results
+}
+
+func validateFrontendTLS(gateway gwv1.Gateway, listener gwv1.Listener, resources *common.ResourceMap) (error, error) {
+	if listener.Protocol != gwv1.HTTPSProtocolType {
+		return nil, nil
+	}
+	validation := common.EffectiveFrontendTLSValidation(gateway, listener.Port)
+	if validation == nil {
+		return nil, nil
+	}
+	if common.FrontendValidationMode(validation) == gwv1.AllowInsecureFallback {
+		return errListenerNoValidCACertificate, errListenerInvalidCACertificateRef
+	}
+	if len(validation.CACertificateRefs) != 1 {
+		return errListenerNoValidCACertificate, errListenerInvalidCACertificateRef
+	}
+	ref := validation.CACertificateRefs[0]
+	if common.ValidateFrontendCAReference(ref) != nil {
+		return errListenerNoValidCACertificate, errListenerInvalidCACertificateKind
+	}
+	if !resources.GatewayCanReferenceConfigMap(gateway, ref) {
+		return errListenerNoValidCACertificate, errRefNotPermitted
+	}
+	key := common.IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, gateway.Namespace)
+	configMap := resources.FrontendCA(key)
+	if configMap == nil {
+		return errListenerNoValidCACertificate, errListenerInvalidCACertificateRef
+	}
+	if _, err := common.ParseFrontendCABundle(*configMap, time.Now()); err != nil {
+		return errListenerNoValidCACertificate, errListenerInvalidCACertificateRef
+	}
+	return nil, nil
 }
 
 // orphanedProtocolAnnotations returns the annotation keys on gateway whose

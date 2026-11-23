@@ -40,6 +40,7 @@ const (
 
 	MeshService_PeerIndex      = "__meshservice_referencing_peer"
 	Secret_GatewayIndex        = "__secret_referencing_gateway"
+	ConfigMap_GatewayIndex     = "__configmap_referencing_gateway"
 	Gatewaypolicy_GatewayIndex = "__gatewaypolicy_referencing_gateway"
 )
 
@@ -104,6 +105,11 @@ var indexes = []index{
 		name:        Secret_GatewayIndex,
 		target:      &gwv1.Gateway{},
 		indexerFunc: gatewayForSecret,
+	},
+	{
+		name:        ConfigMap_GatewayIndex,
+		target:      &gwv1.Gateway{},
+		indexerFunc: gatewayForConfigMap,
 	},
 	{
 		name:        HTTPRoute_GatewayIndex,
@@ -233,6 +239,16 @@ func gatewayForSecret(o client.Object) []string {
 		}
 	}
 	return secretReferences
+}
+
+func gatewayForConfigMap(o client.Object) []string {
+	gateway := o.(*gwv1.Gateway)
+	refs := common.FrontendCAReferences(*gateway)
+	result := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		result = append(result, ref.String())
+	}
+	return result
 }
 
 func gatewaysForHTTPRoute(o client.Object) []string {

@@ -4,10 +4,14 @@
 package binding
 
 import (
+	"slices"
+	"time"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -192,6 +196,17 @@ func (b *Binder) Snapshot() *Snapshot {
 			// sync set
 			b.config.Resources.TranslateFileSystemCertificate(secret.(types.NamespacedName))
 		}
+		for _, key := range common.FrontendCAReferences(b.config.Gateway) {
+			configMap := b.config.Resources.FrontendCA(key)
+			if configMap == nil {
+				continue
+			}
+			_, err := common.ParseFrontendCABundle(*configMap, time.Now())
+			if err != nil {
+				continue
+			}
+			b.config.Resources.TranslateFrontendCA(b.config.Gateway, key)
+		}
 	}
 
 	// now cleanup any routes or certificates that we haven't already processed
@@ -251,13 +266,28 @@ func (b *Binder) Snapshot() *Snapshot {
 			})
 		}
 
-		status.Conditions = b.config.Gateway.Status.Conditions
+		// Clone so the stale-condition cleanup does not mutate the old status that is diffed below.
+		status.Conditions = slices.Clone(b.config.Gateway.Status.Conditions)
+		status.Conditions = slices.DeleteFunc(status.Conditions, func(condition metav1.Condition) bool {
+			return condition.Type == "InsecureFrontendValidationMode"
+		})
+		if gatewayUsesInsecureFrontendValidation(b.config.Gateway) {
+			status.Conditions, _ = setCondition(status.Conditions, metav1.Condition{
+				Type:               "InsecureFrontendValidationMode",
+				Status:             metav1.ConditionTrue,
+				Reason:             "ConfigurationChanged",
+				ObservedGeneration: b.config.Gateway.Generation,
+				Message:            "AllowInsecureFallback is configured but is not safely supported by this Consul version",
+				LastTransitionTime: timeFunc(),
+			})
+		}
 
 		// we do this loop to not accidentally override any additional statuses that
 		// have been set anywhere outside of validation.
 		for _, condition := range gatewayValidation.Conditions(b.config.Gateway.Generation, listenerValidation.Invalid()) {
 			status.Conditions, _ = setCondition(status.Conditions, condition)
 		}
+
 		status.Addresses = addressesForGateway(b.config.Service, registrationPods)
 
 		// only mark the gateway as needing a status update if there's a diff with its old
@@ -335,6 +365,21 @@ func (b *Binder) Snapshot() *Snapshot {
 	}
 
 	return snapshot
+}
+
+func gatewayUsesInsecureFrontendValidation(gateway gwv1.Gateway) bool {
+	if gateway.Spec.TLS == nil || gateway.Spec.TLS.Frontend == nil {
+		return false
+	}
+	if common.FrontendValidationMode(gateway.Spec.TLS.Frontend.Default.Validation) == gwv1.AllowInsecureFallback {
+		return true
+	}
+	for _, override := range gateway.Spec.TLS.Frontend.PerPort {
+		if common.FrontendValidationMode(override.TLS.Validation) == gwv1.AllowInsecureFallback {
+			return true
+		}
+	}
+	return false
 }
 
 func secretsForGateway(gateway gwv1.Gateway, resources *common.ResourceMap) mapset.Set {

@@ -248,6 +248,9 @@ var (
 	errListenerJWTProviderNotFound                    = errors.New("policy referencing this listener references unknown JWT provider")
 	errListenerInvalidRouteKinds                      = errors.New("allowed route kind is invalid")
 	errListenerProgrammed_Invalid                     = errors.New("listener cannot be programmed because it is invalid")
+	errListenerInvalidCACertificateRef                = errors.New("frontend CA certificate reference is invalid")
+	errListenerInvalidCACertificateKind               = errors.New("frontend CA certificate kind is unsupported")
+	errListenerNoValidCACertificate                   = errors.New("frontend validation has no valid CA certificate")
 
 	// Below is where any custom generic listener validation errors should go.
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
@@ -327,6 +330,15 @@ func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Con
 			Type:               "Accepted",
 			Status:             metav1.ConditionFalse,
 			Reason:             "UnsupportedProtocol",
+			ObservedGeneration: generation,
+			Message:            l.acceptedErr.Error(),
+			LastTransitionTime: now,
+		}
+	case errListenerNoValidCACertificate:
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionFalse,
+			Reason:             "NoValidCACertificate",
 			ObservedGeneration: generation,
 			Message:            l.acceptedErr.Error(),
 			LastTransitionTime: now,
@@ -425,6 +437,24 @@ func (l listenerValidationResult) resolvedRefsConditions(generation int64) []met
 				Type:               "ResolvedRefs",
 				Status:             metav1.ConditionFalse,
 				Reason:             "InvalidJWTProviderRef",
+				ObservedGeneration: generation,
+				Message:            refErr.Error(),
+				LastTransitionTime: now,
+			})
+		case errListenerInvalidCACertificateRef:
+			conditions = append(conditions, metav1.Condition{
+				Type:               "ResolvedRefs",
+				Status:             metav1.ConditionFalse,
+				Reason:             "InvalidCACertificateRef",
+				ObservedGeneration: generation,
+				Message:            refErr.Error(),
+				LastTransitionTime: now,
+			})
+		case errListenerInvalidCACertificateKind:
+			conditions = append(conditions, metav1.Condition{
+				Type:               "ResolvedRefs",
+				Status:             metav1.ConditionFalse,
+				Reason:             "InvalidCACertificateKind",
 				ObservedGeneration: generation,
 				Message:            refErr.Error(),
 				LastTransitionTime: now,

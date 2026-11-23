@@ -120,8 +120,19 @@ func (e entryComparator) apiGatewaysEqual(a, b api.APIGatewayConfigEntry) bool {
 		maps.Equal(a.Meta, b.Meta) &&
 		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual) &&
 		a.TLS.Enabled == b.TLS.Enabled &&
+		bothNilOrEqualFunc(a.FrontendTLS, b.FrontendTLS, e.frontendTLSEqual) &&
 		e.upstreamLimitsEqual(a.Defaults, b.Defaults) &&
 		bothNilOrEqualFunc(a.ExtAuthz, b.ExtAuthz, gatewayExtAuthzEqual)
+}
+
+func (e entryComparator) frontendTLSEqual(a, b api.APIGatewayFrontendTLSConfig) bool {
+	equalValidation := func(a, b api.APIGatewayFrontendTLSValidation) bool {
+		return a.Mode == b.Mode && slices.EqualFunc(a.CACertificateRefs, b.CACertificateRefs, e.resourceReferencesEqual)
+	}
+	return bothNilOrEqualFunc(a.Default, b.Default, equalValidation) &&
+		slices.EqualFunc(a.PerPort, b.PerPort, func(a, b api.APIGatewayFrontendTLSPortConfig) bool {
+			return a.Port == b.Port && bothNilOrEqualFunc(a.Validation, b.Validation, equalValidation)
+		})
 }
 
 func gatewayExtAuthzEqual(a, b api.APIGatewayExtAuthz) bool {

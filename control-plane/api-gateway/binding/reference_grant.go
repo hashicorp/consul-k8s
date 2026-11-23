@@ -44,6 +44,20 @@ func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1.Gateway, se
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(secretRef.Name))
 }
 
+func (rv *referenceValidator) GatewayCanReferenceConfigMap(gateway gwv1.Gateway, configMapRef gwv1.ObjectReference) bool {
+	fromNS := gateway.GetNamespace()
+	fromGK := metav1.GroupKind{
+		Group: gateway.GroupVersionKind().Group,
+		Kind:  gateway.GroupVersionKind().Kind,
+	}
+	toNS := gateway.Namespace
+	if configMapRef.Namespace != nil {
+		toNS = string(*configMapRef.Namespace)
+	}
+	toGK := metav1.GroupKind{Group: string(configMapRef.Group), Kind: string(configMapRef.Kind)}
+	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(configMapRef.Name))
+}
+
 func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1.BackendRef) bool {
 	fromNS := httproute.GetNamespace()
 	fromGK := metav1.GroupKind{

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 
@@ -158,6 +159,11 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to fetch certificates for gateway")
 		return ctrl.Result{}, err
 	}
+	if err := r.fetchFrontendCAsForGateway(ctx, resources, gateway); err != nil {
+		log.Error(err, "unable to fetch frontend CA ConfigMaps for gateway")
+		return ctrl.Result{}, err
+	}
+	frontendCARequeueAfter := nextFrontendCARequeue(gateway, resources, time.Now())
 
 	// fetch our file-system-certificates from cache, this needs to happen
 	// here since the certificates need to be reference counted before
@@ -351,7 +357,32 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: frontendCARequeueAfter}, nil
+}
+
+func nextFrontendCARequeue(gateway gwv1.Gateway, resources *common.ResourceMap, now time.Time) time.Duration {
+	var next time.Time
+	for _, key := range common.FrontendCAReferences(gateway) {
+		configMap := resources.FrontendCA(key)
+		if configMap == nil {
+			continue
+		}
+		bundle, _ := common.ParseFrontendCABundle(*configMap, now)
+		if bundle.NextTransition.IsZero() {
+			continue
+		}
+		if next.IsZero() || bundle.NextTransition.Before(next) {
+			next = bundle.NextTransition
+		}
+	}
+	if next.IsZero() {
+		return 0
+	}
+	delay := next.Sub(now) + time.Second
+	if delay < time.Second {
+		return time.Second
+	}
+	return delay
 }
 
 func (r *GatewayController) deregisterAllServices(ctx context.Context, consulKey api.ResourceReference) error {
@@ -515,6 +546,10 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.transformSecret),
+		).
+		Watches(
+			&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(r.transformConfigMap),
 		).
 		Watches(
 			&v1alpha1.MeshService{},
@@ -682,6 +717,17 @@ func (r *GatewayController) transformSecret(ctx context.Context, o client.Object
 	gatewayList := &gwv1.GatewayList{}
 	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, client.ObjectKeyFromObject(secret).String()),
+	}); err != nil {
+		return nil
+	}
+	return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
+}
+
+func (r *GatewayController) transformConfigMap(ctx context.Context, o client.Object) []reconcile.Request {
+	configMap := o.(*corev1.ConfigMap)
+	gatewayList := &gwv1.GatewayList{}
+	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(ConfigMap_GatewayIndex, client.ObjectKeyFromObject(configMap).String()),
 	}); err != nil {
 		return nil
 	}
@@ -1298,6 +1344,20 @@ func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, res
 		}
 	}
 
+	return nil
+}
+
+func (c *GatewayController) fetchFrontendCAsForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1.Gateway) error {
+	for _, key := range common.FrontendCAReferences(gateway) {
+		var configMap corev1.ConfigMap
+		if err := c.Client.Get(ctx, key, &configMap); err != nil {
+			if k8serrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		resources.AddFrontendCA(configMap)
+	}
 	return nil
 }
 

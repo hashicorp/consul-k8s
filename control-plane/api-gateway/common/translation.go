@@ -12,6 +12,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul/api"
@@ -79,11 +80,66 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1.Gateway, resources *Resour
 			constants.MetaKeyKubeNS:   gateway.Namespace,
 			constants.MetaKeyKubeName: gateway.Name,
 		}),
-		Listeners: listeners,
-		TLS:       gatewayTLS(gateway.Annotations),
-		Defaults:  t.translateGatewayDefaults(gateway),
-		ExtAuthz:  gatewayExtAuthz(gateway.Annotations),
+		Listeners:   listeners,
+		TLS:         gatewayTLS(gateway.Annotations),
+		FrontendTLS: t.frontendTLS(gateway, resources, gwcc),
+		Defaults:    t.translateGatewayDefaults(gateway),
+		ExtAuthz:    gatewayExtAuthz(gateway.Annotations),
 	}
+}
+
+func (t ResourceTranslator) frontendTLS(gateway gwv1.Gateway, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) *api.APIGatewayFrontendTLSConfig {
+	if gateway.Spec.TLS == nil || gateway.Spec.TLS.Frontend == nil {
+		return nil
+	}
+
+	translate := func(validation *gwv1.FrontendTLSValidation) *api.APIGatewayFrontendTLSValidation {
+		if validation == nil {
+			return nil
+		}
+		// An unresolved configured policy must never become an absent policy.
+		deny := &api.APIGatewayFrontendTLSValidation{Mode: api.APIGatewayFrontendValidationDenyAll}
+		if FrontendValidationMode(validation) != gwv1.AllowValidOnly || len(validation.CACertificateRefs) != 1 {
+			return deny
+		}
+		ref := validation.CACertificateRefs[0]
+		if ValidateFrontendCAReference(ref) != nil || !resources.GatewayCanReferenceConfigMap(gateway, ref) {
+			return deny
+		}
+		key := IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, gateway.Namespace)
+		configMap := resources.FrontendCA(key)
+		if configMap == nil {
+			return deny
+		}
+		if _, err := ParseFrontendCABundle(*configMap, time.Now()); err != nil {
+			return deny
+		}
+		return &api.APIGatewayFrontendTLSValidation{
+			Mode: api.APIGatewayFrontendValidationMode(FrontendValidationMode(validation)),
+			CACertificateRefs: []api.ResourceReference{t.NonNormalizedConfigEntryReference(
+				api.FileSystemCertificate,
+				types.NamespacedName{
+					Namespace: gateway.Namespace,
+					Name:      FrontendCAResourceName(client.ObjectKeyFromObject(&gateway), key),
+				},
+			)},
+		}
+	}
+
+	config := &api.APIGatewayFrontendTLSConfig{
+		Default: translate(gateway.Spec.TLS.Frontend.Default.Validation),
+	}
+	portMapping := int32(0)
+	if gwcc != nil {
+		portMapping = gwcc.Spec.MapPrivilegedContainerPorts
+	}
+	for _, override := range gateway.Spec.TLS.Frontend.PerPort {
+		config.PerPort = append(config.PerPort, api.APIGatewayFrontendTLSPortConfig{
+			Port:       ToContainerPort(override.Port, portMapping),
+			Validation: translate(override.TLS.Validation),
+		})
+	}
+	return config
 }
 
 // gatewayTLS translates the gateway-wide tls-enabled annotation into the Consul

@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/consul/api"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 // ConsulUpdateOperation is an operation representing an
@@ -66,6 +67,10 @@ type ReferenceValidator interface {
 	GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1.SecretObjectReference) bool
 	HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1.BackendRef) bool
 	TCPRouteCanReferenceBackend(tcpRoute gwv1.TCPRoute, backendRef gwv1.BackendRef) bool
+}
+
+type frontendCAReferenceValidator interface {
+	GatewayCanReferenceConfigMap(gateway gwv1.Gateway, configMapRef gwv1.ObjectReference) bool
 }
 
 // noopReferenceValidator is a ReferenceValidator that always returns true.
@@ -127,6 +132,7 @@ type ResourceMap struct {
 	services     map[types.NamespacedName]api.ResourceReference
 	meshServices map[types.NamespacedName]api.ResourceReference
 	certificates mapset.Set
+	frontendCAs  map[types.NamespacedName]*corev1.ConfigMap
 
 	// this acts a a secondary store of what has not yet
 	// been processed for the sake of garbage collection.
@@ -157,6 +163,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		services:              make(map[types.NamespacedName]api.ResourceReference),
 		meshServices:          make(map[types.NamespacedName]api.ResourceReference),
 		certificates:          mapset.NewSet(),
+		frontendCAs:           make(map[types.NamespacedName]*corev1.ConfigMap),
 		consulTCPRoutes:       make(map[api.ResourceReference]*consulTCPRoute),
 		consulHTTPRoutes:      make(map[api.ResourceReference]*consulHTTPRoute),
 		certificateGateways:   make(map[api.ResourceReference]*certificate),
@@ -167,6 +174,15 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
 		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
+}
+
+func (s *ResourceMap) AddFrontendCA(configMap corev1.ConfigMap) {
+	copy := configMap.DeepCopy()
+	s.frontendCAs[client.ObjectKeyFromObject(copy)] = copy
+}
+
+func (s *ResourceMap) FrontendCA(key types.NamespacedName) *corev1.ConfigMap {
+	return s.frontendCAs[key]
 }
 
 func (s *ResourceMap) AddService(id types.NamespacedName, name string) {
@@ -839,6 +855,33 @@ func (s *ResourceMap) TranslateFileSystemCertificate(key types.NamespacedName) {
 	})
 }
 
+func (s *ResourceMap) TranslateFrontendCA(gateway gwv1.Gateway, key types.NamespacedName) {
+	resourceName := FrontendCAResourceName(client.ObjectKeyFromObject(&gateway), key)
+	consulKey := s.translator.NonNormalizedConfigEntryReference(
+		api.FileSystemCertificate,
+		types.NamespacedName{Namespace: gateway.Namespace, Name: resourceName},
+	)
+	s.processedCertificates.Add(consulKey)
+	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+		Entry: &api.FileSystemCertificateConfigEntry{
+			Kind:        api.FileSystemCertificate,
+			Name:        resourceName,
+			Namespace:   s.translator.Namespace(gateway.Namespace),
+			Partition:   s.translator.ConsulPartition,
+			Certificate: "/consul/gateway-certificates/" + FrontendCAFilename(client.ObjectKeyFromObject(&gateway), key),
+			Meta: s.translator.addDatacenterToMeta(map[string]string{
+				constants.MetaKeyKubeNS:   gateway.Namespace,
+				constants.MetaKeyKubeName: gateway.Name,
+			}),
+		},
+		OnUpdate: func(err error) {
+			if err != nil {
+				s.logger.Error(err, "error syncing frontend CA certificate to Consul", "gateway", client.ObjectKeyFromObject(&gateway), "configMap", key)
+			}
+		},
+	})
+}
+
 func (s *ResourceMap) Mutations() []*ConsulUpdateOperation {
 	return s.consulMutations
 }
@@ -872,6 +915,14 @@ func (s *ResourceMap) toConsulReference(kind string, key types.NamespacedName) a
 
 func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1.Gateway, ref gwv1.SecretObjectReference) bool {
 	return s.referenceValidator.GatewayCanReferenceSecret(gateway, ref)
+}
+
+func (s *ResourceMap) GatewayCanReferenceConfigMap(gateway gwv1.Gateway, ref gwv1.ObjectReference) bool {
+	validator, ok := s.referenceValidator.(frontendCAReferenceValidator)
+	if !ok {
+		return true
+	}
+	return validator.GatewayCanReferenceConfigMap(gateway, ref)
 }
 
 func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1.HTTPRoute, ref gwv1.BackendRef) bool {

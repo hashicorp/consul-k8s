@@ -13,6 +13,22 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
+func TestEntriesEqualGatewayFrontendTLS(t *testing.T) {
+	strict := &api.APIGatewayFrontendTLSValidation{
+		Mode:              api.APIGatewayFrontendValidationAllowValidOnly,
+		CACertificateRefs: []api.ResourceReference{{Kind: api.FileSystemCertificate, Name: "ca"}},
+	}
+	old := &api.APIGatewayConfigEntry{FrontendTLS: &api.APIGatewayFrontendTLSConfig{Default: strict}}
+	same := &api.APIGatewayConfigEntry{FrontendTLS: &api.APIGatewayFrontendTLSConfig{Default: strict}}
+	blocked := &api.APIGatewayConfigEntry{FrontendTLS: &api.APIGatewayFrontendTLSConfig{
+		Default: &api.APIGatewayFrontendTLSValidation{Mode: api.APIGatewayFrontendValidationDenyAll},
+	}}
+	require.True(t, EntriesEqual(old, same))
+	require.False(t, EntriesEqual(old, blocked))
+	same.FrontendTLS.PerPort = []api.APIGatewayFrontendTLSPortConfig{{Port: 8443, Validation: strict}}
+	require.False(t, EntriesEqual(old, same))
+}
+
 func TestEntryComparator_APIGatewayListenerTLSConfigurationsEqual_SDS(t *testing.T) {
 	t.Parallel()
 
