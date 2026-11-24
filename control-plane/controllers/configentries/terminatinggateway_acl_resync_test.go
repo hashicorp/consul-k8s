@@ -221,3 +221,21 @@ func TestTerminatingGatewayController_updateACls_SkipsUnchangedRoleWrite(t *test
 	require.Equal(t, before.ModifyIndex, after.ModifyIndex, "an unchanged role must not be written again")
 	require.ElementsMatch(t, aclResyncPolicyNames(before), aclResyncPolicyNames(after))
 }
+
+// A resync that changes nothing must not write the TerminatingGateway status.
+// Each status write triggers another reconcile.
+func TestTerminatingGatewayController_Reconcile_ACLResyncDoesNotRewriteUnchangedStatus(t *testing.T) {
+	t.Parallel()
+	env := newACLResyncTestEnv(t, true, "svc-a")
+	env.reconcile(t, aclResyncGateway)
+
+	key := types.NamespacedName{Namespace: aclResyncNamespace, Name: aclResyncGateway}
+	before := &consulv1alpha1.TerminatingGateway{}
+	require.NoError(t, env.kubeClient.Get(context.Background(), key, before))
+
+	env.reconcile(t, aclResyncGateway)
+
+	after := &consulv1alpha1.TerminatingGateway{}
+	require.NoError(t, env.kubeClient.Get(context.Background(), key, after))
+	require.Equal(t, before.ResourceVersion, after.ResourceVersion, "an unchanged TerminatingGateway must not be written again")
+}
