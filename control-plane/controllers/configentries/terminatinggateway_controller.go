@@ -32,6 +32,10 @@ var _ Controller = (*TerminatingGatewayController)(nil)
 
 const terminatingGatewayByLinkedServiceName = "linkedServiceName"
 
+// errGatewayPolicyNotLinked means that the terminating gateway role has no
+// link to the gateway policy. server-acl-init creates this link.
+var errGatewayPolicyNotLinked = errors.New("terminating gateway policy is not linked to the terminating gateway role")
+
 // TerminatingGatewayController is the controller for TerminatingGateway resources.
 type TerminatingGatewayController struct {
 	client.Client
@@ -126,7 +130,11 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		err = r.updateACls(log, termGW)
 		if err != nil {
 			log.Error(err, "error updating terminating-gateway roles")
-			r.UpdateStatusFailedToSetACLs(ctx, termGW, err)
+			reason := consulv1alpha1.TerminatingGatewayFailedToSetACLs
+			if errors.Is(err, errGatewayPolicyNotLinked) {
+				reason = consulv1alpha1.TerminatingGatewayGatewayPolicyNotLinked
+			}
+			r.UpdateStatusFailedToSetACLs(ctx, termGW, reason, err)
 			return ctrl.Result{}, err
 		}
 
@@ -168,9 +176,9 @@ func termGWLinkedServiceIndexer(o client.Object) []string {
 	return names
 }
 
-func (r *TerminatingGatewayController) UpdateStatusFailedToSetACLs(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway, err error) {
-	termGW.SetSyncedCondition(corev1.ConditionFalse, consulv1alpha1.TerminatingGatewayFailedToSetACLs, err.Error())
-	termGW.SetACLStatusConditon(corev1.ConditionFalse, consulv1alpha1.TerminatingGatewayFailedToSetACLs, err.Error())
+func (r *TerminatingGatewayController) UpdateStatusFailedToSetACLs(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway, reason string, err error) {
+	termGW.SetSyncedCondition(corev1.ConditionFalse, reason, err.Error())
+	termGW.SetACLStatusConditon(corev1.ConditionFalse, reason, err.Error())
 	if err := r.UpdateStatus(ctx, termGW); err != nil {
 		r.Log.Error(err, "error updating status")
 	}
@@ -212,7 +220,8 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 	}
 
 	if terminatingGatewayRoleID == "" {
-		return errors.New("terminating gateway role not found")
+		return fmt.Errorf("terminating gateway role ending in %q not found for gateway %q; server-acl-init creates this role",
+			fmt.Sprintf("%s-acl-role", termGW.Name), termGW.Name)
 	}
 
 	terminatingGatewayRole, _, err := connMgrClient.ACL().RoleRead(terminatingGatewayRoleID, nil)
@@ -248,7 +257,9 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		termGWPoliciesToKeep, termGWPoliciesToRemove = handleDeletionForPolicies(termGW.Spec.Services)
 	}
 
-	termGWPoliciesToKeep = append(termGWPoliciesToKeep, terminatingGatewayPolicy)
+	if terminatingGatewayPolicy != nil {
+		termGWPoliciesToKeep = append(termGWPoliciesToKeep, terminatingGatewayPolicy)
+	}
 	terminatingGatewayRole.Policies = termGWPoliciesToKeep
 
 	_, _, err = connMgrClient.ACL().RoleUpdate(terminatingGatewayRole, nil)
@@ -259,6 +270,12 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 	err = r.conditionallyDeletePolicies(log, connMgrClient, termGWPoliciesToRemove, termGW.Name)
 	if err != nil {
 		return err
+	}
+
+	if terminatingGatewayPolicy == nil {
+		return fmt.Errorf("%w: role %q has no link to policy %q; server-acl-init creates this link. "+
+			"Link the policy to the role, or run server-acl-init again",
+			errGatewayPolicyNotLinked, terminatingGatewayRole.Name, fmt.Sprintf("%s-policy", termGW.Name))
 	}
 
 	return nil
@@ -338,7 +355,7 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 		serviceName := serviceNameFromPolicy(policy.Name)
 
 		if err := r.Client.List(context.Background(), termGWList, client.MatchingFields{terminatingGatewayByLinkedServiceName: serviceName}); err != nil {
-			log.Error(err, "failed to lookup terminating gateway list for service", serviceName)
+			log.Error(err, "failed to lookup terminating gateway list for service", "service", serviceName)
 			mErr = errors.Join(mErr, fmt.Errorf("failed to lookup terminating gateway list for service %q: %w", serviceName, err))
 			continue
 		}
@@ -357,7 +374,7 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 
 		policy, _, err := consulClient.ACL().PolicyReadByName(policyName, nil)
 		if err != nil {
-			log.Error(err, "failed to lookup policy by name from consul", policyName)
+			log.Error(err, "failed to lookup policy by name from consul", "policy", policyName)
 			mErr = errors.Join(mErr, fmt.Errorf("error reading policy %q: %w", policyName, err))
 			continue
 		}
@@ -369,7 +386,7 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 
 		_, err = consulClient.ACL().PolicyDelete(policy.ID, nil)
 		if err != nil {
-			log.Error(err, "failed to delete policy from consul", policy.Name)
+			log.Error(err, "failed to delete policy from consul", "policy", policy.Name)
 			mErr = errors.Join(mErr, fmt.Errorf("error delete policy %q: %w", policy.Name, err))
 		}
 	}

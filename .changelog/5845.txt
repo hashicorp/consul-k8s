@@ -1,0 +1,3 @@
+```release-note:bug
+terminating-gateway: Fix the error `No such ACL policy with name ""` when the terminating gateway role has no link to the gateway policy. The controller now keeps the linked-service policy links up to date and reports the missing link on the `TerminatingGateway` resource with the reason `GatewayPolicyNotLinked`. The "role not found" error now names the gateway.
+```
