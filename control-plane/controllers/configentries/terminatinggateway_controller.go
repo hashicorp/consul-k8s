@@ -147,11 +147,15 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, err
 		}
 
-		termGW.SetACLStatusConditon(corev1.ConditionTrue, "", "")
-		err = r.UpdateStatus(ctx, termGW)
-		if err != nil {
-			log.Error(err, "error updating terminating-gateway status")
-			return ctrl.Result{}, err
+		// Write the status only when it changes. Each write triggers another
+		// reconcile, and SetACLStatusConditon sets a new transition time.
+		if !aclStatusConditionIsTrue(termGW) {
+			termGW.SetACLStatusConditon(corev1.ConditionTrue, "", "")
+			err = r.UpdateStatus(ctx, termGW)
+			if err != nil {
+				log.Error(err, "error updating terminating-gateway status")
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
@@ -445,4 +449,11 @@ func serviceNameFromPolicy(policyName string) string {
 
 	// remove the write policy suffix
 	return strings.TrimSuffix(n, "-write-policy")
+}
+
+// aclStatusConditionIsTrue returns true if the ConsulACLsSynced condition of
+// termGW is True with no reason and no message.
+func aclStatusConditionIsTrue(termGW *consulv1alpha1.TerminatingGateway) bool {
+	cond := termGW.Status.GetCondition(consulv1alpha1.ConsulACLStatus)
+	return cond != nil && cond.Status == corev1.ConditionTrue && cond.Reason == "" && cond.Message == ""
 }

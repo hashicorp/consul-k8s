@@ -427,3 +427,23 @@ func TestTerminatingGatewayController_updateACls_DeletionWithGatewayPolicyLinkMi
 	require.NoError(t, err)
 	require.Nil(t, policy, "the unused service policy must be deleted")
 }
+
+// A resync that changes nothing must not write the TerminatingGateway status.
+// Each status write triggers another reconcile.
+func TestTerminatingGatewayController_Reconcile_ACLResyncDoesNotRewriteUnchangedStatus(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t, newTestTerminatingGateway("svc-a"))
+	env.createPolicies(t, tgwTestGWPolicy)
+	env.createRole(t, tgwTestGWPolicy)
+	require.NoError(t, env.reconcile(t))
+
+	key := types.NamespacedName{Namespace: tgwTestNamespace, Name: tgwTestGatewayName}
+	before := &consulv1alpha1.TerminatingGateway{}
+	require.NoError(t, env.kubeClient.Get(context.Background(), key, before))
+
+	require.NoError(t, env.reconcile(t))
+
+	after := &consulv1alpha1.TerminatingGateway{}
+	require.NoError(t, env.kubeClient.Get(context.Background(), key, after))
+	require.Equal(t, before.ResourceVersion, after.ResourceVersion, "an unchanged TerminatingGateway must not be written again")
+}
