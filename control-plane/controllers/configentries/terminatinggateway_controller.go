@@ -211,10 +211,14 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, err
 		}
 
-		termGW.SetACLStatusCondition(corev1.ConditionTrue, "", "")
-		if err := r.UpdateStatus(ctx, termGW); err != nil {
-			log.Error(err, "error updating terminating gateway ACL status")
-			return ctrl.Result{}, err
+		// Write the status only when it changes. Each write triggers another
+		// reconcile, and SetACLStatusCondition sets a new transition time.
+		if !aclStatusConditionIsTrue(termGW) {
+			termGW.SetACLStatusCondition(corev1.ConditionTrue, "", "")
+			if err := r.UpdateStatus(ctx, termGW); err != nil {
+				log.Error(err, "error updating terminating gateway ACL status")
+				return ctrl.Result{}, err
+			}
 		}
 	}
 	ctx = context.WithValue(ctx, "isSecretChange", isSecretChange)
@@ -1882,4 +1886,11 @@ func (r *TerminatingGatewayController) terminatingGatewayConsulNamespace(
 
 	// 5. Default.
 	return defaultIfEmpty(defaultsNS)
+}
+
+// aclStatusConditionIsTrue returns true if the ConsulACLsSynced condition of
+// termGW is True with no reason and no message.
+func aclStatusConditionIsTrue(termGW *consulv1alpha1.TerminatingGateway) bool {
+	cond := termGW.Status.GetCondition(consulv1alpha1.ConsulACLStatus)
+	return cond != nil && cond.Status == corev1.ConditionTrue && cond.Reason == "" && cond.Message == ""
 }
