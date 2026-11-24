@@ -40,6 +40,14 @@ var _ Controller = (*TerminatingGatewayController)(nil)
 
 const terminatingGatewayByLinkedServiceName = "linkedServiceName"
 
+// terminatingGatewayACLResyncPeriod is how often the controller reconciles a
+// TerminatingGateway again when consul-k8s manages the ACLs. server-acl-init
+// also writes the terminating gateway role, and Consul has no compare-and-set
+// for roles. Thus, a role update by server-acl-init that is based on an earlier
+// read can remove a linked-service policy link that the controller added. The
+// resync links it again.
+const terminatingGatewayACLResyncPeriod = 5 * time.Minute
+
 const (
 	secretOwnerKey      = ".metadata.secretOwner"
 	secretTriggerPrefix = "__secret_rotation__"
@@ -189,7 +197,8 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	if aclsEnabled && helmValues.Global.ACLs.ManageSystemACLs {
+	aclsManaged := aclsEnabled && helmValues.Global.ACLs.ManageSystemACLs
+	if aclsManaged {
 		if err := r.ensureTerminatingGatewayACLBootstrap(log, termGW, helmValues); err != nil {
 			log.Error(err, "error creating terminating gateway ACL role/policy/binding rule")
 			r.UpdateStatusFailedToSetACLs(ctx, termGW, err)
@@ -243,6 +252,12 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		if err := r.UpdateStatus(ctx, termGW); err != nil {
 			return ctrl.Result{}, err
 		}
+	}
+
+	// Secret-triggered requests must not run again periodically, because each
+	// run updates the last-rotation metadata of the config entry.
+	if aclsManaged && !isSecretChange && !result.Requeue && result.RequeueAfter == 0 {
+		result.RequeueAfter = terminatingGatewayACLResyncPeriod
 	}
 
 	return result, nil
@@ -479,11 +494,19 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		termGWPoliciesToKeep = append(termGWPoliciesToKeep, terminatingGatewayPolicy)
 	}
 
-	terminatingGatewayRole.Policies = termGWPoliciesToKeep
+	keptTermGWPolicies := mapset.NewSet[string]()
+	for _, policy := range termGWPoliciesToKeep {
+		keptTermGWPolicies.Add(policy.Name)
+	}
 
-	_, _, err = connMgrClient.ACL().RoleUpdate(terminatingGatewayRole, nil)
-	if err != nil {
-		return err
+	// Skip the write when the links do not change, so that a periodic resync
+	// does not write the role each time.
+	if !keptTermGWPolicies.Equal(existingTermGWPolicies) || len(termGWPoliciesToKeep) != len(terminatingGatewayRole.Policies) {
+		terminatingGatewayRole.Policies = termGWPoliciesToKeep
+		_, _, err = connMgrClient.ACL().RoleUpdate(terminatingGatewayRole, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = r.conditionallyDeletePolicies(log, connMgrClient, termGWPoliciesToRemove, gatewayName)
