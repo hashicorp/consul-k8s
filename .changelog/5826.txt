@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Fix the Consul server SecurityContextConstraints on OpenShift to allow the `runtime/default` seccomp profile so server pods can be admitted.
+```

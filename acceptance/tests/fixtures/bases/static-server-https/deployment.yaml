@@ -29,6 +29,11 @@ spec:
                 - "NET_BIND_SERVICE"
               drop:
                 - ALL
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           ports:
             - name: https-port
               containerPort: 443

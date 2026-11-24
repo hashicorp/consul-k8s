@@ -18,11 +18,12 @@ func TestMain(m *testing.M) {
 
 	expectedNumberOfClusters := 4
 
-	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) && suite.Config().UseKind {
+	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) &&
+		(suite.Config().UseKind || suite.Config().UseOpenshift) {
 		os.Exit(suite.Run())
 	} else {
 		fmt.Println(fmt.Sprintf("Skipping sameness tests because either -enable-multi-cluster is "+
-			"not set, the number of clusters did not match the expected count of %d, or --useKind is false. "+
-			"Sameness acceptance tests are currently only supported on Kind clusters", expectedNumberOfClusters))
+			"not set, the number of clusters did not match the expected count of %d, or neither -use-kind nor -use-openshift is set. "+
+			"Sameness acceptance tests are currently only supported on Kind and OpenShift clusters", expectedNumberOfClusters))
 	}
 }
