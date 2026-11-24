@@ -835,3 +835,69 @@ func TestTerminatingGatewayController_ensureACLBootstrap_UnmanagedIsNoop(t *test
 	require.NoError(t, err)
 	require.Nil(t, role)
 }
+
+// When the TerminatingGateway list fails, conditionallyDeletePolicies must
+// return an error that names the service, and must not delete the policy.
+func TestTerminatingGatewayController_conditionallyDeletePolicies_ListError(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	config := capi.DefaultConfig()
+	config.Address = server.URL
+	consulClient, err := capi.NewClient(config)
+	require.NoError(t, err)
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, consulv1alpha1.AddToScheme(scheme))
+	// No linked-service index, so the indexed list fails.
+	kubeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	controller := &TerminatingGatewayController{Client: kubeClient}
+
+	err = controller.conditionallyDeletePolicies(logr.Discard(), consulClient,
+		[]*capi.ACLRolePolicyLink{{Name: "default-db-write-policy"}}, "terminating-gateway")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `failed to lookup terminating gateway list for service "db"`)
+}
+
+// When a policy delete fails, conditionallyDeletePolicies must return an error
+// that names the policy.
+func TestTerminatingGatewayController_conditionallyDeletePolicies_DeleteError(t *testing.T) {
+	t.Parallel()
+
+	const policyName = "default-db-write-policy"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/acl/policy/name/"+policyName:
+			fmt.Fprintf(w, `{"ID":"policy-id","Name":%q}`, policyName)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/acl/policy/policy-id":
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	config := capi.DefaultConfig()
+	config.Address = server.URL
+	consulClient, err := capi.NewClient(config)
+	require.NoError(t, err)
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, consulv1alpha1.AddToScheme(scheme))
+	kubeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithIndex(&consulv1alpha1.TerminatingGateway{}, terminatingGatewayByLinkedServiceName, termGWLinkedServiceIndexer).
+		Build()
+	controller := &TerminatingGatewayController{Client: kubeClient}
+
+	err = controller.conditionallyDeletePolicies(logr.Discard(), consulClient,
+		[]*capi.ACLRolePolicyLink{{Name: policyName}}, "terminating-gateway")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `error delete policy "`+policyName+`"`)
+}
