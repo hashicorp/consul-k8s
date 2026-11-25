@@ -63,7 +63,7 @@ gw_flags=(
         --set 'ai.enabled=false' . |
         yq -r '.spec.template.spec.containers[0].command | join(" ")')
     [[ "$command" != *"-enable-ai=true"* ]]
-    [[ "$command" == *"-ai-agent-image=\"hashicorp/csl-mcp-sc:3.0.0-dev\""* ]]
+    [[ "$command" == *"-ai-agent-image=\"hashicorp/csl-mcp-sc:1.0.0-ent\""* ]]
 }
 
 @test "ai/agent image: omitted when unset" {
