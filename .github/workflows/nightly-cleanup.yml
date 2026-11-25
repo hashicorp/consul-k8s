@@ -28,3 +28,4 @@ jobs:
         ref: shani/aks-gke-aks-test
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}" }'
+        
