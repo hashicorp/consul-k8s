@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -147,6 +148,14 @@ type Command struct {
 	flagResourcePrefix  string
 
 	flagEnableOpenShift bool
+
+	// Ambient mesh flags.
+	flagEnableAmbientMesh         bool
+	flagAmbientInboundPort        int
+	flagAmbientOutboundPort       int
+	flagAmbientProxyMark          int
+	flagAmbientNodeProxySelector  string
+	ambientNodeProxyLabelSelector labels.Selector
 
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
@@ -274,6 +283,16 @@ func (c *Command) init() {
 		"Release prefix of the Consul installation used to determine Consul DNS Service name.")
 	c.flagSet.BoolVar(&c.flagEnableOpenShift, "enable-openshift", false,
 		"Indicates that the command runs in an OpenShift cluster.")
+	c.flagSet.BoolVar(&c.flagEnableAmbientMesh, "enable-ambient-mesh", false,
+		"Allow pods and namespaces to opt into the ambient mesh, where a node-level proxy replaces the sidecar.")
+	c.flagSet.IntVar(&c.flagAmbientInboundPort, "ambient-inbound-port", 15006,
+		"Port the ambient node proxy accepts inbound mesh traffic on inside each pod network namespace.")
+	c.flagSet.IntVar(&c.flagAmbientOutboundPort, "ambient-outbound-port", 15001,
+		"Port of the ambient node proxy's transparent outbound listener inside each pod network namespace.")
+	c.flagSet.IntVar(&c.flagAmbientProxyMark, "ambient-proxy-mark", 1337,
+		"SO_MARK set by the ambient node proxy on upstream sockets so they bypass traffic redirection.")
+	c.flagSet.StringVar(&c.flagAmbientNodeProxySelector, "ambient-node-proxy-selector", "",
+		"Label selector of the ambient node proxy DaemonSet pods in the release namespace.")
 	c.flagSet.BoolVar(&c.flagEnableWebhookCAUpdate, "enable-webhook-ca-update", false,
 		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
 	c.flagSet.BoolVar(&c.flagEnableAutoEncrypt, "enable-auto-encrypt", false,
@@ -554,6 +573,31 @@ func (c *Command) validateFlags() error {
 
 	if c.consul.Partition != "" && !c.flagEnablePartitions {
 		return errors.New("-enable-partitions must be set to 'true' if -partition is set")
+	}
+
+	if c.flagEnableAmbientMesh {
+		if !c.flagEnableCNI {
+			return errors.New("-enable-cni must be set to 'true' if -enable-ambient-mesh is set")
+		}
+		if c.flagAmbientNodeProxySelector == "" {
+			return errors.New("-ambient-node-proxy-selector must be set if -enable-ambient-mesh is set")
+		}
+		selector, err := labels.Parse(c.flagAmbientNodeProxySelector)
+		if err != nil {
+			return fmt.Errorf("-ambient-node-proxy-selector is invalid: %w", err)
+		}
+		c.ambientNodeProxyLabelSelector = selector
+		for name, port := range map[string]int{
+			"-ambient-inbound-port":  c.flagAmbientInboundPort,
+			"-ambient-outbound-port": c.flagAmbientOutboundPort,
+		} {
+			if port < 1 || port > 65535 {
+				return fmt.Errorf("%s must be a valid port", name)
+			}
+		}
+		if c.flagAmbientProxyMark <= 0 {
+			return errors.New("-ambient-proxy-mark must be > 0")
+		}
 	}
 
 	if c.flagDefaultEnvoyProxyConcurrency < 0 {

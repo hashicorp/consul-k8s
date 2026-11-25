@@ -58,7 +58,32 @@ const (
 
 	// annotationDualStack stores if pod need to run in dualstack mode
 	annotationDualStack = "consul.hashicorp.com/dual-stack"
+
+	// keyAmbientMeshStatus is set to "waiting" by the webhook for pods enrolled in the ambient mesh
+	// and set to "complete" by this plugin once redirection rules are applied.
+	keyAmbientMeshStatus = "consul.hashicorp.com/ambient-mesh-status"
+
+	// annotationAmbientRedirectConfig stores the ambientRedirectConfig JSON written by the webhook.
+	annotationAmbientRedirectConfig = "consul.hashicorp.com/ambient-redirect-config"
+
+	// annotationAmbientNetNS is written by this plugin with the pod network namespace path so that
+	// the node proxy can create sockets inside the pod network namespace.
+	annotationAmbientNetNS = "consul.hashicorp.com/ambient-netns"
 )
+
+// ambientRedirectConfig is the webhook-provided part of nftables.AmbientConfig.
+type ambientRedirectConfig struct {
+	InboundPort          int
+	OutboundPort         int
+	ProxyMark            uint32
+	ConsulDNSIP          string
+	ConsulDNSPort        int
+	ProbePorts           []string
+	ExcludeInboundPorts  []string
+	ExcludeOutboundPorts []string
+	ExcludeOutboundCIDRs []string
+	DualStack            bool
+}
 
 type Command struct {
 	// client is a kubernetes client
@@ -200,6 +225,13 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		pod, err := c.client.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error retrieving pod: %s", err)
+		}
+
+		if isAmbientPod(*pod) {
+			if err := c.setupAmbient(ctx, *pod, args.Netns, logger); err != nil {
+				return err
+			}
+			return types.PrintResult(result, cfg.CNIVersion)
 		}
 
 		// Skip traffic redirection if the correct annotations are not on the pod.
@@ -404,6 +436,105 @@ func parseDualStackAnnotation(pod corev1.Pod, annotation string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// isAmbientPod returns true if the webhook enrolled the pod in the ambient mesh.
+func isAmbientPod(pod corev1.Pod) bool {
+	if pod.Annotations[keyInjectStatus] == "" {
+		return false
+	}
+	_, ok := pod.Annotations[keyAmbientMeshStatus]
+	return ok
+}
+
+// setupAmbient applies ambient redirection rules in the pod network namespace and records the
+// network namespace path on the pod. Unlike the sidecar path, failing to record the annotations
+// is an error: the node proxy and the endpoints controller cannot serve the pod without them.
+func (c *Command) setupAmbient(ctx context.Context, pod corev1.Pod, netNS string, logger hclog.Logger) error {
+	anno, ok := pod.Annotations[annotationAmbientRedirectConfig]
+	if !ok {
+		return fmt.Errorf("could not find %s annotation for %s pod", annotationAmbientRedirectConfig, pod.Name)
+	}
+	var redirectCfg ambientRedirectConfig
+	if err := json.Unmarshal([]byte(anno), &redirectCfg); err != nil {
+		return fmt.Errorf("could not unmarshal %s annotation for %s pod: %w", annotationAmbientRedirectConfig, pod.Name, err)
+	}
+
+	ambientCfg := nftables.AmbientConfig{
+		NetNS:                netNS,
+		ProxyMark:            redirectCfg.ProxyMark,
+		InboundPort:          redirectCfg.InboundPort,
+		OutboundPort:         redirectCfg.OutboundPort,
+		ConsulDNSIP:          redirectCfg.ConsulDNSIP,
+		ConsulDNSPort:        redirectCfg.ConsulDNSPort,
+		ProbePorts:           redirectCfg.ProbePorts,
+		ExcludeInboundPorts:  redirectCfg.ExcludeInboundPorts,
+		ExcludeOutboundPorts: redirectCfg.ExcludeOutboundPorts,
+		ExcludeOutboundCIDRs: redirectCfg.ExcludeOutboundCIDRs,
+		NftablesProvider:     c.nftablesProvider,
+	}
+	if len(redirectCfg.ProbePorts) > 0 {
+		nodeIP, err := c.nodeInternalIP(ctx, pod.Spec.NodeName, redirectCfg.DualStack)
+		if err != nil {
+			return err
+		}
+		ambientCfg.NodeIP = nodeIP
+	}
+
+	if err := nftables.SetupAmbient(ambientCfg, redirectCfg.DualStack); err != nil {
+		return fmt.Errorf("could not apply ambient nftables rules: %w", err)
+	}
+
+	if err := c.updateAmbientAnnotations(ctx, pod.Name, pod.Namespace, netNS); err != nil {
+		return fmt.Errorf("could not update ambient annotations for %s pod: %w", pod.Name, err)
+	}
+	logger.Debug("ambient traffic redirect rules applied", "pod", pod.Name, "netns", netNS)
+	return nil
+}
+
+// nodeInternalIP returns the node's InternalIP. pod.Status.HostIP is not reliable during CNI ADD
+// because the kubelet has not yet reported pod status.
+func (c *Command) nodeInternalIP(ctx context.Context, nodeName string, ipv6 bool) (string, error) {
+	node, err := c.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error retrieving node %q: %w", nodeName, err)
+	}
+	for _, addr := range node.Status.Addresses {
+		if addr.Type != corev1.NodeInternalIP {
+			continue
+		}
+		ip := net.ParseIP(addr.Address)
+		if ip == nil {
+			continue
+		}
+		if (ip.To4() == nil) == ipv6 {
+			return ip.String(), nil
+		}
+	}
+	return "", fmt.Errorf("node %q has no InternalIP address", nodeName)
+}
+
+// updateAmbientAnnotations records the network namespace and marks ambient redirection complete,
+// retrying on update conflicts.
+func (c *Command) updateAmbientAnnotations(ctx context.Context, podName, namespace, netNS string) error {
+	var err error
+	for i := 0; i < 5; i++ {
+		var pod *corev1.Pod
+		pod, err = c.client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pod.Annotations[annotationAmbientNetNS] = netNS
+		pod.Annotations[keyAmbientMeshStatus] = complete
+		if _, err = c.client.CoreV1().Pods(namespace).Update(ctx, pod, metav1.UpdateOptions{}); err == nil {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return err
 }
 
 // updateTransparentProxyStatusAnnotation updates the transparent-proxy-status annotation. We use it as a simple inicator of

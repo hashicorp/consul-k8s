@@ -20,6 +20,13 @@ rules:
   - watch
   - patch
   - update
+{{- if .Values.ambientMesh.enabled }}
+- apiGroups: [""]
+  resources:
+  - nodes
+  verbs:
+  - get
+{{- end }}
 - apiGroups: ["policy"]
   resources:
   - podsecuritypolicies 

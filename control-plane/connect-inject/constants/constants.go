@@ -58,6 +58,19 @@ const (
 	// MetaKeyPodUID is the meta key name for Kubernetes pod uid used for the Consul services.
 	MetaKeyPodUID = "pod-uid"
 
+	// MetaKeyAmbientMesh marks a proxy registration as served by the node-level ambient proxy.
+	MetaKeyAmbientMesh = "ambient-mesh"
+
+	// MetaKeyAmbientNode is the Kubernetes node whose ambient proxy serves the workload.
+	MetaKeyAmbientNode = "ambient-node"
+
+	// MetaKeyAmbientNetNS is the pod network namespace path the ambient proxy binds sockets in.
+	MetaKeyAmbientNetNS = "ambient-netns"
+
+	// AmbientNodeProxyCheckName is the name of the health check that reflects the readiness of
+	// the node-level ambient proxy serving a workload.
+	AmbientNodeProxyCheckName = "Ambient Node Proxy"
+
 	// DefaultGracefulPort is the default port that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulPort = 20600
 

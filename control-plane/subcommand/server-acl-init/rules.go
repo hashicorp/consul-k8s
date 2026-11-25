@@ -503,3 +503,33 @@ func (c *Command) dnsProxyRules() (string, error) {
 	`
 	return c.renderRules(dnsProxyRulesTpl)
 }
+
+// ambientMeshRules defines the ACL policy for the ambient mesh node proxy. One
+// node proxy serves the xDS config of every ambient workload on its node, so it
+// needs service:write on all services (the same permission each sidecar token
+// has for its own service), plus node/service/query read for Consul DNS.
+func (c *Command) ambientMeshRules() (string, error) {
+	ambientMeshRulesTpl := `
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- end }}
+  node_prefix "" {
+    policy = "read"
+  }
+  query_prefix "" {
+    policy = "read"
+  }
+{{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+    service_prefix "" {
+      policy = "write"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
+}
+{{- end }}`
+	return c.renderRules(ambientMeshRulesTpl)
+}

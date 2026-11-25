@@ -36,6 +36,8 @@ import (
 
 const dnsProxyName = "dns-proxy"
 
+const ambientMeshName = "ambient-mesh"
+
 type Command struct {
 	UI cli.Ui
 
@@ -129,6 +131,8 @@ type Command struct {
 	once         sync.Once
 	help         string
 	flagDNSProxy bool
+
+	flagAmbientMesh bool
 }
 
 func (c *Command) init() {
@@ -239,6 +243,8 @@ func (c *Command) init() {
 
 	c.flags.BoolVar(&c.flagDNSProxy, dnsProxyName, false,
 		"Toggle for configuring ACL login for the DNS proxy.")
+	c.flags.BoolVar(&c.flagAmbientMesh, ambientMeshName, false,
+		"Toggle for configuring ACL login for the ambient mesh node proxy.")
 
 	c.k8s = &k8sflags.K8SFlags{}
 	c.consulFlags = &flags.ConsulFlags{}
@@ -731,6 +737,21 @@ func (c *Command) Run(args []string) int {
 		}
 
 		if err := c.createACLPolicyRoleAndBindingRule(dnsProxyName, dnsProxyRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagAmbientMesh {
+		serviceAccountName := c.withPrefix(ambientMeshName)
+
+		ambientMeshRules, err := c.ambientMeshRules()
+		if err != nil {
+			c.log.Error("Error templating ambient-mesh rules", "err", err)
+			return 1
+		}
+
+		if err := c.createACLPolicyRoleAndBindingRule(ambientMeshName, ambientMeshRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}

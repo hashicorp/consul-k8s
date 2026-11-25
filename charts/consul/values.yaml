@@ -3224,6 +3224,71 @@ connectInject:
         # @type: string
         cpu: null
 
+# Configures the ambient mesh (POC). When enabled, a node-level proxy DaemonSet
+# (consul-ambient-dataplane) replaces the consul-dataplane sidecar for pods that
+# opt in with the `consul.hashicorp.com/ambient-mesh: "true"` pod annotation or
+# namespace label. Requires `connectInject.enabled` and `connectInject.cni.enabled`.
+ambientMesh:
+  # If true, deploys the ambient node proxy DaemonSet and lets pods and
+  # namespaces opt into the ambient mesh.
+  # @type: boolean
+  enabled: false
+
+  # The consul-ambient-dataplane image (includes Envoy).
+  # @type: string
+  image: ""
+
+  # Port the node proxy accepts inbound mesh (mTLS) traffic on in each pod network namespace.
+  # @type: integer
+  inboundPort: 15006
+
+  # Port of the node proxy's transparent outbound listener in each pod network namespace.
+  # @type: integer
+  outboundPort: 15001
+
+  # SO_MARK the node proxy sets on its upstream sockets so they bypass redirection.
+  # @type: integer
+  proxyMark: 1337
+
+  # Port the node proxy serves Consul DNS on inside each ambient pod network
+  # namespace. Pod DNS on 127.0.0.1:53 is redirected here when DNS redirection is enabled.
+  # @type: integer
+  consulDNSPort: 8600
+
+  # Host directory holding pod network namespaces (container runtime specific).
+  # @type: string
+  netnsHostDir: /var/run/netns
+
+  # Envoy admin port, bound on 127.0.0.1 of the node.
+  # @type: integer
+  envoyAdminPort: 19100
+
+  # Readiness port, bound on the node IP.
+  # @type: integer
+  readyPort: 21100
+
+  # Override the global log level for the node proxy.
+  # @type: string
+  logLevel: ""
+
+  # @type: map
+  resources:
+    requests:
+      memory: "100Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: null
+
+  # @type: string
+  nodeSelector: null
+
+  # @type: string
+  tolerations: null
+
+  # @type: string
+  priorityClassName: ""
+
 # [Mesh Gateways](https://developer.hashicorp.com/consul/docs/east-west/mesh-gateway) enable Consul to work across Consul datacenters.
 meshGateway:
   # If [mesh gateways](https://developer.hashicorp.com/consul/docs/east-west/mesh-gateway) are enabled, a Deployment will be created that runs

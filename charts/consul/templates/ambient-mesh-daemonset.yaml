@@ -1,0 +1,195 @@
+{{- if .Values.ambientMesh.enabled }}
+{{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true if ambientMesh.enabled is true" }}{{ end }}
+{{- if not .Values.connectInject.cni.enabled }}{{ fail "connectInject.cni.enabled must be true if ambientMesh.enabled is true" }}{{ end }}
+{{- if not .Values.ambientMesh.image }}{{ fail "ambientMesh.image must be set if ambientMesh.enabled is true" }}{{ end }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ template "consul.fullname" . }}-ambient-mesh
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ambient-mesh
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: ambient-mesh
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: ambient-mesh
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      # The node proxy owns listeners inside every ambient pod network namespace
+      # on the node, so it shares the host network and mounts the netns directory.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 30
+      serviceAccountName: {{ template "consul.fullname" . }}-ambient-mesh
+      {{- if .Values.ambientMesh.priorityClassName }}
+      priorityClassName: {{ .Values.ambientMesh.priorityClassName | quote }}
+      {{- end }}
+      {{- if .Values.ambientMesh.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.ambientMesh.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+      tolerations:
+      {{- if .Values.ambientMesh.tolerations }}
+        {{ tpl .Values.ambientMesh.tolerations . | indent 8 | trim }}
+      {{- else }}
+        - operator: Exists
+      {{- end }}
+      volumes:
+        - name: netns
+          hostPath:
+            path: {{ .Values.ambientMesh.netnsHostDir }}
+            type: DirectoryOrCreate
+      {{- if .Values.global.tls.enabled }}
+      {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+        - name: consul-ca-cert
+          secret:
+          {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
+            items:
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+                path: tls.crt
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: ambient-node-proxy
+          image: {{ .Values.ambientMesh.image | quote }}
+          securityContext:
+            # setns into pod network namespaces needs CAP_SYS_ADMIN, and
+            # SO_MARK / foreign-netns sockets need CAP_NET_ADMIN.
+            privileged: true
+            runAsUser: 0
+          volumeMounts:
+            # Mounted at the host path because Envoy opens the netns path the
+            # Consul server sends in each listener as-is.
+            - name: netns
+              mountPath: {{ .Values.ambientMesh.netnsHostDir }}
+              mountPropagation: HostToContainer
+          {{- if .Values.global.tls.enabled }}
+          {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+          {{- end }}
+          {{- end }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            {{- if (and (not .Values.global.acls.manageSystemACLs) .Values.global.acls.bootstrapToken.secretName) }}
+            - name: CONSUL_STATIC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.bootstrapToken.secretName }}
+                  key: {{ .Values.global.acls.bootstrapToken.secretKey }}
+            {{- end }}
+          command:
+            - consul-ambient-dataplane
+          args:
+            {{- if .Values.externalServers.enabled }}
+            - -addresses={{ .Values.externalServers.hosts | first }}
+            - -grpc-port={{ .Values.externalServers.grpcPort }}
+            {{- else }}
+            - -addresses={{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+            - -grpc-port=8502
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            {{- if not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) }}
+            - -ca-certs=/consul/tls/ca/tls.crt
+            {{- end }}
+            {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+            - -tls-server-name={{ .Values.externalServers.tlsServerName }}
+            {{- end }}
+            {{- else }}
+            - -tls-disabled
+            {{- end }}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - -credential-type=login
+            - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
+            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+            - -login-auth-method={{ template "consul.globalComponentAuthMethodName" . }}
+            - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
+            {{- else }}
+            - -login-auth-method={{ template "consul.localComponentAuthMethodName" . }}
+            {{- end }}
+            - -login-meta=pod=$(NAMESPACE)/$(POD_NAME)
+            - -login-meta=component=ambient-mesh
+            {{- if .Values.global.adminPartitions.enabled }}
+            - -login-partition={{ .Values.global.adminPartitions.name }}
+            {{- end }}
+            {{- else if .Values.global.acls.bootstrapToken.secretName }}
+            - -credential-type=static
+            - -static-token=$(CONSUL_STATIC_TOKEN)
+            {{- end }}
+            {{- if .Values.global.adminPartitions.enabled }}
+            - -partition={{ .Values.global.adminPartitions.name }}
+            {{- end }}
+            - -datacenter={{ .Values.global.datacenter }}
+            - -node-name=$(NODE_NAME)
+            - -envoy-admin-bind-address=127.0.0.1
+            - -envoy-admin-bind-port={{ .Values.ambientMesh.envoyAdminPort }}
+            - -ready-bind-address=$(HOST_IP)
+            - -ready-bind-port={{ .Values.ambientMesh.readyPort }}
+            - -netns-dir={{ .Values.ambientMesh.netnsHostDir }}
+            - -consul-dns-bind-port={{ .Values.ambientMesh.consulDNSPort }}
+            - -proxy-mark={{ .Values.ambientMesh.proxyMark }}
+            - -log-level={{ default .Values.global.logLevel .Values.ambientMesh.logLevel }}
+            - -log-json={{ .Values.global.logJSON }}
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ .Values.ambientMesh.readyPort }}
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.ambientMesh.readyPort }}
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          {{- if .Values.ambientMesh.resources }}
+          resources:
+            {{- toYaml .Values.ambientMesh.resources | nindent 12 }}
+          {{- end }}
+{{- end }}

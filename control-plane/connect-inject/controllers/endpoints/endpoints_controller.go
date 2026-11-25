@@ -150,6 +150,9 @@ type Controller struct {
 	// consulClientHttpPort is only used in tests.
 	consulClientHttpPort int
 	NodeMeta             map[string]string
+
+	// Ambient configures registration of pods served by the node-level ambient proxy.
+	Ambient AmbientConfig
 }
 
 // +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
@@ -306,7 +309,20 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					// which then causes connect-init's gateway registration lookup to see multiple
 					// matching services for the same pod and fail.
 					if hasBeenInjected(pod) && !isGateway(pod) {
-						if isConsulDataplaneSupported(pod) {
+						if r.Ambient.Enabled && common.IsAmbientPod(pod) {
+							// Keep any existing registration while the CNI plugin finishes setting up the pod.
+							deregisterEndpointAddress[address.IP] = false
+							if !ambientPodReady(pod) {
+								r.Log.Info("waiting for CNI to set up ambient pod", "name", pod.Name, "ns", pod.Namespace)
+								requeueForEndpointsLag = true
+								continue
+							}
+							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
+							if err = r.registerAmbientServicesAndHealthCheck(ctx, apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
+								r.Log.Error(err, "failed to register ambient services or health check", "name", serviceName, "ns", serviceNamespace)
+								errs = multierror.Append(errs, err)
+							}
+						} else if isConsulDataplaneSupported(pod) {
 							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
 							if err = r.registerServicesAndHealthCheck(ctx, apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
 								r.Log.Error(err, "failed to register services or health check", "name", serviceName, "ns", serviceNamespace)
@@ -405,6 +421,10 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForCredentialGatewayPod)).
 		// Pods evicted by the kubelet move to the Failed phase without necessarily changing their EndpointSlice.
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForTerminalPod)).
+		// Ambient pods are registered once the CNI plugin marks them complete, and their
+		// "Ambient Node Proxy" check follows the readiness of the node proxy on their node.
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForAmbientPod)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForAmbientNodeProxyPod)).
 		Complete(r)
 }
 
