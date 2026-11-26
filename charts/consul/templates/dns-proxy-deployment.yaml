@@ -229,4 +229,19 @@ spec:
             - containerPort: {{ .Values.dns.proxy.port }}
               protocol: "UDP"
               name: dns-udp
+      {{- if .Values.dns.proxy.priorityClassName }}
+      priorityClassName: {{ .Values.dns.proxy.priorityClassName | quote }}
+      {{- end }}
+      {{- if .Values.dns.proxy.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.dns.proxy.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.dns.proxy.affinity }}
+      affinity:
+        {{ tpl .Values.dns.proxy.affinity . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.dns.proxy.tolerations }}
+      tolerations:
+        {{ tpl .Values.dns.proxy.tolerations . | indent 8 | trim }}
+      {{- end }}
 {{- end }}
