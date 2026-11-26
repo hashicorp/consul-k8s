@@ -231,12 +231,14 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	// Set NetNS passed through the CNI.
 	nftCfg.NetNS = args.Netns
 
-	// Set the provider to a fake provider in testing, otherwise use a provider that prefers the
-	// bundled consul-nft binary and falls back to the node's nft.
+	// Set the provider to a fake provider in testing. If install-cni installed the bundled consul-nft
+	// (-install-nft-bundle, e.g. on GKE), use a provider that prefers it. Otherwise leave the provider unset
+	// so that the default provider runs the node's nft.
 	if c.nftablesProvider != nil {
 		nftCfg.NftablesProvider = c.nftablesProvider
-	} else {
-		nftCfg.NftablesProvider = newNftProvider(logger, args.Netns, bundledNftDirs(cfg.CNIBinDir)...)
+	} else if dirs := bundledNftDirs(cfg.CNIBinDir); hasNftBundle(dirs) {
+		logger.Debug("using bundled nft", "dirs", dirs)
+		nftCfg.NftablesProvider = newNftProvider(logger, args.Netns, dirs...)
 	}
 
 	// Apply the nft rules.

@@ -145,6 +145,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		// GKE is currently the only cloud provider that uses a different CNI bin dir.
 		if t.UseGKE {
 			setIfNotEmpty(helmValues, "connectInject.cni.cniBinDir", "/home/kubernetes/bin")
+			// GKE Container-Optimized OS nodes have no usable nft, so the CNI plugin needs the bundled nft.
+			setIfNotEmpty(helmValues, "connectInject.cni.installNftBundle", "true")
 		}
 		if t.EnableOpenshift {
 			setIfNotEmpty(helmValues, "connectInject.cni.multus", "true")

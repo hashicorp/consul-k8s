@@ -2753,6 +2753,19 @@ connectInject:
     # @type: string
     cniBinDir: "/opt/cni/bin"
 
+    # If true, the CNI installer copies an nft binary bundled in the consul-k8s-control-plane image, with its
+    # libraries, into `cniBinDir` on each node, and the CNI plugin uses it to apply traffic redirection rules.
+    # Only needed on nodes without a usable nft, such as GKE nodes running Container-Optimized OS.
+    # Leave false on other platforms (e.g. EKS, AKS, OpenShift) so that the plugin uses the node's nft.
+    # Example on GKE:
+    #
+    # ```yaml
+    # cniBinDir: "/home/kubernetes/bin"
+    # installNftBundle: true
+    # ```
+    # @type: boolean
+    installNftBundle: false
+
     # Location on the kubernetes node of all CNI configuration. Should be the absolute path and start with a '/'
     # @type: string
     cniNetDir: "/etc/cni/net.d"

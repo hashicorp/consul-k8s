@@ -27,7 +27,7 @@ import (
 const (
 	defaultCNIBinSourceDir = "/bin"
 	consulCNIName          = "consul-cni" // Name of the plugin and binary. They must be the same as per the CNI spec.
-	consulNftName          = "consul-nft" // Bundled nft used by the plugin when the node has no nft.
+	consulNftName          = "consul-nft" // Bundled nft, installed with -install-nft-bundle for nodes without a usable nft.
 	defaultLogJSON         = false
 	gracePeriodTimeout     = 100 * time.Second
 )
@@ -57,6 +57,9 @@ type Command struct {
 	flagInstallationID string
 	// flagCNITokenPath is the path to the CNI token file for testing purposes.
 	flagCNITokenPath string
+	// flagInstallNftBundle is a boolean flag to install the bundled nft on the node. Only needed on nodes
+	// without a usable nft, such as GKE Container-Optimized OS.
+	flagInstallNftBundle bool
 
 	flagSet *flag.FlagSet
 
@@ -80,6 +83,8 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagMultus, "multus", config.DefaultMultus, "If the plugin is a multus plugin (default = false)")
 	c.flagSet.StringVar(&c.flagInstallationID, "installation-id", "", "Unique identifier for this installation instance (auto-generated if not provided)")
 	c.flagSet.StringVar(&c.flagCNITokenPath, "cni-token-path", "", "Path to the CNI token file for testing purposes.")
+	c.flagSet.BoolVar(&c.flagInstallNftBundle, "install-nft-bundle", false,
+		"Install the bundled nft on the node for nodes without a usable nft, such as GKE Container-Optimized OS (default = false)")
 
 	c.help = flags.Usage(help, c.flagSet)
 
@@ -153,6 +158,7 @@ func (c *Command) Run(args []string) int {
 		"cni_token_path:", cfg.CNITokenPath,
 		"cni_host_token_path", cfg.CNIHostTokenPath,
 		"autorotate_token:", cfg.AutorotateToken,
+		"install_nft_bundle", c.flagInstallNftBundle,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -167,10 +173,10 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Copy the bundled nft so the plugin can apply rules on nodes without nft (e.g. GKE COS). Fail before
-	// the plugin is enabled so that the pod is restarted and the installation retried.
-	if err := c.installNftBundle(cfg.CNIBinDir); err != nil {
-		c.logger.Error("Unable to install nft bundle", "error", err)
+	// Install or remove the bundled nft depending on -install-nft-bundle. Fail before the plugin is enabled
+	// so that the pod is restarted and the installation retried.
+	if err := c.syncNftBundle(cfg.CNIBinDir); err != nil {
+		c.logger.Error("Unable to sync nft bundle", "error", err)
 		return 1
 	}
 

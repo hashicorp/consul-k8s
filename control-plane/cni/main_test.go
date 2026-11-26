@@ -951,3 +951,21 @@ func TestNftProvider_ApplyRules(t *testing.T) {
 		require.ErrorContains(t, p.ApplyRules("nft"), "nft binary not found")
 	})
 }
+
+func TestHasNftBundle(t *testing.T) {
+	t.Run("no bundle installed", func(t *testing.T) {
+		require.False(t, hasNftBundle([]string{"", t.TempDir()}))
+	})
+
+	t.Run("bundle installed", func(t *testing.T) {
+		dir := t.TempDir()
+		writeBundle(t, dir, "")
+		require.True(t, hasNftBundle([]string{"", t.TempDir(), dir}))
+	})
+
+	t.Run("only lock file present while the bundle is being installed", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, nftlock.FileName), nil, 0o644))
+		require.True(t, hasNftBundle([]string{dir}))
+	})
+}

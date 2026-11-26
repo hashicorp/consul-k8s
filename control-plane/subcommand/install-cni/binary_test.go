@@ -353,3 +353,40 @@ func TestCommand_InstallNftBundle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "v1", string(content))
 }
+
+func TestCommand_SyncNftBundle(t *testing.T) {
+	t.Run("installs the bundle when enabled", func(t *testing.T) {
+		src, dest := t.TempDir(), t.TempDir()
+		writeTestNftBundle(t, filepath.Join(src, consulNftName), "v1")
+		cmd := &Command{flagCNIBinSourceDir: src, flagInstallNftBundle: true, logger: hclog.NewNullLogger()}
+
+		require.NoError(t, cmd.syncNftBundle(dest))
+		content, err := os.ReadFile(filepath.Join(dest, consulNftName, "nft"))
+		require.NoError(t, err)
+		require.Equal(t, "v1", string(content))
+	})
+
+	t.Run("does not touch the node when disabled and no bundle is installed", func(t *testing.T) {
+		src, dest := t.TempDir(), t.TempDir()
+		writeTestNftBundle(t, filepath.Join(src, consulNftName), "v1")
+		cmd := &Command{flagCNIBinSourceDir: src, logger: hclog.NewNullLogger()}
+
+		require.NoError(t, cmd.syncNftBundle(dest))
+		entries, err := os.ReadDir(dest)
+		require.NoError(t, err)
+		require.Empty(t, entries, "nothing must be written to the CNI bin dir")
+	})
+
+	t.Run("removes a previously installed bundle when disabled", func(t *testing.T) {
+		src, dest := t.TempDir(), t.TempDir()
+		writeTestNftBundle(t, filepath.Join(src, consulNftName), "v1")
+		enabled := &Command{flagCNIBinSourceDir: src, flagInstallNftBundle: true, logger: hclog.NewNullLogger()}
+		require.NoError(t, enabled.syncNftBundle(dest))
+
+		disabled := &Command{flagCNIBinSourceDir: src, logger: hclog.NewNullLogger()}
+		require.NoError(t, disabled.syncNftBundle(dest))
+		entries, err := os.ReadDir(dest)
+		require.NoError(t, err)
+		require.Empty(t, entries, "bundle, versions and lock file must be removed")
+	})
+}

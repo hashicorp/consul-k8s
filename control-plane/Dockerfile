@@ -59,9 +59,10 @@ ENV VERSION=${VERSION}
 # Add --upgrade to ensure the latest security patches for iputils are applied
 RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables zlib
 
-# Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
-# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
-# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
+# Bundle the nft binary installed above with its shared libraries and loader. When enabled with
+# -install-nft-bundle (Helm: connectInject.cni.installNftBundle), install-cni copies it to the node so the CNI
+# plugin can apply nftables rules on nodes without a usable nft (e.g. GKE Container-Optimized OS).
+# Otherwise it is not copied and the plugin uses the node's nft.
 RUN set -eu; d=/bin/consul-nft; \
     loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
     test -n "$loader"; \
@@ -128,9 +129,10 @@ ENV VERSION=${PRODUCT_VERSION}
 # Add --upgrade to ensure the latest security patches for iputils are applied
 RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ nftables zlib
 
-# Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
-# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
-# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
+# Bundle the nft binary installed above with its shared libraries and loader. When enabled with
+# -install-nft-bundle (Helm: connectInject.cni.installNftBundle), install-cni copies it to the node so the CNI
+# plugin can apply nftables rules on nodes without a usable nft (e.g. GKE Container-Optimized OS).
+# Otherwise it is not copied and the plugin uses the node's nft.
 RUN set -eu; d=/bin/consul-nft; \
     loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
     test -n "$loader"; \
@@ -218,9 +220,10 @@ RUN microdnf update -y && \
     microdnf install -y ca-certificates libcap openssl shadow-utils nftables && \
     microdnf clean all
 
-# Bundle the nft binary installed above with its shared libraries and loader. install-cni copies it to
-# the node so the CNI plugin applies nftables rules with a known nft version on every node, including nodes
-# without nft or with an nft that cannot read rules from stdin (e.g. GKE Container-Optimized OS).
+# Bundle the nft binary installed above with its shared libraries and loader. When enabled with
+# -install-nft-bundle (Helm: connectInject.cni.installNftBundle), install-cni copies it to the node so the CNI
+# plugin can apply nftables rules on nodes without a usable nft (e.g. GKE Container-Optimized OS).
+# Otherwise it is not copied and the plugin uses the node's nft.
 RUN set -eu; d=/bin/consul-nft; \
     loader=$(ldd /usr/sbin/nft | sed -n 's|^[[:space:]]*\(/[^ ]*\) (.*|\1|p'); \
     test -n "$loader"; \

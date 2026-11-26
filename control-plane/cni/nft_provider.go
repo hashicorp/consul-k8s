@@ -26,7 +26,8 @@ const bundledNftName = "consul-nft"
 
 // nftProvider implements nftables.Provider. It collects nft script lines and applies them atomically
 // with `nft -f <script file>` inside the pod's network namespace, using the bundled consul-nft directory
-// when present and otherwise the node's nft binary.
+// when present and otherwise the node's nft binary. It is only used on nodes where install-cni installed
+// the bundle (-install-nft-bundle); other nodes use the default nftables provider.
 type nftProvider struct {
 	lines []string
 	// netNS is the pod network namespace path. When empty the rules are applied in the current namespace.
@@ -127,7 +128,7 @@ func writeNftScript(lines []string) (string, error) {
 }
 
 // nftCommand returns the command used to run nft: the bundled nft run through its bundled dynamic loader,
-// so that a known nft version with its own libraries is used, or the node's nft binary from PATH if no
+// so that the nft from the control-plane image is used with its own libraries, or the node's nft binary from PATH if no
 // usable bundle is installed. A bundle that cannot be locked in time, e.g. because the installer is still
 // replacing it, is skipped so that the node's nft can be used instead. When the bundle is used it is locked
 // (shared) until release is called.
@@ -179,6 +180,22 @@ func isExecutable(path string) bool {
 func isDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
+}
+
+// hasNftBundle reports whether install-cni installed the bundled consul-nft in one of dirs.
+func hasNftBundle(dirs []string) bool {
+	for _, dir := range dirs {
+		if dir == "" {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(dir, bundledNftName)); err == nil {
+			return true
+		}
+		if _, err := os.Lstat(filepath.Join(dir, nftlock.FileName)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // bundledNftDirs returns the directories that may contain the bundled consul-nft directory: the configured CNI bin

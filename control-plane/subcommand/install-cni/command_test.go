@@ -30,6 +30,7 @@ func TestRun_FlagDefaults(t *testing.T) {
 	require.Equal(t, cmd.flagLogLevel, config.DefaultLogLevel)
 	require.Equal(t, cmd.flagLogJSON, defaultLogJSON)
 	require.Equal(t, cmd.flagMultus, config.DefaultMultus)
+	require.False(t, cmd.flagInstallNftBundle)
 }
 
 func TestRun_DirectoryWatcher(t *testing.T) {
@@ -405,6 +406,7 @@ func TestRun_SignalCleanup(t *testing.T) {
 					"-kubeconfig", cfg.Kubeconfig,
 					"-installation-id", uid,
 					"-log-level", "info",
+					"-install-nft-bundle",
 				}
 				if tt.autorotateToken {
 					args = append(args, "-autorotate-token")

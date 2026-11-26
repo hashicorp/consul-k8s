@@ -84,6 +84,16 @@ const (
 	nftBundleLockTimeout = 30 * time.Second
 )
 
+// syncNftBundle installs the nft bundle into destDir when -install-nft-bundle is set. Otherwise it removes
+// a bundle left by a previous installation, so that the plugin uses the node's nft as before.
+func (c *Command) syncNftBundle(destDir string) error {
+	if c.flagInstallNftBundle {
+		return c.installNftBundle(destDir)
+	}
+	c.logger.Debug("nft bundle installation disabled, removing any installed nft bundle", "destination", destDir)
+	return removeNftBundle(destDir)
+}
+
 // installNftBundle installs the nft bundle from the image into destDir. A bundle that is missing from the
 // image is not an error: the plugin still works on nodes that have nft installed.
 func (c *Command) installNftBundle(destDir string) error {
@@ -174,6 +184,11 @@ func installNftBundle(srcDir, destDir string) error {
 // removeNftBundle removes the consul-nft symlink, all installed bundle versions and the lock file from
 // destDir. It waits for in-flight plugin invocations that use the bundle to finish.
 func removeNftBundle(destDir string) error {
+	// The lock file is created before a bundle is installed and removed after it is removed, so without it
+	// there is nothing to remove. Return early so that nothing is written to nodes without a bundle.
+	if _, err := os.Lstat(filepath.Join(destDir, nftlock.FileName)); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
 	release, err := nftlock.Exclusive(destDir, nftBundleLockTimeout)
 	if err != nil {
 		if os.IsNotExist(err) {
