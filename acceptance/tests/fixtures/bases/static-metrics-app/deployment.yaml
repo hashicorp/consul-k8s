@@ -17,14 +17,36 @@ spec:
       annotations:
         'consul.hashicorp.com/connect-inject': 'true'
         'consul.hashicorp.com/connect-service': 'server'
+        'consul.hashicorp.com/connect-service-port': '8080'
+        'consul.hashicorp.com/service-metrics-port': '9090'
+        'consul.hashicorp.com/service-metrics-path': '/legacy-metrics'
       labels:
         app: static-metrics-app
     spec:
       containers:
       - name: static-metrics-app
-        image: ishustava/fake-service:0.7.0
-        env:
-        - name: METRICS_ENABLE_PROMETHEUS
-          value: "true"
+        image: docker.mirror.hashicorp.services/library/busybox:latest
+        command:
+          - /bin/sh
+          - -c
+          - |
+            httpd -f -p 8080 -h /www/app &
+            httpd -f -p 9090 -h /www/metrics &
+            wait
+        volumeMounts:
+          - name: metrics
+            mountPath: /www
         ports:
         - containerPort: 9090
+          name: metrics
+        - containerPort: 8080
+          name: http
+      volumes:
+        - name: metrics
+          configMap:
+            name: static-metrics-app
+            items:
+              - key: index.html
+                path: app/index.html
+              - key: legacy-metrics
+                path: metrics/legacy-metrics

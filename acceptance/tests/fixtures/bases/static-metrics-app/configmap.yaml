@@ -1,0 +1,13 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: static-metrics-app
+data:
+  index.html: "ok"
+  legacy-metrics: |
+    # HELP legacy_service_requests_total Requests served by the legacy metrics endpoint.
+    # TYPE legacy_service_requests_total counter
+    legacy_service_requests_total{endpoint="custom"} 42
