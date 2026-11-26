@@ -546,7 +546,7 @@ gw_flags=(
         . | tee /dev/stderr |
         yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
         yq -r '.spec.image' | tee /dev/stderr)
-    [ "$actual" = "hashicorp/csl-inf-rt:3.0.0-dev" ]
+    [ "$actual" = "hashicorp/csl-inf-rt:1.0.0-ent" ]
 }
 
 @test "ai/InferenceGateway/object: per-gateway image overrides default" {
