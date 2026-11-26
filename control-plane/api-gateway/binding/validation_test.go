@@ -1597,6 +1597,17 @@ func TestValidateAuthFilters(t *testing.T) {
 			}}),
 			expected: authFilterValidationResults{authFilterValidationResult{}},
 		},
+		"auth filter with only ext_authz and no JWT is valid": {
+			authFilters: []*v1alpha1.RouteAuthFilter{
+				{
+					Spec: v1alpha1.RouteAuthFilterSpec{
+						ExtAuthz: &v1alpha1.RouteAuthFilterExtAuthz{Enabled: true},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{}),
+			expected:  authFilterValidationResults{authFilterValidationResult{}},
+		},
 		"auth filter references missing JWT Provider": {
 			authFilters: []*v1alpha1.RouteAuthFilter{
 				{
@@ -1634,6 +1645,112 @@ func TestValidateAuthFilters(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, tc.expected, validateAuthFilters(tc.authFilters, tc.resources))
+		})
+	}
+}
+
+func TestValidateExtProcFilters(t *testing.T) {
+	for name, tc := range map[string]struct {
+		extProcFilters []*v1alpha1.RouteExtProc
+		expected       extProcFilterValidationResults
+	}{
+		"nil filter produces accepted result": {
+			extProcFilters: []*v1alpha1.RouteExtProc{nil},
+			expected:       extProcFilterValidationResults{extProcFilterValidationResult{}},
+		},
+		"override mode with overrides is valid": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "override",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{extProcFilterValidationResult{}},
+		},
+		"enabled mode without overrides is valid": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode: "enabled",
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{extProcFilterValidationResult{}},
+		},
+		"disabled mode without overrides is valid": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode: "disabled",
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{extProcFilterValidationResult{}},
+		},
+		"enabled mode with overrides is not accepted": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "enabled",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{
+				extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+			},
+		},
+		"disabled mode with overrides is not accepted": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "disabled",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{
+				extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+			},
+		},
+		"mode comparison is case-insensitive": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "ENABLED",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{
+				extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+			},
+		},
+		"multiple filters are index-aligned": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "override",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "enabled",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{
+				extProcFilterValidationResult{},
+				extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, validateExtProcFilters(tc.extProcFilters))
 		})
 	}
 }
@@ -1722,4 +1839,156 @@ func TestRouteTLSSDSFilterIsInvalid_ClusterInheritanceMissing(t *testing.T) {
 	}
 
 	require.True(t, routeTLSSDSFilterIsInvalid(filter, route, resources, route.Namespace))
+}
+
+// TestOrphanedProtocolAnnotations verifies that orphanedProtocolAnnotations
+// correctly identifies listener-protocol annotation keys that do not match
+// any listener name in spec.listeners.
+//
+// The function is the structural glue that makes the annotation-to-listener
+// binding visible: if a user types
+//
+//	api-gateway.consul.hashicorp.com/listener-grpc-listner-protocol: grpc   ← typo
+//
+// and the listener is named "grpc-listener" (not "grpc-listner"), the annotation
+// is silently ignored by resolveListenerProtocol.  orphanedProtocolAnnotations
+// detects and returns these orphaned keys so the binder can log a warning.
+func TestOrphanedProtocolAnnotations(t *testing.T) {
+	t.Parallel()
+
+	mkGW := func(annotations map[string]string, listenerNames ...string) gwv1.Gateway {
+		listeners := make([]gwv1.Listener, len(listenerNames))
+		for i, n := range listenerNames {
+			listeners[i] = gwv1.Listener{Name: gwv1.SectionName(n)}
+		}
+		return gwv1.Gateway{
+			ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+			Spec:       gwv1.GatewaySpec{Listeners: listeners},
+		}
+	}
+	pfx := common.ListenerProtocolAnnotationPrefix
+	sfx := common.ListenerProtocolAnnotationSuffix
+
+	tests := []struct {
+		name        string
+		gateway     gwv1.Gateway
+		wantOrphans []string
+	}{
+		{
+			name:        "no annotations — no orphans",
+			gateway:     mkGW(nil, "http-listener"),
+			wantOrphans: nil,
+		},
+		{
+			name: "annotation matches listener exactly — no orphan",
+			gateway: mkGW(
+				map[string]string{pfx + "grpc-listener" + sfx: "grpc"},
+				"http-listener", "grpc-listener",
+			),
+			wantOrphans: nil,
+		},
+		{
+			name: "all three listeners annotated correctly — no orphans",
+			gateway: mkGW(
+				map[string]string{
+					pfx + "http-listener" + sfx: "http",
+					pfx + "grpc-listener" + sfx: "grpc",
+					pfx + "h2-listener" + sfx:   "http2",
+				},
+				"http-listener", "grpc-listener", "h2-listener",
+			),
+			wantOrphans: nil,
+		},
+		{
+			name: "typo in annotation section name — one orphan",
+			gateway: mkGW(
+				map[string]string{
+					// "grpc-listner" (missing 'e') does not match listener "grpc-listener"
+					pfx + "grpc-listner" + sfx:  "grpc",
+					pfx + "http-listener" + sfx: "http",
+				},
+				"http-listener", "grpc-listener",
+			),
+			wantOrphans: []string{pfx + "grpc-listner" + sfx},
+		},
+		{
+			name: "annotation references a listener that was deleted — orphan",
+			gateway: mkGW(
+				map[string]string{
+					// old-listener was removed but annotation was not cleaned up
+					pfx + "old-listener" + sfx:  "grpc",
+					pfx + "http-listener" + sfx: "http",
+				},
+				"http-listener",
+			),
+			wantOrphans: []string{pfx + "old-listener" + sfx},
+		},
+		{
+			name: "non-protocol annotation is not reported as orphan",
+			gateway: mkGW(
+				map[string]string{
+					// unrelated annotation with similar prefix should be ignored
+					"api-gateway.consul.hashicorp.com/tls_min_version": "TLSv1_2",
+					pfx + "http-listener" + sfx:                        "http",
+				},
+				"http-listener",
+			),
+			wantOrphans: nil,
+		},
+		{
+			name: "no listeners but annotation present — all annotated are orphaned",
+			gateway: mkGW(
+				map[string]string{pfx + "some-listener" + sfx: "grpc"},
+			),
+			wantOrphans: []string{pfx + "some-listener" + sfx},
+		},
+		{
+			name: "multiple orphans from mixed typos and removed listeners",
+			gateway: mkGW(
+				map[string]string{
+					pfx + "http-listener" + sfx:  "http",  // correct
+					pfx + "grpc-lstener" + sfx:   "grpc",  // typo
+					pfx + "stale-listener" + sfx: "http2", // removed
+				},
+				"http-listener", "grpc-listener",
+			),
+			wantOrphans: []string{
+				pfx + "grpc-lstener" + sfx,
+				pfx + "stale-listener" + sfx,
+			},
+		},
+		{
+			name: "prefix/suffix overlapping key with no section name is skipped",
+			gateway: mkGW(
+				map[string]string{
+					// "api-gateway.consul.hashicorp.com/listener-protocol" has both
+					// the prefix and the suffix but no section name between them.
+					// It must not panic and must not be reported as an orphan.
+					"api-gateway.consul.hashicorp.com/listener-protocol": "grpc",
+					pfx + "http-listener" + sfx:                          "http",
+				},
+				"http-listener",
+			),
+			wantOrphans: nil,
+		},
+		{
+			name: "key with empty section name is skipped",
+			gateway: mkGW(
+				map[string]string{pfx + sfx: "grpc"},
+				"http-listener",
+			),
+			wantOrphans: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := orphanedProtocolAnnotations(tt.gateway)
+			// Sort both slices so the comparison is order-independent.
+			require.ElementsMatch(t, tt.wantOrphans, got,
+				"orphanedProtocolAnnotations mismatch for %q", tt.name)
+		})
+	}
 }

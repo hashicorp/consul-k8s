@@ -15,6 +15,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -349,4 +350,81 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 	require.Contains(t, argsStr, fmt.Sprintf("-grpc-port=%d", GRPCPort))
 	require.Contains(t, argsStr, "-log-level=DEBUG")
 	require.Contains(t, argsStr, "-log-json=true")
+}
+
+func TestConsulDataplaneContainer_EnvoyProxyConcurrencyAnnotation(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                string
+		annotations         map[string]string
+		expectedConcurrency string
+		expectErr           bool
+	}{
+		{
+			name:                "no annotation set uses default concurrency",
+			annotations:         nil,
+			expectedConcurrency: "-envoy-concurrency=1",
+		},
+		{
+			name: "valid annotation overrides default concurrency",
+			annotations: map[string]string{
+				constants.AnnotationEnvoyProxyConcurrency: "4",
+			},
+			expectedConcurrency: "-envoy-concurrency=4",
+		},
+		{
+			name: "invalid annotation returns an error",
+			annotations: map[string]string{
+				constants.AnnotationEnvoyProxyConcurrency: "not-a-number",
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics := common.MetricsConfig{}
+			config := common.HelmConfig{
+				ImageDataplane:        "consul-dataplane:test",
+				GlobalImagePullPolicy: "IfNotPresent",
+				LogLevel:              "INFO",
+				LogJSON:               false,
+				ConsulConfig: common.ConsulConfig{
+					Address:  "consul.default.svc.cluster.local",
+					GRPCPort: GRPCPort,
+				},
+			}
+
+			gateway := gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-gateway",
+					Namespace:   "default",
+					Annotations: tc.annotations,
+				},
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
+						{
+							Name: "http",
+							Port: NonPrivilegedPort8080,
+						},
+					},
+				},
+			}
+
+			gcc := v1alpha1.GatewayClassConfig{
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					MapPrivilegedContainerPorts: 0,
+				},
+			}
+
+			container, err := consulDataplaneContainer(metrics, config, gcc, gateway, []corev1.VolumeMount{})
+			if tc.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Contains(t, container.Args, tc.expectedConcurrency)
+		})
+	}
 }

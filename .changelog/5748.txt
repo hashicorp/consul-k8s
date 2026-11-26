@@ -1,0 +1,11 @@
+```release-note:bug
+server-acl-init: Fix component ACL binding rules matching only the ServiceAccount name, which let a same-named ServiceAccount in any namespace log in and receive the component's ACL role. Rules now also require the Consul release namespace, and existing rules are updated on upgrade, including in federated secondary datacenters. Components running outside the release namespace must be moved into it.
+```
+
+```release-note:bug
+control-plane: Fix the TerminatingGateway controller overwriting the terminating-gateway ACL binding rule with a selector that matched only the ServiceAccount name. The rule is now restricted to the Consul release namespace, consistent with `server-acl-init`.
+```
+
+```release-note:security
+server-acl-init: Binding rules of components that were disabled before upgrading are not rewritten. If you previously enabled and later disabled a component (for example sync-catalog, mesh-gateway or a gateway), delete its old binding rule on the component auth method (`consul acl binding-rule list -method <prefix>-k8s-component-auth-method`, then `consul acl binding-rule delete -id <id>`), or re-enable the component once and run the upgrade so its rule is updated.
+```

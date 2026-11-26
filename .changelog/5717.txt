@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Fix terminating gateway Services selecting pods of all terminating gateways in a release by adding the `terminating-gateway-name` label to the Service selector.
+```

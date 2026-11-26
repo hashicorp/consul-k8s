@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Fix snapshot-agent ACL login failures when Consul namespace mirroring is enabled by no longer injecting the mirrored CONSUL_NAMESPACE into the snapshot-agent container. The agent authenticates and registers its consul-snapshot service in the default Consul namespace; the configured admin partition and workload namespace mirroring are unchanged.
+```

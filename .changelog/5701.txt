@@ -1,0 +1,3 @@
+```release-note:feature
+Add a feature-gate-set Job that applies feature gates configured through Helm values to Consul servers.
+```

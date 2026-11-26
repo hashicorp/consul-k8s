@@ -48,3 +48,31 @@ variable "kubernetes_version_prefix" {
   default     = "1.32."
   description = "Kubernetes version supported on EKS"
 }
+
+variable "uptycs_enroll_secret" {
+  type        = string
+  default     = ""
+  description = "Uptycs enroll secret containing customer identifiers."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_ca_bundle" {
+  type        = string
+  default     = ""
+  description = "Base64-encoded CA bundle for kubequery webhook."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_tls_crt" {
+  type        = string
+  default     = ""
+  description = "Base64-encoded TLS certificate for kubequery webhook server."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_tls_key" {
+  type        = string
+  default     = ""
+  description = "Base64-encoded TLS private key for kubequery webhook server."
+  sensitive   = true
+}

@@ -1,0 +1,3 @@
+```release-note:bug
+endpoints-controller: add enterprise gating while registering services with multiple ports. In consul CE cluster, register single port catalog service for pods with multiple container ports.
+```

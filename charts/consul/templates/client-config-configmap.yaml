@@ -21,8 +21,8 @@ data:
     }
   log-level.json: |-
     {
-      {{- if .Values.client.logLevel }}
-      "log_level": "{{ .Values.client.logLevel | upper }}"
+      {{- if (or .Values.client.logLevel .Values.global.logLevel) }}
+      "log_level": "{{ (default .Values.global.logLevel .Values.client.logLevel) | upper }}"
       {{- end }}
     }
   central-config.json: |-

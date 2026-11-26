@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	v1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -18,6 +20,7 @@ import (
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/catalog/registration"
+	aicontrollers "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/ai"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -73,6 +76,22 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
+
+	// If partitions are enabled, we know this is Consul Enterprise,
+	// so skip the license check. The license endpoint requires operator:read
+	// which is not allowed in partition-scoped ACL policies.
+	var isEnterpriseDistribution bool
+	if c.flagEnablePartitions {
+		isEnterpriseDistribution = true
+	} else {
+		var err error
+		isEnterpriseDistribution, err = consul.IsEnterpriseDistribution(ctx, consulConfig, watcher)
+		if err != nil {
+			setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; multi-port service registrations will remain disabled until a valid license is detected", "error", err)
+			isEnterpriseDistribution = false
+		}
+	}
+
 	if err := (&endpoints.Controller{
 		Client:                     mgr.GetClient(),
 		ConsulClientConfig:         consulConfig,
@@ -98,6 +117,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ReleaseNamespace:           c.flagReleaseNamespace,
 		EnableAutoEncrypt:          c.flagEnableAutoEncrypt,
 		EnableTelemetryCollector:   c.flagEnableTelemetryCollector,
+		IsEnterpriseDistribution:   isEnterpriseDistribution,
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})
@@ -108,12 +128,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to register field indexes for gateway.networking.k8s.io API")
 		return err
-	}
-
-	isEnterpriseDistribution, err := consul.IsEnterpriseDistribution(consulConfig, watcher)
-	if err != nil {
-		setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; enterprise-only gateway scaling will remain disabled until a valid license is detected", "error", err)
-		isEnterpriseDistribution = false
 	}
 
 	if c.flagEnableCustomGatewayCRDController {
@@ -206,6 +220,80 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
 		return err
+	}
+
+	// AI controllers — only registered when ai.enabled=true.
+	// When false: no watches are set up, no RBAC is consumed, the CRDs are not installed.
+	if c.flagEnableAI {
+		if err := (&aicontrollers.InferenceModelConfigController{
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("inference-model-config"),
+			Recorder: mgr.GetEventRecorderFor("inferencemodelconfig-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferenceModelConfig")
+			return err
+		}
+		if err := (&aicontrollers.McpServerConfigController{
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("mcp-server-config"),
+			Recorder: mgr.GetEventRecorderFor("mcpserverconfig-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "McpServerConfig")
+			return err
+		}
+		if err := (&aicontrollers.AgentConfigController{
+			Client:   mgr.GetClient(),
+			Recorder: mgr.GetEventRecorderFor("agentconfig-controller"),
+			Log:      ctrl.Log.WithName("controller").WithName("agent-config"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "AgentConfig")
+			return err
+		}
+		if err := (&aicontrollers.InferencePoolConfigController{
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("inference-pool-config"),
+			Recorder: mgr.GetEventRecorderFor("inferencepoolconfig-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferencePoolConfig")
+			return err
+		}
+	}
+
+	// Match the chart's InferenceGateway CRD gate before starting its watches or cache.
+	if c.flagEnableAI && c.flagEnableAIInferenceGateway {
+		defaultResources, err := c.inferenceGatewayDefaultResources()
+		if err != nil {
+			setupLog.Error(err, "invalid AI inference gateway default resource flag")
+			return err
+		}
+		if err := (&aicontrollers.InferenceGatewayController{
+			Client:                 mgr.GetClient(),
+			Log:                    ctrl.Log.WithName("controller").WithName("inference-gateway"),
+			Recorder:               mgr.GetEventRecorderFor("inferencegateway-controller"),
+			GatewayImage:           c.flagAIInferenceGatewayImage,
+			DataplaneImage:         c.flagConsulDataplaneImage,
+			ConsulK8SImage:         c.flagConsulK8sImage,
+			DefaultService:         c.inferenceGatewayDefaultService(),
+			DefaultResources:       defaultResources,
+			ConsulClientConfig:     consulConfig,
+			ConsulServerConnMgr:    watcher,
+			ConsulAddress:          c.consul.Addresses,
+			ConsulTLSEnabled:       c.consul.UseTLS,
+			ConsulCACert:           string(c.caCertPem),
+			ConsulTLSServerName:    c.consul.TLSServerName,
+			ConsulPartition:        c.consul.Partition,
+			ConsulNamespace:        c.flagConsulDestinationNamespace,
+			EnableConsulNamespaces: c.flagEnableNamespaces,
+			EnableK8SNSMirroring:   c.flagEnableK8SNSMirroring,
+			EnableOpenShift:        c.flagEnableOpenShift,
+			NSMirroringPrefix:      c.flagK8SNSMirroringPrefix,
+			CrossNSACLPolicy:       c.flagCrossNamespaceACLPolicy,
+			Datacenter:             c.consul.Datacenter,
+			AuthMethod:             c.flagACLAuthMethod,
+		}).SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferenceGateway")
+			return err
+		}
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassController{
@@ -491,10 +579,13 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ConsulServerConnMgr:                       watcher,
 		ImageConsul:                               c.flagConsulImage,
 		ImageConsulDataplane:                      c.flagConsulDataplaneImage,
+		ImageMCPServer:                            c.flagAIMCPServerImage,
+		ImageAIAgent:                              c.flagAIAgentImage,
 		EnvoyExtraArgs:                            c.flagEnvoyExtraArgs,
 		ImageConsulK8S:                            c.flagConsulK8sImage,
 		GlobalImagePullPolicy:                     c.flagGlobalImagePullPolicy,
 		RequireAnnotation:                         !c.flagDefaultInject,
+		DisableMultiportRegistration:              c.flagDisableMultiportRegistration,
 		AuthMethod:                                c.flagACLAuthMethod,
 		ConsulCACert:                              string(c.caCertPem),
 		TLSEnabled:                                c.consul.UseTLS,
@@ -673,4 +764,70 @@ func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// inferenceGatewayDefaultService builds the DefaultService value for the
+// InferenceGatewayController from the CLI flags that mirror
+// ai.inferenceGateway.defaults.service in values.yaml.
+func (c *Command) inferenceGatewayDefaultService() v1alpha1.InferenceGatewayService {
+	svcType := v1.ServiceTypeClusterIP
+	if c.flagAIInferenceGatewayDefaultServiceType != "" {
+		svcType = v1.ServiceType(c.flagAIInferenceGatewayDefaultServiceType)
+	}
+	port := int32(c.flagAIInferenceGatewayDefaultServicePort)
+	if port <= 0 {
+		port = 8443
+	}
+	return v1alpha1.InferenceGatewayService{
+		Type:  svcType,
+		Ports: []v1alpha1.InferenceGatewayServicePort{{Port: port}},
+	}
+}
+
+// inferenceGatewayDefaultResources builds the DefaultResources value for the
+// InferenceGatewayController from the CLI flags that mirror
+// ai.inferenceGateway.defaults.resources in values.yaml.
+// Any flag left empty is omitted from the resource list.
+// Returns an error if any flag value is not a valid Kubernetes resource quantity.
+func (c *Command) inferenceGatewayDefaultResources() (v1.ResourceRequirements, error) {
+	req := v1.ResourceList{}
+	lim := v1.ResourceList{}
+
+	if c.flagAIInferenceGatewayDefaultCPURequest != "" {
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultCPURequest)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-cpu-request %q: %w", c.flagAIInferenceGatewayDefaultCPURequest, err)
+		}
+		req[v1.ResourceCPU] = q
+	}
+	if c.flagAIInferenceGatewayDefaultMemRequest != "" {
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultMemRequest)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-mem-request %q: %w", c.flagAIInferenceGatewayDefaultMemRequest, err)
+		}
+		req[v1.ResourceMemory] = q
+	}
+	if c.flagAIInferenceGatewayDefaultCPULimit != "" {
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultCPULimit)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-cpu-limit %q: %w", c.flagAIInferenceGatewayDefaultCPULimit, err)
+		}
+		lim[v1.ResourceCPU] = q
+	}
+	if c.flagAIInferenceGatewayDefaultMemLimit != "" {
+		q, err := resource.ParseQuantity(c.flagAIInferenceGatewayDefaultMemLimit)
+		if err != nil {
+			return v1.ResourceRequirements{}, fmt.Errorf("invalid -ai-inference-gateway-default-mem-limit %q: %w", c.flagAIInferenceGatewayDefaultMemLimit, err)
+		}
+		lim[v1.ResourceMemory] = q
+	}
+
+	res := v1.ResourceRequirements{}
+	if len(req) > 0 {
+		res.Requests = req
+	}
+	if len(lim) > 0 {
+		res.Limits = lim
+	}
+	return res, nil
 }

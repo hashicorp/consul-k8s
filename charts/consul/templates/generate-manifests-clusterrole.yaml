@@ -20,6 +20,7 @@ rules:
     resources:
     - gatewayclassconfigs
     - serviceintentions
+    - gatewaypolicies
     verbs:
     - get
     - update
@@ -36,6 +37,21 @@ rules:
     - referencegrants
     - grpcroutes
     - udproutes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - consul.hashicorp.com
+    resources:
+    - customgatewayclasses
+    - cgateways
+    - chttproutes
+    - ctcproutes
+    - ctlsroutes
+    - creferencegrants
+    - cgrpcroutes
+    - cudproutes
     verbs:
     - get
     - list

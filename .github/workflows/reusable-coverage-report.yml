@@ -1,0 +1,360 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Reusable workflow: merges per-module coverage profiles, computes the total,
+# posts/edits a PR comment, uploads an HTML artifact, uploads to Codecov, and
+# (on main) pushes a coverage badge SVG to the `badges` branch for the README.
+
+name: reusable-coverage-report
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+      pr-number:
+        required: false
+        type: string
+    outputs:
+      total:
+        description: >-
+          Total computed coverage as a percentage string (e.g. "67.0%"),
+          or "N/A" when no coverage profiles were found.
+        value: ${{ jobs.report.outputs.total }}
+      patch:
+        description: >-
+          Patch coverage: the percentage of the lines this PR adds/modifies
+          (non-test, non-mock Go code in the covered modules) that are covered
+          by tests. "N/A" when the PR changes no coverable Go lines or coverage
+          could not be computed. Consumed by the coverage-gate job to enforce
+          the minimum patch-coverage threshold.
+        value: ${{ jobs.report.outputs.patch }}
+      patch_covered:
+        description: Number of changed coverable lines that are covered.
+        value: ${{ jobs.report.outputs.patch_covered }}
+      patch_coverable:
+        description: Number of changed coverable lines in the PR.
+        value: ${{ jobs.report.outputs.patch_coverable }}
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write  # required for OIDC tokenless Codecov upload
+    outputs:
+      total: ${{ steps.coverage.outputs.total }}
+      patch: ${{ steps.patch.outputs.patch }}
+      patch_covered: ${{ steps.patch.outputs.covered }}
+      patch_coverable: ${{ steps.patch.outputs.coverable }}
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: Download coverage profiles
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+        with:
+          pattern: '*-coverage'
+          path: coverage-artifacts
+
+      - name: Create Go workspace for multi-module coverage analysis
+        # consul-k8s is a multi-module repo (control-plane/ and cli/ each have
+        # their own go.mod). go tool cover -func/-html needs to resolve package
+        # source paths across both modules. A go.work file at the root makes
+        # both modules visible without requiring a root-level go.mod.
+        run: go work init ./control-plane ./cli
+
+      - name: Compute coverage
+        id: coverage
+        run: |
+          PROFILES=$(find coverage-artifacts -name 'coverage.txt' 2>/dev/null | sort)
+          COUNT=$(echo "$PROFILES" | grep -c . || true)
+          echo "Found $COUNT coverage profile(s)"
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "No coverage profiles found"
+            echo "total=N/A" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$COUNT" -eq 1 ]; then
+            cp "$(echo "$PROFILES")" merged-coverage.out
+          else
+            go install github.com/wadey/gocovmerge@b5bfa59ec0ad
+            echo "$PROFILES" | xargs gocovmerge > merged-coverage.out
+          fi
+
+          # Exclude generated mock files and acceptance test paths.
+          # Go 1.20+ includes all compiled packages in the profile (even those
+          # without test files), which inflates the denominator.
+          TOTAL=$(awk '
+            /^mode:/ { next }
+            /\/mocks\/|\/mock_|\/acceptance\/|\/cli\/helm\/mock\.go/ { next }
+            { stmts += $2; if ($3 > 0) covered += $2 }
+            END { if (stmts > 0) printf "%.1f%%", covered/stmts*100; else print "0.0%" }
+          ' merged-coverage.out)
+          echo "Total coverage: $TOTAL"
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+
+          # Strip excluded lines from profile before generating HTML and per-package summary.
+          grep -v -e '/mocks/' -e '/mock_' -e '/acceptance/' -e '/cli/helm/mock.go' merged-coverage.out > filtered-coverage.out || true
+          mv filtered-coverage.out merged-coverage.out
+
+          # Package-level summary grouped by top-level directory.
+          # go tool cover -func separates fields with variable numbers of tabs,
+          # so use $NF for the percentage and $1 for the path.
+          go tool cover -func merged-coverage.out | grep -v '^total:' | \
+            awk '{
+              sub(/^github\.com\/hashicorp\/consul-k8s\//, "", $1)
+              split($1, parts, "/")
+              pkg = parts[1]
+              gsub(/:.*/, "", pkg)
+              pct = $NF; gsub(/%/, "", pct)
+              sum[pkg] += pct; n[pkg]++
+            }
+            END {
+              for (pkg in sum) printf "%-40s %.1f%%\n", pkg, sum[pkg]/n[pkg]
+            }' | sort > pkg-summary.txt
+
+          {
+            echo "## Go Test Coverage"
+            echo ""
+            echo "**Total coverage: $TOTAL**"
+            echo ""
+            echo "| Package | Avg Coverage |"
+            echo "|---------|-------------|"
+            while IFS= read -r line; do
+              pkg=$(echo "$line" | awk '{print $1}')
+              pct=$(echo "$line" | awk '{print $2}')
+              echo "| \`$pkg\` | $pct |"
+            done < pkg-summary.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          go tool cover -html=merged-coverage.out -o coverage.html
+
+      - name: Compute patch coverage
+        id: patch
+        if: inputs.pr-number != '' && steps.coverage.outputs.total != 'N/A'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr-number }}
+          REPO: ${{ github.repository }}
+          # Repo import-path prefix. consul-k8s is a multi-module repo, but the
+          # repo-relative diff paths already include the module subdir
+          # (control-plane/..., cli/...), so prefixing the repo import path
+          # yields the import-path-prefixed file names used in the coverage
+          # profile for both modules.
+          MODULE: github.com/hashicorp/consul-k8s
+        run: |
+          set -euo pipefail
+
+          # 1) Collect the lines this PR adds/modifies for non-test, non-mock Go
+          #    files. We read the unified diff straight from the PR via the API
+          #    (no git history needed) and emit "<import-path>\t<lineno>".
+          #    merged-coverage.out is already filtered (mocks/acceptance/
+          #    cli-helm-mock removed), so changed lines in excluded or
+          #    non-covered modules simply never intersect a block and are
+          #    ignored as non-coverable.
+          gh api --paginate "repos/${REPO}/pulls/${PR}/files" \
+            --jq '.[]
+                  | select(.filename | test("\\.go$"))
+                  | select(.filename | test("_test\\.go$") | not)
+                  | select(.filename | test("(^|/)mocks/|(^|/)mock_") | not)
+                  | if .patch == null
+                    then "NULLPATCH\t\(.filename)"
+                    else "FILE\t\(.filename)\n\(.patch)"
+                    end' > /tmp/pr-patches.txt
+
+          # This is a merge gate, so fail closed: a coverable .go file whose
+          # diff the API cannot return (.patch == null, e.g. the file's diff is
+          # too large to render) must not be silently treated as zero changed
+          # lines and let the gate pass.
+          if grep -q '^NULLPATCH' /tmp/pr-patches.txt; then
+            echo "::error::Cannot compute patch coverage: the GitHub API returned no diff (patch == null) for changed Go file(s):"
+            grep '^NULLPATCH' /tmp/pr-patches.txt | cut -f2 | sed 's/^/  - /'
+            echo "This usually means a single file's diff is too large for the API to render. Split the change so coverage can be measured."
+            exit 1
+          fi
+
+          awk -v module="$MODULE" '
+            /^FILE\t/ { file=$2; next }
+            /^@@ / {
+              # @@ -a,b +c,d @@  -> new-file hunk starts at line c
+              plus=$3; sub(/^\+/, "", plus); split(plus, a, ","); newline=a[1]; next
+            }
+            /^\\/ { next }                          # e.g. "\ No newline at end of file": not a real line
+            {
+              if (file=="") next
+              ch=substr($0,1,1)
+              if (ch=="+")      { print module"/"file"\t"newline; newline++ }
+              else if (ch=="-") { }                  # removed line: no new-file number
+              else              { newline++ }         # context line advances pointer
+            }
+          ' /tmp/pr-patches.txt > /tmp/changed-lines.txt
+
+          # 2) Intersect changed lines with the (already mock-filtered) coverage
+          #    profile. A changed line is "coverable" if it falls inside any
+          #    profile block, and "covered" if any such block has a hit count > 0.
+          awk '
+            BEGIN { NB = 0 }
+            FNR==NR {
+              if ($0 ~ /^mode:/) next
+              n=split($1, p, ":"); f=p[1]
+              split(p[2], rr, ","); split(rr[1], s, "."); split(rr[2], e, ".")
+              blkF[NB]=f; blkS[NB]=s[1]; blkE[NB]=e[1]; blkC[NB]=$3; NB++
+              next
+            }
+            {
+              f=$1; L=$2; coverable=0; covered=0
+              for (i=0; i<NB; i++) {
+                if (blkF[i]==f && L>=blkS[i] && L<=blkE[i]) {
+                  coverable=1; if (blkC[i]>0) covered=1
+                }
+              }
+              if (coverable) { tot++; if (covered) cov++ }
+            }
+            END {
+              if (tot==0) { print "patch=N/A"; print "covered=0"; print "coverable=0" }
+              else { printf "patch=%.1f%%\n", cov/tot*100; print "covered="cov; print "coverable="tot }
+            }
+          ' merged-coverage.out /tmp/changed-lines.txt > /tmp/patch-result.txt
+
+          PATCH=$(awk -F= '/^patch=/{print $2}' /tmp/patch-result.txt)
+          COVD=$(awk -F= '/^covered=/{print $2}' /tmp/patch-result.txt)
+          COVB=$(awk -F= '/^coverable=/{print $2}' /tmp/patch-result.txt)
+          echo "Patch coverage: ${PATCH} (${COVD}/${COVB} changed coverable lines)"
+          {
+            echo "patch=${PATCH}"
+            echo "covered=${COVD}"
+            echo "coverable=${COVB}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment
+        if: inputs.pr-number != '' && steps.coverage.outputs.total != 'N/A' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOTAL: ${{ steps.coverage.outputs.total }}
+          PATCH: ${{ steps.patch.outputs.patch }}
+          PATCH_COVD: ${{ steps.patch.outputs.covered }}
+          PATCH_COVB: ${{ steps.patch.outputs.coverable }}
+        run: |
+          MARKER="<!-- coverage-report-comment -->"
+          if [ -z "${PATCH:-}" ] || [ "${PATCH:-N/A}" = "N/A" ]; then
+            PATCH_LINE="**Patch coverage:** N/A (no coverable Go lines changed)"
+          else
+            PATCH_LINE="**Patch coverage:** ${PATCH} (${PATCH_COVD}/${PATCH_COVB} changed lines covered)"
+          fi
+          BODY=$(cat <<EOF
+          ${MARKER}
+
+          ### Go Test Coverage: **${TOTAL}**
+
+          ${PATCH_LINE}
+
+          See the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for the full per-package breakdown and downloadable HTML report.
+          EOF
+          )
+
+          COMMENT_ID=$(gh api --paginate \
+            "repos/${{ github.repository }}/issues/${{ inputs.pr-number }}/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body // "" | contains("<!-- coverage-report-comment -->"))) | .id' \
+            | tail -n1)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api \
+              --method PATCH \
+              "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              -f body="$BODY"
+          else
+            gh pr comment ${{ inputs.pr-number }} \
+              --repo "${{ github.repository }}" \
+              --body "$BODY"
+          fi
+
+      - name: Upload HTML coverage report
+        if: steps.coverage.outputs.total != 'N/A'
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: coverage-report-html
+          path: |
+            merged-coverage.out
+            coverage.html
+
+      - name: Upload to Codecov
+        if: steps.coverage.outputs.total != 'N/A'
+        uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
+        with:
+          files: merged-coverage.out
+          use_oidc: true
+          fail_ci_if_error: false
+          verbose: false
+
+      - name: Update coverage badge
+        if: github.ref == 'refs/heads/main' && steps.coverage.outputs.total != 'N/A'
+        env:
+          TOTAL: ${{ steps.coverage.outputs.total }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PCT=$(echo "$TOTAL" | tr -d '%')
+          if awk "BEGIN {exit !($PCT >= 75)}"; then COLOR="#4c1"
+          elif awk "BEGIN {exit !($PCT >= 60)}"; then COLOR="#97CA00"
+          elif awk "BEGIN {exit !($PCT >= 40)}"; then COLOR="#dfb317"
+          else COLOR="#e05d44"
+          fi
+
+          # Compute dynamic text widths: label "coverage" = 62px, value width ~7px/char
+          LABEL="coverage"
+          LABEL_W=62
+          VAL_LEN=${#TOTAL}
+          VAL_W=$(( VAL_LEN * 7 + 10 ))
+          TOTAL_W=$(( LABEL_W + VAL_W ))
+          LABEL_MID=$(( LABEL_W / 2 + 1 ))
+          VAL_MID=$(( LABEL_W + VAL_W / 2 ))
+
+          cat > /tmp/coverage.svg <<SVGEOF
+          <svg xmlns="http://www.w3.org/2000/svg" width="${TOTAL_W}" height="20">
+            <linearGradient id="s" x2="0" y2="100%">
+              <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+              <stop offset="1" stop-opacity=".1"/>
+            </linearGradient>
+            <rect rx="3" width="${TOTAL_W}" height="20" fill="#555"/>
+            <rect rx="3" x="${LABEL_W}" width="${VAL_W}" height="20" fill="${COLOR}"/>
+            <rect x="${LABEL_W}" width="4" height="20" fill="${COLOR}"/>
+            <rect rx="3" width="${TOTAL_W}" height="20" fill="url(#s)"/>
+            <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+              <text x="${LABEL_MID}" y="15" fill="#010101" fill-opacity=".3">${LABEL}</text>
+              <text x="${LABEL_MID}" y="14">${LABEL}</text>
+              <text x="${VAL_MID}" y="15" fill="#010101" fill-opacity=".3">${TOTAL}</text>
+              <text x="${VAL_MID}" y="14">${TOTAL}</text>
+            </g>
+          </svg>
+          SVGEOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          if git ls-remote --exit-code origin badges >/dev/null 2>&1; then
+            git fetch origin badges:badges --depth=1
+            git worktree add /tmp/badges-wt badges
+          else
+            git worktree add --detach /tmp/badges-wt HEAD
+            git -C /tmp/badges-wt checkout --orphan badges
+            git -C /tmp/badges-wt rm -rf . --quiet 2>/dev/null || true
+          fi
+
+          cp /tmp/coverage.svg /tmp/badges-wt/coverage.svg
+          git -C /tmp/badges-wt add coverage.svg
+          if git -C /tmp/badges-wt diff --staged --quiet; then
+            echo "Badge unchanged, skipping commit"
+          else
+            git -C /tmp/badges-wt commit -m "chore: update coverage badge [skip ci]"
+            git -C /tmp/badges-wt push origin HEAD:badges
+          fi

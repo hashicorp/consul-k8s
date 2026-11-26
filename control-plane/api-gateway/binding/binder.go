@@ -13,8 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -50,7 +48,7 @@ type BinderConfig struct {
 	// HTTPRoutes is a list of HTTPRoute objects that ought to be bound to the Gateway.
 	HTTPRoutes []gwv1.HTTPRoute
 	// TCPRoutes is a list of TCPRoute objects that ought to be bound to the Gateway.
-	TCPRoutes []gwv1alpha2.TCPRoute
+	TCPRoutes []gwv1.TCPRoute
 	// Pods are any pods that are part of the Gateway deployment.
 	Pods []corev1.Pod
 	// Service is the deployed service associated with the Gateway deployment.
@@ -129,8 +127,10 @@ func (b *Binder) Snapshot() *Snapshot {
 	var listenerValidation listenerValidationResults
 	var policyValidation gatewayPolicyValidationResults
 	var authFilterValidation authFilterValidationResults
+	var extProcFilterValidation extProcFilterValidationResults
 
 	authFilters := b.config.Resources.GetExternalAuthFilters()
+	extProcFilters := b.config.Resources.GetExternalExtProcFilters()
 	if !isGatewayDeleted {
 		var updatedGwcc bool
 
@@ -146,8 +146,25 @@ func (b *Binder) Snapshot() *Snapshot {
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
 		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, gatewayClassConfig)
+
+		// Warn about any listener-protocol annotations whose embedded section name
+		// does not match any listener in spec.listeners. These annotations are silently
+		// ignored by resolveListenerProtocol, so a typo produces no Consul protocol
+		// override and no other visible feedback. The warning makes the
+		// misconfiguration discoverable in controller logs.
+		if orphans := orphanedProtocolAnnotations(b.config.Gateway); len(orphans) > 0 {
+			b.config.Logger.Info(
+				"gateway has listener-protocol annotations that do not match any listener name "+
+					"and will be ignored; check that the annotation key contains the exact listener sectionName",
+				"gateway", b.config.Gateway.Name,
+				"namespace", b.config.Gateway.Namespace,
+				"orphanedAnnotationKeys", orphans,
+			)
+		}
+
 		policyValidation = validateGatewayPolicies(b.config.Gateway, b.config.Policies, b.config.Resources)
 		authFilterValidation = validateAuthFilters(authFilters, b.config.Resources)
+		extProcFilterValidation = validateExtProcFilters(extProcFilters)
 	}
 
 	// used for tracking how many routes have successfully bound to which listeners
@@ -276,6 +293,23 @@ func (b *Binder) Snapshot() *Snapshot {
 			if !common.RouteAuthFilterStatusesEqual(filterStatus, authFilter.Status) {
 				authFilter.Status = filterStatus
 				snapshot.Kubernetes.StatusUpdates.Add(authFilter)
+			}
+		}
+
+		for idx, extProcFilter := range extProcFilters {
+			if extProcFilter == nil {
+				continue
+			}
+			extProcFilter := extProcFilter
+
+			var filterStatus v1alpha1.Status
+			filterStatus.Conditions = extProcFilterValidation.Conditions(extProcFilter.Generation, idx)
+			filterStatus.LastSyncedTime = extProcFilter.Status.LastSyncedTime
+
+			// only mark the filter as needing a status update if there's a diff with its old status
+			if !common.RouteExtProcStatusesEqual(filterStatus, extProcFilter.Status) {
+				extProcFilter.Status = filterStatus
+				snapshot.Kubernetes.StatusUpdates.Add(extProcFilter)
 			}
 		}
 	} else {

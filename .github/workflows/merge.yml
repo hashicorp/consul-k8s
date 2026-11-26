@@ -16,6 +16,16 @@ env:
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  get-go-version:
+    uses: ./.github/workflows/reusable-get-go-version.yml
+
+  coverage:
+    needs:
+      - get-go-version
+    uses: ./.github/workflows/coverage.yml
+    with:
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
+
   test:
     name: test
     runs-on: ubuntu-latest

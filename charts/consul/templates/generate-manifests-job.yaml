@@ -16,7 +16,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+    "helm.sh/hook-delete-policy": hook-succeeded, before-hook-creation
 spec:
   template:
     metadata:
@@ -35,6 +35,7 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-generate-manifests
+      {{- include "consul.podSecurityContext" . | nindent 6 }}
       containers:
         - name: generate-manifests
           image: {{ .Values.global.imageK8S }}

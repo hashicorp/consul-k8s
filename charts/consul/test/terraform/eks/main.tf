@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.27.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12.0"
+    }
   }
 }
 
@@ -109,7 +113,11 @@ provider "kubernetes" {
   alias                  = "cluster0"
   host                   = module.eks[0].cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
-  token                  = data.aws_eks_cluster_auth.cluster[0].token
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    args        = ["eks", "get-token", "--cluster-name", module.eks[0].cluster_id]
+    command     = "aws"
+  }
 }
 
 # Provider for second cluster (cluster1)
@@ -120,7 +128,11 @@ provider "kubernetes" {
   # This avoids errors from empty string credentials.
   host                   = var.cluster_count > 1 ? module.eks[1].cluster_endpoint : null
   cluster_ca_certificate = var.cluster_count > 1 ? base64decode(module.eks[1].cluster_certificate_authority_data) : null
-  token                  = var.cluster_count > 1 ? data.aws_eks_cluster_auth.cluster[1].token : null
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    args        = var.cluster_count > 1 ? ["eks", "get-token", "--cluster-name", module.eks[1].cluster_id] : ["eks", "get-token", "--cluster-name", "dummy"]
+    command     = "aws"
+  }
 }
 
 
@@ -289,4 +301,183 @@ resource "aws_route" "peering_public_1" {
   route_table_id            = module.vpc[1].public_route_table_ids[count.index]
   destination_cidr_block    = module.vpc[0].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+# Deploy IBM Uptycs EDR agent to each EKS cluster.
+provider "helm" {
+  alias = "cluster_0"
+  kubernetes {
+    host                   = module.eks[0].cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
+    token                  = data.aws_eks_cluster_auth.cluster[0].token
+  }
+}
+
+provider "helm" {
+  alias = "cluster_1"
+  kubernetes {
+    host                   = var.cluster_count > 1 ? module.eks[1].cluster_endpoint : module.eks[0].cluster_endpoint
+    cluster_ca_certificate = base64decode(var.cluster_count > 1 ? module.eks[1].cluster_certificate_authority_data : module.eks[0].cluster_certificate_authority_data)
+    token                  = var.cluster_count > 1 ? data.aws_eks_cluster_auth.cluster[1].token : data.aws_eks_cluster_auth.cluster[0].token
+  }
+}
+
+# Cluster 0 EDR
+resource "helm_release" "uptycs_0" {
+  provider         = helm.cluster_0
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_0" {
+  depends_on       = [helm_release.uptycs_0]
+  provider         = helm.cluster_0
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = module.eks[0].cluster_id
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
+}
+
+# Cluster 1 EDR (only when cluster_count > 1)
+resource "helm_release" "uptycs_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  provider         = helm.cluster_1
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  depends_on       = [helm_release.uptycs_1]
+  provider         = helm.cluster_1
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = module.eks[1].cluster_id
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
+}
+
+# NOTE: 
+# Below private subnet routing and security group is required because of `TestVault_Partitions` test.
+# TestVault_Partitions is based on peered dualcluster setup where consul server and consul client exist in different cluster
+# and client agent need to join and participate in Serf LAN gossip with consul server, which required flat network (direct pod-to-pod route)
+# Otherwise, consul client agent won't be able to come up properly because Serf LAN gossip membership update fails due to no pod-to-pod ruote and this leads to test failure.
+# Ref: https://developer.hashicorp.com/consul/docs/deploy/server/k8s/multi-cluster#requirements
+
+# PRIVATE SUBNET ROUTES: 
+# Add routes to private route tables in VPC 0 to route traffic to VPC 1 through the peering connection.
+resource "aws_route" "peering_private_0" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[0].private_route_table_ids) : 0
+  route_table_id            = module.vpc[0].private_route_table_ids[count.index]
+  destination_cidr_block    = module.vpc[1].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+# Add routes to private route tables in VPC 1 to route traffic to VPC 0 through the peering connection.
+resource "aws_route" "peering_private_1" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[1].private_route_table_ids) : 0
+  route_table_id            = module.vpc[1].private_route_table_ids[count.index]
+  destination_cidr_block    = module.vpc[0].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+
+# EXTENDED SECURITY GROUP RULES
+# Allow ingress traffic from the other VPC's private subnets via the peering connection for workers.
+resource "aws_security_group_rule" "allowingressprivatefrom1-0" {
+  count             = var.cluster_count > 1 ? length(module.vpc[1].private_subnets_cidr_blocks) : 0
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = [module.vpc[1].private_subnets_cidr_blocks[count.index]]
+  security_group_id = module.eks[0].worker_security_group_id
+  description       = "Allow node traffic from cluster 1 private subnet ${count.index}"
+}
+
+resource "aws_security_group_rule" "allowingressprivatefrom0-1" {
+  count             = var.cluster_count > 1 ? length(module.vpc[0].private_subnets_cidr_blocks) : 0
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = [module.vpc[0].private_subnets_cidr_blocks[count.index]]
+  security_group_id = module.eks[1].worker_security_group_id
+  description       = "Allow node traffic from cluster 0 private subnet ${count.index}"
+}
+
+# Add identical cluster primary SG rules (EKS managed nodes usually inherit this).
+resource "aws_security_group_rule" "allowingressprivate_cluster1_0" {
+  count             = var.cluster_count > 1 ? length(module.vpc[1].private_subnets_cidr_blocks) : 0
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = [module.vpc[1].private_subnets_cidr_blocks[count.index]]
+  security_group_id = module.eks[0].cluster_primary_security_group_id
+  description       = "Allow cluster node traffic from cluster 1 private subnet"
+}
+
+resource "aws_security_group_rule" "allowingressprivate_cluster0_1" {
+  count             = var.cluster_count > 1 ? length(module.vpc[0].private_subnets_cidr_blocks) : 0
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = [module.vpc[0].private_subnets_cidr_blocks[count.index]]
+  security_group_id = module.eks[1].cluster_primary_security_group_id
+  description       = "Allow cluster node traffic from cluster 0 private subnet"
 }

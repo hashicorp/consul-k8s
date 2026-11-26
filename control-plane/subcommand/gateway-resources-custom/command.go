@@ -32,7 +32,7 @@ import (
 
 const (
 	gatewayConfigFilename  = "/consul/config/config-ocp.yaml"
-	resourceConfigFilename = "/consul/config/resources-ocp.json"
+	resourceConfigFilename = "/consul/config/resources.json"
 	meshGatewayComponent   = "consul-mesh-gateway"
 )
 

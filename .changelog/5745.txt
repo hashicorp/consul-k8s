@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: Deregister service instances of pods in a terminal phase (e.g. evicted by the kubelet) from Consul so Envoy stops retaining their IPs and overflowing traffic to peer failover targets.
+```

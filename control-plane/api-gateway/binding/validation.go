@@ -500,6 +500,48 @@ func validateListeners(gateway gwv1.Gateway, listeners []gwv1.Listener, resource
 	return results
 }
 
+// orphanedProtocolAnnotations returns the annotation keys on gateway whose
+// embedded listener name does not match any listener in gateway.Spec.Listeners.
+//
+// The ListenerProtocol annotation is keyed as:
+//
+//	"api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol"
+//
+// If a user writes a typo in <sectionName> the annotation is silently ignored
+// by resolveListenerProtocol.  This function surfaces those cases so the
+// controller can log a warning, making the misconfiguration visible without
+// blocking reconciliation.
+func orphanedProtocolAnnotations(gateway gwv1.Gateway) []string {
+	// Build a set of known listener names for O(1) lookup.
+	known := make(map[string]struct{}, len(gateway.Spec.Listeners))
+	for _, l := range gateway.Spec.Listeners {
+		known[string(l.Name)] = struct{}{}
+	}
+
+	var orphans []string
+	for key := range gateway.Annotations {
+		if !strings.HasPrefix(key, common.ListenerProtocolAnnotationPrefix) {
+			continue
+		}
+		if !strings.HasSuffix(key, common.ListenerProtocolAnnotationSuffix) {
+			continue
+		}
+		// Guard against keys that are too short to contain a section name
+		// between the prefix and suffix, e.g. the prefix and suffix overlapping
+		// in "api-gateway.consul.hashicorp.com/listener-protocol".  Slicing
+		// those would panic, and they carry no section name to orphan.
+		if len(key) <= len(common.ListenerProtocolAnnotationPrefix)+len(common.ListenerProtocolAnnotationSuffix) {
+			continue
+		}
+		// Extract the embedded section name between the prefix and suffix.
+		inner := key[len(common.ListenerProtocolAnnotationPrefix) : len(key)-len(common.ListenerProtocolAnnotationSuffix)]
+		if _, ok := known[inner]; !ok {
+			orphans = append(orphans, key)
+		}
+	}
+	return orphans
+}
+
 func validateListenerAllowedRouteKinds(allowedRoutes *gwv1.AllowedRoutes) error {
 	if allowedRoutes == nil {
 		return nil
@@ -603,6 +645,12 @@ func checkIfReferencesMissingJWTProvider(filter gwv1.HTTPRouteFilter, resources 
 	}
 	authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
 	if !ok {
+		return
+	}
+
+	// A RouteAuthFilter may configure only ext_authz (no JWT), in which case
+	// there are no JWT providers to validate.
+	if authFilter.Spec.JWT == nil {
 		return
 	}
 
@@ -785,9 +833,13 @@ func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *com
 		}
 		var result authFilterValidationResult
 		missingJWTProviders := make([]string, 0)
-		for _, provider := range filter.Spec.JWT.Providers {
-			if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
-				missingJWTProviders = append(missingJWTProviders, provider.Name)
+		// A RouteAuthFilter may configure only ext_authz (no JWT), so guard
+		// against a nil JWT spec before validating JWT providers.
+		if filter.Spec.JWT != nil {
+			for _, provider := range filter.Spec.JWT.Providers {
+				if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
+					missingJWTProviders = append(missingJWTProviders, provider.Name)
+				}
 			}
 		}
 
@@ -800,6 +852,28 @@ func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *com
 			result.acceptedErr = errRouteFilterNotAcceptedDueToInvalidRefs
 		}
 
+		results = append(results, result)
+	}
+	return results
+}
+
+// validateExtProcFilters checks each RouteExtProc for internal consistency between
+// its Mode and Overrides. Invalid filters are surfaced as an unaccepted status
+// condition rather than being silently dropped. Results are index-aligned with the
+// input slice (nil entries produce a zero-value, accepted result).
+func validateExtProcFilters(extProcFilters []*v1alpha1.RouteExtProc) extProcFilterValidationResults {
+	results := make(extProcFilterValidationResults, 0, len(extProcFilters))
+
+	for _, filter := range extProcFilters {
+		var result extProcFilterValidationResult
+		if filter != nil {
+			switch strings.ToLower(filter.Spec.Mode) {
+			case "enabled", "disabled":
+				if filter.Spec.Overrides != nil {
+					result.acceptedErr = errRouteExtProcOverridesWithoutOverrideMode
+				}
+			}
+		}
 		results = append(results, result)
 	}
 	return results

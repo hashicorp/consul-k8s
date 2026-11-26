@@ -237,6 +237,17 @@ func TestVault_Partitions(t *testing.T) {
 	}
 	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
+	featureGateSetRole := FeatureGateSetRole
+	featureGateSetServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, FeatureGateSetRole)
+	featureGateSetAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  featureGateSetServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      KubernetesAuthMethodPath,
+		RoleName:            featureGateSetRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, serverPKIConfig.PolicyName),
+	}
+	featureGateSetAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
 	// allow all components to access server ca
 	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
@@ -270,6 +281,15 @@ func TestVault_Partitions(t *testing.T) {
 		PolicyNames:         partitionTokenSecret.PolicyName,
 	}
 	aclAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+
+	featureGateSetAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+		ServiceAccountName:  featureGateSetServiceAccountName,
+		KubernetesNamespace: ns,
+		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+		RoleName:            featureGateSetRole,
+		PolicyNames:         fmt.Sprintf("%s,%s", partitionTokenSecret.PolicyName, serverPKIConfig.PolicyName),
+	}
+	featureGateSetAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
 	// partition init
 	adminPartitionsRole := "partition-init"
@@ -307,6 +327,7 @@ func TestVault_Partitions(t *testing.T) {
 		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
 		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
 		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
+		"global.secretsBackend.vault.featureGateSetRole":   featureGateSetRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecretName,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
@@ -405,6 +426,16 @@ func TestVault_Partitions(t *testing.T) {
 	}
 
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
+
+	// Pre-flight: ensure the primary's expose-servers Service is actually
+	// reachable on its HTTPS port before installing the workload cluster.
+	// The workload install fires a `partition-init` pre-install Job (and later
+	// a `server-acl-init` post-upgrade Job) that calls this address; both are
+	// gated by helm's 15m hook timeout. Block here so LB cold-start (DNS,
+	// ELB registration, SG activation) surfaces deterministically here
+	// instead of as a "failed pre-install: timed out" inside helm. No-op on
+	// Kind.
+	k8s.WaitForServiceReachable(t, cfg, serverClusterCtx, partitionServiceName, 8501)
 
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterCtx, cfg, consulReleaseName)

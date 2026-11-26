@@ -1,0 +1,33 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Enterprise zero-touch TLS termination: the gateway opts into Consul-managed
+# TLS via the tls-enabled annotation with no custom certificateRef.  The
+# auto-issued Connect leaf cert carries namespace+partition-scoped wildcard SANs
+# (*.api-gateway.<ns>.<partition>.consul) as well as any hostnames declared on
+# bound HTTPRoutes (e.g. demo.example.com).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: ent-tls-termination-gateway
+  labels:
+    component: api-gateway
+  annotations:
+    consul.hashicorp.com/tls-enabled: "true"
+spec:
+  gatewayClassName: ent-tls-termination-gateway-class
+  listeners:
+  - protocol: HTTPS
+    port: 8443
+    name: https
+    tls:
+      mode: Terminate
+      # No certificateRefs: the leaf cert is issued by Consul Connect. Gateway
+      # API >= v1.4 CRDs enforce that a Terminate listener sets certificateRefs
+      # or options, so pin the (default) TLS_AUTO minimum version to satisfy
+      # that rule without altering the gateway's TLS behaviour.
+      options:
+        api-gateway.consul.hashicorp.com/tls_min_version: "TLS_AUTO"
+    allowedRoutes:
+      namespaces:
+        from: "All"

@@ -104,7 +104,19 @@ func (e entryComparator) apiGatewaysEqual(a, b api.APIGatewayConfigEntry) bool {
 		e.namespaceA == e.namespaceB &&
 		e.partitionA == e.partitionB &&
 		maps.Equal(a.Meta, b.Meta) &&
-		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual)
+		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual) &&
+		a.TLS.Enabled == b.TLS.Enabled &&
+		apiGatewayExtAuthzEqual(a.ExtAuthz, b.ExtAuthz)
+}
+
+func apiGatewayExtAuthzEqual(a, b *api.APIGatewayExtAuthz) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Enabled == b.Enabled
 }
 
 func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) bool {
@@ -231,7 +243,13 @@ func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual)
+		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual) &&
+		slices.EqualFunc(a.Filters.ExtProc, b.Filters.ExtProc, e.extProcFiltersEqual) &&
+		bothNilOrEqualFunc(a.Filters.ExtAuthz, b.Filters.ExtAuthz, extAuthzFiltersEqual)
+}
+
+func extAuthzFiltersEqual(a, b api.HTTPRouteExtAuthzFilter) bool {
+	return a.Enabled == b.Enabled
 }
 
 func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
@@ -253,6 +271,28 @@ func (e entryComparator) httpMatchesEqual(a, b api.HTTPMatch) bool {
 
 func (e entryComparator) httpPathMatchesEqual(a, b api.HTTPPathMatch) bool {
 	return a.Match == b.Match && a.Value == b.Value
+}
+
+func (e entryComparator) extProcFiltersEqual(a, b api.ExtProcFilter) bool {
+	return a.StatPrefix == b.StatPrefix &&
+		a.Mode == b.Mode &&
+		bothNilOrEqualFunc(a.Overrides, b.Overrides, e.extProcOverridesEqual)
+}
+
+func (e entryComparator) extProcOverridesEqual(a, b api.ExtProcOverrides) bool {
+	return bothNilOrEqualFunc(a.Processing, b.Processing, e.extProcProcessingEqual)
+}
+
+func (e entryComparator) extProcProcessingEqual(a, b api.ExtProcProcessing) bool {
+	return bothNilOrEqualFunc(a.Request, b.Request, e.extProcProcessingDirectionEqual) &&
+		bothNilOrEqualFunc(a.Response, b.Response, e.extProcProcessingDirectionEqual)
+}
+
+func (e entryComparator) extProcProcessingDirectionEqual(a, b api.ExtProcProcessingDirection) bool {
+	return a.HeadersMode == b.HeadersMode &&
+		a.BodyMode == b.BodyMode &&
+		a.TrailersMode == b.TrailersMode &&
+		a.MaxBodyBytes == b.MaxBodyBytes
 }
 
 func (e entryComparator) httpHeaderMatchesEqual(a, b api.HTTPHeaderMatch) bool {

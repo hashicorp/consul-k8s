@@ -10,7 +10,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func TestBindResults_Condition(t *testing.T) {
@@ -260,4 +263,58 @@ func TestAuthFilterValidationResult_Conditions(t *testing.T) {
 			require.EqualValues(t, tc.expected, tc.results.Conditions(generation))
 		})
 	}
+}
+
+func TestExtProcFilterValidationResult_Conditions(t *testing.T) {
+	t.Parallel()
+	var generation int64 = 7
+	for name, tc := range map[string]struct {
+		result   extProcFilterValidationResult
+		expected []v1alpha1.Condition
+	}{
+		"accepted": {
+			result: extProcFilterValidationResult{},
+			expected: []v1alpha1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             corev1.ConditionTrue,
+					Reason:             "Accepted",
+					Message:            "route ext_proc filter accepted",
+					LastTransitionTime: timeFunc(),
+				},
+			},
+		},
+		"not accepted due to overrides without override mode": {
+			result: extProcFilterValidationResult{
+				acceptedErr: errRouteExtProcOverridesWithoutOverrideMode,
+			},
+			expected: []v1alpha1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             corev1.ConditionFalse,
+					Reason:             "Invalid",
+					Message:            errRouteExtProcOverridesWithoutOverrideMode.Error(),
+					LastTransitionTime: timeFunc(),
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.EqualValues(t, tc.expected, tc.result.Conditions(generation))
+		})
+	}
+}
+
+func TestExtProcFilterValidationResults_Conditions(t *testing.T) {
+	t.Parallel()
+	var generation int64 = 3
+
+	results := extProcFilterValidationResults{
+		extProcFilterValidationResult{},
+		extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+	}
+
+	require.Equal(t, corev1.ConditionTrue, results.Conditions(generation, 0)[0].Status)
+	require.Equal(t, corev1.ConditionFalse, results.Conditions(generation, 1)[0].Status)
+	require.Equal(t, errRouteExtProcOverridesWithoutOverrideMode.Error(), results.Conditions(generation, 1)[0].Message)
 }

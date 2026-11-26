@@ -1,0 +1,22 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  labels:
+    component: api-gateway
+  annotations:
+    # Gateway-wide ext_authz posture. "disabled" => APIGatewayConfigEntry.ExtAuthz.Enabled=false,
+    # meaning routes default to skipping the ext_authz check and must opt in individually.
+    consul.hashicorp.com/ext-authz: "disabled"
+spec:
+  gatewayClassName: gateway-class
+  listeners:
+  - protocol: HTTP
+    port: 80
+    name: http
+    allowedRoutes:
+      namespaces:
+        from: "All"

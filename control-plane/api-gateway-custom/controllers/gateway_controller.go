@@ -425,12 +425,6 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			common.ComponentLabel: "api-gateway-consul",
 		}),
 	)
-	gwPredicate, _ := predicate.LabelSelectorPredicate(
-		*metav1.SetAsLabelSelector(map[string]string{
-			common.ComponentLabel: "api-gateway-consul",
-		}),
-	)
-
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
@@ -461,7 +455,13 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 
 	builder := ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-consul").
-		For(&gwv1beta1.Gateway{}, builder.WithPredicates(gwPredicate)).
+		// Deliberately unfiltered. See the equivalent comment in
+		// control-plane/api-gateway/controllers/gateway_controller.go: the
+		// ComponentLabel is set on generated resources, not on the
+		// user-authored Gateway CR, so filtering the root watch on it drops
+		// every Gateway event. Reconcile does the authoritative
+		// ControllerName ownership check.
+		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).

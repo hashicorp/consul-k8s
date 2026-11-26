@@ -5,7 +5,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func init() {
@@ -78,7 +78,7 @@ type PolicyTargetReference struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// SectionName refers to the listener targeted by this policy.
-	SectionName *gwv1beta1.SectionName `json:"sectionName,omitempty"`
+	SectionName *gwv1.SectionName `json:"sectionName,omitempty"`
 }
 
 type GatewayPolicyConfig struct {

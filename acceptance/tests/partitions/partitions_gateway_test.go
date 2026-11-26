@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // Test that Gateway works in a default and ACLsEnabled installations for X-Partition and in-partition networking.
@@ -125,6 +125,11 @@ func TestPartitions_Gateway(t *testing.T) {
 	}
 
 	helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
+
+	// Pre-flight: wait for the primary's expose-servers Service to be
+	// reachable before installing the secondary cluster (see other partition
+	// tests for rationale). No-op on Kind.
+	k8s.WaitForServiceReachable(t, cfg, defaultPartitionClusterContext, partitionServiceName, 8501)
 
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
@@ -253,7 +258,7 @@ func TestPartitions_Gateway(t *testing.T) {
 	var gatewayAddress string
 	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: staticServerNamespace}, &gateway)
 		require.NoError(r, err)
 

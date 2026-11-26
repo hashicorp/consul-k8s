@@ -1,0 +1,101 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# HTTPRoutes for the SINGLE-ext-proc gateway (api-gateway-single).
+#
+# With a single always-on gateway ext-proc, the FIRST request (no x-route-target)
+# lands on default-route -> service-a. ext-proc-http consults route-decider, which
+# maps the :path (suffix /b->service-b, /c->service-c, else service-a) to a
+# target, sets x-route-target and clears the route cache. Envoy re-evaluates and
+# the header-matched route below forwards to the chosen MeshService. No
+# RouteExtProc filters are needed because the single instance runs on every route.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: single-service-a-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway-single
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          headers:
+            - name: x-route-target
+              value: service-a
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-a-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: single-service-b-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway-single
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          headers:
+            - name: x-route-target
+              value: service-b
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-b-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: single-service-c-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway-single
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          headers:
+            - name: x-route-target
+              value: service-c
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-c-mesh
+          namespace: default
+          port: 8080
+---
+# Default route: carries the initial (header-less) request into the ext-proc
+# decision path and serves as the fallback target.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: single-default-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway-single
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-a-mesh
+          namespace: default
+          port: 8080

@@ -33,3 +33,40 @@ variable "kubernetes_version" {
   default     = "1.32"
   description = "Kubernetes version supported on EKS"
 }
+
+# ----------------------------------------------------------------------------
+# HC-COMPUTE-010 / SECVULN-44200 security baseline
+#
+# The Uptycs EDR agent (k8sosquery DaemonSet + kubequery) is deployed to every
+# acceptance cluster so the ephemeral worker nodes are covered by the security
+# baseline, mirroring the AKS and GKE acceptance modules.
+# ----------------------------------------------------------------------------
+
+variable "uptycs_owner" {
+  default     = "hc-team-consul-dg@ibm.com"
+  description = "Owner email for Uptycs EDR agent tags."
+}
+
+variable "uptycs_enroll_secret" {
+  default     = ""
+  description = "Uptycs enroll secret containing customer identifiers."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_ca_bundle" {
+  default     = ""
+  description = "Base64-encoded CA bundle for kubequery webhook."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_tls_crt" {
+  default     = ""
+  description = "Base64-encoded TLS certificate for kubequery webhook server."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_tls_key" {
+  default     = ""
+  description = "Base64-encoded TLS private key for kubequery webhook server."
+  sensitive   = true
+}

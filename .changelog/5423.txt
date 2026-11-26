@@ -1,0 +1,4 @@
+```release-note:bug
+control-plane: fix mesh-gateway ACL policy generation for Admin Partition failover so Sameness Group clusters can form across local partitions.
+```
+

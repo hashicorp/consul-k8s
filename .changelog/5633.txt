@@ -1,0 +1,3 @@
+```release-note:feature
+helm: Add `global.globalRegistry` Helm values to configure Consul server integration with an external global registry service, including support for authenticating via a Kubernetes secret token.
+```

@@ -1,0 +1,36 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Two independent sets of Prometheus metrics, one served on each of the
+# application's ports. The metric families are deliberately disjoint so a test
+# can prove that both ports were scraped and merged, rather than just one.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: static-multiport-metrics-app
+data:
+  # Served on port 8080 at /metrics.
+  metrics: |
+    # HELP app_http_requests_total Requests served by the primary API.
+    # TYPE app_http_requests_total counter
+    app_http_requests_total{port="8080",code="200"} 1027
+    app_http_requests_total{port="8080",code="500"} 3
+    # HELP app_http_request_duration_seconds Request latency on the primary API.
+    # TYPE app_http_request_duration_seconds summary
+    app_http_request_duration_seconds{port="8080",quantile="0.5"} 0.012
+    app_http_request_duration_seconds{port="8080",quantile="0.99"} 0.310
+    # HELP app_build_info Build metadata for the primary API.
+    # TYPE app_build_info gauge
+    app_build_info{port="8080",version="1.4.2"} 1
+  # Served on port 9090 at /alt-metrics.
+  alt-metrics: |
+    # HELP worker_jobs_processed_total Jobs processed by the background worker.
+    # TYPE worker_jobs_processed_total counter
+    worker_jobs_processed_total{port="9090",queue="default"} 88
+    worker_jobs_processed_total{port="9090",queue="priority"} 14
+    # HELP worker_queue_depth Current depth of the worker queue.
+    # TYPE worker_queue_depth gauge
+    worker_queue_depth{port="9090",queue="default"} 7
+    # HELP worker_last_success_timestamp_seconds Unix time of last successful job.
+    # TYPE worker_last_success_timestamp_seconds gauge
+    worker_last_success_timestamp_seconds{port="9090"} 1757000000

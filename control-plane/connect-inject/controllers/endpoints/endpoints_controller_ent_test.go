@@ -18,9 +18,11 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -29,8 +31,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
-// TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
-// object. The cases test a basic endpoints object with two addresses. This test verifies that the services and their TTL
+// TestReconcileCreateEndpointWithNamespaces tests service registration from an EndpointSlice
+// with two addresses. This test verifies that the services and their TTL
 // health checks are created in the expected Consul namespace for various combinations of namespace flags.
 // This test covers Controller.createServiceRegistrations.
 func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
@@ -91,30 +93,30 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createPodWithNamespace("pod1", testCase.SourceKubeNS, "1.2.3.4", true, true)
 				pod2 := createPodWithNamespace("pod2", testCase.SourceKubeNS, "2.2.3.4", true, true)
-				endpoints := &corev1.Endpoints{
+				endpoints := &discoveryv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
 						Namespace: testCase.SourceKubeNS,
+						Labels:    map[string]string{discoveryv1.LabelServiceName: "service-created"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					AddressType: discoveryv1.AddressTypeIPv4,
+					Endpoints: []discoveryv1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP: "1.2.3.4",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod1",
-										Namespace: testCase.SourceKubeNS,
-									},
-								},
-								{
-									IP: "2.2.3.4",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "pod2",
-										Namespace: testCase.SourceKubeNS,
-									},
-								},
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Addresses:  []string{"1.2.3.4"},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod1",
+								Namespace: testCase.SourceKubeNS,
+							},
+						},
+						{
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Addresses:  []string{"2.2.3.4"},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "pod2",
+								Namespace: testCase.SourceKubeNS,
 							},
 						},
 					},
@@ -216,7 +218,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 			// Create fake k8s client.
 			k8sObjects := append(setup.k8sObjects(), &ns, &node)
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(k8sObjects...).Build()
 
 			// Create test consulServer server
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
@@ -244,6 +246,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 				Name:      "service-created",
 			}
 
+			requireEndpointSliceCount(t, fakeClient, namespacedName, 1)
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
@@ -354,38 +357,39 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 						},
 					},
 				}
-				endpoints := &corev1.Endpoints{
+				endpoints := &discoveryv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "gateway",
 						Namespace: "default",
+						Labels:    map[string]string{discoveryv1.LabelServiceName: "gateway"},
 					},
-					Subsets: []corev1.EndpointSubset{
+					AddressType: discoveryv1.AddressTypeIPv4,
+					Endpoints: []discoveryv1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{
-								{
-									IP: "3.3.3.3",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "mesh-gateway",
-										Namespace: "default",
-									},
-								},
-								{
-									IP: "4.4.4.4",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "terminating-gateway",
-										Namespace: "default",
-									},
-								},
-								{
-									IP: "5.5.5.5",
-									TargetRef: &corev1.ObjectReference{
-										Kind:      "Pod",
-										Name:      "ingress-gateway",
-										Namespace: "default",
-									},
-								},
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Addresses:  []string{"3.3.3.3"},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "mesh-gateway",
+								Namespace: "default",
+							},
+						},
+						{
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Addresses:  []string{"4.4.4.4"},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "terminating-gateway",
+								Namespace: "default",
+							},
+						},
+						{
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Addresses:  []string{"5.5.5.5"},
+							TargetRef: &corev1.ObjectReference{
+								Kind:      "Pod",
+								Name:      "ingress-gateway",
+								Namespace: "default",
 							},
 						},
 					},
@@ -477,7 +481,7 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Create fake k8s client.
 			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(append(setup.k8sObjects(), &node)...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(append(setup.k8sObjects(), &node)...).Build()
 
 			// Create testCase Consul server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
@@ -502,6 +506,7 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 				Name:      "gateway",
 			}
 
+			requireEndpointSliceCount(t, fakeClient, namespacedName, 1)
 			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: namespacedName,
 			})
@@ -615,22 +620,21 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true, true)
-					endpoint := &corev1.Endpoints{
+					endpoint := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
-						Subsets: []corev1.EndpointSubset{
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints: []discoveryv1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP: "4.4.4.4",
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+								Addresses:  []string{"4.4.4.4"},
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
 							},
 						},
@@ -694,22 +698,21 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "4.4.4.4", true, true)
 					pod1.Annotations[constants.AnnotationService] = "different-consul-svc-name"
-					endpoint := &corev1.Endpoints{
+					endpoint := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
-						Subsets: []corev1.EndpointSubset{
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints: []discoveryv1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP: "4.4.4.4",
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+								Addresses:  []string{"4.4.4.4"},
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
 							},
 						},
@@ -773,30 +776,30 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
 					pod2 := createPodWithNamespace("pod2", ts.SourceKubeNS, "2.2.3.4", true, true)
-					endpointWithTwoAddresses := &corev1.Endpoints{
+					endpointWithTwoAddresses := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
-						Subsets: []corev1.EndpointSubset{
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints: []discoveryv1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP: "1.2.3.4",
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
-									{
-										IP: "2.2.3.4",
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod2",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+								Addresses:  []string{"1.2.3.4"},
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
+								},
+							},
+							{
+								Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+								Addresses:  []string{"2.2.3.4"},
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod2",
+									Namespace: ts.SourceKubeNS,
 								},
 							},
 						},
@@ -869,22 +872,21 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
-					endpoint := &corev1.Endpoints{
+					endpoint := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
-						Subsets: []corev1.EndpointSubset{
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints: []discoveryv1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP: "1.2.3.4",
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+								Addresses:  []string{"1.2.3.4"},
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
 							},
 						},
@@ -984,22 +986,21 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
 					pod1.Annotations[constants.AnnotationService] = "different-consul-svc-name"
-					endpoint := &corev1.Endpoints{
+					endpoint := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
-						Subsets: []corev1.EndpointSubset{
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints: []discoveryv1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP: "1.2.3.4",
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+								Addresses:  []string{"1.2.3.4"},
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
 							},
 						},
@@ -1099,11 +1100,14 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				name:          "Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
-					endpoint := &corev1.Endpoints{
+					endpoint := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints:   []discoveryv1.Endpoint{},
 					}
 					return []runtime.Object{endpoint}
 				},
@@ -1188,11 +1192,14 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				name:          "Different Consul service name: Consul has instances that are not in the endpoints, and the endpoints has no addresses.",
 				consulSvcName: "different-consul-svc-name",
 				k8sObjects: func() []runtime.Object {
-					endpoint := &corev1.Endpoints{
+					endpoint := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints:   []discoveryv1.Endpoint{},
 					}
 					return []runtime.Object{endpoint}
 				},
@@ -1276,22 +1283,21 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod2 := createPodWithNamespace("pod2", ts.SourceKubeNS, "4.4.4.4", true, true)
-					endpoint := &corev1.Endpoints{
+					endpoint := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
-						Subsets: []corev1.EndpointSubset{
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints: []discoveryv1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP: "4.4.4.4",
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod2",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+								Addresses:  []string{"4.4.4.4"},
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod2",
+									Namespace: ts.SourceKubeNS,
 								},
 							},
 						},
@@ -1370,22 +1376,21 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				consulSvcName: "service-updated",
 				k8sObjects: func() []runtime.Object {
 					pod1 := createPodWithNamespace("pod1", ts.SourceKubeNS, "1.2.3.4", true, true)
-					endpoint := &corev1.Endpoints{
+					endpoint := &discoveryv1.EndpointSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "service-updated",
 							Namespace: ts.SourceKubeNS,
+							Labels:    map[string]string{discoveryv1.LabelServiceName: "service-updated"},
 						},
-						Subsets: []corev1.EndpointSubset{
+						AddressType: discoveryv1.AddressTypeIPv4,
+						Endpoints: []discoveryv1.Endpoint{
 							{
-								Addresses: []corev1.EndpointAddress{
-									{
-										IP: "1.2.3.4",
-										TargetRef: &corev1.ObjectReference{
-											Kind:      "Pod",
-											Name:      "pod1",
-											Namespace: ts.SourceKubeNS,
-										},
-									},
+								Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+								Addresses:  []string{"1.2.3.4"},
+								TargetRef: &corev1.ObjectReference{
+									Kind:      "Pod",
+									Name:      "pod1",
+									Namespace: ts.SourceKubeNS,
 								},
 							},
 						},
@@ -1516,7 +1521,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 				// Create fake k8s client.
 				k8sObjects := append(tt.k8sObjects(), &ns, &node)
-				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+				fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(k8sObjects...).Build()
 
 				// Create test consulServer server
 				adminToken := "123e4567-e89b-12d3-a456-426614174000"
@@ -1606,6 +1611,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 					Name:      "service-updated",
 				}
 
+				requireEndpointSliceCount(t, fakeClient, namespacedName, 1)
 				resp, err := ep.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,
 				})
@@ -1668,7 +1674,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 	}
 }
 
-// Tests deleting an Endpoints object, with and without matching Consul and K8s service names when Consul namespaces are enabled.
+// Tests deleting all EndpointSlices, with and without matching Consul and K8s service names when Consul namespaces are enabled.
 // This test covers Controller.deregisterService when the map is nil (not selectively deregistered).
 func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 	t.Parallel()
@@ -1822,7 +1828,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 			t.Run(fmt.Sprintf("%s:%s", name, tt.name), func(t *testing.T) {
 				node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 				// Create fake k8s client.
-				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(&node).Build()
+				fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(&node).Build()
 
 				// Create test consulServer server
 				adminToken := "123e4567-e89b-12d3-a456-426614174000"
@@ -1926,7 +1932,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 	}
 }
 
-// Tests deleting an Endpoints object, with and without matching Consul and K8s service names when Consul namespaces are enabled.
+// Tests deleting all EndpointSlices, with and without matching Consul and K8s service names when Consul namespaces are enabled.
 // This test covers Controller.deregisterService when the map is nil (not selectively deregistered).
 func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 	t.Parallel()
@@ -2119,7 +2125,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 			t.Run(fmt.Sprintf("%s:%s", name, tt.name), func(t *testing.T) {
 				// Create fake k8s client.
 				node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(&node).Build()
+				fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(&node).Build()
 
 				// Create test Consul server.
 				adminToken := "123e4567-e89b-12d3-a456-426614174000"

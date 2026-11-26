@@ -45,6 +45,15 @@ service "consul-snapshot" {
 const entLicenseRules = `operator = "write"`
 const entPartitionLicenseRules = `acl = "write"`
 
+// connectInjectOperatorReadRules grants global operator:read so the connect-inject
+// controller can call /v1/operator/license to detect whether Consul is enterprise.
+// `operator` is a global-scope resource and cannot be granted to a partition-scoped
+// token, so this is created as a separate global policy attached to a token issued
+// in the default partition. The connect-inject controller uses this token only for
+// the IsEnterpriseDistribution check; all other Consul API calls continue to use
+// the partition-scoped connect-inject token.
+const connectInjectOperatorReadRules = `operator = "read"`
+
 // The partition token is utilized by the partition-init job and server-acl-init in
 // non-default partitions. This token requires permissions to create partitions, read the
 // agent endpoint during startup and have the ability to create an auth-method within a namespace
@@ -152,15 +161,38 @@ func (c *Command) meshGatewayRules() (string, error) {
 	// namespaces, it needs access to all namespaces. For peering, it requires the ability to list all peers which in
 	// enterprise requires peering:read on all partitions or in OSS requires a top level peering:read. Since we cannot
 	// determine whether we are using an enterprise or OSS consul image based on whether peering is enabled, we include
-	// both permissions here.
+	// both permissions here. When admin partitions are enabled, the default partition's mesh gateway additionally needs
+	// service and node read permissions under partition_prefix so it can form clusters for failover targets in other
+	// local partitions (e.g. Sameness Group failover). The partition_prefix block is only emitted for the default
+	// partition because partition rules are not valid in a policy scoped to a non-default admin partition; non-default
+	// partitions fall back to local namespace-scoped reads.
 	meshGatewayRulesTpl := `mesh = "write"
 {{- if .EnablePeering }}
 peering = "read"
+{{- end }}
 {{- if eq .PartitionName "default" }}
 partition_prefix "" {
+{{- if .EnablePeering }}
   peering = "read"
-}
 {{- end }}
+{{- if .EnableNamespaces }}
+  namespace_prefix "" {
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
+  }
+{{- else }}
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+{{- end }}
+}
 {{- end }}
 {{- if .EnableNamespaces }}
 namespace "default" {
@@ -170,6 +202,9 @@ namespace "default" {
   }
 {{- if .EnableNamespaces }}
 }
+{{- end }}
+{{- if ne .PartitionName "default" }}
+{{- if .EnableNamespaces }}
 namespace_prefix "" {
 {{- end }}
   node_prefix "" {
@@ -180,6 +215,7 @@ namespace_prefix "" {
   }
 {{- if .EnableNamespaces }}
 }
+{{- end }}
 {{- end }}
 `
 

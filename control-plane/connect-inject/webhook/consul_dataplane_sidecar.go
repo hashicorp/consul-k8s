@@ -451,16 +451,32 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		args = append(args, "-telemetry-prom-merge-port="+mergedMetricsPort)
 
-		serviceMetricsPath := w.MetricsConfig.ServiceMetricsPath(pod)
-		serviceMetricsPort, err := w.MetricsConfig.ServiceMetricsPort(pod)
+		serviceMetricsEndpoints, err := w.MetricsConfig.ServiceMetricsEndpoints(pod)
 		if err != nil {
-			return nil, fmt.Errorf("unable to determine if service metrics port: %w", err)
+			return nil, fmt.Errorf("unable to determine service metrics endpoints: %w", err)
 		}
 
-		if serviceMetricsPath != "" && serviceMetricsPort != "" {
-			addr := constants.Getv4orv6Str("127.0.0.1", "::1")
-			addr = net.JoinHostPort(addr, serviceMetricsPort)
-			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://%s%s", addr, serviceMetricsPath))
+		if len(serviceMetricsEndpoints) > 0 {
+			// The service-metrics-endpoints annotation lets a container expose
+			// metrics on more than one port. consul-dataplane accepts
+			// -telemetry-prom-service-metrics-url once per scrape target.
+			host := constants.Getv4orv6Str("127.0.0.1", "::1")
+			for _, endpoint := range serviceMetricsEndpoints {
+				addr := net.JoinHostPort(host, endpoint.Port)
+				args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://%s%s", addr, endpoint.Path))
+			}
+		} else {
+			serviceMetricsPath := w.MetricsConfig.ServiceMetricsPath(pod)
+			serviceMetricsPort, err := w.MetricsConfig.ServiceMetricsPort(pod)
+			if err != nil {
+				return nil, fmt.Errorf("unable to determine if service metrics port: %w", err)
+			}
+
+			if serviceMetricsPath != "" && serviceMetricsPort != "" {
+				addr := constants.Getv4orv6Str("127.0.0.1", "::1")
+				addr = net.JoinHostPort(addr, serviceMetricsPort)
+				args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://%s%s", addr, serviceMetricsPath))
+			}
 		}
 
 		// Pull the TLS config from the relevant annotations.
@@ -501,6 +517,12 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 				"-telemetry-prom-cert-file="+prometheusCertFile,
 				"-telemetry-prom-key-file="+prometheusKeyFile)
 		}
+	}
+
+	// Local Credential Broker for CAMP OBO: ai-agent pods only. Pairs with
+	// consul-obo-outbound/inbound --broker-uds on the shared volume.
+	if common.IsAIAgent(pod) {
+		args = append(args, "-credential-broker-bind-addr=unix:///consul/connect-inject/credential-broker.sock")
 	}
 
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy

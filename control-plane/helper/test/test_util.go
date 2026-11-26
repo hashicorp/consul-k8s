@@ -216,9 +216,13 @@ func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, service
 	abr := api.ACLBindingRule{
 		Description: fmt.Sprintf("Binding Rule for %s", serviceAccountName),
 		AuthMethod:  componentAuthMethod,
-		Selector:    fmt.Sprintf("serviceaccount.name==%q", serviceAccountName),
-		BindType:    api.BindingRuleBindTypeRole,
-		BindName:    aclRoleName,
+		Selector: fmt.Sprintf(
+			"serviceaccount.name==%q and serviceaccount.namespace==%q",
+			serviceAccountName,
+			k8sComponentNS,
+		),
+		BindType: api.BindingRuleBindTypeRole,
+		BindName: aclRoleName,
 	}
 	_, _, err = consulClient.ACL().BindingRuleCreate(&abr, nil)
 	require.NoError(t, err)

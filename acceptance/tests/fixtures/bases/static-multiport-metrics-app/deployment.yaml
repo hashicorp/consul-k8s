@@ -1,0 +1,70 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: static-multiport-metrics-app
+  name: static-multiport-metrics-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-multiport-metrics-app
+  template:
+    metadata:
+      annotations:
+        'consul.hashicorp.com/connect-inject': 'true'
+        'consul.hashicorp.com/connect-service': 'multiport-metrics'
+        # The container exposes two ports, so the port to register must be
+        # pinned to one of them. Without this the Pod is rejected when
+        # multi-port service registration is disabled, which is the Helm
+        # default. Metrics endpoints are independent of the registered port.
+        'consul.hashicorp.com/connect-service-port': '8080'
+        # A single container exposing metrics on two ports. The first endpoint
+        # is given as a port number and the second as a named container port, so
+        # that both forms are exercised. The second endpoint also uses a
+        # non-default path.
+        'consul.hashicorp.com/service-metrics-endpoints': '8080:/metrics,metrics-b:/alt-metrics'
+      labels:
+        app: static-multiport-metrics-app
+    spec:
+      containers:
+      - name: static-multiport-metrics-app
+        image: docker.mirror.hashicorp.services/library/busybox:latest
+        # Two static file servers, one per port, each rooted at a directory
+        # holding that port's metrics file. busybox httpd serves the file whose
+        # name matches the request path, so /metrics and /alt-metrics resolve to
+        # the two ConfigMap keys.
+        command:
+          - /bin/sh
+          - -c
+          - |
+            httpd -f -p 8080 -h /www/a &
+            httpd -f -p 9090 -h /www/b &
+            wait
+        volumeMounts:
+          - name: metrics-a
+            mountPath: /www/a
+          - name: metrics-b
+            mountPath: /www/b
+        ports:
+        - containerPort: 8080
+          name: metrics-a
+        - containerPort: 9090
+          name: metrics-b
+      volumes:
+        - name: metrics-a
+          configMap:
+            name: static-multiport-metrics-app
+            items:
+              - key: metrics
+                path: metrics
+        - name: metrics-b
+          configMap:
+            name: static-multiport-metrics-app
+            items:
+              - key: alt-metrics
+                path: alt-metrics
+      terminationGracePeriodSeconds: 0 # so deletion is quick

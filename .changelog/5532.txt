@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: upgrade the api-gateway operator to support tcproute under v1 under package version 1.6.0 of gateway-api
+```

@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: fix a race during startup where pod registration could be permanently skipped when the Kubernetes Endpoints object lagged behind Pod IP assignment. The endpoints controller now requeues reconciliation until the Endpoints address is populated.
+```

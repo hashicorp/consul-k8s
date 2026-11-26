@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: remove shortNames for routes
+```

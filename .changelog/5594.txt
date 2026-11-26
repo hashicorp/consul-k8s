@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: Add support for `http2` and `grpc` listener protocols via a per-section annotation on the Kubernetes `Gateway` object (`api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol`). Each listener can now independently select its Consul protocol, enabling Envoy `http2_protocol_options` and gRPC-specific filters (`grpc_stats`, `grpc_http1_bridge`) to be generated for the appropriate listeners.
+```

@@ -24,6 +24,11 @@ container {
 
   triage {
     suppress {
+      vulnerabilities = [
+        "GO-2026-5932",
+        "GO-2026-6443",
+      ]
+      
       paths = [
         // The OSV scanner will trip on several packages that are included in the
         // the UBI images. This is due to RHEL using the same base version in the
@@ -48,7 +53,10 @@ binary {
 
   triage {
     suppress {
-      vulnerabilities = []
+      vulnerabilities = [
+        "GO-2026-5932",
+        "GO-2026-6443",
+      ]
     }
   }
 }

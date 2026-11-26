@@ -217,3 +217,19 @@ func Test_compareDeployments(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareDeployments_ContainerArgs(t *testing.T) {
+	a := &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "consul-dataplane", Args: []string{"-envoy-concurrency=4"}}}}}}}
+	b := &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "consul-dataplane", Args: []string{"-envoy-concurrency=1"}}}}}}}
+	assert.False(t, compareDeployments(a, b), "different container args should not be equal")
+	assert.True(t, compareDeployments(a, a.DeepCopy()), "same container args should be equal")
+}
+
+// A changed managed arg (e.g. -envoy-concurrency) must replace the existing template.
+func TestMergeDeployments_ArgsUpdate(t *testing.T) {
+	existing := &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "consul-dataplane", Args: []string{"-envoy-concurrency=1"}}}}}}}
+	desired := &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "consul-dataplane", Args: []string{"-envoy-concurrency=4"}}}}}}}
+
+	merged := mergeDeployments(desired, existing)
+	assert.Equal(t, []string{"-envoy-concurrency=4"}, merged.Spec.Template.Spec.Containers[0].Args)
+}

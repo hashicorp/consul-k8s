@@ -1,0 +1,50 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# TWO gateway ext-proc instances (HTTP) on the api-gateway inbound listener,
+# keyed by statPrefix:
+#
+#   base -> ext-proc-http      : drives the bare paths (/a, /b, /c). Consul emits
+#                                the Envoy filter "envoy.filters.http.ext_proc/base".
+#   path -> ext-proc-http-path : drives the /ext_proc/* paths. Consul emits
+#                                "envoy.filters.http.ext_proc/path".
+#
+# Both instances are ENABLED-by-default on every route, so routes attach
+# RouteExtProc "disable-base"/"disable-path" filters (see ../common/routeextproc.yaml)
+# to run exactly one instance per route:
+#   - bare  /a|/b|/c        -> disable-path (only base runs)
+#   - /ext_proc/a|/b|/c     -> disable-base (only path runs)
+#   - /aa, /ext_proc/aa etc -> disable BOTH (static bypass; neither processor runs)
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: api-gateway
+spec:
+  protocol: http
+  envoyExtensions:
+    - name: builtin/ext-proc
+      required: true
+      arguments:
+        proxyType: api-gateway
+        listenerType: inbound
+        config:
+          statPrefix: base
+          routeCacheAction: CLEAR
+          httpService:
+            target:
+              service:
+                name: ext-proc-http
+            path: /decide
+    - name: builtin/ext-proc
+      required: true
+      arguments:
+        proxyType: api-gateway
+        listenerType: inbound
+        config:
+          statPrefix: path
+          routeCacheAction: CLEAR
+          httpService:
+            target:
+              service:
+                name: ext-proc-http-path
+            path: /decide

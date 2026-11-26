@@ -1,0 +1,29 @@
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled .Values.ai.inferenceGateway.enabled }}
+{{- if .Values.ai.inferenceGateway.gateways }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "consul.fullname" . }}-inference-gateways-apply
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-failed
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: inference-gateway
+subjects:
+- kind: ServiceAccount
+  name: {{ template "consul.fullname" . }}-inference-gateways-apply
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ template "consul.fullname" . }}-inference-gateways-apply
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}

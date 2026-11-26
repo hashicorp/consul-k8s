@@ -1,0 +1,79 @@
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# This post-install/post-upgrade Job runs the "ai-inference-resources" subcommand.
+# It reads ai.inferenceModel defaults from values.yaml (passed as CLI flags below)
+# and upserts the InferenceModelConfig CR in the cluster so that
+# InferenceModelConfigController always has an up-to-date CR to reconcile.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-inference-resources
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-inference-model
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-ai-inference-resources
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: ai-inference-model
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-ai-inference-resources
+      containers:
+        - name: ai-inference-resources
+          image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - ai-inference-resources
+            - -config-name=consul-ai-gateway
+            - -app={{ template "consul.name" . }}
+            - -chart={{ template "consul.chart" . }}
+            - -heritage={{ .Release.Service }}
+            - -release-name={{ .Release.Name }}
+            - -component=ai-inference-model
+            - -enabled={{ .Values.ai.enabled }}
+            - -interceptor-port={{ .Values.ai.inferenceModel.defaults.interceptorPort }}
+            - -inference-path={{ .Values.ai.inferenceModel.defaults.inferencePath }}
+            - -inference-protocol={{ .Values.ai.inferenceModel.defaults.inferenceProtocol }}
+            - -requests-memory={{ .Values.ai.inferenceModel.defaults.resources.requests.memory }}
+            - -requests-cpu={{ .Values.ai.inferenceModel.defaults.resources.requests.cpu }}
+            - -limits-memory={{ .Values.ai.inferenceModel.defaults.resources.limits.memory }}
+            - -limits-cpu={{ .Values.ai.inferenceModel.defaults.resources.limits.cpu }}
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+{{- end }}

@@ -135,6 +135,8 @@ func runPartitionsSync(t *testing.T, c partitionsSyncCase) {
 
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
 
+	k8s.WaitForServiceReachable(t, cfg, primaryClusterContext, partitionServiceName, 8501)
+
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	secondaryConsulCluster := consul.NewHelmCluster(t, clientHelmValues, secondaryClusterContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)

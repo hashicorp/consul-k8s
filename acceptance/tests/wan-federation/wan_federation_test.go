@@ -47,6 +47,10 @@ func runWANFederation(t *testing.T, c wanFederationCase) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
 	primaryContext := env.DefaultContext(t)
 	secondaryContext := env.Context(t, 1)
 
@@ -195,6 +199,10 @@ func runWANFederationFailover(t *testing.T, c wanFederationCase) {
 	t.Helper()
 	env := suite.Environment()
 	cfg := suite.Config()
+
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
 
 	if cfg.EnableRestrictedPSAEnforcement {
 		t.Skip("This test case is not run with enable restricted PSA enforcement enabled")

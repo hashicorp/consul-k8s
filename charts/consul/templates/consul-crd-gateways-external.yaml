@@ -39,7 +39,7 @@ metadata:
     release: {{ .Release.Name }}
     name: consul-custom-gateways
     component: crd
-  name: gateways.consul.hashicorp.com
+  name: cgateways.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -47,10 +47,10 @@ spec:
       - gateway-api
     kind: Gateway
     listKind: GatewayList
-    plural: gateways
+    plural: cgateways
+    singular: cgateway
     shortNames:
       - cgtw
-    singular: gateway
   scope: Namespaced
   versions:
     - additionalPrinterColumns:

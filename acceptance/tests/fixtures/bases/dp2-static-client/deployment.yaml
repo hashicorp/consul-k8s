@@ -1,0 +1,41 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dp2-static-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dp2-static-client
+  template:
+    metadata:
+      name: dp2-static-client
+      labels:
+        app: dp2-static-client
+    spec:
+      containers:
+        - name: dp2-static-client
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              add:
+                - "NET_BIND_SERVICE"
+              drop:
+                - ALL
+          image: docker.mirror.hashicorp.services/buildpack-deps:jammy-curl
+          command: [ "/bin/sh", "-c", "--" ]
+          args: [ "while true; do sleep 30; done;" ]
+          env:
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+      serviceAccountName: dp2-static-client
+      terminationGracePeriodSeconds: 0 # so deletion is quick

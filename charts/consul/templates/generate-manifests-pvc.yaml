@@ -13,11 +13,14 @@ metadata:
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "-9"
-    "helm.sh/resource-policy": keep
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
+  {{- if .Values.global.generateManifestsStorageClassName }}
+  storageClassName: {{ .Values.global.generateManifestsStorageClassName }}
+  {{- end }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: {{ .Values.global.generateManifestsStorage | default "1Gi" }}
 {{- end }}

@@ -9,11 +9,16 @@ import (
 	"github.com/mitchellh/cli"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
+	cmdAICleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/ai-cleanup"
+	cmdAgentResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/agent-resources"
+	cmdAIInferenceResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/ai-inference-resources"
+	cmdMCPServerResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/mcp-server-resources"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
+	cmdFeatureGateSet "github.com/hashicorp/consul-k8s/control-plane/subcommand/feature-gate-set"
 	cmdGatewayCleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup"
 	cmdGatewayCleanupCustom "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup-custom"
 	cmdGatewayResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources"
@@ -23,6 +28,7 @@ import (
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
 	cmdInstallCNI "github.com/hashicorp/consul-k8s/control-plane/subcommand/install-cni"
+	cmdConvertMultiportServices "github.com/hashicorp/consul-k8s/control-plane/subcommand/convert-multiport-services"
 	cmdPartitionInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/partition-init"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/server-acl-init"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/control-plane/subcommand/sync-catalog"
@@ -41,6 +47,26 @@ func init() {
 	Commands = map[string]cli.CommandFactory{
 		"acl-init": func() (cli.Command, error) {
 			return &cmdACLInit.Command{UI: ui}, nil
+		},
+
+		"feature-gate-set": func() (cli.Command, error) {
+			return &cmdFeatureGateSet.Command{UI: ui}, nil
+		},
+
+		"ai-cleanup": func() (cli.Command, error) {
+			return &cmdAICleanup.Command{UI: ui}, nil
+		},
+
+		"agent-resources": func() (cli.Command, error) {
+			return &cmdAgentResources.Command{UI: ui}, nil
+		},
+
+		"ai-inference-resources": func() (cli.Command, error) {
+			return &cmdAIInferenceResources.Command{UI: ui}, nil
+		},
+
+		"mcp-server-resources": func() (cli.Command, error) {
+			return &cmdMCPServerResources.Command{UI: ui}, nil
 		},
 
 		"connect-init": func() (cli.Command, error) {
@@ -115,6 +141,9 @@ func init() {
 		"install-cni": func() (cli.Command, error) {
 			return &cmdInstallCNI.Command{UI: ui}, nil
 		},
+		"convert-multiport-services": func() (cli.Command, error) {
+			return &cmdConvertMultiportServices.Command{UI: ui}, nil
+		},
 		"fetch-server-region": func() (cli.Command, error) {
 			return &cmdFetchServerRegion.Command{UI: ui}, nil
 		},
@@ -127,7 +156,8 @@ func helpFunc() cli.HelpFunc {
 	// aren't shown in any help output. We use this for prerelease functionality
 	// or advanced features.
 	hidden := map[string]struct{}{
-		"inject-connect": {},
+		"inject-connect":             {},
+		"convert-multiport-services": {},
 	}
 
 	var include []string

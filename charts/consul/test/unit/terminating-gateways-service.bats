@@ -47,3 +47,14 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
+
+@test "terminatingGateways/Service: selector includes gateway name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-service.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=gateway1' \
+      . | tee /dev/stderr |
+      yq -r '.spec.selector["terminating-gateway-name"]' | tee /dev/stderr)
+  [ "${actual}" = "release-name-consul-gateway1" ]
+}

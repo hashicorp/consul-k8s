@@ -39,7 +39,7 @@ metadata:
     release: {{ .Release.Name }}
     name: consul-custom-tcproutes
     component: crd
-  name: tcproutes.consul.hashicorp.com
+  name: ctcproutes.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -47,10 +47,8 @@ spec:
       - gateway-api
     kind: TCPRoute
     listKind: TCPRouteList
-    plural: tcproutes
-    singular: tcproute
-    shortNames:
-      - ctcproutes
+    plural: ctcproutes
+    singular: ctcproute
   scope: Namespaced
   versions:
     - additionalPrinterColumns:

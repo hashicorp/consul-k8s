@@ -1,0 +1,31 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Day-1 HTTPRoute: matches requests where the x-canary header equals "true",
+# with the invert-filter-v1 ExtensionRef flipping that match to Invert=true so
+# it routes when x-canary is ABSENT or NOT "true".
+#
+# The TestAPIGateway_HeaderMatchInvert_Lifecycle acceptance test updates this
+# route programmatically (Day 2: swap to invert-filter-v2, Day 3: drop filter).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: invert-route
+spec:
+  parentRefs:
+  - name: header-invert-gw
+  rules:
+  - matches:
+    - headers:
+      - type: Exact
+        name: x-canary
+        value: "true"
+    backendRefs:
+    - name: static-server
+      port: 80
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: consul.hashicorp.com
+        kind: RouteHeaderMatchInvertFilter
+        name: invert-filter-v1

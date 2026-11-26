@@ -1,0 +1,97 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Manually dispatches the PR acceptance suite with Consul images built from a
+# dependent Consul change. Normal PR runs continue to use the default images
+# resolved by consul-k8s-workflows.
+name: PR Acceptance with Consul Override
+run-name: PR #${{ inputs.pr-number }} acceptance with Consul override
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: "consul-k8s PR number. Select this PR's branch before running the workflow."
+        required: true
+        type: string
+      consul-image:
+        description: "Optional exact Consul CE image built from the dependent Consul change."
+        required: false
+        type: string
+        default: ""
+      consul-enterprise-image:
+        description: "Optional exact Consul Enterprise image built from the dependent Consul change."
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: Dispatch acceptance tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build workflow inputs
+        id: workflow-inputs
+        env:
+          PR_NUMBER: ${{ inputs.pr-number }}
+          CONSUL_IMAGE: ${{ inputs.consul-image }}
+          CONSUL_ENTERPRISE_IMAGE: ${{ inputs.consul-enterprise-image }}
+          ACTOR: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${PR_NUMBER}" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr-number must contain only digits"
+            exit 1
+          fi
+
+          if [[ -z "${CONSUL_IMAGE}" && -z "${CONSUL_ENTERPRISE_IMAGE}" ]]; then
+            echo "::error::Set consul-image, consul-enterprise-image, or both"
+            exit 1
+          fi
+
+          json_params=$(jq -cn \
+            --arg consul_image "${CONSUL_IMAGE}" \
+            --arg consul_enterprise_image "${CONSUL_ENTERPRISE_IMAGE}" \
+            '{
+              "gotestsum-version": "1.12.3",
+              "terraform-version": "latest",
+              "test-ce": true,
+              "test-type": "short",
+              "dual-stack": true,
+              "consul-image": $consul_image,
+              "consul-enterprise-image": $consul_enterprise_image
+            }')
+
+          workflow_inputs=$(jq -cn \
+            --arg context "pr-${PR_NUMBER}" \
+            --arg actor "${ACTOR}" \
+            --arg repository "${REPOSITORY}" \
+            --arg branch "${BRANCH}" \
+            --arg sha "${SHA}" \
+            --arg json_params "${json_params}" \
+            '{
+              context: $context,
+              actor: $actor,
+              repository: $repository,
+              branch: $branch,
+              sha: $sha,
+              json_params: $json_params
+            }')
+
+          echo "inputs=${workflow_inputs}" >> "${GITHUB_OUTPUT}"
+
+      - name: Dispatch acceptance tests
+        uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+        with:
+          workflow: test.yml
+          repo: hashicorp/consul-k8s-workflows
+          ref: main
+          token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+          inputs: ${{ steps.workflow-inputs.outputs.inputs }}

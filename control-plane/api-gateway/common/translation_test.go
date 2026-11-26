@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	logrtest "github.com/go-logr/logr/testing"
 
@@ -45,7 +44,7 @@ func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTP
 	return true
 }
 
-func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1.BackendRef) bool {
+func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1.TCPRoute, backendRef gwv1.BackendRef) bool {
 	return true
 }
 
@@ -355,9 +354,59 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 	}
 }
 
-func TestTranslator_ToAPIGateway_TLSWithSDS(t *testing.T) {
+func TestTranslator_ToAPIGateway_GatewayLevelTLS(t *testing.T) {
 	t.Parallel()
 
+	cases := map[string]struct {
+		annotations map[string]string
+		expectedTLS api.GatewayTLSConfig
+	}{
+		"tls-enabled=true sets gateway-level TLS.Enabled": {
+			annotations: map[string]string{AnnotationTLSEnabled: TLSEnabledValue},
+			expectedTLS: api.GatewayTLSConfig{Enabled: true},
+		},
+		"no annotation leaves gateway-level TLS at zero value": {
+			annotations: map[string]string{},
+			expectedTLS: api.GatewayTLSConfig{},
+		},
+		"unrecognized value leaves gateway-level TLS at zero value": {
+			annotations: map[string]string{AnnotationTLSEnabled: "yes"},
+			expectedTLS: api.GatewayTLSConfig{},
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			input := gwv1.Gateway{
+				TypeMeta:   metav1.TypeMeta{Kind: "Gateway"},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-gw", Namespace: "ns", Annotations: tc.annotations},
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
+						{
+							Name:     gwv1.SectionName("https"),
+							Port:     gwv1.PortNumber(8443),
+							Protocol: gwv1.ProtocolType("HTTPS"),
+							TLS:      &gwv1.ListenerTLSConfig{},
+						},
+					},
+				},
+			}
+
+			translator := ResourceTranslator{}
+			resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+
+			actual := translator.ToAPIGateway(input, resources, &v1alpha1.GatewayClassConfig{})
+
+			require.Equal(t, tc.expectedTLS, actual.TLS)
+		})
+	}
+}
+
+func TestTranslator_ToAPIGateway_TLSWithSDS(t *testing.T) {
+	t.Parallel()
 	translator := ResourceTranslator{
 		EnableConsulNamespaces: true,
 		EnableK8sMirroring:     true,
@@ -1593,7 +1642,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 func TestTranslator_ToTCPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		k8sRoute     gwv1alpha2.TCPRoute
+		k8sRoute     gwv1.TCPRoute
 		services     []types.NamespacedName
 		meshServices []v1alpha1.MeshService
 	}
@@ -1603,39 +1652,39 @@ func TestTranslator_ToTCPRoute(t *testing.T) {
 	}{
 		"base test": {
 			args: args{
-				k8sRoute: gwv1alpha2.TCPRoute{
+				k8sRoute: gwv1.TCPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "tcp-route",
 						Namespace: "k8s-ns",
 					},
-					Spec: gwv1alpha2.TCPRouteSpec{
-						Rules: []gwv1alpha2.TCPRouteRule{
+					Spec: gwv1.TCPRouteSpec{
+						Rules: []gwv1.TCPRouteRule{
 							{
-								BackendRefs: []gwv1alpha2.BackendRef{
+								BackendRefs: []gwv1.BackendRef{
 									{
-										BackendObjectReference: gwv1alpha2.BackendObjectReference{
+										BackendObjectReference: gwv1.BackendObjectReference{
 											Name:      "some-service",
-											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
 								},
 							},
 							{
-								BackendRefs: []gwv1alpha2.BackendRef{
+								BackendRefs: []gwv1.BackendRef{
 									{
-										BackendObjectReference: gwv1alpha2.BackendObjectReference{
+										BackendObjectReference: gwv1.BackendObjectReference{
 											Name:      "some-service-part-two",
-											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
 									{
-										BackendObjectReference: gwv1alpha2.BackendObjectReference{
-											Group:     PointerTo(gwv1alpha2.Group(v1alpha1.ConsulHashicorpGroup)),
-											Kind:      PointerTo(gwv1alpha2.Kind(v1alpha1.MeshServiceKind)),
+										BackendObjectReference: gwv1.BackendObjectReference{
+											Group:     PointerTo(gwv1.Group(v1alpha1.ConsulHashicorpGroup)),
+											Kind:      PointerTo(gwv1.Kind(v1alpha1.MeshServiceKind)),
 											Name:      "some-service-part-three",
-											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
@@ -1802,6 +1851,161 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 			requestHeaders, responseHeaders, _ := t.translateHTTPFilters(tt.args.filters, nil, "", nil)
 			assert.Equalf(t1, tt.want, requestHeaders, "translateHTTPFilters(%v)", tt.args.filters)
 			assert.Equalf(t1, tt.wantResponseFilters, responseHeaders, "translateHTTPFilters(%v)", tt.args.filters)
+		})
+	}
+}
+
+func TestResourceTranslator_translateRouteExtProcFilter(t *testing.T) {
+	translator := ResourceTranslator{}
+
+	for name, tc := range map[string]struct {
+		routeExtProc *v1alpha1.RouteExtProc
+		expected     api.ExtProcFilter
+	}{
+		"minimal filter without overrides": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					StatPrefix: "my-prefix",
+					Mode:       "enabled",
+				},
+			},
+			expected: api.ExtProcFilter{
+				StatPrefix: "my-prefix",
+				Mode:       "enabled",
+			},
+		},
+		"override mode with empty overrides": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode:      "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode:      "override",
+				Overrides: &api.ExtProcOverrides{},
+			},
+		},
+		"override mode with nil processing": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode: "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: nil,
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode:      "override",
+				Overrides: &api.ExtProcOverrides{},
+			},
+		},
+		"override mode with full processing directions": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					StatPrefix: "prefix",
+					Mode:       "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: &v1alpha1.RouteExtProcProcessing{
+							Request: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode:  "SEND",
+								BodyMode:     "BUFFERED",
+								TrailersMode: "SKIP",
+								MaxBodyBytes: 1024,
+							},
+							Response: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode:  "SKIP",
+								BodyMode:     "STREAMED",
+								TrailersMode: "SEND",
+								MaxBodyBytes: 2048,
+							},
+						},
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				StatPrefix: "prefix",
+				Mode:       "override",
+				Overrides: &api.ExtProcOverrides{
+					Processing: &api.ExtProcProcessing{
+						Request: &api.ExtProcProcessingDirection{
+							HeadersMode:  "SEND",
+							BodyMode:     "BUFFERED",
+							TrailersMode: "SKIP",
+							MaxBodyBytes: 1024,
+						},
+						Response: &api.ExtProcProcessingDirection{
+							HeadersMode:  "SKIP",
+							BodyMode:     "STREAMED",
+							TrailersMode: "SEND",
+							MaxBodyBytes: 2048,
+						},
+					},
+				},
+			},
+		},
+		"override mode with only request processing": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode: "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: &v1alpha1.RouteExtProcProcessing{
+							Request: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode: "SEND",
+							},
+						},
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode: "override",
+				Overrides: &api.ExtProcOverrides{
+					Processing: &api.ExtProcProcessing{
+						Request: &api.ExtProcProcessingDirection{
+							HeadersMode: "SEND",
+						},
+						Response: nil,
+					},
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, translator.translateRouteExtProcFilter(tc.routeExtProc))
+		})
+	}
+}
+
+func TestTranslateExtProcProcessingDirection(t *testing.T) {
+	for name, tc := range map[string]struct {
+		direction *v1alpha1.RouteExtProcProcessingDirection
+		expected  *api.ExtProcProcessingDirection
+	}{
+		"nil direction returns nil": {
+			direction: nil,
+			expected:  nil,
+		},
+		"empty direction": {
+			direction: &v1alpha1.RouteExtProcProcessingDirection{},
+			expected:  &api.ExtProcProcessingDirection{},
+		},
+		"fully populated direction": {
+			direction: &v1alpha1.RouteExtProcProcessingDirection{
+				HeadersMode:  "SEND",
+				BodyMode:     "BUFFERED_PARTIAL",
+				TrailersMode: "SKIP",
+				MaxBodyBytes: 4096,
+			},
+			expected: &api.ExtProcProcessingDirection{
+				HeadersMode:  "SEND",
+				BodyMode:     "BUFFERED_PARTIAL",
+				TrailersMode: "SKIP",
+				MaxBodyBytes: 4096,
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, translateExtProcProcessingDirection(tc.direction))
 		})
 	}
 }
@@ -2146,4 +2350,141 @@ func TestResourceTranslator_toAPIGatewayListener_WithSDSAndCertificateRefs(t *te
 
 	expectedCert := translator.NonNormalizedConfigEntryReference(api.FileSystemCertificate, types.NamespacedName{Name: "gw-cert", Namespace: "default"})
 	require.Contains(t, got.TLS.Certificates, expectedCert)
+}
+
+// TestResolveListenerProtocol verifies that the annotation-based protocol
+// override selects the correct Consul listener protocol (RFC-0002).
+func TestResolveListenerProtocol(t *testing.T) {
+	t.Parallel()
+
+	makeGateway := func(annotations map[string]string) gwv1.Gateway {
+		return gwv1.Gateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "edge",
+				Namespace:   "default",
+				Annotations: annotations,
+			},
+		}
+	}
+	makeListener := func(name string, protocol gwv1.ProtocolType) gwv1.Listener {
+		return gwv1.Listener{Name: gwv1.SectionName(name), Protocol: protocol}
+	}
+
+	tests := []struct {
+		name               string
+		gatewayAnnotations map[string]string
+		listener           gwv1.Listener
+		wantProtocol       string
+	}{
+		{
+			name: "grpc annotation overrides HTTP listener protocol",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "grpc",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "grpc",
+		},
+		{
+			name: "http2 annotation overrides HTTP listener protocol",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "h2" + ListenerProtocolAnnotationSuffix: "http2",
+			},
+			listener:     makeListener("h2", gwv1.HTTPProtocolType),
+			wantProtocol: "http2",
+		},
+		{
+			name: "annotation is case-insensitive",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "GRPC",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "grpc",
+		},
+		{
+			name: "invalid annotation value falls back to protocol map",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "invalid-protocol",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "http", // falls back to listenerProtocolMap["http"]
+		},
+		{
+			name:         "no annotation uses protocol map — HTTP",
+			listener:     makeListener("web", gwv1.HTTPProtocolType),
+			wantProtocol: "http",
+		},
+		{
+			name:         "no annotation uses protocol map — HTTPS",
+			listener:     makeListener("secure", gwv1.HTTPSProtocolType),
+			wantProtocol: "http",
+		},
+		{
+			name:         "no annotation uses protocol map — TCP",
+			listener:     makeListener("tcp", gwv1.TCPProtocolType),
+			wantProtocol: "tcp",
+		},
+		{
+			name: "annotation on different section does not affect this listener",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "other-listener" + ListenerProtocolAnnotationSuffix: "grpc",
+			},
+			listener:     makeListener("web", gwv1.HTTPProtocolType),
+			wantProtocol: "http",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gw := makeGateway(tt.gatewayAnnotations)
+			got := resolveListenerProtocol(gw, tt.listener)
+			require.Equal(t, tt.wantProtocol, got)
+		})
+	}
+}
+
+// TestToAPIGatewayListener_ProtocolAnnotation verifies that the annotation-based
+// protocol selection is propagated into the Consul api-gateway listener (RFC-0002).
+func TestToAPIGatewayListener_ProtocolAnnotation(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{
+		EnableConsulNamespaces: false,
+		ConsulDestNamespace:    "default",
+	}
+
+	for _, tc := range []struct {
+		annotation   string
+		wantProtocol string
+	}{
+		{"grpc", "grpc"},
+		{"http2", "http2"},
+	} {
+		tc := tc
+		t.Run(tc.annotation, func(t *testing.T) {
+			t.Parallel()
+
+			gateway := gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "edge",
+					Namespace: "default",
+					Annotations: map[string]string{
+						ListenerProtocolAnnotationPrefix + "listener" + ListenerProtocolAnnotationSuffix: tc.annotation,
+					},
+				},
+			}
+			listener := gwv1.Listener{
+				Name:     "listener",
+				Port:     9080,
+				Protocol: gwv1.HTTPProtocolType,
+			}
+
+			resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+			got, ok := translator.toAPIGatewayListener(gateway, listener, resources, nil)
+			require.True(t, ok)
+			require.Equal(t, tc.wantProtocol, got.Protocol,
+				"expected Consul listener protocol %q from annotation %q", tc.wantProtocol, tc.annotation)
+		})
+	}
 }

@@ -1,0 +1,3 @@
+```release-note:bug
+crd: Fix InferencePoolConfig PII action validation to accept `placeholder`, `mask`, `block`, and `off`, matching the actions supported by the inference policy processor.
+```
