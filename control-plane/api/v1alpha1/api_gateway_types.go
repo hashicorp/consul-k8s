@@ -42,6 +42,14 @@ type GatewayClassConfigSpec struct {
 	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
 	ServiceType *corev1.ServiceType `json:"serviceType,omitempty"`
 
+	// +kubebuilder:validation:Enum=Cluster;Local
+	// ExternalTrafficPolicy determines whether the gateway service routes external
+	// traffic to node-local or cluster-wide endpoints. If unspecified, Kubernetes
+	// defaults this to "Cluster". Only applies to NodePort and LoadBalancer
+	// ServiceTypes; it is ignored for ClusterIP, which Kubernetes does not permit
+	// to set this field.
+	ExternalTrafficPolicy *corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
+
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
 	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
