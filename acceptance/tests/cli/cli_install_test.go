@@ -167,7 +167,13 @@ func TestInstall(t *testing.T) {
 // translates the table into a map.
 func translateListOutput(raw []byte) map[string]string {
 	formatted := make(map[string]string)
-	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[3:] {
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	// The table has a namespace line, a blank line and a header before the rows. Anything shorter
+	// (e.g. "No proxies found in default namespace.") has no rows.
+	if len(lines) <= 3 {
+		return formatted
+	}
+	for _, pod := range lines[3:] {
 		row := strings.Split(strings.TrimSpace(pod), "\t")
 
 		var name string
