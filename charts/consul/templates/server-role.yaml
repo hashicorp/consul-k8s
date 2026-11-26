@@ -10,7 +10,7 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: server
-{{- if (or (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts) .Values.global.enablePodSecurityPolicies) }}
+{{- if (or (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts) .Values.global.enablePodSecurityPolicies (and .Values.server.exposeServicePerReplica.enabled .Values.server.exposeServicePerReplica.advertise)) }}
 rules:
 {{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: ["policy"]
@@ -27,6 +27,12 @@ rules:
   - {{ template "consul.fullname" . }}-server
   verbs:
   - use
+{{- end }}
+{{- if (and .Values.server.exposeServicePerReplica.enabled .Values.server.exposeServicePerReplica.advertise) }}
+- apiGroups: [""]
+  resources: ["services"]
+  verbs:
+  - get
 {{- end }}
 {{- else}}
 rules: []
