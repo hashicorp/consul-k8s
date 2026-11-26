@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -334,15 +336,16 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 	// Verify that Consul DNS resolves the api-gateway hostname to the gateway's
 	// address. This proves the state store gateway-services mapping is live.
 	logger.Log(t, "verifying DNS resolution of "+apiGWHostname)
-	retryCheckWithWait(t, 30, 3*time.Second, func(r *retry.R) {
+	// kube-dns can take up to a couple of minutes to reload its ConfigMap.
+	retryCheckWithWait(t, 60, 3*time.Second, func(r *retry.R) {
+		// The static-client image has no nslookup; getent uses the system resolver.
 		out, err := k8s.RunKubectlAndGetOutputE(r, k8sOptions,
 			"exec", "deploy/"+StaticClientName, "-c", StaticClientName, "--",
-			"sh", "-c", fmt.Sprintf("nslookup %s 2>&1 || getent hosts %s 2>&1", apiGWHostname, apiGWHostname),
+			"getent", "hosts", apiGWHostname,
 		)
 		require.NoError(r, err, out)
-		// Either an A record or the gateway IP must appear in the output.
 		require.Truef(r,
-			strings.Contains(out, gatewayAddress) || strings.Contains(out, "Address"),
+			strings.Contains(out, gatewayAddress),
 			"expected DNS resolution of %q to include gateway address %q; got: %s",
 			apiGWHostname, gatewayAddress, out,
 		)
@@ -397,10 +400,10 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, httpsAddr, "-k")
 }
 
-// patchCoreDNSForConsul patches the cluster's CoreDNS ConfigMap to forward all
-// .consul domain queries to the Consul DNS service, then rolls CoreDNS out so
-// pods immediately see the new configuration. The original Corefile is restored
-// on test cleanup.
+// patchCoreDNSForConsul configures the cluster DNS to forward .consul queries to
+// the Consul DNS service and restores the original configuration on test cleanup.
+// CoreDNS clusters (EKS, AKS, kind) get a stub zone in the Corefile. kube-dns
+// clusters (GKE) ignore the Corefile and get a "consul" stubDomains entry instead.
 func patchCoreDNSForConsul(t *testing.T, releaseName string) {
 	t.Helper()
 
@@ -418,18 +421,22 @@ func patchCoreDNSForConsul(t *testing.T, releaseName string) {
 
 	// 2. Detect whether the cluster uses coredns or kube-dns.
 	cmClient := k8sClient.CoreV1().ConfigMaps("kube-system")
-	cmName := "coredns"
+	var origCM *corev1.ConfigMap
 	for _, candidate := range []string{"coredns", "kube-dns"} {
-		if _, err := cmClient.Get(context.Background(), candidate, metav1.GetOptions{}); err == nil {
-			cmName = candidate
+		if cm, err := cmClient.Get(context.Background(), candidate, metav1.GetOptions{}); err == nil {
+			origCM = cm
 			break
 		}
 	}
-	logger.Logf(t, "DNS ConfigMap name: %s", cmName)
+	require.NotNil(t, origCM, "neither a coredns nor a kube-dns ConfigMap exists in kube-system")
+	logger.Logf(t, "DNS ConfigMap name: %s", origCM.Name)
+
+	if origCM.Name == "kube-dns" {
+		patchKubeDNSForConsul(t, origCM, consulDNSIP)
+		return
+	}
 
 	// 3. Backup original Corefile.
-	origCM, err := cmClient.Get(context.Background(), cmName, metav1.GetOptions{})
-	require.NoError(t, err)
 	origCorefile := origCM.Data["Corefile"]
 
 	// 4. Build new Corefile with consul stub zone.
@@ -443,8 +450,7 @@ consul:53 {
 
 	// 5. Apply the patch.
 	patch := fmt.Sprintf(`{"data":{"Corefile":%q}}`, newCorefile)
-	_, err = k8sClient.CoreV1().ConfigMaps("kube-system").Patch(
-		context.Background(), cmName,
+	_, err = cmClient.Patch(context.Background(), origCM.Name,
 		types.MergePatchType, []byte(patch), metav1.PatchOptions{},
 	)
 	require.NoError(t, err, "failed to patch CoreDNS ConfigMap")
@@ -453,8 +459,7 @@ consul:53 {
 	_, err = k8s.RunKubectlAndGetOutputE(t, k8sOptions,
 		"rollout", "restart", "deployment/coredns", "-n", "kube-system")
 	if err != nil {
-		// kube-dns clusters use a different deployment name; ignore if not found.
-		logger.Logf(t, "coredns rollout restart: %v (may be kube-dns cluster, continuing)", err)
+		logger.Logf(t, "coredns rollout restart: %v (continuing)", err)
 	}
 	_, _ = k8s.RunKubectlAndGetOutputE(t, k8sOptions,
 		"rollout", "status", "--timeout=2m", "--watch", "deployment/coredns", "-n", "kube-system")
@@ -463,12 +468,51 @@ consul:53 {
 	restorePatch := fmt.Sprintf(`{"data":{"Corefile":%q}}`, origCorefile)
 	t.Cleanup(func() {
 		logger.Log(t, "restoring original CoreDNS Corefile")
-		_, _ = k8sClient.CoreV1().ConfigMaps("kube-system").Patch(
-			context.Background(), cmName,
+		_, _ = cmClient.Patch(context.Background(), origCM.Name,
 			types.MergePatchType, []byte(restorePatch), metav1.PatchOptions{},
 		)
 		_, _ = k8s.RunKubectlAndGetOutputE(t, k8sOptions,
 			"rollout", "restart", "deployment/coredns", "-n", "kube-system")
+	})
+}
+
+// patchKubeDNSForConsul adds a "consul" stub domain pointing at the Consul DNS
+// service to the kube-dns ConfigMap, keeping any existing stub domains. kube-dns
+// reloads the ConfigMap on its own, so no restart is needed. The original
+// stubDomains value is restored on test cleanup.
+func patchKubeDNSForConsul(t *testing.T, origCM *corev1.ConfigMap, consulDNSIP string) {
+	t.Helper()
+
+	cmClient := suite.Environment().DefaultContext(t).KubernetesClient(t).CoreV1().ConfigMaps("kube-system")
+	origStubDomains, hadStubDomains := origCM.Data["stubDomains"]
+
+	stubDomains := map[string][]string{}
+	if hadStubDomains && strings.TrimSpace(origStubDomains) != "" {
+		require.NoError(t, json.Unmarshal([]byte(origStubDomains), &stubDomains),
+			"could not parse existing kube-dns stubDomains")
+	}
+	stubDomains["consul"] = []string{consulDNSIP}
+	newStubDomains, err := json.Marshal(stubDomains)
+	require.NoError(t, err)
+
+	patch, err := json.Marshal(map[string]any{"data": map[string]string{"stubDomains": string(newStubDomains)}})
+	require.NoError(t, err)
+	_, err = cmClient.Patch(context.Background(), origCM.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	require.NoError(t, err, "failed to patch kube-dns ConfigMap")
+	logger.Logf(t, "kube-dns stubDomains set to %s", newStubDomains)
+
+	// A null value removes the key in a merge patch.
+	var restore any
+	if hadStubDomains {
+		restore = origStubDomains
+	}
+	restorePatch, err := json.Marshal(map[string]any{"data": map[string]any{"stubDomains": restore}})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		logger.Log(t, "restoring original kube-dns stubDomains")
+		_, _ = cmClient.Patch(context.Background(), origCM.Name,
+			types.MergePatchType, restorePatch, metav1.PatchOptions{},
+		)
 	})
 }
 
