@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Fix default `ai.inferenceGateway.image`, `ai.agent.image` and `ai.mcpServer.image` to published `hashicorp/csl-inf-rt:1.0.0-ent` and `hashicorp/csl-mcp-sc:1.0.0-ent` images.
+```
