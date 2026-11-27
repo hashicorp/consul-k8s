@@ -88,6 +88,80 @@ func TestTerminatingGateway_MatchesConsul(t *testing.T) {
 			},
 			Matches: true,
 		},
+		"linked service tenancy defaulted by Consul Enterprise matches": {
+			Ours: TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: TerminatingGatewaySpec{
+					Services: []LinkedService{{Name: "svc"}},
+				},
+			},
+			Theirs: &capi.TerminatingGatewayConfigEntry{
+				Kind:      capi.TerminatingGateway,
+				Name:      "name",
+				Namespace: "default",
+				Partition: "default",
+				Services: []capi.LinkedService{
+					{Name: "svc", Namespace: "default"},
+				},
+			},
+			Matches: true,
+		},
+		"empty linked service namespace matches the config entry namespace": {
+			Ours: TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: TerminatingGatewaySpec{
+					Services: []LinkedService{{Name: "svc"}},
+				},
+			},
+			Theirs: &capi.TerminatingGatewayConfigEntry{
+				Kind:      capi.TerminatingGateway,
+				Name:      "name",
+				Namespace: "gateways",
+				Services: []capi.LinkedService{
+					{Name: "svc", Namespace: "gateways"},
+				},
+			},
+			Matches: true,
+		},
+		"explicit default linked service namespace matches Consul CE": {
+			Ours: TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: TerminatingGatewaySpec{
+					Services: []LinkedService{{Name: "svc", Namespace: "default"}},
+				},
+			},
+			Theirs: &capi.TerminatingGatewayConfigEntry{
+				Kind:     capi.TerminatingGateway,
+				Name:     "name",
+				Services: []capi.LinkedService{{Name: "svc"}},
+			},
+			Matches: true,
+		},
+		"different linked service namespace does not match": {
+			Ours: TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: TerminatingGatewaySpec{
+					Services: []LinkedService{{Name: "svc", Namespace: "ns1"}},
+				},
+			},
+			Theirs: &capi.TerminatingGatewayConfigEntry{
+				Kind:      capi.TerminatingGateway,
+				Name:      "name",
+				Namespace: "default",
+				Services: []capi.LinkedService{
+					{Name: "svc", Namespace: "ns2"},
+				},
+			},
+			Matches: false,
+		},
 		"different types does not match": {
 			Ours: TerminatingGateway{
 				ObjectMeta: metav1.ObjectMeta{
