@@ -1641,6 +1641,29 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "server/StatefulSet: readiness probe uses default timings" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr |
+      yq -c '.spec.template.spec.containers[0].readinessProbe | del(.exec)' | tee /dev/stderr)
+  [ "${actual}" = '{"failureThreshold":2,"initialDelaySeconds":5,"periodSeconds":3,"successThreshold":1,"timeoutSeconds":5}' ]
+}
+
+@test "server/StatefulSet: readiness probe timings can be overridden" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.readinessProbe.failureThreshold=10' \
+      --set 'server.readinessProbe.initialDelaySeconds=0' \
+      --set 'server.readinessProbe.periodSeconds=30' \
+      --set 'server.readinessProbe.successThreshold=2' \
+      --set 'server.readinessProbe.timeoutSeconds=15' \
+      . | tee /dev/stderr |
+      yq -c '.spec.template.spec.containers[0].readinessProbe | del(.exec)' | tee /dev/stderr)
+  [ "${actual}" = '{"failureThreshold":10,"initialDelaySeconds":0,"periodSeconds":30,"successThreshold":2,"timeoutSeconds":15}' ]
+}
+
 @test "server/StatefulSet: sets Consul environment variables when global.tls.enabled" {
   cd `chart_dir`
   local env=$(helm template \
