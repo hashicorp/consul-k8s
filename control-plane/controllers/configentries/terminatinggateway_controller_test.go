@@ -241,20 +241,26 @@ func (e *tgwACLTestEnv) conditions(t *testing.T) (aclStatus, synced *consulv1alp
 }
 
 // When the gateway policy link is missing from the role, updateACls must not
-// send an empty policy link to Consul. It must still update the linked-service
-// policy links, and it must return an error that names the missing link.
+// send an empty policy link to Consul, and it must return an error that names
+// the missing link. It must not write the role at all: server-acl-init can link
+// the gateway policy at the same time, and a write based on this read would
+// remove that link again.
 func TestTerminatingGatewayController_updateACls_GatewayPolicyLinkMissing(t *testing.T) {
 	t.Parallel()
 	env := newTGWACLTestEnv(t)
 	env.createPolicies(t, tgwTestGWPolicy, tgwTestSvcAPolicy)
-	env.createRole(t, tgwTestSvcAPolicy)
+	before := env.createRole(t, tgwTestSvcAPolicy)
 
 	err := env.controller.updateACls(logr.Discard(), newTestTerminatingGateway("svc-a", "svc-b"))
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), `No such ACL policy with name ""`)
 	require.Contains(t, err.Error(), tgwTestGWPolicy)
 	require.Contains(t, err.Error(), tgwTestRoleName)
-	require.ElementsMatch(t, []string{tgwTestSvcAPolicy, tgwTestSvcBPolicy}, env.rolePolicyNames(t))
+
+	after, _, err := env.consul.ACL().RoleRead(before.ID, nil)
+	require.NoError(t, err)
+	require.Equal(t, before.ModifyIndex, after.ModifyIndex, "the role must not be written while the gateway policy link is missing")
+	require.ElementsMatch(t, []string{tgwTestSvcAPolicy}, env.rolePolicyNames(t))
 }
 
 // Reconcile must report the missing gateway policy link on the CR with a clear
@@ -337,4 +343,107 @@ func TestTerminatingGatewayController_Reconcile_RoleNotFound(t *testing.T) {
 	aclStatus, _ := env.conditions(t)
 	require.Equal(t, corev1.ConditionFalse, aclStatus.Status)
 	require.Equal(t, consulv1alpha1.TerminatingGatewayFailedToSetACLs, aclStatus.Reason)
+}
+
+// server-acl-init and the controller both read, change, and write the
+// terminating gateway role, and Consul has no compare-and-set for roles. If
+// server-acl-init writes a role that it read before the controller linked a new
+// service, the new link is lost. The controller must schedule an ACL resync so
+// that the next reconcile links the service again, without a change to the CR.
+func TestTerminatingGatewayController_Reconcile_ACLResyncRestoresLinkRemovedByStaleRoleWrite(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t, newTestTerminatingGateway("svc-a"))
+	env.createPolicies(t, tgwTestGWPolicy)
+	env.createRole(t, tgwTestGWPolicy)
+
+	result, err := env.controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: tgwTestNamespace, Name: tgwTestGatewayName},
+	})
+	require.NoError(t, err)
+	require.Equal(t, terminatingGatewayACLResyncPeriod, result.RequeueAfter)
+	require.ElementsMatch(t, []string{tgwTestGWPolicy, tgwTestSvcAPolicy}, env.rolePolicyNames(t))
+
+	// server-acl-init reads the role.
+	staleRole, _, err := env.consul.ACL().RoleReadByName(tgwTestRoleName, nil)
+	require.NoError(t, err)
+
+	// The controller links a new service.
+	termGW := &consulv1alpha1.TerminatingGateway{}
+	require.NoError(t, env.kubeClient.Get(context.Background(),
+		types.NamespacedName{Namespace: tgwTestNamespace, Name: tgwTestGatewayName}, termGW))
+	termGW.Spec.Services = append(termGW.Spec.Services, consulv1alpha1.LinkedService{Name: "svc-b"})
+	require.NoError(t, env.kubeClient.Update(context.Background(), termGW))
+	require.NoError(t, env.reconcile(t))
+	require.ElementsMatch(t, []string{tgwTestGWPolicy, tgwTestSvcAPolicy, tgwTestSvcBPolicy}, env.rolePolicyNames(t))
+
+	// server-acl-init writes the role that it read earlier.
+	_, _, err = env.consul.ACL().RoleUpdate(staleRole, nil)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{tgwTestGWPolicy, tgwTestSvcAPolicy}, env.rolePolicyNames(t),
+		"precondition: the stale write removed the svc-b link")
+
+	// The scheduled resync links svc-b again.
+	result, err = env.controller.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: tgwTestNamespace, Name: tgwTestGatewayName},
+	})
+	require.NoError(t, err)
+	require.Equal(t, terminatingGatewayACLResyncPeriod, result.RequeueAfter)
+	require.ElementsMatch(t, []string{tgwTestGWPolicy, tgwTestSvcAPolicy, tgwTestSvcBPolicy}, env.rolePolicyNames(t))
+}
+
+// A periodic resync must not write the role when its links did not change.
+func TestTerminatingGatewayController_updateACls_SkipsUnchangedRoleWrite(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t)
+	env.createPolicies(t, tgwTestGWPolicy, tgwTestSvcAPolicy)
+	before := env.createRole(t, tgwTestGWPolicy, tgwTestSvcAPolicy)
+
+	require.NoError(t, env.controller.updateACls(logr.Discard(), newTestTerminatingGateway("svc-a")))
+
+	after, _, err := env.consul.ACL().RoleRead(before.ID, nil)
+	require.NoError(t, err)
+	require.Equal(t, before.ModifyIndex, after.ModifyIndex, "an unchanged role must not be written again")
+}
+
+// When the TerminatingGateway is deleted and the gateway policy link is
+// missing, updateACls must not block the deletion. It must delete the unused
+// service policies and must not write the role.
+func TestTerminatingGatewayController_updateACls_DeletionWithGatewayPolicyLinkMissing(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t)
+	env.createPolicies(t, tgwTestGWPolicy, tgwTestSvcAPolicy)
+	before := env.createRole(t, tgwTestSvcAPolicy)
+
+	termGW := newTestTerminatingGateway("svc-a")
+	now := metav1.Now()
+	termGW.DeletionTimestamp = &now
+
+	require.NoError(t, env.controller.updateACls(logr.Discard(), termGW))
+
+	after, _, err := env.consul.ACL().RoleRead(before.ID, nil)
+	require.NoError(t, err)
+	require.Equal(t, before.ModifyIndex, after.ModifyIndex, "the role must not be written while the gateway policy link is missing")
+	policy, _, err := env.consul.ACL().PolicyReadByName(tgwTestSvcAPolicy, nil)
+	require.NoError(t, err)
+	require.Nil(t, policy, "the unused service policy must be deleted")
+}
+
+// A resync that changes nothing must not write the TerminatingGateway status.
+// Each status write triggers another reconcile.
+func TestTerminatingGatewayController_Reconcile_ACLResyncDoesNotRewriteUnchangedStatus(t *testing.T) {
+	t.Parallel()
+	env := newTGWACLTestEnv(t, newTestTerminatingGateway("svc-a"))
+	env.createPolicies(t, tgwTestGWPolicy)
+	env.createRole(t, tgwTestGWPolicy)
+	require.NoError(t, env.reconcile(t))
+
+	key := types.NamespacedName{Namespace: tgwTestNamespace, Name: tgwTestGatewayName}
+	before := &consulv1alpha1.TerminatingGateway{}
+	require.NoError(t, env.kubeClient.Get(context.Background(), key, before))
+
+	require.NoError(t, env.reconcile(t))
+
+	after := &consulv1alpha1.TerminatingGateway{}
+	require.NoError(t, env.kubeClient.Get(context.Background(), key, after))
+	require.Equal(t, before.ResourceVersion, after.ResourceVersion, "an unchanged TerminatingGateway must not be written again")
 }

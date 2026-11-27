@@ -225,8 +225,39 @@ func (in *TerminatingGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+	desired, ok := in.ToConsul("").(*capi.TerminatingGatewayConfigEntry)
+	if !ok {
+		return false
+	}
+	// An empty linked-service namespace means the namespace of the config
+	// entry. Consul Enterprise returns that namespace, and Consul CE returns an
+	// empty value. Compare them as equal, so that the controller does not write
+	// the config entry again on every reconcile.
+	defaultNamespace := configEntry.Namespace
+	if defaultNamespace == "" {
+		defaultNamespace = "default"
+	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(
+		withDefaultLinkedServiceNamespace(desired, defaultNamespace),
+		withDefaultLinkedServiceNamespace(configEntry, defaultNamespace),
+		cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
+		cmpopts.IgnoreUnexported(),
+		cmpopts.EquateEmpty(),
+	)
+}
+
+// withDefaultLinkedServiceNamespace returns a copy of entry in which each
+// linked service with an empty namespace has the namespace defaultNamespace.
+func withDefaultLinkedServiceNamespace(entry *capi.TerminatingGatewayConfigEntry, defaultNamespace string) *capi.TerminatingGatewayConfigEntry {
+	normalized := *entry
+	normalized.Services = append([]capi.LinkedService(nil), entry.Services...)
+	for i := range normalized.Services {
+		if normalized.Services[i].Namespace == "" {
+			normalized.Services[i].Namespace = defaultNamespace
+		}
+	}
+	return &normalized
 }
 
 func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {

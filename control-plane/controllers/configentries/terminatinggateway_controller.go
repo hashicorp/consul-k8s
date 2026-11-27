@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 
@@ -31,6 +32,14 @@ import (
 var _ Controller = (*TerminatingGatewayController)(nil)
 
 const terminatingGatewayByLinkedServiceName = "linkedServiceName"
+
+// terminatingGatewayACLResyncPeriod is how often the controller reconciles a
+// TerminatingGateway again when ACLs are enabled. server-acl-init also writes
+// the terminating gateway role, and Consul has no compare-and-set for roles.
+// Thus, a role update by server-acl-init that is based on an earlier read can
+// remove a linked-service policy link that the controller added. The resync
+// links it again.
+const terminatingGatewayACLResyncPeriod = 5 * time.Minute
 
 // errGatewayPolicyNotLinked means that the terminating gateway role has no
 // link to the gateway policy. server-acl-init creates this link.
@@ -138,15 +147,23 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, err
 		}
 
-		termGW.SetACLStatusConditon(corev1.ConditionTrue, "", "")
-		err = r.UpdateStatus(ctx, termGW)
-		if err != nil {
-			log.Error(err, "error updating terminating-gateway status")
-			return ctrl.Result{}, err
+		// Write the status only when it changes. Each write triggers another
+		// reconcile, and SetACLStatusConditon sets a new transition time.
+		if !aclStatusConditionIsTrue(termGW) {
+			termGW.SetACLStatusConditon(corev1.ConditionTrue, "", "")
+			err = r.UpdateStatus(ctx, termGW)
+			if err != nil {
+				log.Error(err, "error updating terminating-gateway status")
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
-	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, termGW)
+	result, err := r.ConfigEntryController.ReconcileEntry(ctx, r, req, termGW)
+	if err == nil && enabled && termGW.ObjectMeta.DeletionTimestamp.IsZero() && !result.Requeue && result.RequeueAfter == 0 {
+		result.RequeueAfter = terminatingGatewayACLResyncPeriod
+	}
+	return result, err
 }
 
 func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Logger {
@@ -257,28 +274,38 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		termGWPoliciesToKeep, termGWPoliciesToRemove = handleDeletionForPolicies(termGW.Spec.Services)
 	}
 
-	if terminatingGatewayPolicy != nil {
-		termGWPoliciesToKeep = append(termGWPoliciesToKeep, terminatingGatewayPolicy)
-	}
-	terminatingGatewayRole.Policies = termGWPoliciesToKeep
-
-	_, _, err = connMgrClient.ACL().RoleUpdate(terminatingGatewayRole, nil)
-	if err != nil {
-		return err
-	}
-
-	err = r.conditionallyDeletePolicies(log, connMgrClient, termGWPoliciesToRemove, termGW.Name)
-	if err != nil {
-		return err
-	}
-
+	// Do not write the role when the gateway policy link is missing.
+	// server-acl-init can link the gateway policy at the same time, and Consul
+	// has no compare-and-set for roles, so a write based on this read could
+	// remove that link again.
 	if terminatingGatewayPolicy == nil {
+		if !termGW.ObjectMeta.DeletionTimestamp.IsZero() {
+			// Do not block the deletion of the TerminatingGateway. The deleted
+			// service policies are no longer granted through the role.
+			return r.conditionallyDeletePolicies(log, connMgrClient, termGWPoliciesToRemove, termGW.Name)
+		}
 		return fmt.Errorf("%w: role %q has no link to policy %q; server-acl-init creates this link. "+
 			"Link the policy to the role, or run server-acl-init again",
 			errGatewayPolicyNotLinked, terminatingGatewayRole.Name, fmt.Sprintf("%s-policy", termGW.Name))
 	}
+	termGWPoliciesToKeep = append(termGWPoliciesToKeep, terminatingGatewayPolicy)
 
-	return nil
+	keptTermGWPolicies := mapset.NewSet[string]()
+	for _, policy := range termGWPoliciesToKeep {
+		keptTermGWPolicies.Add(policy.Name)
+	}
+
+	// Skip the write when the links do not change, so that a periodic resync
+	// does not write the role each time.
+	if !keptTermGWPolicies.Equal(existingTermGWPolicies) || len(termGWPoliciesToKeep) != len(terminatingGatewayRole.Policies) {
+		terminatingGatewayRole.Policies = termGWPoliciesToKeep
+		_, _, err = connMgrClient.ACL().RoleUpdate(terminatingGatewayRole, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	return r.conditionallyDeletePolicies(log, connMgrClient, termGWPoliciesToRemove, termGW.Name)
 }
 
 func handleDeletionForPolicies(services []v1alpha1.LinkedService) ([]*capi.ACLRolePolicyLink, []*capi.ACLRolePolicyLink) {
@@ -422,4 +449,11 @@ func serviceNameFromPolicy(policyName string) string {
 
 	// remove the write policy suffix
 	return strings.TrimSuffix(n, "-write-policy")
+}
+
+// aclStatusConditionIsTrue returns true if the ConsulACLsSynced condition of
+// termGW is True with no reason and no message.
+func aclStatusConditionIsTrue(termGW *consulv1alpha1.TerminatingGateway) bool {
+	cond := termGW.Status.GetCondition(consulv1alpha1.ConsulACLStatus)
+	return cond != nil && cond.Status == corev1.ConditionTrue && cond.Reason == "" && cond.Message == ""
 }
