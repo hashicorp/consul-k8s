@@ -1,0 +1,7 @@
+```release-note:bug
+server-acl-init: Fix a regression where each run of `server-acl-init` removed policy links and identities that other components or operators added to its ACL roles, such as the linked-service policy links on the terminating gateway role. `server-acl-init` now adds missing policy links and removes only obsolete links to policies that it owns.
+```
+
+```release-note:improvement
+terminating-gateway: When consul-k8s manages the ACLs, the TerminatingGateway controller now reconciles each gateway every 5 minutes. This links linked-service policies again if a concurrent `server-acl-init` role update removed them. The controller no longer writes the terminating gateway role when its policy links did not change.
+```

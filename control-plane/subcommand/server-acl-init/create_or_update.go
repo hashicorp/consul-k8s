@@ -70,7 +70,7 @@ func (c *Command) addRoleAndBindingRule(client *consul.DynamicClient, componentN
 		Description: fmt.Sprintf("ACL Role for %s", serviceAccountName),
 		Policies:    policies,
 	}
-	err := c.updateOrCreateACLRole(client, role)
+	err := c.updateOrCreateACLRole(client, role, ownedRolePolicyNames(componentName, dc))
 	if err != nil {
 		c.log.Error("unable to update or create ACL Role", err)
 		return err
@@ -101,8 +101,9 @@ func (c *Command) addRoleAndBindingRule(client *consul.DynamicClient, componentN
 }
 
 // updateOrCreateACLRole will query to see if existing role is in place and update them
-// or create them if they do not yet exist.
-func (c *Command) updateOrCreateACLRole(client *consul.DynamicClient, role *api.ACLRole) error {
+// or create them if they do not yet exist. An existing role is merged with the
+// desired role (see mergeACLRole), so links that other components own are kept.
+func (c *Command) updateOrCreateACLRole(client *consul.DynamicClient, role *api.ACLRole, ownedPolicyNames []string) error {
 	err := c.untilSucceeds(fmt.Sprintf("update or create acl role for %s", role.Name),
 		func() error {
 			var err error
@@ -116,11 +117,11 @@ func (c *Command) updateOrCreateACLRole(client *consul.DynamicClient, role *api.
 				return err
 			}
 			if aclRole != nil {
-				// Copy the existing ID onto the desired role so the update targets the
-				// correct record. Use `role` (the desired state) rather than `aclRole`
-				// (the stale read) so new policy assignments are actually applied.
-				role.ID = aclRole.ID
-				_, _, err := client.ConsulClient.ACL().RoleUpdate(role, &api.WriteOptions{})
+				merged, changed := mergeACLRole(aclRole, role, ownedPolicyNames)
+				if !changed {
+					return nil
+				}
+				_, _, err := client.ConsulClient.ACL().RoleUpdate(merged, &api.WriteOptions{})
 				if err != nil {
 					c.log.Error("unable to update role", err)
 					return err
@@ -135,6 +136,60 @@ func (c *Command) updateOrCreateACLRole(client *consul.DynamicClient, role *api.
 			return err
 		})
 	return err
+}
+
+// ownedRolePolicyNames returns the names of the policies that server-acl-init
+// can link to the role of componentName in datacenter dc.
+func ownedRolePolicyNames(componentName, dc string) []string {
+	names := []string{fmt.Sprintf("%s-policy", componentName)}
+	if dc != "" {
+		names = append(names, fmt.Sprintf("%s-policy-%s", componentName, dc))
+	}
+	return names
+}
+
+// mergeACLRole applies the desired role to the existing role. server-acl-init
+// is not the only writer of its roles: for example, the TerminatingGateway
+// controller links linked-service policies to the gateway role, and operators
+// can add policies or identities. Thus, the merge adds the desired policy links
+// that are missing and removes only the links in ownedPolicyNames that are no
+// longer desired. All other links and identities are kept. It returns the role
+// to write and whether it differs from the existing role.
+func mergeACLRole(existing, desired *api.ACLRole, ownedPolicyNames []string) (*api.ACLRole, bool) {
+	desiredNames := make(map[string]struct{}, len(desired.Policies))
+	for _, link := range desired.Policies {
+		desiredNames[link.Name] = struct{}{}
+	}
+	owned := make(map[string]struct{}, len(ownedPolicyNames))
+	for _, name := range ownedPolicyNames {
+		owned[name] = struct{}{}
+	}
+
+	merged := *existing
+	merged.Description = desired.Description
+	changed := existing.Description != desired.Description
+
+	merged.Policies = make([]*api.ACLRolePolicyLink, 0, len(existing.Policies)+len(desired.Policies))
+	linked := make(map[string]struct{}, len(existing.Policies))
+	for _, link := range existing.Policies {
+		_, isOwned := owned[link.Name]
+		_, isDesired := desiredNames[link.Name]
+		if isOwned && !isDesired {
+			changed = true
+			continue
+		}
+		merged.Policies = append(merged.Policies, link)
+		linked[link.Name] = struct{}{}
+	}
+	for _, link := range desired.Policies {
+		if _, ok := linked[link.Name]; ok {
+			continue
+		}
+		merged.Policies = append(merged.Policies, &api.ACLRolePolicyLink{Name: link.Name})
+		linked[link.Name] = struct{}{}
+		changed = true
+	}
+	return &merged, changed
 }
 
 // createConnectBindingRule will query to see if existing binding rules are in place and update them
