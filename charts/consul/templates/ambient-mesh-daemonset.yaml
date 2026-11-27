@@ -39,10 +39,11 @@ spec:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/mesh-inject": "false"
     spec:
-      # The node proxy owns listeners inside every ambient pod network namespace
-      # on the node, so it shares the host network and mounts the netns directory.
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      # The node proxy runs in its own pod network: other proxies dial its pod
+      # IP for inbound mesh traffic. It mounts the netns directory to bind
+      # per-workload listeners and local app connections inside ambient pods.
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
       terminationGracePeriodSeconds: 30
       serviceAccountName: {{ template "consul.fullname" . }}-ambient-mesh
       {{- if .Values.ambientMesh.priorityClassName }}
@@ -111,10 +112,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            - name: HOST_IP
+            - name: POD_IP
               valueFrom:
                 fieldRef:
-                  fieldPath: status.hostIP
+                  fieldPath: status.podIP
             {{- if (and (not .Values.global.acls.manageSystemACLs) .Values.global.acls.bootstrapToken.secretName) }}
             - name: CONSUL_STATIC_TOKEN
               valueFrom:
@@ -167,7 +168,7 @@ spec:
             - -node-name=$(NODE_NAME)
             - -envoy-admin-bind-address=127.0.0.1
             - -envoy-admin-bind-port={{ .Values.ambientMesh.envoyAdminPort }}
-            - -ready-bind-address=$(HOST_IP)
+            - -ready-bind-address=$(POD_IP)
             - -ready-bind-port={{ .Values.ambientMesh.readyPort }}
             - -netns-dir={{ .Values.ambientMesh.netnsHostDir }}
             - -consul-dns-bind-port={{ .Values.ambientMesh.consulDNSPort }}

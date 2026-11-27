@@ -10,6 +10,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -39,10 +40,14 @@ func createAmbientPod(name, ip, status string) *corev1.Pod {
 	return pod
 }
 
+const ambientNodeProxyIP = "10.244.1.9"
+
 func createAmbientNodeProxyPod(node string, ready bool) *corev1.Pod {
 	status := corev1.ConditionFalse
+	podIP := ""
 	if ready {
 		status = corev1.ConditionTrue
+		podIP = ambientNodeProxyIP
 	}
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -51,7 +56,7 @@ func createAmbientNodeProxyPod(node string, ready bool) *corev1.Pod {
 			Labels:    map[string]string{"app": "consul", "component": "ambient-mesh"},
 		},
 		Spec:   corev1.PodSpec{NodeName: node},
-		Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: status}}},
+		Status: corev1.PodStatus{PodIP: podIP, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: status}}},
 	}
 }
 
@@ -94,18 +99,30 @@ func TestReconcile_AmbientPod(t *testing.T) {
 		nodeProxyReady   bool
 		expectRegistered bool
 		expectProxyCheck string
+		expectProxyAddr  string
+		// nodeProxyLosesIP re-reconciles after the node proxy pod loses its IP.
+		nodeProxyLosesIP bool
+		expectNoProxy    bool
 	}{
 		"registers once CNI is complete": {
 			podStatus:        constants.AmbientMeshStatusComplete,
 			nodeProxyReady:   true,
 			expectRegistered: true,
 			expectProxyCheck: api.HealthPassing,
+			expectProxyAddr:  ambientNodeProxyIP,
 		},
-		"node proxy not ready makes the proxy critical": {
+		"proxy is not registered at the app pod IP while the node proxy has no IP": {
 			podStatus:        constants.AmbientMeshStatusComplete,
 			nodeProxyReady:   false,
 			expectRegistered: true,
-			expectProxyCheck: api.HealthCritical,
+			expectNoProxy:    true,
+		},
+		"proxy is deregistered when the node proxy loses its IP": {
+			podStatus:        constants.AmbientMeshStatusComplete,
+			nodeProxyReady:   true,
+			nodeProxyLosesIP: true,
+			expectRegistered: true,
+			expectNoProxy:    true,
 		},
 		"waits for CNI": {
 			podStatus:      constants.AmbientMeshStatusWaiting,
@@ -143,10 +160,22 @@ func TestReconcile_AmbientPod(t *testing.T) {
 				},
 			}
 
-			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
-				NamespacedName: types.NamespacedName{Namespace: "default", Name: "web"},
-			})
+			req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "default", Name: "web"}}
+			resp, err := ep.Reconcile(context.Background(), req)
 			require.NoError(t, err)
+
+			if c.nodeProxyLosesIP {
+				proxies, _, err := consulClient.Catalog().Service("web-sidecar-proxy", "", nil)
+				require.NoError(t, err)
+				require.Len(t, proxies, 1)
+				var nodeProxy corev1.Pod
+				require.NoError(t, fakeClient.Get(context.Background(),
+					types.NamespacedName{Namespace: "consul", Name: "consul-ambient-mesh-" + nodeName}, &nodeProxy))
+				nodeProxy.Status = createAmbientNodeProxyPod(nodeName, false).Status
+				require.NoError(t, fakeClient.Status().Update(context.Background(), &nodeProxy))
+				resp, err = ep.Reconcile(context.Background(), req)
+				require.NoError(t, err)
+			}
 
 			proxies, _, err := consulClient.Catalog().Service("web-sidecar-proxy", "", nil)
 			require.NoError(t, err)
@@ -164,15 +193,20 @@ func TestReconcile_AmbientPod(t *testing.T) {
 			require.NotContains(t, services[0].ServiceMeta, constants.MetaKeyAmbientMesh)
 			require.Equal(t, api.ServiceAddress{Address: "10.96.0.20", Port: 80}, services[0].ServiceTaggedAddresses["virtual"])
 
+			if c.expectNoProxy {
+				require.Empty(t, proxies, "the proxy must never be registered at the app pod IP")
+				return
+			}
 			require.Len(t, proxies, 1)
 			proxy := proxies[0]
 			require.Equal(t, consulNodeName, proxy.Node)
 			require.Equal(t, "pod1-web-sidecar-proxy", proxy.ServiceID)
-			require.Equal(t, "1.2.3.4", proxy.ServiceAddress)
+			require.Equal(t, c.expectProxyAddr, proxy.ServiceAddress)
 			require.Equal(t, 15006, proxy.ServicePort)
 			require.Equal(t, "true", proxy.ServiceMeta[constants.MetaKeyAmbientMesh])
 			require.Equal(t, nodeName, proxy.ServiceMeta[constants.MetaKeyAmbientNode])
 			require.Equal(t, ambientNetNS, proxy.ServiceMeta[constants.MetaKeyAmbientNetNS])
+			require.Equal(t, "1.2.3.4", proxy.ServiceMeta[constants.MetaKeyAmbientPodIP])
 			require.Equal(t, api.ServiceAddress{Address: "10.96.0.20", Port: 80}, proxy.ServiceTaggedAddresses["virtual"])
 			require.Equal(t, api.ProxyModeTransparent, proxy.ServiceProxy.Mode)
 			require.Equal(t, 15001, proxy.ServiceProxy.TransparentProxy.OutboundListenerPort)
@@ -193,6 +227,85 @@ func TestReconcile_AmbientPod(t *testing.T) {
 			require.NotNil(t, nodeProxyCheck)
 			require.Equal(t, "pod1-web-sidecar-proxy/ambient-node-proxy", nodeProxyCheck.CheckID)
 			require.Equal(t, c.expectProxyCheck, nodeProxyCheck.Status)
+		})
+	}
+}
+
+func TestReconcile_AmbientPodServiceAccount(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		serviceAccount    string
+		alreadyRegistered bool
+		expectRegistered  bool
+	}{
+		"matching service account is registered": {
+			serviceAccount:   "web",
+			expectRegistered: true,
+		},
+		"mismatched service account is not registered": {
+			serviceAccount: "other",
+		},
+		"mismatched service account removes an existing registration": {
+			serviceAccount:    "other",
+			alreadyRegistered: true,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			objs := ambientTestObjects(constants.AmbientMeshStatusComplete, true)
+			objs[0].(*corev1.Pod).Spec.ServiceAccountName = c.serviceAccount
+			fakeClient := fake.NewClientBuilder().WithScheme(endpointSliceTestScheme(t)).WithRuntimeObjects(objs...).Build()
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(cfg *testutil.TestServerConfig) {
+				cfg.ACL.Enabled = true
+				cfg.ACL.Tokens.InitialManagement = "123e4567-e89b-12d3-a456-426614174000"
+			})
+			testClient.TestServer.WaitForActiveCARoot(t)
+
+			ep := &Controller{
+				Client:                fakeClient,
+				Log:                   logrtest.New(t),
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consul",
+				ReleaseNamespace:      "consul",
+				Ambient: AmbientConfig{
+					Enabled:            true,
+					InboundPort:        15006,
+					OutboundPort:       15001,
+					NodeProxySelector:  labels.SelectorFromSet(labels.Set{"app": "consul", "component": "ambient-mesh"}),
+					NodeProxyNamespace: "consul",
+				},
+			}
+			req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "default", Name: "web"}}
+			registered := func() int {
+				proxies, _, err := testClient.APIClient.Catalog().Service("web-sidecar-proxy", "", nil)
+				require.NoError(t, err)
+				services, _, err := testClient.APIClient.Catalog().Service("web", "", nil)
+				require.NoError(t, err)
+				require.Equal(t, len(services), len(proxies))
+				return len(proxies)
+			}
+
+			if c.alreadyRegistered {
+				// Registered before the check applied (ACL login disabled).
+				_, err := ep.Reconcile(context.Background(), req)
+				require.NoError(t, err)
+				require.Equal(t, 1, registered())
+			}
+
+			ep.AuthMethod = test.AuthMethod
+			resp, err := ep.Reconcile(context.Background(), req)
+			require.NoError(t, err)
+			require.Zero(t, resp.RequeueAfter, "a service account mismatch must not be retried")
+			if c.expectRegistered {
+				require.Equal(t, 1, registered())
+			} else {
+				require.Zero(t, registered())
+			}
 		})
 	}
 }

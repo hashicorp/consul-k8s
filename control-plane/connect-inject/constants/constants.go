@@ -67,6 +67,10 @@ const (
 	// MetaKeyAmbientNetNS is the pod network namespace path the ambient proxy binds sockets in.
 	MetaKeyAmbientNetNS = "ambient-netns"
 
+	// MetaKeyAmbientPodIP is the workload pod IP of an ambient proxy registration, whose address
+	// is the node proxy's IP.
+	MetaKeyAmbientPodIP = "ambient-pod-ip"
+
 	// AmbientNodeProxyCheckName is the name of the health check that reflects the readiness of
 	// the node-level ambient proxy serving a workload.
 	AmbientNodeProxyCheckName = "Ambient Node Proxy"

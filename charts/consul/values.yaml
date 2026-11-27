@@ -3238,7 +3238,7 @@ ambientMesh:
   # @type: string
   image: ""
 
-  # Port the node proxy accepts inbound mesh (mTLS) traffic on in each pod network namespace.
+  # Port of the node proxy's transparent inbound listener in each pod network namespace.
   # @type: integer
   inboundPort: 15006
 

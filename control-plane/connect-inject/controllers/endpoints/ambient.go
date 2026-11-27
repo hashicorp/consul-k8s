@@ -23,7 +23,7 @@ import (
 type AmbientConfig struct {
 	// Enabled turns on ambient mesh registration.
 	Enabled bool
-	// InboundPort is the port the node proxy accepts inbound mesh traffic on inside each pod netns.
+	// InboundPort is the port the node proxy accepts inbound mesh traffic on, on its own pod IP.
 	InboundPort int
 	// OutboundPort is the transparent outbound listener port inside each pod netns.
 	OutboundPort int
@@ -44,15 +44,31 @@ func ambientPodReady(pod corev1.Pod) bool {
 		pod.Annotations[constants.AnnotationAmbientNetNS] != ""
 }
 
+// validateAmbientServiceAccount applies connect-init's identity check to ambient pods: with ACLs
+// enabled, a pod may only be registered as the Consul service named after its Kubernetes service
+// account. Sidecar pods are checked by connect-init before their own ACL token is used. Ambient
+// pods have neither, and the node proxy may write every service, so without this check a pod could
+// take another service's identity (and leaf certificate) via the connect-service annotation.
+func (r *Controller) validateAmbientServiceAccount(pod corev1.Pod, serviceEndpoints corev1.Endpoints) error {
+	if r.AuthMethod == "" {
+		return nil
+	}
+	svcName := serviceName(pod, serviceEndpoints)
+	if pod.Spec.ServiceAccountName != svcName {
+		return fmt.Errorf("service account name %q doesn't match Consul service name %q", pod.Spec.ServiceAccountName, svcName)
+	}
+	return nil
+}
+
 // registerAmbientServicesAndHealthCheck registers the service and its proxy for a pod served by the
 // node-level ambient proxy. The service registration is identical to sidecar mode; the proxy
-// registration points at the node proxy's ports inside the pod network namespace.
+// registration points at the node proxy's inbound listener on the node proxy pod's IP.
 func (r *Controller) registerAmbientServicesAndHealthCheck(ctx context.Context, apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
 	if pod.Labels[constants.KeyManagedBy] != constants.ManagedByValue {
 		return nil
 	}
 
-	serviceRegistration, proxyServiceRegistration, err := r.createAmbientServiceRegistrations(ctx, pod, podIP, serviceEndpoints, healthStatus)
+	serviceRegistration, proxyServiceRegistration, proxyRoutable, err := r.createAmbientServiceRegistrations(ctx, pod, podIP, serviceEndpoints, healthStatus)
 	if err != nil {
 		return err
 	}
@@ -66,48 +82,75 @@ func (r *Controller) registerAmbientServicesAndHealthCheck(ctx context.Context, 
 		r.Log.Error(err, "failed to add ip to virtual ip table", "name", serviceRegistration.Service.Service)
 	}
 
+	if !proxyRoutable {
+		// The proxy must only ever be reachable at the node proxy's address. Until the node proxy
+		// pod has an IP, keep the proxy out of the catalog; a node proxy pod update re-reconciles.
+		r.Log.Info("ambient node proxy has no IP yet; deregistering ambient proxy service",
+			"id", proxyServiceRegistration.Service.ID, "node", pod.Spec.NodeName)
+		_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
+			Node:      proxyServiceRegistration.Node,
+			ServiceID: proxyServiceRegistration.Service.ID,
+			Namespace: proxyServiceRegistration.Service.Namespace,
+			Partition: proxyServiceRegistration.Partition,
+		}, nil)
+		return err
+	}
+
 	r.Log.Info("registering ambient proxy service with Consul", "name", proxyServiceRegistration.Service.Service,
 		"id", proxyServiceRegistration.Service.ID, "node", pod.Spec.NodeName)
 	_, err = apiClient.Catalog().Register(proxyServiceRegistration, nil)
 	return err
 }
 
-func (r *Controller) createAmbientServiceRegistrations(ctx context.Context, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
+// createAmbientServiceRegistrations builds the service and proxy registrations for an ambient pod.
+// proxyRoutable is false when the node proxy has no pod IP yet; the proxy registration must then
+// not be registered, because its address would not point at a node proxy.
+func (r *Controller) createAmbientServiceRegistrations(ctx context.Context, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (serviceRegistration, proxyRegistration *api.CatalogRegistration, proxyRoutable bool, err error) {
 	// Build the base registrations with sidecar-only transparent proxy handling (probe exposure,
 	// pod tproxy annotations) switched off; the ambient equivalents are applied below.
 	base := *pod.DeepCopy()
 	base.Annotations[constants.KeyTransparentProxy] = "false"
-	serviceRegistration, proxyRegistration, err := r.createServiceRegistrations(ctx, base, podIP, serviceEndpoints, healthStatus)
+	serviceRegistration, proxyRegistration, err = r.createServiceRegistrations(ctx, base, podIP, serviceEndpoints, healthStatus)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
+	nodeProxy, nodeProxyErr := r.ambientNodeProxyPod(ctx, pod.Spec.NodeName)
+
 	proxy := proxyRegistration.Service
+	// Other proxies dial the node proxy, which serves every ambient workload on the node and
+	// selects the destination service by SNI. The app pod IP is never used as the proxy address.
+	proxy.Address = ""
+	if nodeProxy != nil && nodeProxy.Status.PodIP != "" {
+		proxy.Address = nodeProxy.Status.PodIP
+		proxyRoutable = true
+	}
 	proxy.Port = r.Ambient.InboundPort
 	proxy.Proxy.Mode = api.ProxyModeTransparent
 	proxy.Proxy.TransparentProxy = &api.TransparentProxyConfig{OutboundListenerPort: r.Ambient.OutboundPort}
 	proxy.Proxy.Expose = api.ExposeConfig{}
 
 	// The service and proxy registrations share one meta map; ambient keys belong to the proxy only.
-	meta := make(map[string]string, len(proxy.Meta)+3)
+	meta := make(map[string]string, len(proxy.Meta)+4)
 	for k, v := range proxy.Meta {
 		meta[k] = v
 	}
 	meta[constants.MetaKeyAmbientMesh] = "true"
 	meta[constants.MetaKeyAmbientNode] = pod.Spec.NodeName
 	meta[constants.MetaKeyAmbientNetNS] = pod.Annotations[constants.AnnotationAmbientNetNS]
+	meta[constants.MetaKeyAmbientPodIP] = podIP
 	proxy.Meta = meta
 
 	taggedAddresses, err := r.ambientVirtualTaggedAddresses(ctx, pod, serviceEndpoints, serviceRegistration.Service.Port)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if taggedAddresses != nil {
 		serviceRegistration.Service.TaggedAddresses = taggedAddresses
 		proxy.TaggedAddresses = taggedAddresses
 	}
 
-	nodeProxyStatus, nodeProxyOutput := r.ambientNodeProxyHealth(ctx, pod.Spec.NodeName)
+	nodeProxyStatus, nodeProxyOutput := ambientNodeProxyHealth(pod.Spec.NodeName, nodeProxy, nodeProxyErr)
 	proxyRegistration.Checks = api.HealthChecks{{
 		CheckID:   ambientNodeProxyCheckID(proxy.ID),
 		Name:      constants.AmbientNodeProxyCheckName,
@@ -118,7 +161,7 @@ func (r *Controller) createAmbientServiceRegistrations(ctx context.Context, pod 
 		Namespace: proxy.Namespace,
 	}}
 
-	return serviceRegistration, proxyRegistration, nil
+	return serviceRegistration, proxyRegistration, proxyRoutable, nil
 }
 
 // ambientVirtualTaggedAddresses mirrors the sidecar transparent proxy behaviour: the Kubernetes
@@ -150,8 +193,7 @@ func (r *Controller) ambientVirtualTaggedAddresses(ctx context.Context, pod core
 }
 
 // ambientNodeProxyHealth returns the health of the node proxy pod running on nodeName.
-func (r *Controller) ambientNodeProxyHealth(ctx context.Context, nodeName string) (string, string) {
-	pod, err := r.ambientNodeProxyPod(ctx, nodeName)
+func ambientNodeProxyHealth(nodeName string, pod *corev1.Pod, err error) (string, string) {
 	if err != nil {
 		return api.HealthCritical, fmt.Sprintf("failed to look up ambient node proxy on node %s: %s", nodeName, err)
 	}
