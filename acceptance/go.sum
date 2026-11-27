@@ -145,10 +145,10 @@ github.com/gruntwork-io/terratest v0.46.7 h1:oqGPBBO87SEsvBYaA0R5xOq+Lm2Xc5dmFVf
 github.com/gruntwork-io/terratest v0.46.7/go.mod h1:6gI5MlLeyF+SLwqocA5GBzcTix+XiuxCy1BPwKuT+WM=
 github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.11 h1:PcEEhHGn2iPnVNugSgVpK4V7yHO1nJ3d0JkpzKzS6qs=
 github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.11/go.mod h1:GCmiNNnr+f7cb3lpZb3s2EDpsH0dKsXyNE+DPwTXivk=
-github.com/hashicorp/consul/api v1.35.0 h1:4ULHUF0DDHcDqQE48KpdbV7PIIQDua3UaJ/bEcUiTE0=
-github.com/hashicorp/consul/api v1.35.0/go.mod h1:RwV43v4y1mHVnJY2V9m89rR/0mDF9QL6q7+G0Rkma/I=
-github.com/hashicorp/consul/sdk v0.19.0 h1:zucuiWFKpggzzrx9MPHCpei74gnrLoHT/TGP2NmegHc=
-github.com/hashicorp/consul/sdk v0.19.0/go.mod h1:Xak7xFgsTYKR6j523cZDqCgZy0g/JvKMNs9MhX7MUM4=
+github.com/hashicorp/consul/api v1.35.1 h1:fVlGFvYSiNUcHfMLDpMxQypK0xlo7SUB8Y8vcTV6YOc=
+github.com/hashicorp/consul/api v1.35.1/go.mod h1:49mXhX2/52F/fn4KUgCqrDrJA+E2d9X5HlWv4q3brZc=
+github.com/hashicorp/consul/sdk v0.19.1 h1:ePDMM/XkDFCNW9x+cxAthvyUQiowrfxBcw0P9XvHgfI=
+github.com/hashicorp/consul/sdk v0.19.1/go.mod h1:J+EXUIEdnAF9+BOk/fD8YTA8MFcwJjRpiu5DAhQo8JQ=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
