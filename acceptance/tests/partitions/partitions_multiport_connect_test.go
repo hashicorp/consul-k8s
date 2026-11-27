@@ -277,9 +277,9 @@ func runPartitionsConnectMultiport(t *testing.T, aclsEnabled bool, gatewayMode s
 
 	if checkDenied {
 		logger.Log(t, "checking that cross-partition connections fail before intentions are configured")
-		k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAPIURL)
-		k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamMetricsURL)
-		k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAdminURL)
+		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAPIURL)
+		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamMetricsURL)
+		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAdminURL)
 		createMultiportIntention()
 	}
 
