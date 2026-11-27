@@ -15,11 +15,11 @@
     "TestAPIGateway_ExternalServers": 216.0
   },
   "basic": {
-    "TestBasicInstallation": 243.23
+    "TestBasicInstallation": 254.67
   },
   "cli": {
-    "TestInstall": 372.82,
-    "TestUpgrade": 180.71
+    "TestInstall": 381.5,
+    "TestUpgrade": 225.67
   },
   "config-entries": {
     "TestController_NotSecure_NoVault": 540,
@@ -37,7 +37,9 @@
     "TestConnectInject_PermissiveMTLS": 196,
     "TestConnectInject_LocalRateLimiting": 182.57,
     "TestConnectInject_ExternalServers": 401.6,
-    "TestConnectInject_MultiportServices": 432.53
+    "TestConnectInject_MultiportServices": 432.53,
+    "TestConnectInject_MultiportRegistrationGate": 93.75,
+    "TestFeatureGate_ExternalServers": 297.94
   },
   "connect-lifecycle": {
     "TestConnectInject_ProxyLifecycleShutdown_NotSecure_DrainListeners_GracePeriod5": 370,
@@ -59,13 +61,14 @@
     "TestConsulDNS_SecureNoInjectDNSProxy_PrivilegedPort": 136,
     "TestConsulDNS_NoTLSNoProxy_NonPrivilegedPort": 136,
     "TestConsulDNS_NoTLSDNSProxy_NonPrivilegedPort": 136,
-    "TestConsulDNS_SecureNoProxy_NonPrivilegedPort": 136,
+    "TestConsulDNS_SecureNoProxy_NonPrivilegedPort": 143.34,
     "TestConsulDNS_SecureDNSProxy_NonPrivilegedPort": 151.21,
     "TestConsulDNS_SecureNoInjectDNSProxy_NonPrivilegedPort": 136
   },
   "metrics": {
-    "TestComponentMetrics": 93.07,
-    "TestAppMetrics": 165.36
+    "TestComponentMetrics": 93.81,
+    "TestAppMetrics": 165.36,
+    "TestAppMetricsMultiplePorts_PortDown": 355.98
   },
   "partitions": {
     "TestPartitions_Connect_DefaultNamespace": 553,
@@ -101,13 +104,13 @@
     "TestFailover_Connect_SecureFailover": 1080
   },
   "snapshot-agent": {
-    "TestSnapshotAgent_K8sSecret": 91.52,
-    "TestSnapshotAgent_Vault": 45.33
+    "TestSnapshotAgent_K8sSecret": 92.55,
+    "TestSnapshotAgent_Vault": 69.42
   },
   "sync": {
-    "TestSyncCatalogNamespaces": 405.1,
-    "TestSyncCatalog": 197.78,
-    "TestSyncCatalogWithIngress": 205.5
+    "TestSyncCatalogNamespaces": 465.98,
+    "TestSyncCatalog": 223.78,
+    "TestSyncCatalogWithIngress": 226.84
   },
   "terminating-gateway": {
     "TestTerminatingGatewayNamespaceMirroring_AllDefault_NotSecure": 224,
@@ -118,7 +121,8 @@
     "TestTerminatingGatewayNamespaceMirroring_MeshDefaultOthersNonDefault_Secure": 224,
     "TestTerminatingGatewayNamespaceMirroring_ExternalDefaultOthersNonDefault_NotSecure": 224,
     "TestTerminatingGatewayNamespaceMirroring_ExternalDefaultOthersNonDefault_Secure": 224,
-    "TestTerminatingGatewaySingleNamespace": 360
+    "TestTerminatingGatewaySingleNamespace": 360,
+    "TestTerminatingGateway": 298.54
   },
   "vault": {
     "TestVault_Partitions": 207.1,
