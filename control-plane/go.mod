@@ -6,7 +6,7 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.19.0
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.19.1
 
 replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260922143634-a221db5d588a
 
@@ -25,8 +25,8 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.11
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.12
-	github.com/hashicorp/consul/api v1.35.0
-	github.com/hashicorp/consul/sdk v0.19.0
+	github.com/hashicorp/consul/api v1.35.1
+	github.com/hashicorp/consul/sdk v0.19.1
 	github.com/hashicorp/go-bexpr v0.1.16
 	github.com/hashicorp/go-discover v1.5.0
 	github.com/hashicorp/go-hclog v1.6.3
@@ -141,7 +141,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.16 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/gophercloud/gophercloud v1.14.1 // indirect
-	github.com/hashicorp/consul/proto-public v0.9.0 // indirect
+	github.com/hashicorp/consul/proto-public v0.9.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-discover/provider/gce v0.0.0-20260729160347-bd352ec235a2 // indirect
@@ -221,6 +221,6 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 )
 
-replace github.com/hashicorp/consul/troubleshoot => github.com/hashicorp/consul/troubleshoot v0.0.0-20260922143634-a221db5d588a
+replace github.com/hashicorp/consul/troubleshoot => github.com/hashicorp/consul/troubleshoot v0.10.2
 
 exclude github.com/hashicorp/vic v1.5.1-0.20190403131502-bbfe86ec9443
