@@ -169,11 +169,19 @@ resource "aws_iam_role_policy_attachment" "csi" {
   policy_arn = data.aws_iam_policy.csi-driver-policy.arn
 }
 
+# Use AWS's default EBS CSI add-on version for the cluster's Kubernetes version
+# instead of a fixed pin, which stops being supported on newer EKS releases.
+data "aws_eks_addon_version" "csi-driver" {
+  addon_name         = "aws-ebs-csi-driver"
+  kubernetes_version = var.kubernetes_version
+  most_recent        = false
+}
+
 resource "aws_eks_addon" "csi-driver" {
   count                       = var.cluster_count
   cluster_name                = module.eks[count.index].cluster_id
   addon_name                  = "aws-ebs-csi-driver"
-  addon_version               = "v1.44.0-eksbuild.1"
+  addon_version               = data.aws_eks_addon_version.csi-driver.version
   service_account_role_arn    = aws_iam_role.csi-driver-role[count.index].arn
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
