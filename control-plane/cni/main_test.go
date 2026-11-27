@@ -738,3 +738,52 @@ func minimalNftCfgJSON(t *testing.T) string {
 	require.NoError(t, err)
 	return string(buf)
 }
+
+func Test_cmdAdd_Ambient(t *testing.T) {
+	t.Parallel()
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
+		Status: corev1.NodeStatus{Addresses: []corev1.NodeAddress{
+			{Type: corev1.NodeHostName, Address: "node-1"},
+			{Type: corev1.NodeInternalIP, Address: "10.0.0.5"},
+		}},
+	}
+	pod := minimalPod(defaultPodName)
+	pod.Spec.NodeName = "node-1"
+	pod.Annotations[keyInjectStatus] = "injected"
+	pod.Annotations[keyAmbientMeshStatus] = waiting
+	pod.Annotations[annotationAmbientRedirectConfig] = `{"InboundPort":15006,"OutboundPort":15001,"ProxyMark":1337,"ConsulDNSPort":8600,"ProbePorts":["8080"]}`
+
+	provider := &fakeNftablesProvider{}
+	cmd := &Command{client: fake.NewSimpleClientset(node, pod), nftablesProvider: provider}
+
+	require.NoError(t, cmd.cmdAdd(minimalSkelArgs(defaultPodName, defaultNamespace, goodStdinData)))
+
+	updated, err := cmd.client.CoreV1().Pods(defaultNamespace).Get(context.Background(), defaultPodName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, complete, updated.Annotations[keyAmbientMeshStatus])
+	require.Equal(t, "/some/netns/path", updated.Annotations[annotationAmbientNetNS])
+	_, hasTproxyStatus := updated.Annotations[keyTransparentProxyStatus]
+	require.False(t, hasTproxyStatus, "ambient pods must not go through the sidecar redirection path")
+
+	rules := provider.Rules()
+	require.Contains(t, rules, "nft add rule inet consul_ambient CONSUL_AMBIENT_NAT_OUTPUT meta mark 0x539 return")
+	require.Contains(t, rules, "nft add rule inet consul_ambient CONSUL_AMBIENT_INBOUND ip saddr 10.0.0.5 tcp dport 8080 return")
+	require.Contains(t, rules, "nft add rule inet consul_ambient CONSUL_AMBIENT_DNS ip daddr 127.0.0.1 udp dport 53 dnat to 127.0.0.1:8600")
+	for _, r := range rules {
+		require.NotContains(t, r, "consul_tproxy")
+	}
+}
+
+func Test_cmdAdd_AmbientMissingConfig(t *testing.T) {
+	t.Parallel()
+
+	pod := minimalPod(defaultPodName)
+	pod.Annotations[keyInjectStatus] = "injected"
+	pod.Annotations[keyAmbientMeshStatus] = waiting
+	cmd := &Command{client: fake.NewSimpleClientset(pod), nftablesProvider: &fakeNftablesProvider{}}
+
+	err := cmd.cmdAdd(minimalSkelArgs(defaultPodName, defaultNamespace, goodStdinData))
+	require.ErrorContains(t, err, annotationAmbientRedirectConfig)
+}

@@ -1398,3 +1398,54 @@ partition "default" {
 		})
 	}
 }
+
+func TestAmbientMeshRules(t *testing.T) {
+	cases := []struct {
+		EnableNamespaces bool
+		PartitionName    string
+		Expected         string
+	}{
+		{
+			Expected: `
+  node_prefix "" {
+    policy = "read"
+  }
+  query_prefix "" {
+    policy = "read"
+  }
+    service_prefix "" {
+      policy = "write"
+    }`,
+		},
+		{
+			EnableNamespaces: true,
+			PartitionName:    "part-1",
+			Expected: `
+partition "part-1" {
+  node_prefix "" {
+    policy = "read"
+  }
+  query_prefix "" {
+    policy = "read"
+  }
+  namespace_prefix "" {
+    service_prefix "" {
+      policy = "write"
+    }
+  }
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(fmt.Sprintf("ns=%t, partition=%q", tt.EnableNamespaces, tt.PartitionName), func(t *testing.T) {
+			cmd := Command{
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
+				flagEnableNamespaces: tt.EnableNamespaces,
+			}
+			rules, err := cmd.ambientMeshRules()
+			require.NoError(t, err)
+			require.Equal(t, tt.Expected, rules)
+		})
+	}
+}

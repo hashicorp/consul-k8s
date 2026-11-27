@@ -219,6 +219,16 @@ type MeshWebhook struct {
 	// from mesh services.
 	EnableConsulDNS bool
 
+	// EnableAmbientMesh allows pods (via annotation) and namespaces (via label) to opt into the
+	// ambient mesh, where a node-level proxy replaces the sidecar.
+	EnableAmbientMesh bool
+
+	// AmbientInboundPort, AmbientOutboundPort and AmbientProxyMark configure the CNI redirection
+	// for ambient pods. They must match the node-level proxy.
+	AmbientInboundPort  int
+	AmbientOutboundPort int
+	AmbientProxyMark    int
+
 	// EnableOpenShift indicates that when tproxy is enabled, the security context for the Envoy and init
 	// containers should not be added because OpenShift sets a random user for those and will not allow
 	// those containers to be created otherwise.
@@ -277,6 +287,23 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error creating default annotations: %s", err))
 	}
 
+	// Pods opted into the ambient mesh are served by the node-level proxy and get no sidecar.
+	if w.EnableAmbientMesh {
+		ambientNS, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
+		if err != nil {
+			w.Log.Error(err, "error fetching namespace metadata for ambient mesh", "request name", req.Name)
+			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata: %s", err))
+		}
+		ambient, err := w.ambientMeshRequested(*ambientNS, pod)
+		if err != nil {
+			w.Log.Error(err, "invalid ambient mesh configuration", "request name", req.Name)
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("couldn't check if ambient mesh is enabled: %w", err))
+		}
+		if ambient {
+			return w.handleAmbient(ctx, req, *ambientNS, pod, origPodJson)
+		}
+	}
+
 	// Check if we should inject, for example we don't inject in the
 	// system namespaces.
 	if shouldInject, err := w.shouldInject(pod, req.Namespace); err != nil {
@@ -304,6 +331,13 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	}
 
 	w.Log.Info("received pod", "name", req.Name, "ns", req.Namespace)
+
+	// Ambient keys are owned by the webhook and the CNI plugin. Strip user-supplied values so a
+	// sidecar pod cannot make the CNI plugin skip sidecar traffic redirection.
+	delete(pod.Annotations, constants.KeyAmbientMeshStatus)
+	delete(pod.Annotations, constants.AnnotationAmbientNetNS)
+	delete(pod.Annotations, constants.AnnotationAmbientRedirectConfig)
+	delete(pod.Labels, constants.KeyAmbientMesh)
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.

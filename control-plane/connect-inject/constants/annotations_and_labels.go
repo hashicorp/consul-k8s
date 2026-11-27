@@ -215,6 +215,30 @@ const (
 	// AnnotationDualStack stores if pod need to run in dualstack mode.
 	AnnotationDualStack = "consul.hashicorp.com/dual-stack"
 
+	// KeyAmbientMesh enables or disables the ambient mesh (node-level proxy, no sidecar) for a pod.
+	// It can also be set as a label on a namespace to define the default for all pods in that
+	// namespace. The pod annotation takes precedence over the namespace label.
+	KeyAmbientMesh = "consul.hashicorp.com/ambient-mesh"
+
+	// LabelAmbientMeshEnabled is the value of the KeyAmbientMesh pod label set by the webhook on
+	// pods enrolled in the ambient mesh. The node proxy selects pods by this label.
+	LabelAmbientMeshEnabled = "enabled"
+
+	// KeyAmbientMeshStatus is set to "waiting" by the webhook on pods enrolled in the ambient mesh
+	// and set to "complete" by the CNI plugin once traffic redirection is applied.
+	KeyAmbientMeshStatus = "consul.hashicorp.com/ambient-mesh-status"
+
+	// AnnotationAmbientRedirectConfig stores the ambient traffic redirection configuration used by
+	// the CNI plugin.
+	AnnotationAmbientRedirectConfig = "consul.hashicorp.com/ambient-redirect-config"
+
+	// AnnotationAmbientNetNS is written by the CNI plugin with the pod network namespace path.
+	AnnotationAmbientNetNS = "consul.hashicorp.com/ambient-netns"
+
+	// AmbientMeshStatusWaiting and AmbientMeshStatusComplete are the values of KeyAmbientMeshStatus.
+	AmbientMeshStatusWaiting  = "waiting"
+	AmbientMeshStatusComplete = "complete"
+
 	// AnnotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/meshWebhook.
 	AnnotationOriginalPod = "consul.hashicorp.com/original-pod"

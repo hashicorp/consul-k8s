@@ -232,6 +232,9 @@ spec:
             {{- if .Values.dns.proxy.enabled }}
               -dns-proxy=true \
             {{- end }}
+            {{- if .Values.ambientMesh.enabled }}
+            -ambient-mesh=true \
+            {{- end }}
             {{- if .Values.ingressGateways.enabled }}
             {{- if .Values.global.enableConsulNamespaces }}
             {{- $root := . }}

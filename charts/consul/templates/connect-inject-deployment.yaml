@@ -165,6 +165,13 @@ spec:
                 -default-enable-transparent-proxy=false \
                 {{- end }}
                 -enable-cni={{ .Values.connectInject.cni.enabled }} \
+                {{- if .Values.ambientMesh.enabled }}
+                -enable-ambient-mesh=true \
+                -ambient-inbound-port={{ .Values.ambientMesh.inboundPort }} \
+                -ambient-outbound-port={{ .Values.ambientMesh.outboundPort }} \
+                -ambient-proxy-mark={{ .Values.ambientMesh.proxyMark }} \
+                -ambient-node-proxy-selector="app={{ template "consul.name" . }},component=ambient-mesh,release={{ .Release.Name }}" \
+                {{- end }}
                 {{- if .Values.global.peering.enabled }}
                 -enable-peering=true \
                 {{- end }}

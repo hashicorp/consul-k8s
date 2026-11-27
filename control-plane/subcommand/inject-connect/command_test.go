@@ -158,6 +158,22 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "-global-config-acl-token cannot be set together with -global-config-acl-token-secret-name/-global-config-acl-token-secret-key",
 		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-enable-ambient-mesh"},
+			expErr: "-enable-cni must be set to 'true' if -enable-ambient-mesh is set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-enable-ambient-mesh", "-enable-cni"},
+			expErr: "-ambient-node-proxy-selector must be set if -enable-ambient-mesh is set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-enable-ambient-mesh", "-enable-cni", "-ambient-node-proxy-selector", "app=consul,component=ambient-node-proxy",
+				"-ambient-inbound-port", "0"},
+			expErr: "-ambient-inbound-port",
+		},
 	}
 
 	for _, c := range cases {

@@ -150,6 +150,9 @@ type Controller struct {
 	// consulClientHttpPort is only used in tests.
 	consulClientHttpPort int
 	NodeMeta             map[string]string
+
+	// Ambient configures registration of pods served by the node-level ambient proxy.
+	Ambient AmbientConfig
 }
 
 // +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
@@ -306,7 +309,27 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					// which then causes connect-init's gateway registration lookup to see multiple
 					// matching services for the same pod and fail.
 					if hasBeenInjected(pod) && !isGateway(pod) {
-						if isConsulDataplaneSupported(pod) {
+						if r.Ambient.Enabled && common.IsAmbientPod(pod) {
+							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
+							if err := r.validateAmbientServiceAccount(pod, serviceEndpoints); err != nil {
+								// Not retried: only a change to the pod can fix it. Any existing
+								// registration for the pod is removed.
+								r.Log.Error(err, "refusing to register ambient pod", "name", pod.Name, "ns", pod.Namespace)
+								markForDeregistration(deregisterEndpointAddress, address.IP)
+								continue
+							}
+							// Keep any existing registration while the CNI plugin finishes setting up the pod.
+							deregisterEndpointAddress[address.IP] = false
+							if !ambientPodReady(pod) {
+								r.Log.Info("waiting for CNI to set up ambient pod", "name", pod.Name, "ns", pod.Namespace)
+								requeueForEndpointsLag = true
+								continue
+							}
+							if err = r.registerAmbientServicesAndHealthCheck(ctx, apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
+								r.Log.Error(err, "failed to register ambient services or health check", "name", serviceName, "ns", serviceNamespace)
+								errs = multierror.Append(errs, err)
+							}
+						} else if isConsulDataplaneSupported(pod) {
 							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
 							if err = r.registerServicesAndHealthCheck(ctx, apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
 								r.Log.Error(err, "failed to register services or health check", "name", serviceName, "ns", serviceNamespace)
@@ -405,6 +428,10 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForCredentialGatewayPod)).
 		// Pods evicted by the kubelet move to the Failed phase without necessarily changing their EndpointSlice.
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForTerminalPod)).
+		// Ambient pods are registered once the CNI plugin marks them complete, and their
+		// "Ambient Node Proxy" check follows the readiness of the node proxy on their node.
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForAmbientPod)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.requestsForAmbientNodeProxyPod)).
 		Complete(r)
 }
 
@@ -1214,7 +1241,7 @@ func (r *Controller) deregisterService(
 		// every service instance.
 		var serviceDeregistered bool
 
-		shouldDeregister := deregister(svc.ServiceAddress, deregisterEndpointAddress)
+		shouldDeregister := deregister(instanceEndpointAddress(svc), deregisterEndpointAddress)
 		if !shouldDeregister {
 			terminal, err := r.isTerminalPodInstance(ctx, svc, k8sSvcNamespace)
 			if err != nil {
@@ -2483,6 +2510,15 @@ func markForDeregistration(deregisterEndpointAddress map[string]bool, ip string)
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
 // marked in the map for deregistration.
+// instanceEndpointAddress returns the EndpointSlice address a service instance was registered for.
+// Ambient proxies are registered at the node proxy's address, so their pod IP is kept in meta.
+func instanceEndpointAddress(svc *api.CatalogService) string {
+	if podIP := svc.ServiceMeta[constants.MetaKeyAmbientPodIP]; podIP != "" {
+		return podIP
+	}
+	return svc.ServiceAddress
+}
+
 func deregister(address string, deregisterEndpointAddress map[string]bool) bool {
 	if deregisterEndpointAddress == nil {
 		return true
