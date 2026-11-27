@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.26.10
+go 1.26.11
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
