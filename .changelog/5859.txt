@@ -1,0 +1,3 @@
+```release-note:bug
+cni: Fix kubeconfig resolution to prevent stale legacy kubeconfigs from taking precedence over newer installation-specific kubeconfigs.
+```
