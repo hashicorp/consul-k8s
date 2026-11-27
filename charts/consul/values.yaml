@@ -5,6 +5,9 @@
 
 # Holds values that affect multiple components of the chart.
 global:
+  # If true, Kubernetes Gateway API CRDs (GatewayClass, Gateway, HTTPRoute, etc.)
+  # will be installed as part of the Helm chart. Set to false if your cluster
+  # already has these CRDs installed (e.g. via a cluster-wide platform team deployment).
   installK8sNetworkingCRDs: true
   # The main enabled/disabled setting. If true, servers,
   # clients, Consul DNS and the Consul UI will be enabled. Each component can override

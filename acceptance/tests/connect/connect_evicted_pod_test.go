@@ -22,6 +22,8 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
+const helmGracePeriodSecondsKey = "connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds"
+
 // Test that the endpoints controller deregisters service instances of pods that were evicted by the kubelet.
 // Evicted pods stay in the Failed phase in the Kubernetes API, so without this they remain registered in Consul
 // and keep receiving (or failing over) traffic.

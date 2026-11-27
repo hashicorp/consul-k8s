@@ -587,7 +587,7 @@ const consulDefaultCredentialMessageTimeout = "250ms"
 
 func clearLinkedServiceStringField(in *capi.LinkedService, field string) {
 	v := reflect.ValueOf(in)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
+	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return
 	}
 	fieldValue := v.Elem().FieldByName(field)
