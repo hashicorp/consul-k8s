@@ -1,0 +1,7 @@
+```release-note:security
+build: pin `go.opentelemetry.io/otel` and `go.opentelemetry.io/otel/trace` to v1.47.0 in the bundled `discover` binary to address GHSA-q7gw-24fr-5p69, GO-2026-6974 and GO-2026-6975
+```
+
+```release-note:security
+build: upgrade Go to 1.26.11
+```
