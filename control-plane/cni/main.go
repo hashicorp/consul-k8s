@@ -16,6 +16,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	cniv "github.com/containernetworking/cni/pkg/version"
+	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
 	"github.com/hashicorp/consul-k8s/version"
 	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/go-hclog"
@@ -279,37 +280,49 @@ func main() {
 }
 
 func resolveKubeconfigPath(dir, base string) (string, error) {
-	// we  will return the actual kubeconfig path if present
 	stable := filepath.Join(dir, base)
+
+	var newest string
+	var newestTime time.Time
+
 	if fi, err := os.Stat(stable); err == nil && !fi.IsDir() {
-		return stable, nil
+		// Preserve exact-path precedence for non-default kubeconfig names.
+		if base != config.DefaultKubeconfig {
+			return stable, nil
+		}
+
+		// Include the legacy kubeconfig in the modification-time comparison
+		// to prevent stale files from taking precedence over newer
+		// installation-specific kubeconfigs following an upgrade.
+		newest = stable
+		newestTime = fi.ModTime()
 	}
-	// this will be a fallback to find the most recently modified kubeconfig file with the given base name pattern
-	// example file names: kubeconfig-<time.Now().UnixNano()>.
+
+	// Find installation-specific kubeconfig files with the given base name.
 	pattern := stable + "-*"
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return "", fmt.Errorf("glob failed for %s: %w", pattern, err)
 	}
-	if len(matches) == 0 {
+
+	if len(matches) == 0 && newest == "" {
 		return "", fmt.Errorf("no kubeconfig found at %s or %s-*", stable, stable)
 	}
 
-	var newest string
-	var newestTime time.Time
-
-	// we are looping over the matched files to find the most recently modified kubeconfig file, with O(n) complexity
+	// Select the most recently modified kubeconfig, preferring the
+	// exact path when modification times are equal.
 	for _, fp := range matches {
 		fi, err := os.Stat(fp)
 		if err != nil || fi.IsDir() {
 			continue
 		}
-		if fi.ModTime().After(newestTime) {
+
+		if newest == "" || fi.ModTime().After(newestTime) {
 			newestTime = fi.ModTime()
 			newest = fp
 		}
 	}
-	// checking if a file was found
+
 	if newest == "" {
 		return "", fmt.Errorf("no valid kubeconfig found at %s or %s-*", stable, stable)
 	}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
 	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
@@ -244,8 +245,18 @@ clusters:
 
 // TestResolveKubeconfigPath tests the resolveKubeconfigPath function
 func TestResolveKubeconfigPath(t *testing.T) {
+	now := time.Now()
+	older := now.Add(-time.Hour)
+
+	writeFile := func(t *testing.T, path string, mtime time.Time) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(path, []byte("kubeconfig"), 0600))
+		require.NoError(t, os.Chtimes(path, mtime, mtime))
+	}
+
 	tests := []struct {
 		name                  string
+		base                  string
 		setup                 func(t *testing.T, dir string)
 		wantSuffix            string
 		expectError           bool
@@ -253,70 +264,109 @@ func TestResolveKubeconfigPath(t *testing.T) {
 	}{
 		{
 			name: "stable kubeconfig exists",
+			base: "kubeconfig",
 			setup: func(t *testing.T, dir string) {
-				path := filepath.Join(dir, "kubeconfig")
-				if err := os.WriteFile(path, []byte("stable"), 0644); err != nil {
-					t.Fatal(err)
-				}
+				writeFile(t, filepath.Join(dir, "kubeconfig"), now)
 			},
-			wantSuffix:  "kubeconfig",
-			expectError: false,
+			wantSuffix: "kubeconfig",
 		},
 		{
 			name: "stable path is directory, fallback to versioned",
+			base: "kubeconfig",
 			setup: func(t *testing.T, dir string) {
-				if err := os.Mkdir(filepath.Join(dir, "kubeconfig"), 0755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(
-					filepath.Join(dir, "kubeconfig-1"),
-					[]byte("v1"),
-					0644,
-				); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(
+					filepath.Join(dir, "kubeconfig"), 0755,
+				))
+				writeFile(t, filepath.Join(dir, "kubeconfig-1"), now)
 			},
-			wantSuffix:  "kubeconfig-1",
-			expectError: false,
+			wantSuffix: "kubeconfig-1",
 		},
 		{
 			name: "single versioned kubeconfig",
+			base: "kubeconfig",
 			setup: func(t *testing.T, dir string) {
-				if err := os.WriteFile(
-					filepath.Join(dir, "kubeconfig-123"),
-					[]byte("v123"),
-					0644,
-				); err != nil {
-					t.Fatal(err)
-				}
+				writeFile(t, filepath.Join(dir, "kubeconfig-123"), now)
 			},
-			wantSuffix:  "kubeconfig-123",
-			expectError: false,
+			wantSuffix: "kubeconfig-123",
 		},
 		{
 			name: "multiple versioned kubeconfigs, newest chosen",
+			base: "kubeconfig",
 			setup: func(t *testing.T, dir string) {
-				old := filepath.Join(dir, "kubeconfig-old")
-				newer := filepath.Join(dir, "kubeconfig-new")
-
-				if err := os.WriteFile(old, []byte("old"), 0644); err != nil {
-					t.Fatal(err)
-				}
-				time.Sleep(10 * time.Millisecond) // ensure mtime difference
-				if err := os.WriteFile(newer, []byte("new"), 0644); err != nil {
-					t.Fatal(err)
-				}
+				writeFile(t, filepath.Join(dir, "kubeconfig-old"), older)
+				writeFile(t, filepath.Join(dir, "kubeconfig-new"), now)
 			},
-			wantSuffix:  "kubeconfig-new",
-			expectError: false,
+			wantSuffix: "kubeconfig-new",
 		},
 		{
 			name: "no kubeconfig files",
+			base: "kubeconfig",
 			setup: func(t *testing.T, dir string) {
-				// nothing created
+				// Nothing created.
 			},
 			expectError:           true,
 			expectedErrorContains: fmt.Errorf("no kubeconfig found"),
+		},
+		{
+			name: "older legacy with newer versioned kubeconfig",
+			base: config.DefaultKubeconfig,
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig), older)
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig+"-123"), now)
+			},
+			wantSuffix: config.DefaultKubeconfig + "-123",
+		},
+		{
+			name: "newer legacy with older versioned kubeconfig",
+			base: config.DefaultKubeconfig,
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig), now)
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig+"-123"), older)
+			},
+			wantSuffix: config.DefaultKubeconfig,
+		},
+		{
+			name: "equal modification times prefer exact path",
+			base: config.DefaultKubeconfig,
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig), now)
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig+"-123"), now)
+			},
+			wantSuffix: config.DefaultKubeconfig,
+		},
+		{
+			name: "legacy kubeconfig only",
+			base: config.DefaultKubeconfig,
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig), older)
+			},
+			wantSuffix: config.DefaultKubeconfig,
+		},
+		{
+			name: "versioned kubeconfig only",
+			base: config.DefaultKubeconfig,
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig+"-123"), now)
+			},
+			wantSuffix: config.DefaultKubeconfig + "-123",
+		},
+		{
+			name: "custom kubeconfig preserves exact path precedence",
+			base: "custom-kubeconfig",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, "custom-kubeconfig"), older)
+				writeFile(t, filepath.Join(dir, "custom-kubeconfig-123"), now)
+			},
+			wantSuffix: "custom-kubeconfig",
+		},
+		{
+			name: "explicit installation-specific kubeconfig preserves exact path",
+			base: config.DefaultKubeconfig + "-123",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig+"-123"), older)
+				writeFile(t, filepath.Join(dir, config.DefaultKubeconfig+"-123-456"), now)
+			},
+			wantSuffix: config.DefaultKubeconfig + "-123",
 		},
 	}
 
@@ -325,29 +375,17 @@ func TestResolveKubeconfigPath(t *testing.T) {
 			dir := t.TempDir()
 			tc.setup(t, dir)
 
-			got, err := resolveKubeconfigPath(dir, "kubeconfig")
+			got, err := resolveKubeconfigPath(dir, tc.base)
 
 			if tc.expectError {
-				if err == nil {
-					t.Fatalf("expected error, got nil (path=%s)", got)
-					return
-				}
+				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.expectedErrorContains.Error())
 				return
-
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if !filepath.IsAbs(got) {
-				t.Fatalf("expected absolute path, got %s", got)
-			}
-
-			if !strings.HasSuffix(got, tc.wantSuffix) {
-				t.Fatalf("expected suffix %q, got %q", tc.wantSuffix, got)
-			}
+			require.NoError(t, err)
+			require.True(t, filepath.IsAbs(got))
+			require.Equal(t, filepath.Join(dir, tc.wantSuffix), got)
 		})
 	}
 }
@@ -420,6 +458,66 @@ func TestCreateK8sClient(t *testing.T) {
 		})
 	}
 }
+func TestCreateK8sClientWithStaleLegacyKubeconfig(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	base := config.DefaultKubeconfig
+	logger := hclog.NewNullLogger()
+
+	legacy := filepath.Join(dir, base)
+	versioned := filepath.Join(dir, base+"-123456789")
+
+	// Generate a complete, valid kubeconfig using the existing helper.
+	path := writeKubeconfig(t, dir, true)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	// Remove the helper's original kubeconfig file.
+	require.NoError(t, os.Remove(path))
+
+	// Simulate the malformed server URL observed in the customer incident.
+	legacyData := strings.Replace(
+		string(data),
+		"https://127.0.0.1:6443",
+		`https\://[30.128.0.1]:443`,
+		1,
+	)
+
+	require.NotEqual(t, string(data), legacyData)
+	require.NoError(t, os.WriteFile(legacy, []byte(legacyData), 0600))
+
+	now := time.Now()
+	older := now.Add(-time.Hour)
+
+	require.NoError(t, os.Chtimes(legacy, older, older))
+
+	cfg := &PluginConf{
+		CNINetDir:  dir,
+		Kubeconfig: base,
+	}
+
+	// Confirm that the legacy kubeconfig alone causes client initialization
+	// to fail.
+	cmd := &Command{}
+	err = cmd.createK8sClient(cfg, logger)
+	require.Error(t, err)
+	require.Nil(t, cmd.client)
+
+	t.Logf("Legacy kubeconfig initialization error: %v", err)
+
+	// Simulate a newer installation writing a valid kubeconfig.
+	require.NoError(t, os.WriteFile(versioned, data, 0600))
+	require.NoError(t, os.Chtimes(versioned, now, now))
+
+	// Verify that Kubernetes client initialization now succeeds.
+	cmd = &Command{}
+	require.NoError(t, cmd.createK8sClient(cfg, logger))
+	require.NotNil(t, cmd.client)
+
+	t.Log("Kubernetes client successfully initialized using newer kubeconfig")
+}
+
 func TestSkipTrafficRedirection(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
