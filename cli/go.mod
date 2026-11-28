@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/cli
 
-go 1.26.10
+go 1.26.11
 
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.13.4
