@@ -4039,7 +4039,7 @@ ai:
     # @default: ""
     # @type: string
     # TODO: this is yet to be implemented
-    image: "hashicorp/csl-mcp-sc:3.0.0-dev"
+    image: "hashicorp/csl-mcp-sc:1.0.0-ent"
 
     defaults:
       # The port the MCP server container listens on inside the pod.
@@ -4091,7 +4091,7 @@ ai:
     # ```
     # @default: hashicorp/csl-inf-rt:<latest version>
     # @type: string
-    image: "hashicorp/csl-inf-rt:3.0.0-dev"
+    image: "hashicorp/csl-inf-rt:1.0.0-ent"
 
     # Default values applied to every gateway in the gateways list below unless
     # overridden on the individual gateway entry.
@@ -4171,9 +4171,9 @@ ai:
     # image: "hashicorp/csl-mcp-sc:0.1.0"
     # image: "myregistry/csl-mcp-sc:latest"
     # ```
-    # @default: "hashicorp/csl-mcp-sc:3.0.0-dev"
+    # @default: "hashicorp/csl-mcp-sc:1.0.0-ent"
     # @type: string
-    image: "hashicorp/csl-mcp-sc:3.0.0-dev"
+    image: "hashicorp/csl-mcp-sc:1.0.0-ent"
 
     defaults:
       # The port the agent interceptor listens on inside the pod.

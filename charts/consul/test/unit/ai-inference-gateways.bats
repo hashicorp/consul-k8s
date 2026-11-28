@@ -63,7 +63,7 @@ gw_flags=(
         --set 'ai.enabled=false' . |
         yq -r '.spec.template.spec.containers[0].command | join(" ")')
     [[ "$command" != *"-enable-ai=true"* ]]
-    [[ "$command" == *"-ai-agent-image=\"hashicorp/csl-mcp-sc:3.0.0-dev\""* ]]
+    [[ "$command" == *"-ai-agent-image=\"hashicorp/csl-mcp-sc:1.0.0-ent\""* ]]
 }
 
 @test "ai/agent image: omitted when unset" {
@@ -546,7 +546,7 @@ gw_flags=(
         . | tee /dev/stderr |
         yq -r '.data["manifests.yaml"]' | tee /dev/stderr |
         yq -r '.spec.image' | tee /dev/stderr)
-    [ "$actual" = "hashicorp/csl-inf-rt:3.0.0-dev" ]
+    [ "$actual" = "hashicorp/csl-inf-rt:1.0.0-ent" ]
 }
 
 @test "ai/InferenceGateway/object: per-gateway image overrides default" {
