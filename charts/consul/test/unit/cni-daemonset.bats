@@ -90,6 +90,23 @@ load _helpers
   local actual=$(echo "$cmd" |
     yq 'any(contains("multus=false"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("install-nft-bundle=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "cni/DaemonSet: install-nft-bundle can be enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.cni.installNftBundle=true' \
+      bar \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("install-nft-bundle=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

@@ -1,0 +1,3 @@
+```release-note:bug
+cni: Fix transparent proxy traffic redirection failing on GKE Container-Optimized OS nodes, which do not ship a usable nft. Set the new Helm value `connectInject.cni.installNftBundle: true` on GKE so that the CNI installer copies the nft binary from the control-plane image's nftables package, together with its shared libraries, to the CNI bin directory, and the CNI plugin uses it to apply rules from a script file. The value defaults to `false`, in which case nothing is copied and the plugin uses the node's nft as before.
+```
