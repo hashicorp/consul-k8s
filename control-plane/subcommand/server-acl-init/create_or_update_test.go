@@ -392,7 +392,7 @@ func TestUpdateOrCreateACLRole_UpdatesPoliciesOnRerun(t *testing.T) {
 		Description: "test role",
 		Policies:    []*api.ACLRolePolicyLink{{Name: policyV1Name}},
 	}
-	err = cmd.updateOrCreateACLRole(client, roleV1)
+	err = cmd.updateOrCreateACLRole(client, roleV1, []string{policyV1Name, policyV2Name})
 	require.NoError(err)
 
 	// Verify: role exists and links to policy-v1.
@@ -408,7 +408,7 @@ func TestUpdateOrCreateACLRole_UpdatesPoliciesOnRerun(t *testing.T) {
 		Description: "test role",
 		Policies:    []*api.ACLRolePolicyLink{{Name: policyV2Name}},
 	}
-	err = cmd.updateOrCreateACLRole(client, roleV2)
+	err = cmd.updateOrCreateACLRole(client, roleV2, []string{policyV1Name, policyV2Name})
 	require.NoError(err)
 
 	// Verify: role must now link to policy-v2, not the old policy-v1.
@@ -420,4 +420,253 @@ func TestUpdateOrCreateACLRole_UpdatesPoliciesOnRerun(t *testing.T) {
 	require.Len(role.Policies, 1)
 	require.Equal(policyV2Name, role.Policies[0].Name,
 		"after second run role should link to policy-v2 (updated), not the old policy-v1")
+}
+
+// newRoleTestCommand starts a Consul test server with ACLs enabled and returns
+// a Command and a client that uses the bootstrap token.
+func newRoleTestCommand(t *testing.T) (*Command, *consul.DynamicClient) {
+	t.Helper()
+	cmd := &Command{
+		UI:        cli.NewMockUi(),
+		clientset: fake.NewSimpleClientset(),
+		log:       hclog.NewNullLogger(),
+	}
+	cmd.init()
+
+	bootToken := "11111111-2222-3333-4444-555555555555"
+	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.Tokens.InitialManagement = bootToken
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = svr.Stop() })
+	svr.WaitForLeader(t)
+
+	client, err := consul.NewDynamicClient(&api.Config{Address: svr.HTTPAddr, Token: bootToken})
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		_, _, err := client.ConsulClient.ACL().PolicyList(nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
+	return cmd, client
+}
+
+func createTestPolicies(t *testing.T, client *consul.DynamicClient, names ...string) map[string]string {
+	t.Helper()
+	ids := make(map[string]string, len(names))
+	for _, name := range names {
+		p, _, err := client.ConsulClient.ACL().PolicyCreate(&api.ACLPolicy{
+			Name:  name,
+			Rules: `node_prefix "" { policy = "read" }`,
+		}, nil)
+		require.NoError(t, err)
+		ids[name] = p.ID
+	}
+	return ids
+}
+
+func rolePolicyNames(role *api.ACLRole) []string {
+	names := make([]string, 0, len(role.Policies))
+	for _, p := range role.Policies {
+		names = append(names, p.Name)
+	}
+	return names
+}
+
+func policyLinks(names ...string) []*api.ACLRolePolicyLink {
+	links := make([]*api.ACLRolePolicyLink, 0, len(names))
+	for _, name := range names {
+		links = append(links, &api.ACLRolePolicyLink{Name: name})
+	}
+	return links
+}
+
+const (
+	testTGWRoleName   = "consul-terminating-gateway-acl-role"
+	testTGWPolicy     = "terminating-gateway-policy"
+	testSvcAPolicy    = "default-svc-a-write-policy"
+	testSvcBPolicy    = "default-svc-b-write-policy"
+	testTGWRoleDesc   = "ACL Role for consul-terminating-gateway"
+	testTGWComponent  = "terminating-gateway"
+	testDatacenter    = "dc1"
+	testOtherPolicy   = "operator-added-policy"
+	testComponentRole = "consul-connect-inject-acl-role"
+)
+
+// A rerun of server-acl-init must keep the links that other owners added to
+// the role, for example the TerminatingGateway controller's linked-service
+// policies.
+func TestUpdateOrCreateACLRole_KeepsLinksOwnedByOthers(t *testing.T) {
+	cmd, client := newRoleTestCommand(t)
+	createTestPolicies(t, client, testTGWPolicy, testSvcAPolicy, testSvcBPolicy)
+
+	existing, _, err := client.ConsulClient.ACL().RoleCreate(&api.ACLRole{
+		Name:        testTGWRoleName,
+		Description: testTGWRoleDesc,
+		Policies:    policyLinks(testSvcAPolicy, testSvcBPolicy, testTGWPolicy),
+	}, nil)
+	require.NoError(t, err)
+
+	err = cmd.updateOrCreateACLRole(client, &api.ACLRole{
+		Name:        testTGWRoleName,
+		Description: testTGWRoleDesc,
+		Policies:    policyLinks(testTGWPolicy),
+	}, ownedRolePolicyNames(testTGWComponent, testDatacenter))
+	require.NoError(t, err)
+
+	role, _, err := client.ConsulClient.ACL().RoleReadByName(testTGWRoleName, nil)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.Equal(t, existing.ID, role.ID)
+	require.ElementsMatch(t, []string{testTGWPolicy, testSvcAPolicy, testSvcBPolicy}, rolePolicyNames(role))
+}
+
+// When the gateway policy is deleted and created again, it gets a new ID and
+// Consul no longer returns the old link. A rerun must link the new policy and
+// keep the other links.
+func TestUpdateOrCreateACLRole_RelinksRecreatedPolicyAndKeepsOtherLinks(t *testing.T) {
+	cmd, client := newRoleTestCommand(t)
+	ids := createTestPolicies(t, client, testTGWPolicy, testSvcAPolicy, testSvcBPolicy)
+
+	_, _, err := client.ConsulClient.ACL().RoleCreate(&api.ACLRole{
+		Name:        testTGWRoleName,
+		Description: testTGWRoleDesc,
+		Policies:    policyLinks(testSvcAPolicy, testSvcBPolicy, testTGWPolicy),
+	}, nil)
+	require.NoError(t, err)
+
+	_, err = client.ConsulClient.ACL().PolicyDelete(ids[testTGWPolicy], nil)
+	require.NoError(t, err)
+	newIDs := createTestPolicies(t, client, testTGWPolicy)
+	require.NotEqual(t, ids[testTGWPolicy], newIDs[testTGWPolicy])
+
+	role, _, err := client.ConsulClient.ACL().RoleReadByName(testTGWRoleName, nil)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{testSvcAPolicy, testSvcBPolicy}, rolePolicyNames(role),
+		"precondition: Consul hides the link to the deleted policy")
+
+	err = cmd.updateOrCreateACLRole(client, &api.ACLRole{
+		Name:        testTGWRoleName,
+		Description: testTGWRoleDesc,
+		Policies:    policyLinks(testTGWPolicy),
+	}, ownedRolePolicyNames(testTGWComponent, testDatacenter))
+	require.NoError(t, err)
+
+	role, _, err = client.ConsulClient.ACL().RoleReadByName(testTGWRoleName, nil)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{testTGWPolicy, testSvcAPolicy, testSvcBPolicy}, rolePolicyNames(role))
+	for _, p := range role.Policies {
+		if p.Name == testTGWPolicy {
+			require.Equal(t, newIDs[testTGWPolicy], p.ID)
+		}
+	}
+}
+
+// A rerun must keep service identities, node identities, and policies that an
+// operator added to a component role.
+func TestUpdateOrCreateACLRole_KeepsIdentitiesAndOperatorPolicies(t *testing.T) {
+	cmd, client := newRoleTestCommand(t)
+	createTestPolicies(t, client, "connect-inject-policy", testOtherPolicy)
+
+	_, _, err := client.ConsulClient.ACL().RoleCreate(&api.ACLRole{
+		Name:              testComponentRole,
+		Description:       "old description",
+		Policies:          policyLinks("connect-inject-policy", testOtherPolicy),
+		ServiceIdentities: []*api.ACLServiceIdentity{{ServiceName: "web"}},
+		NodeIdentities:    []*api.ACLNodeIdentity{{NodeName: "node-1", Datacenter: testDatacenter}},
+	}, nil)
+	require.NoError(t, err)
+
+	err = cmd.updateOrCreateACLRole(client, &api.ACLRole{
+		Name:        testComponentRole,
+		Description: "ACL Role for consul-connect-injector",
+		Policies:    policyLinks("connect-inject-policy"),
+	}, ownedRolePolicyNames("connect-inject", testDatacenter))
+	require.NoError(t, err)
+
+	role, _, err := client.ConsulClient.ACL().RoleReadByName(testComponentRole, nil)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"connect-inject-policy", testOtherPolicy}, rolePolicyNames(role))
+	require.Len(t, role.ServiceIdentities, 1)
+	require.Equal(t, "web", role.ServiceIdentities[0].ServiceName)
+	require.Len(t, role.NodeIdentities, 1)
+	require.Equal(t, "node-1", role.NodeIdentities[0].NodeName)
+	require.Equal(t, "ACL Role for consul-connect-injector", role.Description)
+}
+
+// A policy that server-acl-init owns but no longer wants (for example the
+// datacenter-suffixed name after federation is turned off) must be removed.
+// This keeps the purpose of the original fix in #5683.
+func TestUpdateOrCreateACLRole_RemovesObsoleteOwnedPolicy(t *testing.T) {
+	cmd, client := newRoleTestCommand(t)
+	obsolete := testTGWComponent + "-policy-" + testDatacenter
+	createTestPolicies(t, client, testTGWPolicy, obsolete, testSvcAPolicy)
+
+	_, _, err := client.ConsulClient.ACL().RoleCreate(&api.ACLRole{
+		Name:        testTGWRoleName,
+		Description: testTGWRoleDesc,
+		Policies:    policyLinks(obsolete, testSvcAPolicy),
+	}, nil)
+	require.NoError(t, err)
+
+	err = cmd.updateOrCreateACLRole(client, &api.ACLRole{
+		Name:        testTGWRoleName,
+		Description: testTGWRoleDesc,
+		Policies:    policyLinks(testTGWPolicy),
+	}, ownedRolePolicyNames(testTGWComponent, testDatacenter))
+	require.NoError(t, err)
+
+	role, _, err := client.ConsulClient.ACL().RoleReadByName(testTGWRoleName, nil)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{testTGWPolicy, testSvcAPolicy}, rolePolicyNames(role))
+}
+
+// Running server-acl-init again with no change must not add duplicate links
+// or write the role again.
+func TestUpdateOrCreateACLRole_IdempotentOnRerun(t *testing.T) {
+	cmd, client := newRoleTestCommand(t)
+	createTestPolicies(t, client, testTGWPolicy, testSvcAPolicy)
+
+	_, _, err := client.ConsulClient.ACL().RoleCreate(&api.ACLRole{
+		Name:        testTGWRoleName,
+		Description: testTGWRoleDesc,
+		Policies:    policyLinks(testTGWPolicy, testSvcAPolicy),
+	}, nil)
+	require.NoError(t, err)
+
+	desired := func() *api.ACLRole {
+		return &api.ACLRole{Name: testTGWRoleName, Description: testTGWRoleDesc, Policies: policyLinks(testTGWPolicy)}
+	}
+	owned := ownedRolePolicyNames(testTGWComponent, testDatacenter)
+
+	require.NoError(t, cmd.updateOrCreateACLRole(client, desired(), owned))
+	first, _, err := client.ConsulClient.ACL().RoleReadByName(testTGWRoleName, nil)
+	require.NoError(t, err)
+
+	require.NoError(t, cmd.updateOrCreateACLRole(client, desired(), owned))
+	second, _, err := client.ConsulClient.ACL().RoleReadByName(testTGWRoleName, nil)
+	require.NoError(t, err)
+
+	require.ElementsMatch(t, []string{testTGWPolicy, testSvcAPolicy}, rolePolicyNames(second))
+	require.Equal(t, first.ModifyIndex, second.ModifyIndex, "an unchanged role must not be written again")
+}
+
+// When the role does not exist, server-acl-init creates it from the desired
+// role.
+func TestUpdateOrCreateACLRole_CreatesRoleWhenMissing(t *testing.T) {
+	cmd, client := newRoleTestCommand(t)
+	createTestPolicies(t, client, testTGWPolicy)
+
+	err := cmd.updateOrCreateACLRole(client, &api.ACLRole{
+		Name:        testTGWRoleName,
+		Description: testTGWRoleDesc,
+		Policies:    policyLinks(testTGWPolicy),
+	}, ownedRolePolicyNames(testTGWComponent, testDatacenter))
+	require.NoError(t, err)
+
+	role, _, err := client.ConsulClient.ACL().RoleReadByName(testTGWRoleName, nil)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.Equal(t, testTGWRoleDesc, role.Description)
+	require.Equal(t, []string{testTGWPolicy}, rolePolicyNames(role))
 }
