@@ -4035,10 +4035,10 @@ ai:
     # The container image for the MCP server sidecar injected by the webhook
     # into pods annotated with consul.hashicorp.com/ai-role: "mcp-server".
     #
-    # @default: ""
+    # @default: "hashicorp/csl-mcp-sc:1.0.0-ent"
     # @type: string
     # TODO: this is yet to be implemented
-    image: "hashicorp/consul-mcp-gateway:2.1.0-rc1"
+    image: "hashicorp/csl-mcp-sc:1.0.0-ent"
 
     defaults:
       # The port the MCP server container listens on inside the pod.
@@ -4085,12 +4085,12 @@ ai:
     # Examples:
     #
     # ```yaml
-    # image: "hashicorp/consul-inference-gateway:0.1.0"
+    # image: "hashicorp/csl-inf-rt:1.0.0-ent"
     # image: "myregistry/my-inference-gateway:latest"
     # ```
-    # @default: hashicorp/consul-inference-gateway:<latest version>
+    # @default: hashicorp/csl-inf-rt:<latest version>
     # @type: string
-    image: "hashicorp/consul-inference-gateway:2.1.0-rc1"
+    image: "hashicorp/csl-inf-rt:1.0.0-ent"
 
     # Default values applied to every gateway in the gateways list below unless
     # overridden on the individual gateway entry.
@@ -4167,12 +4167,12 @@ ai:
     # Examples:
     #
     # ```yaml
-    # image: "hashicorp/consul-mcp-sc:0.1.0"
-    # image: "myregistry/consul-mcp-sc:latest"
+    # image: "hashicorp/csl-mcp-sc:1.0.0-ent"
+    # image: "myregistry/csl-mcp-sc:latest"
     # ```
-    # @default: "hashicorp/consul-mcp-sc:2.1.0-rc1"
+    # @default: "hashicorp/csl-mcp-sc:1.0.0-ent"
     # @type: string
-    image: "hashicorp/consul-mcp-sc:2.1.0-rc1"
+    image: "hashicorp/csl-mcp-sc:1.0.0-ent"
 
     defaults:
       # The port the agent interceptor listens on inside the pod.
