@@ -68,3 +68,31 @@ variable "uptycs_webhook_tls_key" {
   description = "Base64-encoded TLS private key for kubequery webhook server."
   sensitive   = true
 }
+
+variable "hc_security_base_repo" {
+  default     = ""
+  description = "apt source for hc-security-base as \"<https url> <suite> <components>\". Empty skips the install."
+
+  validation {
+    condition     = var.hc_security_base_repo == "" || can(regex("^https://[^ ]+( [A-Za-z0-9._/-]+)+$", var.hc_security_base_repo))
+    error_message = "hc_security_base_repo must look like \"https://host/path suite component\"."
+  }
+}
+
+variable "hc_security_base_repo_key" {
+  default     = ""
+  description = "ASCII-armored public key that signs the hc-security-base repo."
+  sensitive   = true
+}
+
+variable "hc_security_base_repo_username" {
+  default     = ""
+  description = "Username for the hc-security-base repo, if it needs auth."
+  sensitive   = true
+}
+
+variable "hc_security_base_repo_password" {
+  default     = ""
+  description = "Password or token for the hc-security-base repo, if it needs auth."
+  sensitive   = true
+}
